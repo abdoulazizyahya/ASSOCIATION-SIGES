@@ -40,6 +40,19 @@ $classes = db_all(
 if ($id_classe) $classes = array_values(array_filter($classes, fn($c) => (int) $c['IDClasses'] === $id_classe));
 if (empty($classes)) die('Aucune classe pour cette année.');
 
+// Préchargement des absences (notes_apc.php) — même correctif que
+// pdf/statistiques.php (trouvé le 21/08/2026) : bilan_classe_genre_arabe()
+// appelle jours_absence_non_justifiees_trimestre() par élève, jamais
+// préchargée depuis ce fichier.
+if (in_array($onglet, ['eleves', 'niveau'], true)) {
+    $trims_precharger = $vue === 'annee' ? trimestres_de_annee($val_annee) : ($id_trim ? [$id_trim] : []);
+    foreach ($classes as $c) {
+        foreach ($trims_precharger as $t) {
+            precharger_absences_classe_trim((int) $c['IDClasses'], $t, $val_annee);
+        }
+    }
+}
+
 $fmt = fn(?float $v): string => $v === null ? '-' : rtrim(rtrim(number_format($v, 2, '.', ''), '0'), '.');
 
 // Enveloppé dans un try/catch — voir fonctions.php::pdf_erreur_generation()

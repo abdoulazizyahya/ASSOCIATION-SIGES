@@ -50,6 +50,25 @@ if ($id_classe)           $classes = array_values(array_filter($classes, fn($c) 
 elseif ($niveau_f !== '') $classes = array_values(array_filter($classes, fn($c) => $c['Niveau'] === $niveau_f));
 if (empty($classes)) die('Aucune classe pour cette année.');
 
+// Préchargement des absences (notes_apc.php) pour toutes les classes du
+// périmètre — trouvé le 21/08/2026 en auditant les requêtes de ce fichier :
+// les onglets « Par classe/Résultats » et « Par niveau » appellent
+// bilan_classe_genre() par classe, qui interroge `absence` UNE FOIS PAR
+// ÉLÈVE de la classe (jours_absence_non_justifiees_trimestre(), jamais
+// préchargée depuis ce fichier) — 115 requêtes mesurées pour ~90 élèves sur
+// 6 classes. Même fonction de préchargement déjà utilisée par
+// pdf/bulletin_trimestriel.php ; jours_absence_non_justifiees_annuel()
+// délègue en interne à la version trimestre par trimestre, donc précharger
+// les 3 trimestres de l'année couvre aussi la vue annuelle.
+if (in_array($onglet, ['eleves', 'niveau'], true)) {
+    $trims_precharger = $vue === 'annee' ? trimestres_de_annee($val_annee) : ($id_trim ? [$id_trim] : []);
+    foreach ($classes as $c) {
+        foreach ($trims_precharger as $t) {
+            precharger_absences_classe_trim((int) $c['IDClasses'], $t, $val_annee);
+        }
+    }
+}
+
 $fmt = fn(?float $v): string => $v === null ? '-' : rtrim(rtrim(number_format($v, 2, '.', ''), '0'), '.');
 
 // Enveloppé dans un try/catch — voir fonctions.php::pdf_erreur_generation()
