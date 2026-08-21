@@ -1,14 +1,25 @@
 @echo off
-REM Script de synchronisation GitHub pour jaynitaare_v2
-
 cd C:\wamp64\www\jaynitaare_v2
 
-REM Vérifier si le dossier est déjà un dépôt Git
 IF NOT EXIST ".git" (
     echo Initialisation du dépôt Git...
     git init
-    git remote add origin https://github.com/abdoulazizyahya/jaynitaare_v2.git
 )
+
+REM Configurer le remote origin si absent
+git remote remove origin >nul 2>&1
+git remote add origin https://github.com/abdoulazizyahya/jaynitaare_v2.git
+
+REM Vérifier si un commit existe
+git rev-parse --verify HEAD >nul 2>&1
+IF ERRORLEVEL 1 (
+    echo Aucun commit trouvé, création du commit initial...
+    git add .
+    git commit -m "Initial commit"
+)
+
+REM Renommer la branche en main
+git branch -M main
 
 echo ============================================
 echo 1 - Mettre à jour depuis GitHub (pull)
@@ -17,7 +28,6 @@ echo ============================================
 set /p choix="Votre choix (1 ou 2): "
 
 IF "%choix%"=="1" (
-    echo Récupération des mises à jour depuis GitHub...
     git pull origin main
     echo Pull terminé !
     pause
@@ -25,11 +35,10 @@ IF "%choix%"=="1" (
 )
 
 IF "%choix%"=="2" (
-    echo Préparation de l'envoi vers GitHub...
     git add .
     set DATE=%date% %time%
     git commit -m "Mise à jour automatique %DATE%"
-    git push origin main
+    git push -u origin main
     echo Push terminé !
     pause
     exit
