@@ -1,5 +1,5 @@
 @echo off
-REM Script pour mettre à jour le dépôt GitHub jaynitaare_v2
+REM Script de synchronisation GitHub pour jaynitaare_v2
 
 cd C:\wamp64\www\jaynitaare_v2
 
@@ -10,15 +10,30 @@ IF NOT EXIST ".git" (
     git remote add origin https://github.com/abdoulazizyahya/jaynitaare_v2.git
 )
 
-REM Ajouter tous les fichiers
-git add .
+echo ============================================
+echo 1 - Mettre à jour depuis GitHub (pull)
+echo 2 - Envoyer vers GitHub (push)
+echo ============================================
+set /p choix="Votre choix (1 ou 2): "
 
-REM Créer un commit avec horodatage
-set DATE=%date% %time%
-git commit -m "Mise à jour automatique %DATE%"
+IF "%choix%"=="1" (
+    echo Récupération des mises à jour depuis GitHub...
+    git pull origin main
+    echo Pull terminé !
+    pause
+    exit
+)
 
-REM Pousser vers GitHub (branche principale)
-git push origin main
+IF "%choix%"=="2" (
+    echo Préparation de l'envoi vers GitHub...
+    git add .
+    set DATE=%date% %time%
+    git commit -m "Mise à jour automatique %DATE%"
+    git push origin main
+    echo Push terminé !
+    pause
+    exit
+)
 
-echo Mise à jour terminée !
+echo Choix invalide.
 pause
