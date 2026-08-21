@@ -175,6 +175,16 @@ function carte_filigrane(FPDF $pdf, array $etab, float $x, float $y, float $cW, 
 // GD, fond transparent, fichier temporaire à supprimer par l'appelant.
 function carte_flag_triangle_tmp(int $w_px = 200, int $h_px = 200): string {
     $w_px = max(20, $w_px); $h_px = max(20, $h_px);
+    // Cache disque déterministe (nom dérivé des paramètres, jamais des
+    // données élève) — trouvé le 21/08/2026 en auditant cartes.php : cette
+    // vignette est purement décorative (mêmes couleurs/dimensions pour
+    // TOUTE la classe), mais tempnam() lui donnait un nom aléatoire à
+    // CHAQUE élève, regénérée par GD puis supprimée aussitôt après usage —
+    // aucune réutilisation possible, ni au sein du lot, ni entre requêtes.
+    // Même principe que le cache filigrane/QR (pdf/header_pdf.php,
+    // pdf/verif_lib.php) et que le correctif Image()/Output() de fpdf.php.
+    $tmp = sys_get_temp_dir() . '/jnflag_' . md5($w_px . '|' . $h_px) . '.png';
+    if (is_file($tmp)) return $tmp;
     $img = imagecreatetruecolor($w_px, $h_px);
     imagesavealpha($img, true);
     $transparent = imagecolorallocatealpha($img, 0, 0, 0, 127);
@@ -195,7 +205,6 @@ function carte_flag_triangle_tmp(int $w_px = 200, int $h_px = 200): string {
         $pts[] = $cy + $r * sin($ang);
     }
     imagefilledpolygon($img, $pts, $yellow);
-    $tmp = tempnam(sys_get_temp_dir(), 'jnflag_') . '.png';
     imagepng($img, $tmp);
     imagedestroy($img);
     return $tmp;
@@ -207,6 +216,10 @@ function carte_flag_triangle_tmp(int $w_px = 200, int $h_px = 200): string {
 // rouge, voir dessiner_carte_5_verso()).
 function carte_etoile_tmp(int $w_px = 120, array $rgb = [252, 209, 22]): string {
     $w_px = max(20, $w_px);
+    // Cache déterministe — voir carte_flag_triangle_tmp() ci-dessus, même
+    // principe et même trouvaille (21/08/2026).
+    $tmp = sys_get_temp_dir() . '/jnstar_' . md5($w_px . '|' . implode(',', $rgb)) . '.png';
+    if (is_file($tmp)) return $tmp;
     $img  = imagecreatetruecolor($w_px, $w_px);
     imagesavealpha($img, true);
     $transparent = imagecolorallocatealpha($img, 0, 0, 0, 127);
@@ -222,7 +235,6 @@ function carte_etoile_tmp(int $w_px = 120, array $rgb = [252, 209, 22]): string 
         $pts[] = $cy + $r * sin($ang);
     }
     imagefilledpolygon($img, $pts, $color);
-    $tmp = tempnam(sys_get_temp_dir(), 'jnstar_') . '.png';
     imagepng($img, $tmp);
     imagedestroy($img);
     return $tmp;
@@ -235,6 +247,10 @@ function carte_etoile_tmp(int $w_px = 120, array $rgb = [252, 209, 22]): string 
 // nationales sont respectées. Même technique GD que carte_flag_triangle_tmp().
 function carte_armoiries_tmp(int $w_px = 140, int $h_px = 160): string {
     $w_px = max(20, $w_px); $h_px = max(20, $h_px);
+    // Cache déterministe — voir carte_flag_triangle_tmp() ci-dessus, même
+    // principe et même trouvaille (21/08/2026).
+    $tmp = sys_get_temp_dir() . '/jnarmo_' . md5($w_px . '|' . $h_px) . '.png';
+    if (is_file($tmp)) return $tmp;
     $img  = imagecreatetruecolor($w_px, $h_px);
     imagesavealpha($img, true);
     $transparent = imagecolorallocatealpha($img, 0, 0, 0, 127);
@@ -270,7 +286,6 @@ function carte_armoiries_tmp(int $w_px = 140, int $h_px = 160): string {
     }
     imagefilledpolygon($img, $pts, $dark);
 
-    $tmp = tempnam(sys_get_temp_dir(), 'jnarmo_') . '.png';
     imagepng($img, $tmp);
     imagedestroy($img);
     return $tmp;
@@ -282,6 +297,10 @@ function carte_armoiries_tmp(int $w_px = 140, int $h_px = 160): string {
 // le modèle 5 (recto ET verso, couleur différente).
 function carte_vague_tmp(int $w_px, int $h_px, array $rgb): string {
     $w_px = max(20, $w_px); $h_px = max(10, $h_px);
+    // Cache déterministe — voir carte_flag_triangle_tmp() ci-dessus, même
+    // principe et même trouvaille (21/08/2026).
+    $tmp = sys_get_temp_dir() . '/jnvague_' . md5($w_px . '|' . $h_px . '|' . implode(',', $rgb)) . '.png';
+    if (is_file($tmp)) return $tmp;
     $img  = imagecreatetruecolor($w_px, $h_px);
     imagesavealpha($img, true);
     $transparent = imagecolorallocatealpha($img, 0, 0, 0, 127);
@@ -297,7 +316,6 @@ function carte_vague_tmp(int $w_px, int $h_px, array $rgb): string {
     $pts[] = (float) $w_px; $pts[] = (float) $h_px;
     $pts[] = 0.0; $pts[] = (float) $h_px;
     imagefilledpolygon($img, $pts, $color);
-    $tmp = tempnam(sys_get_temp_dir(), 'jnvague_') . '.png';
     imagepng($img, $tmp);
     imagedestroy($img);
     return $tmp;
@@ -354,7 +372,7 @@ function dessiner_carte_1(FPDF $pdf, array $el, array $etab, string $val_annee,
     $hLettre = $cH * 0.25;
     $flagW = $cW * 0.15;
     $flag_tmp = carte_flag_triangle_tmp(200, (int) round(200 * $hLettre / max(0.01, $flagW)));
-    try { $pdf->Image($flag_tmp, $x, $y, $flagW, $hLettre, 'PNG'); } finally { if (is_file($flag_tmp)) unlink($flag_tmp); }
+    $pdf->Image($flag_tmp, $x, $y, $flagW, $hLettre, 'PNG');
 
     $logoW = $cW * 0.15;
     $colW  = ($cW - $flagW - $logoW) / 2;
@@ -459,7 +477,7 @@ function dessiner_carte_2(FPDF $pdf, array $el, array $etab, string $val_annee,
     $hHead = $cH * 0.20;
     $flagW = $cW * 0.15;
     $flag_tmp = carte_flag_triangle_tmp(200, (int) round(200 * $hHead / max(0.01, $flagW)));
-    try { $pdf->Image($flag_tmp, $x, $y, $flagW, $hHead, 'PNG'); } finally { if (is_file($flag_tmp)) unlink($flag_tmp); }
+    $pdf->Image($flag_tmp, $x, $y, $flagW, $hHead, 'PNG');
 
     $colW = ($cW - $flagW - 2) / 2;
     $xFr = $x + $flagW; $xEn = $xFr + $colW + 2;
@@ -851,7 +869,7 @@ function dessiner_carte_5(FPDF $pdf, array $el, array $etab, string $val_annee,
     $hVague = max(3.5, $cH * 0.09);
     $yVague = $y + $cH - $hVague;
     $vague_tmp = carte_vague_tmp((int) round($cW * 4), (int) round($hVague * 4), [0, 122, 61]);
-    try { $pdf->Image($vague_tmp, $x, $yVague, $cW, $hVague, 'PNG'); } finally { if (is_file($vague_tmp)) unlink($vague_tmp); }
+    $pdf->Image($vague_tmp, $x, $yVague, $cW, $hVague, 'PNG');
 
     $pdf->SetTextColor(255, 255, 255);
     $pdf->SetFont('Arial', 'B', max(3.2, $fs2 - 0.5));
@@ -983,13 +1001,11 @@ function dessiner_carte_5_verso(FPDF $pdf, array $el, array $etab, ?array $paren
     }
     $starD = min($wRouge * 0.32, $hEmblemes * 0.6);
     $star_tmp = carte_etoile_tmp((int) round($starD * 6));
-    try { $pdf->Image($star_tmp, $x + $wVert + ($wRouge - $starD) / 2, $cyEmb - $starD / 2, $starD, $starD, 'PNG'); }
-    finally { if (is_file($star_tmp)) unlink($star_tmp); }
+    $pdf->Image($star_tmp, $x + $wVert + ($wRouge - $starD) / 2, $cyEmb - $starD / 2, $starD, $starD, 'PNG');
     $armoW = min($wJaune * 0.5, $hEmblemes * 0.68);
     $armoH = $armoW * 1.1;
     $armo_tmp = carte_armoiries_tmp((int) round($armoW * 6), (int) round($armoH * 6));
-    try { $pdf->Image($armo_tmp, $x + $wVert + $wRouge + ($wJaune - $armoW) / 2, $cyEmb - $armoH / 2, $armoW, $armoH, 'PNG'); }
-    finally { if (is_file($armo_tmp)) unlink($armo_tmp); }
+    $pdf->Image($armo_tmp, $x + $wVert + $wRouge + ($wJaune - $armoW) / 2, $cyEmb - $armoH / 2, $armoW, $armoH, 'PNG');
 
     // ── Ruban de devise (chevron vert, texte bilingue) ─────────────
     $yRuban = $y + $hBande + 1.4;
@@ -1021,7 +1037,7 @@ function dessiner_carte_5_verso(FPDF $pdf, array $el, array $etab, ?array $paren
     $hVague = max(14, $cH * 0.30);
     $yVague = $y + $cH - $hVague;
     $vague_tmp = carte_vague_tmp((int) round($cW * 4), (int) round($hVague * 4), [13, 148, 136]);
-    try { $pdf->Image($vague_tmp, $x, $yVague, $cW, $hVague, 'PNG'); } finally { if (is_file($vague_tmp)) unlink($vague_tmp); }
+    $pdf->Image($vague_tmp, $x, $yVague, $cW, $hVague, 'PNG');
 
     $lieu = $etab['lieu'] ?: $etab['ville'];
     $fsSig = max(3, min(4.2, $cW / 22));
