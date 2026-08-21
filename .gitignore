@@ -1,0 +1,24 @@
+/vendor/
+
+# ── Fichiers générés / mis en cache sur disque (régénérables à la volée,
+# voir pdf/verif_lib.php, pdf/header_pdf.php, pdf/fpdf.php) ────────────
+/assets/uploads/fond_degrade_*.png
+/assets/uploads/filigrane_logo.png
+/assets/uploads/filigrane_excel.png
+/assets/uploads/qr_bulletins/
+/assets/uploads/qr_honneur/
+/assets/uploads/qr_recus/
+
+# ── Données personnelles élèves (photos, dossiers) — jamais en dépôt,
+# même privé : à restaurer depuis un backup séparé si besoin ──────────
+/assets/uploads/eleves/
+/assets/uploads/dossiers_eleves/
+/assets/uploads/profils/
+
+# ── Dumps SQL de sauvegarde (contiennent des données réelles d'élèves,
+# pas seulement le schéma — les migrations elles-mêmes (migration_v*.sql)
+# restent versionnées, ce sont les backup_*.sql à écarter) ────────────
+/bd/backup_*.sql
+
+# ── Config locale Claude Code (spécifique à ce poste) ──────────────────
+/.claude/settings.local.json

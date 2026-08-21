@@ -1,0 +1,26 @@
+--- classe 3 ---
+{"id_comp":"1","orale":"20","ecrite":"15","pratique":"0","savoir_etre":"5","total_points":"40"}
+{"id_comp":"2","orale":"20","ecrite":"15","pratique":"0","savoir_etre":"5","total_points":"40"}
+{"id_comp":"3","orale":"10","ecrite":"5","pratique":"3","savoir_etre":"2","total_points":"20"}
+{"id_comp":"4","orale":"5","ecrite":"20","pratique":"0","savoir_etre":"5","total_points":"30"}
+{"id_comp":"5","orale":"5","ecrite":"5","pratique":"15","savoir_etre":"5","total_points":"30"}
+{"id_comp":"6","orale":"3","ecrite":"3","pratique":"10","savoir_etre":"4","total_points":"20"}
+{"id_comp":"7","orale":"5","ecrite":"5","pratique":"8","savoir_etre":"2","total_points":"20"}
+{"id_comp":"8","orale":"5","ecrite":"3","pratique":"10","savoir_etre":"2","total_points":"20"}
+{"id_comp":"9","orale":"3","ecrite":"3","pratique":"10","savoir_etre":"4","total_points":"20"}
+{"id_comp":"10","orale":"3","ecrite":"3","pratique":"10","savoir_etre":"4","total_points":"20"}
+{"id_comp":"11","orale":"4","ecrite":"3","pratique":"10","savoir_etre":"3","total_points":"20"}
+--- classe 4 ---
+{"id_comp":"1","orale":"20","ecrite":"15","pratique":"0","savoir_etre":"5","total_points":"40"}
+{"id_comp":"2","orale":"20","ecrite":"15","pratique":"0","savoir_etre":"5","total_points":"40"}
+{"id_comp":"3","orale":"10","ecrite":"5","pratique":"3","savoir_etre":"2","total_points":"20"}
+{"id_comp":"4","orale":"5","ecrite":"20","pratique":"0","savoir_etre":"5","total_points":"30"}
+{"id_comp":"5","orale":"5","ecrite":"5","pratique":"15","savoir_etre":"5","total_points":"30"}
+{"id_comp":"6","orale":"3","ecrite":"3","pratique":"10","savoir_etre":"4","total_points":"20"}
+{"id_comp":"7","orale":"5","ecrite":"5","pratique":"8","savoir_etre":"2","total_points":"20"}
+{"id_comp":"8","orale":"5","ecrite":"3","pratique":"10","savoir_etre":"2","total_points":"20"}
+{"id_comp":"9","orale":"3","ecrite":"3","pratique":"10","savoir_etre":"4","total_points":"20"}
+{"id_comp":"10","orale":"3","ecrite":"3","pratique":"10","savoir_etre":"4","total_points":"20"}
+{"id_comp":"11","orale":"4","ecrite":"3","pratique":"10","savoir_etre":"3","total_points":"20"}
+{"id_comp":"12","orale":"0","ecrite":"0","pratique":"0","savoir_etre":"0","total_points":"0"}
+{"id_comp":"13","orale":"0","ecrite":"0","pratique":"0","savoir_etre":"0","total_points":"0"}

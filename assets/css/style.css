@@ -1,0 +1,544 @@
+/* ═══════════════════════════════════════════════════
+   ABZ_MBE — Feuille de style principale
+   Palette « marine & or », inspirée du style du module
+   Conseil de Classe — cohérente sur toute l'application.
+═══════════════════════════════════════════════════ */
+:root {
+  /* Palette principale */
+  --primary      : #1a2744;   /* marine profond — structure, boutons, en-têtes */
+  --primary-2    : #243358;   /* marine clair — dégradés */
+  --primary-dark : #0f1a30;   /* marine foncé — hover */
+  --gold         : #c8960a;   /* or — accents, actif, mise en avant */
+  --gold-light   : #f0c230;   /* or clair — dégradés, hover sur or */
+
+  --sidebar-bg   : var(--primary);
+  --sidebar-bg2  : var(--primary-2);
+  --sidebar-link : #aeb5c9;
+  --sidebar-act  : var(--gold);
+
+  --bg           : #f5f4f0;   /* fond de page — crème, plus chaud que le bleu-gris d'origine */
+  --surface      : #ffffff;
+  --border       : #e2ded0;   /* bordures neutres chaudes */
+  --hover-bg     : #f2f0e8;   /* survol léger */
+  --muted        : #6b7280;
+  --muted-2      : #9ca3af;
+  --text         : #1e2a3a;
+
+  /* Sémantique */
+  --ok      : #1e7c50; --ok-bg      : #e6f4ee;
+  --warn    : #c05c00; --warn-bg    : #fef0e0;
+  --danger  : #b91c1c; --danger-bg  : #fee2e2;
+  --info    : #1d4ed8; --info-bg    : #dbeafe;
+  --purple  : #6d28d9; --purple-bg  : #ede9fe;
+
+  /* Typo */
+  --font-heading : 'Georgia', 'Times New Roman', serif;
+  --font-body    : 'Segoe UI', 'Inter', system-ui, -apple-system, sans-serif;
+  --font-mono    : 'Courier New', monospace;
+
+  --card-shadow   : 0 2px 12px rgba(26,39,68,.09);
+  --card-shadow-lg: 0 6px 22px rgba(26,39,68,.16);
+  --radius       : 8px;
+  --radius-sm    : 5px;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: var(--font-body);
+  background: var(--bg);
+  color: var(--text);
+  font-size: .88rem;
+}
+
+/* ── Layout ───────────────────────────────────────── */
+.abz-shell  { display: flex; min-height: 100vh; }
+
+.abz-sidebar {
+  width: 255px; flex-shrink: 0;
+  background: linear-gradient(180deg, var(--sidebar-bg), var(--sidebar-bg2));
+  color: #fff;
+  position: fixed; top: 0; bottom: 0; left: 0; z-index: 1040;
+  display: flex; flex-direction: column;
+  transition: transform .28s cubic-bezier(.22,.8,.36,1), box-shadow .28s ease;
+  overflow: hidden;
+  border-right: 3px solid var(--gold);
+  /* Ombre permanente (léger relief même en desktop, où la sidebar est fixe)
+     — nettement renforcée en mobile quand elle glisse par-dessus le contenu
+     (règle .open dans le media query plus bas), pour qu'elle soit sans
+     ambiguïté "au premier plan" dès qu'elle apparaît. */
+  box-shadow: 4px 0 24px rgba(15,20,40,.14);
+}
+
+.abz-main { margin-left: 255px; flex: 1; min-width: 0; display: flex; flex-direction: column; }
+
+/* ── Brand ────────────────────────────────────────── */
+.abz-brand {
+  display: flex; align-items: center; gap: .6rem;
+  padding: 1rem 1.1rem;
+  border-bottom: 1px solid rgba(255,255,255,.08);
+  /* Liseré or en pied de bloc marque, en plus de la bordure fine ci-dessus —
+     sépare nettement la zone "identité" du menu défilant, sans ajouter de
+     hauteur (0 sur l'axe layout, juste un dégradé décoratif). */
+  box-shadow: 0 1px 0 rgba(200,150,10,.35);
+  flex-shrink: 0;
+  position: relative;
+}
+.brand-logo {
+  width: 40px; height: 40px; border-radius: 50%; flex-shrink: 0;
+  background: linear-gradient(135deg, var(--gold), var(--gold-light));
+  display: flex; align-items: center; justify-content: center;
+  font-weight: 800; font-size: .9rem; color: var(--primary);
+  box-shadow: 0 4px 14px rgba(200,150,10,.45);
+  font-family: var(--font-heading);
+}
+.brand-logo-img { background: #fff; padding: 2px; overflow: hidden; }
+.brand-logo-img img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; }
+.brand-name { font-weight: 700; font-size: .82rem; line-height: 1.2; color: #fff; font-family: var(--font-heading); }
+.brand-sub  { font-size: .62rem; color: var(--gold-light); text-transform: uppercase; letter-spacing: .08em; }
+
+/* ── Navigation ──────────────────────────────────── */
+.abz-nav {
+  padding: .5rem .6rem;
+  overflow-y: auto; flex: 1;
+  scrollbar-width: thin; scrollbar-color: rgba(255,255,255,.16) transparent;
+}
+/* Barre de défilement Chrome/Edge (scrollbar-width/color ci-dessus ne
+   couvre que Firefox) — sans elle la scrollbar par défaut du navigateur
+   (grise/carrée) jure sur le dégradé marine, moins "beau et convivial". */
+.abz-nav::-webkit-scrollbar { width: 6px; }
+.abz-nav::-webkit-scrollbar-track { background: transparent; }
+.abz-nav::-webkit-scrollbar-thumb { background: rgba(255,255,255,.16); border-radius: 3px; }
+.abz-nav::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,.3); }
+
+.nav-section { margin-bottom: 4px; }
+.nav-groupe {
+  font-size: .68rem; text-transform: uppercase; letter-spacing: .08em;
+  color: #aab2cc; margin: .55rem .5rem .3rem;
+  font-weight: 700;
+  display: flex; align-items: center; gap: .55rem;
+  cursor: pointer; padding: .4rem .5rem; border-radius: var(--radius-sm);
+  transition: background .18s, color .15s, box-shadow .18s;
+}
+.nav-groupe:hover { color: #fff; background: rgba(255,255,255,.07); }
+/* Section dépliée : fond + LISERÉ latéral dans la couleur propre à la
+   section (var(--c), déjà posée en inline-style par header.php) — repère
+   visuel immédiat de "quelle section est ouverte" en un coup d'œil, pas
+   seulement le chevron retourné (facile à manquer). inset box-shadow plutôt
+   qu'un vrai border pour ne décaler aucun contenu. */
+.nav-section.ouvert .nav-groupe {
+  color: #fff; background: rgba(255,255,255,.07);
+  box-shadow: inset 3px 0 0 var(--c, #c8960a);
+}
+.nav-groupe-icone {
+  width: 24px; height: 24px; border-radius: 7px; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-size: .8rem; color: var(--c, #94a3b8);
+  background: color-mix(in srgb, var(--c, #94a3b8) 20%, transparent);
+  transition: background .18s, transform .18s;
+}
+.nav-section.ouvert .nav-groupe-icone { background: color-mix(in srgb, var(--c, #94a3b8) 38%, transparent); transform: scale(1.06); }
+.nav-groupe-label { flex: 1; }
+.nav-groupe-chevron { font-size: .68rem; flex-shrink: 0; color: #8189a8; transition: transform .2s; }
+.nav-section.ouvert .nav-groupe-chevron { transform: rotate(180deg); color: #fff; }
+/* Repliée par défaut, sans aucune exception au chargement de la page (même la
+   section de la page courante). Uniquement le clic sur l'en-tête (jamais le
+   survol) déplie/replie une section ; chaque section est indépendante, on peut
+   en avoir plusieurs dépliées en même temps (toggleNavSection()). */
+.nav-sousmenu { max-height: 0; overflow: hidden; transition: max-height .22s ease; padding-left: .35rem; }
+.nav-section.ouvert .nav-sousmenu { max-height: 900px; }
+.nav-sousmenu .nav-lien { border-left: 2px solid color-mix(in srgb, var(--c, #94a3b8) 45%, transparent); border-radius: 0 var(--radius-sm) var(--radius-sm) 0; margin-left: .5rem; }
+.nav-sousmenu .nav-lien.active { border-left-color: var(--gold); }
+.nav-lien {
+  display: flex; align-items: center; gap: .65rem;
+  padding: .5rem .75rem; border-radius: var(--radius-sm); margin-bottom: 2px;
+  color: var(--sidebar-link); text-decoration: none;
+  font-size: .83rem; font-weight: 500;
+  transition: background .15s, color .15s, transform .15s;
+}
+.nav-lien i { font-size: 1rem; width: 18px; text-align: center; flex-shrink: 0; transition: transform .15s; }
+/* translateX(3px) au survol : micro-mouvement "vers l'avant" qui rend le
+   menu plus vivant/convivial qu'un simple changement de fond statique. */
+.nav-lien:hover  { background: rgba(255,255,255,.09); color: #fff; transform: translateX(3px); }
+.nav-lien:hover i { transform: scale(1.08); }
+.nav-lien.active {
+  background: linear-gradient(135deg, var(--gold), var(--gold-light));
+  color: var(--primary); font-weight: 700;
+  box-shadow: 0 3px 12px rgba(200,150,10,.45);
+}
+.nav-lien.active:hover { transform: none; } /* le lien actif ne "glisse" pas, il est déjà repéré par sa couleur */
+/* Séparateur de sous-groupe dans un sous-menu (ex. piste française / piste
+   arabe dans Pédagogie) — libellé discret encadré de deux filets, pas un
+   lien cliquable. La hauteur max de .nav-sousmenu passe à 900px pour que le
+   dépliage laisse la place aux deux pistes empilées. */
+.nav-separateur {
+  display: flex; align-items: center; gap: .5rem;
+  margin: .5rem .5rem .3rem; padding: 0 .25rem;
+  color: #8b93ad; font-size: .68rem; font-weight: 700;
+  letter-spacing: .06em; text-transform: uppercase;
+}
+.nav-separateur::before, .nav-separateur::after {
+  content: ''; flex: 1; height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,.18), transparent);
+}
+.text-danger-light { color: #ff8a8a !important; }
+
+.abz-sidebar-footer {
+  padding: .5rem .6rem .8rem;
+  border-top: 1px solid rgba(255,255,255,.07);
+  flex-shrink: 0;
+}
+
+/* ── Backdrop mobile ──────────────────────────────── */
+/* opacity/visibility plutôt que display:none/block : permet une transition
+   en fondu (plus "convivial" qu'une apparition brutale) ; visibility évite
+   quand même de capter les clics quand masqué. Fond plus sombre + léger
+   flou (backdrop-filter) pour que la sidebar qui glisse par-dessus se
+   détache sans ambiguïté du contenu de page, quel que soit le thème choisi
+   dans Paramètres > Apparence (18 palettes, certaines très claires). */
+.abz-backdrop {
+  position: fixed; inset: 0;
+  background: rgba(8,11,22,.6);
+  backdrop-filter: blur(2px); -webkit-backdrop-filter: blur(2px);
+  z-index: 1039;
+  opacity: 0; visibility: hidden;
+  transition: opacity .25s ease, visibility .25s ease;
+}
+.abz-backdrop.show { opacity: 1; visibility: visible; }
+
+/* ── Topbar ───────────────────────────────────────── */
+.abz-topbar {
+  height: 58px; background: var(--surface);
+  border-bottom: 3px solid var(--gold);
+  display: flex; align-items: center; gap: .8rem;
+  padding: 0 1.2rem;
+  position: sticky; top: 0; z-index: 1030;
+  box-shadow: 0 2px 8px rgba(26,39,68,.06);
+}
+.topbar-etab { font-size: .85rem; font-weight: 700; color: var(--primary); max-width: 320px; font-family: var(--font-heading); }
+/* Vrai bouton (fond + coins arrondis + hover/active) plutôt qu'une simple
+   icône nue sur fond transparent — sur mobile c'est LE seul contrôle pour
+   faire apparaître le menu, il doit se voir au premier coup d'œil comme
+   cliquable, pas se fondre dans la topbar. */
+.abz-burger {
+  border: none; background: var(--hover-bg); color: var(--primary);
+  font-size: 1.15rem; display: none; cursor: pointer;
+  width: 38px; height: 38px; border-radius: 10px; flex-shrink: 0;
+  align-items: center; justify-content: center;
+  transition: background .15s, color .15s, transform .12s;
+}
+.abz-burger:hover  { background: var(--gold); color: #fff; }
+.abz-burger:active { transform: scale(.92); }
+
+/* Bouton de fermeture DANS la sidebar (mobile uniquement) — le clic sur le
+   fond assombri fermait déjà le menu, mais sans contrôle visible ce
+   n'était pas évident ; un bouton explicite en haut de la sidebar rend
+   l'ouverture ET la fermeture également "bien visibles". */
+.sidebar-close {
+  display: none; position: absolute; top: .85rem; right: .85rem; z-index: 5;
+  width: 30px; height: 30px; border-radius: 50%; border: none;
+  background: rgba(255,255,255,.1); color: #fff; font-size: .85rem;
+  align-items: center; justify-content: center; cursor: pointer;
+  transition: background .15s, transform .2s;
+}
+/* Affiché UNIQUEMENT quand la sidebar est réellement en état "ouvert"
+   (classe .open, posée par le clic sur le burger — voir layout/footer.php),
+   jamais juste "parce que la fenêtre est étroite" : sinon le bouton peut
+   apparaître sans que la sidebar ait la classe .open (fenêtre non maximisée,
+   zoom navigateur...) et le clic ne fait alors rien puisqu'il n'y a rien à
+   fermer. Fonctionne à toute largeur d'écran, pas seulement sous 768px. */
+.abz-sidebar.open .sidebar-close { display: flex; }
+.sidebar-close:hover { background: rgba(255,255,255,.22); transform: rotate(90deg); }
+
+.badge-annee {
+  background: var(--info-bg); color: var(--info);
+  font-weight: 600; padding: .28rem .75rem;
+  border-radius: 20px; font-size: .75rem;
+}
+.badge-seq {
+  background: #fef3c7; color: #92400e;
+  font-weight: 600; padding: .28rem .75rem;
+  border-radius: 20px; font-size: .75rem;
+}
+.avatar-mini {
+  width: 28px; height: 28px; border-radius: 50%;
+  background: linear-gradient(135deg, var(--gold), var(--gold-light));
+  color: var(--primary); font-weight: 700; font-size: .75rem;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+
+/* ── Contenu ──────────────────────────────────────── */
+.abz-content { padding: 1.3rem 1.2rem; flex: 1; }
+.abz-footer  { text-align: center; color: var(--muted-2); font-size: .72rem; padding: .8rem; border-top: 1px solid var(--border); background: var(--surface); }
+
+/* ── Cartes ───────────────────────────────────────── */
+.card { border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--card-shadow); }
+.card-body { padding: .85rem 1rem; }
+.card-header { background: var(--hover-bg); border-bottom: 1px solid var(--border); font-family: var(--font-heading); }
+
+/* ── Page en-tête ────────────────────────────────── */
+.page-titre {
+  display: flex; align-items: center; justify-content: space-between;
+  flex-wrap: wrap; gap: .5rem; margin-bottom: 1rem;
+}
+.page-titre h4 { margin: 0; font-size: 1.08rem; font-weight: 700; font-family: var(--font-heading); color: var(--primary); }
+.page-titre .sub { font-size: .75rem; color: var(--muted); }
+
+/* ── Formulaires compacts ─────────────────────────── */
+.form-label       { font-size: .75rem; font-weight: 600; margin-bottom: 2px; color: #374151; }
+.form-control,
+.form-select      { font-size: .8rem; padding: 4px 9px; height: 30px; border-radius: var(--radius-sm); border-color: var(--border); }
+.form-control:focus,
+.form-select:focus { border-color: var(--gold); box-shadow: 0 0 0 .2rem rgba(200,150,10,.18); }
+textarea.form-control { height: auto; }
+.row.g-compact    { --bs-gutter-y: .4rem; --bs-gutter-x: .6rem; }
+
+/* Section titre formulaire (variante fine, soulignée) */
+.section-titre {
+  font-size: .72rem; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .06em; color: var(--primary);
+  border-left: 3px solid var(--gold);
+  padding-left: 7px; margin-bottom: .5rem;
+}
+/* Section titre "pastille" pleine (utilisée dans plusieurs formulaires) */
+.section-title {
+  background: var(--primary); color: #fff;
+  padding: 6px 14px; border-radius: var(--radius-sm);
+  font-size: .82rem; font-weight: 600;
+  margin-bottom: 10px; margin-top: 16px;
+}
+
+/* ── Boutons de marque (centralisés — ne plus redéfinir en local) ── */
+.btn-abz-primary { background: var(--primary); color: #fff; border: none; transition: transform .12s, box-shadow .12s; }
+.btn-abz-primary:hover { background: var(--primary-dark); color: #fff; transform: translateY(-1px); box-shadow: var(--card-shadow); }
+.btn-abz-outline { background: #fff; color: var(--primary); border: 1.5px solid var(--primary); transition: all .15s; }
+.btn-abz-outline:hover { background: var(--primary); color: #fff; }
+.btn-abz-danger { background: var(--danger); color: #fff; border: none; }
+.btn-abz-danger:hover { background: #991b1b; color: #fff; }
+.btn-abz-gold { background: var(--gold); color: var(--primary); border: none; font-weight: 700; }
+.btn-abz-gold:hover { background: var(--gold-light); color: var(--primary); }
+
+/* ── Tableaux ─────────────────────────────────────── */
+.table-abz th {
+  background: var(--primary); color: #fff;
+  font-size: .75rem; font-weight: 600;
+  padding: 6px 10px; border: none;
+}
+.table-abz td { padding: 5px 10px; font-size: .8rem; vertical-align: middle; }
+.table-abz tbody tr:hover td { background: var(--hover-bg); }
+
+/* Tableaux génériques utilisés par les modules (tbl-*) : mêmes tons que table-abz */
+[class^="tbl-"] th, [class*=" tbl-"] th {
+  background: var(--primary); color: #fff;
+}
+[class^="tbl-"] tr:hover td, [class*=" tbl-"] tr:hover td {
+  background: var(--hover-bg);
+}
+
+/* ── Badges ───────────────────────────────────────── */
+.badge-m  { background: var(--info-bg); color: #1a3fb0; font-size: .7rem; padding: 2px 7px; border-radius: 10px; }
+.badge-f  { background: #ffe0e6; color: #c0144e; font-size: .7rem; padding: 2px 7px; border-radius: 10px; }
+.badge-mat { background: var(--ok-bg); color: var(--ok); font-size: .7rem; padding: 2px 7px; border-radius: 10px; }
+.badge-code{ background: var(--purple-bg); color: var(--purple); font-size: .7rem; padding: 2px 8px; border-radius: 10px; font-family: var(--font-mono); }
+
+/* ── Avatar initiales ─────────────────────────────── */
+.avatar {
+  width: 36px; height: 36px; border-radius: 50%; flex-shrink: 0;
+  background: linear-gradient(135deg, var(--gold-light), var(--gold));
+  color: var(--primary); font-weight: 700; font-size: .82rem;
+  display: flex; align-items: center; justify-content: center;
+}
+
+/* ── Avatar large (profil) ────────────────────────── */
+.avatar-lg {
+  width: 72px; height: 72px; border-radius: 50%;
+  background: linear-gradient(135deg, var(--gold-light), var(--gold));
+  color: var(--primary); font-weight: 700; font-size: 1.8rem;
+  display: flex; align-items: center; justify-content: center;
+}
+
+/* ── Stat cards dashboard ─────────────────────────── */
+.stat-card {
+  border-radius: var(--radius); padding: 1rem 1.1rem;
+  display: flex; align-items: center; gap: .9rem;
+  box-shadow: var(--card-shadow); background: var(--surface);
+  border: 1px solid var(--border);
+}
+.stat-icon {
+  width: 46px; height: 46px; border-radius: var(--radius);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1.3rem; flex-shrink: 0;
+}
+.stat-val  { font-size: 1.5rem; font-weight: 800; line-height: 1; font-family: var(--font-heading); color: var(--primary); }
+.stat-lbl  { font-size: .72rem; color: var(--muted); }
+
+/* ── Zone photo ────────────────────────────────────── */
+.photo-preview {
+  width: 110px; height: 130px; object-fit: cover;
+  border-radius: var(--radius-sm); border: 2px solid var(--border); display: block; cursor: pointer;
+}
+.photo-placeholder {
+  width: 110px; height: 130px; border-radius: var(--radius-sm);
+  border: 2px dashed var(--muted-2); background: var(--hover-bg);
+  display: flex; flex-direction: column; align-items: center;
+  justify-content: center; cursor: pointer; color: var(--muted-2);
+  font-size: .72rem; gap: 5px;
+}
+.photo-placeholder i { font-size: 1.8rem; }
+
+/* ── Recadrage ─────────────────────────────────────── */
+.crop-overlay {
+  display: none; position: fixed; inset: 0;
+  background: rgba(0,0,0,.72); z-index: 9999;
+  align-items: center; justify-content: center;
+}
+.crop-overlay.show { display: flex; }
+.crop-box {
+  background: #fff; border-radius: var(--radius); overflow: hidden;
+  width: min(93vw, 520px); display: flex; flex-direction: column;
+}
+.crop-head {
+  background: var(--primary); color: #fff; padding: 8px 14px;
+  display: flex; align-items: center; justify-content: space-between;
+  font-size: .85rem; font-weight: 700;
+}
+.crop-canvas { max-height: 52vh; }
+.crop-foot {
+  padding: 8px 12px; display: flex; gap: 6px; flex-wrap: wrap;
+  background: var(--hover-bg); border-top: 1px solid var(--border);
+}
+
+/* ── Onglets Bootstrap personnalisés ───────────────── */
+.nav-tabs .nav-link {
+  font-size: .82rem; font-weight: 600; color: var(--muted);
+  border: none; border-bottom: 2px solid transparent;
+  padding: .45rem .9rem; border-radius: 0;
+}
+.nav-tabs .nav-link:hover { color: var(--primary); border-bottom-color: var(--gold-light); }
+.nav-tabs .nav-link.active { color: var(--primary); border-bottom: 2px solid var(--gold); background: none; }
+
+/* ── Alertes (légère recoloration pour cohérence) ──── */
+.alert-success { background: var(--ok-bg); color: var(--ok); border-color: var(--ok-bg); }
+.alert-danger  { background: var(--danger-bg); color: var(--danger); border-color: var(--danger-bg); }
+.alert-warning { background: var(--warn-bg); color: var(--warn); border-color: var(--warn-bg); }
+.alert-info    { background: var(--info-bg); color: var(--info); border-color: var(--info-bg); }
+
+/* ── Responsive ────────────────────────────────────── */
+@media (max-width: 768px) {
+  .abz-sidebar { transform: translateX(-100%); }
+  /* Ombre nettement renforcée uniquement pendant qu'elle est ouverte : la
+     sidebar "flotte" visiblement au-dessus du contenu et du backdrop
+     assombri, sans ambiguïté sur ce qui est au premier plan. */
+  .abz-sidebar.open { transform: translateX(0); box-shadow: 16px 0 44px rgba(5,8,18,.5); }
+  .abz-main    { margin-left: 0; }
+  .abz-burger  { display: flex; }
+  .abz-content { padding: .9rem .8rem; }
+}
+
+/* ═══════════════════════════════════════════════════
+   Harmonisation Bootstrap — recolore les classes
+   standards (.btn-primary, .badge.bg-*, etc.) avec la
+   palette marine & or, pour que TOUTE page utilisant les
+   classes Bootstrap natives (sans passer par .btn-abz-*)
+   reste visuellement cohérente sans modification locale.
+═══════════════════════════════════════════════════ */
+
+/* ── Boutons ──────────────────────────────────────── */
+.btn { transition: transform .12s ease, box-shadow .12s ease, background-color .15s, color .15s, border-color .15s; }
+.btn:hover { transform: translateY(-1px); }
+
+.btn-primary, .btn-primary:hover, .btn-primary:focus,
+.btn-check:checked + .btn-primary {
+  background-color: var(--primary); border-color: var(--primary); color: #fff;
+}
+.btn-primary:hover { background-color: var(--primary-dark); border-color: var(--primary-dark); box-shadow: var(--card-shadow); }
+.btn-primary:focus { box-shadow: 0 0 0 .2rem rgba(26,39,68,.25); }
+
+.btn-outline-primary { color: var(--primary); border-color: var(--primary); }
+.btn-outline-primary:hover { background-color: var(--primary); border-color: var(--primary); color: #fff; }
+
+.btn-secondary { background-color: #5b6478; border-color: #5b6478; color: #fff; }
+.btn-secondary:hover { background-color: #454c5c; border-color: #454c5c; }
+
+.btn-outline-secondary { color: var(--muted); border-color: var(--border); }
+.btn-outline-secondary:hover { background-color: var(--hover-bg); border-color: var(--muted-2); color: var(--text); }
+
+.btn-danger { background-color: var(--danger); border-color: var(--danger); }
+.btn-danger:hover { background-color: #991b1b; border-color: #991b1b; }
+.btn-outline-danger { color: var(--danger); border-color: var(--danger); }
+.btn-outline-danger:hover { background-color: var(--danger); border-color: var(--danger); color: #fff; }
+
+.btn-success { background-color: var(--ok); border-color: var(--ok); }
+.btn-success:hover { background-color: #155e3e; border-color: #155e3e; }
+.btn-outline-success { color: var(--ok); border-color: var(--ok); }
+.btn-outline-success:hover { background-color: var(--ok); border-color: var(--ok); color: #fff; }
+
+.btn-warning { background-color: var(--gold); border-color: var(--gold); color: var(--primary); font-weight: 600; }
+.btn-warning:hover { background-color: var(--gold-light); border-color: var(--gold-light); color: var(--primary); }
+.btn-outline-warning { color: var(--warn); border-color: var(--warn); }
+.btn-outline-warning:hover { background-color: var(--warn); border-color: var(--warn); color: #fff; }
+
+.btn-info { background-color: var(--info); border-color: var(--info); color: #fff; }
+.btn-outline-info { color: var(--info); border-color: var(--info); }
+.btn-outline-info:hover { background-color: var(--info); border-color: var(--info); color: #fff; }
+
+.btn-light { background-color: var(--cccr, #f5f4f0); border-color: var(--border); color: var(--text); }
+.btn-light:hover { background-color: var(--hover-bg); border-color: var(--muted-2); }
+
+.btn-dark { background-color: var(--primary-dark); border-color: var(--primary-dark); }
+.btn-dark:hover { background-color: #050d1a; border-color: #050d1a; }
+
+.btn-link { color: var(--primary); }
+.btn-link:hover { color: var(--gold); }
+
+/* ── Badges ───────────────────────────────────────── */
+.badge { font-weight: 600; letter-spacing: .01em; border-radius: 10px; }
+.badge.bg-primary   { background-color: var(--primary) !important; }
+.badge.bg-secondary { background-color: #5b6478 !important; }
+.badge.bg-success   { background-color: var(--ok) !important; }
+.badge.bg-danger    { background-color: var(--danger) !important; }
+.badge.bg-warning   { background-color: var(--gold) !important; color: var(--primary) !important; }
+.badge.bg-info      { background-color: var(--info) !important; }
+.badge.bg-light     { background-color: var(--hover-bg) !important; color: var(--text) !important; }
+.badge.bg-dark      { background-color: var(--primary-dark) !important; }
+
+/* ── Liens ────────────────────────────────────────── */
+a { color: var(--primary); }
+a:hover { color: var(--gold); }
+
+/* ── Tableaux Bootstrap génériques (hors .table-abz) ─ */
+.table > thead { background: var(--primary); color: #fff; }
+.table > thead th { border: none; font-size: .78rem; font-weight: 600; }
+.table-hover > tbody > tr:hover > * { background-color: var(--hover-bg); }
+.table > :not(caption) > * > * { padding: .5rem .65rem; }
+
+/* ── Onglets / Pills ──────────────────────────────── */
+.nav-pills .nav-link.active { background-color: var(--primary); }
+.pagination .page-link { color: var(--primary); }
+.pagination .page-item.active .page-link { background-color: var(--primary); border-color: var(--primary); }
+
+/* ── Formulaires : cases à cocher / radio / switch ─── */
+.form-check-input:checked { background-color: var(--primary); border-color: var(--primary); }
+.form-check-input:focus { border-color: var(--gold); box-shadow: 0 0 0 .2rem rgba(200,150,10,.18); }
+
+/* Case "Signature numérique" (aperçus/impressions) — pastille bleu foncé
+   (couleur de l'app) pour rester lisible quel que soit le fond du bandeau
+   qui l'entoure (certains en-têtes de modale sont volontairement clairs,
+   ce qui rendait le texte blanc hérité de .modal-header illisible). */
+.chk-signature { background: var(--primary); border-radius: 20px; padding: 3px 10px 3px 8px; }
+.chk-signature .form-check-label { color: #fff; }
+
+/* ── Modales ──────────────────────────────────────── */
+.modal-content { border-radius: var(--radius); border: none; box-shadow: var(--card-shadow-lg); }
+.modal-header { background: var(--primary); color: #fff; border-radius: var(--radius) var(--radius) 0 0; }
+.modal-header .btn-close { filter: invert(1) grayscale(1) brightness(2); }
+
+/* ── Dropdowns ────────────────────────────────────── */
+.dropdown-menu { border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--card-shadow-lg); }
+.dropdown-item:hover, .dropdown-item:focus { background-color: var(--hover-bg); }
+.dropdown-item.active, .dropdown-item:active { background-color: var(--primary); }
+
+/* ── Progress bars ────────────────────────────────── */
+.progress-bar { background-color: var(--primary); }
