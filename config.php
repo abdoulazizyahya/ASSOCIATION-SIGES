@@ -19,8 +19,12 @@ define('APP_URL',    '/jaynitaare_v2');       // chemin depuis la racine web
 // machine dans les QR codes — sans cela, un téléphone qui scanne le QR
 // essaie de se connecter à LUI-MÊME (échec / plantage à l'ouverture du
 // document vérifié). Si la détection automatique se trompe (plusieurs
-// cartes réseau, VPN actif...), fixez-la explicitement :
-define('SERVEUR_LAN_HOST', '10.248.27.158');
+// cartes réseau, VPN actif...), fixez-la explicitement — MAIS uniquement si
+// le serveur a une IP LAN FIXE. Si l'IP change souvent (WiFi variés, partage
+// de connexion téléphone), LAISSER CETTE LIGNE COMMENTÉE : la détection
+// automatique (detecter_ip_lan() dans fonctions.php) suit alors le réseau
+// courant, et les QR se régénèrent tout seuls au changement d'adresse.
+// define('SERVEUR_LAN_HOST', '192.168.1.50');
 define('UPLOAD_DIR', __DIR__ . '/assets/uploads/eleves/');
 define('UPLOAD_URL', '/jaynitaare_v2/assets/uploads/eleves/');
 
