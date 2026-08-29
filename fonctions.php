@@ -176,6 +176,12 @@ function est_connecte(): bool {
 // redirection possible) : la page de configuration elle-même et la
 // déconnexion.
 function exiger_connexion(): void {
+    // Membre de l'association en visite lecture seule (est entré dans une
+    // école depuis le portail association/) : session valide, pas de compte
+    // user local, pas de questions secrètes à configurer.
+    if (function_exists('est_visite_association') && est_visite_association()) {
+        return;
+    }
     if (!est_connecte()) {
         header('Location: ' . APP_URL . '/login.php');
         exit;
@@ -222,6 +228,35 @@ function agent_est_aussi_enseignant(): bool {
     return (int) db_val("SELECT COUNT(*) FROM enseignat_classe_arabe WHERE matricule_ens=? AND val_annee=?", [$mat, $val_annee]) > 0;
 }
 
+// ── Restriction des classes visibles par un enseignant (piste française
+// « compétences » uniquement — pages/enseignants/liste.php, onglet
+// « Affectation des classes », demande explicite du 29/08/2026) ───────────
+// DIRECTEUR/SECRETAIRE continuent de tout voir (retour null = « pas de
+// restriction ») ; un ENSEIGNANT (ou un COMPTABLE affecté à enseigner,
+// agent_est_aussi_enseignant() ci-dessus) ne voit que les classes où il a
+// été affecté (enseignat_classe) pour l'année en cours. Ne concerne QUE
+// pages/notes(_arabe)/… non — piste arabe hors scope, voir enseignat_classe
+// vs enseignat_classe_arabe.
+function classes_ids_visibles(string $val_annee): ?array {
+    if (in_array(role_connecte(), ['DIRECTEUR', 'SECRETAIRE'], true)) return null;
+    $mat = matricule_ens_courant();
+    if (!$mat) return [];
+    return array_map('intval', array_column(
+        db_all("SELECT IDClasses FROM enseignat_classe WHERE matricule_ens=? AND val_annee=?", [$mat, $val_annee]),
+        'IDClasses'
+    ));
+}
+
+// Filtre une liste de classes déjà chargée (tableaux avec clé 'IDClasses')
+// selon classes_ids_visibles() — à appeler juste après le db_all() qui
+// construit le <select>/la liste de classes d'une page Pédagogie/Discipline
+// piste française, jamais sur des requêtes Finances/RH (non concernées).
+function filtrer_classes_visibles(array $classes, string $val_annee): array {
+    $ids = classes_ids_visibles($val_annee);
+    if ($ids === null) return $classes;
+    return array_values(array_filter($classes, fn(array $c): bool => in_array((int) $c['IDClasses'], $ids, true)));
+}
+
 // ── Questions secrètes (récupération de mot de passe — migration_v45) ────
 
 function utilisateur_a_questions(int $id_user): bool {
@@ -235,6 +270,12 @@ function normaliser_reponse(string $r): string {
 
 function exiger_role(array $roles): void {
     exiger_connexion();
+    // Membre association en visite : lecture accordée sur toutes les pages
+    // (« visiter toutes les infos »). Les écritures restent bloquées par
+    // csrf_verifier() / db_exec() (est_lecture_seule()).
+    if (function_exists('est_visite_association') && est_visite_association()) {
+        return;
+    }
     if (!in_array(role_connecte(), $roles, true)) {
         die('<div style="font-family:sans-serif;padding:2rem;color:red">
              Accès refusé. Vous n\'avez pas les droits nécessaires.</div>');
@@ -254,6 +295,7 @@ function exiger_role(array $roles): void {
 // en plus : l'appelle déjà en interne).
 function exiger_acces_pedagogie(): void {
     exiger_connexion();
+    if (function_exists('est_visite_association') && est_visite_association()) return;
     if (in_array(role_connecte(), ['DIRECTEUR', 'ENSEIGNANT', 'SECRETAIRE'], true)) return;
     if (agent_est_aussi_enseignant()) return;
     die('<div style="font-family:sans-serif;padding:2rem;color:red">
@@ -268,6 +310,7 @@ function exiger_acces_pedagogie(): void {
 // tout futur rôle) dans un exiger_role() à liste blanche. À appeler APRÈS
 // exiger_connexion() (suppose déjà un utilisateur connecté).
 function interdire_role(string $role_interdit, string $message = 'Accès refusé.'): void {
+    if (function_exists('est_visite_association') && est_visite_association()) return;
     if (role_connecte() === $role_interdit) {
         die('<div style="font-family:sans-serif;padding:2rem;color:red">' . h($message) . '</div>');
     }
@@ -369,6 +412,14 @@ function csrf_champ(): string {
 
 function csrf_verifier(): void {
     session_init();
+    // Visite association en lecture seule : tout traitement de formulaire
+    // (POST) est refusé — point de contrôle unique, tous les enregistrements
+    // de l'application passent par ici. Filet complémentaire : db_exec().
+    if (function_exists('est_lecture_seule') && est_lecture_seule()) {
+        die('<div style="font-family:sans-serif;padding:2rem;color:#b45309">
+             Visite association — consultation en lecture seule.
+             Aucune modification n\'est possible depuis ce mode.</div>');
+    }
     $token = $_POST['csrf'] ?? $_GET['csrf'] ?? '';
     if (!hash_equals($_SESSION['csrf'] ?? '', $token)) {
         die('Requête invalide (CSRF).');
@@ -912,6 +963,7 @@ function libelle_role(string $role): string {
         'ENSEIGNANT' => 'Enseignant(e)',
         'SECRETAIRE' => 'Secrétaire',
         'COMPTABLE'  => 'Agent financier / Comptable',
+        'MEMBRE_ASSOCIATION' => 'Membre de l\'association',
         default      => $role,
     };
 }

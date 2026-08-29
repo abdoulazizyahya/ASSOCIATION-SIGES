@@ -25,6 +25,14 @@ if ($role !== 'ENSEIGNANT' && agent_est_aussi_enseignant()) {
     $roles_effectifs[] = 'ENSEIGNANT';
 }
 
+// Visite d'un membre de l'association : accès en lecture à TOUT (« visiter
+// toutes les infos par école »). Le menu montre alors toutes les entrées
+// quel que soit leur liste de rôles ; les écritures restent bloquées
+// (est_lecture_seule() : csrf_verifier / db_exec).
+$visite_asso   = function_exists('est_visite_association') && est_visite_association();
+$menu_voit_tout = $visite_asso;
+$lecture_seule = function_exists('est_lecture_seule') && est_lecture_seule();
+
 // Année RÉELLEMENT active (Etat_annee_scolaire=1), pas juste le repli de
 // get_annee_active() sur l'année la plus récente — demande explicite du
 // 18/08/2026 : tant qu'aucune année n'est explicitement activée, les menus
@@ -226,7 +234,7 @@ function lien_actif(string $url): string {
   ?>
   <link rel="stylesheet" href="<?= APP_URL ?>/assets/css/style.css?v=<?= $style_css_ver ?>">
 </head>
-<body data-annee-active="<?= $annee_reellement_active ? '1' : '0' ?>">
+<body data-annee-active="<?= $annee_reellement_active ? '1' : '0' ?>" class="<?= $lecture_seule ? 'lecture-seule' : '' ?>">
 <div class="abz-shell">
 
   <!-- ═══ SIDEBAR ═══ -->
@@ -251,8 +259,8 @@ function lien_actif(string $url): string {
     <nav class="abz-nav">
       <?php foreach ($menu as $groupe => $items): ?>
         <?php
-        $visibles = array_filter($items, function($it) use ($roles_effectifs) {
-            return $it[0] === '--' || empty($it[3]) || array_intersect($roles_effectifs, $it[3]);
+        $visibles = array_filter($items, function($it) use ($roles_effectifs, $menu_voit_tout) {
+            return $menu_voit_tout || $it[0] === '--' || empty($it[3]) || array_intersect($roles_effectifs, $it[3]);
         });
         // Un séparateur seul (tous les liens qui le suivent masqués par les
         // rôles) ne doit pas afficher une section vide avec juste un titre.
@@ -296,6 +304,33 @@ function lien_actif(string $url): string {
 
   <!-- ═══ CONTENU PRINCIPAL ═══ -->
   <div class="abz-main">
+
+    <?php if ($visite_asso): ?>
+    <!-- Bandeau : visite d'un membre de l'association -->
+    <?php $ecoles_asso = assoc_all("SELECT id, code, nom FROM etablissement WHERE actif=1 ORDER BY nom"); ?>
+    <div class="d-flex flex-wrap align-items-center gap-2 px-3 py-1"
+         style="background:#fff8e6;border-bottom:1px solid #f0dca0;font-size:.8rem;color:#7a5b00">
+      <span><i class="bi bi-eye me-1"></i><strong>Visite association</strong>
+        <?= $lecture_seule ? '— lecture seule' : '— écriture autorisée' ?></span>
+      <?php if (count($ecoles_asso) > 1): ?>
+      <div class="dropdown">
+        <button class="btn btn-sm btn-light border py-0 px-2 dropdown-toggle" data-bs-toggle="dropdown" style="font-size:.78rem">
+          <?= h($etab['Nom_Etab_Fr'] ?? '') ?>
+        </button>
+        <ul class="dropdown-menu" style="font-size:.82rem">
+          <?php foreach ($ecoles_asso as $ea): ?>
+            <li><a class="dropdown-item" href="<?= APP_URL ?>/association/entrer_ecole.php?id=<?= (int) $ea['id'] ?>">
+              <?= h($ea['nom']) ?>
+            </a></li>
+          <?php endforeach; ?>
+        </ul>
+      </div>
+      <?php endif; ?>
+      <a href="<?= APP_URL ?>/association/sortir_ecole.php" class="ms-auto btn btn-sm btn-outline-secondary py-0 px-2" style="font-size:.78rem">
+        <i class="bi bi-arrow-left me-1"></i>Retour association
+      </a>
+    </div>
+    <?php endif; ?>
 
     <!-- Topbar -->
     <header class="abz-topbar">

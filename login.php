@@ -11,11 +11,33 @@ if (est_connecte()) {
 
 $erreur = '';
 
+// Multi-établissement : liste des écoles à proposer si l'annuaire est
+// présent ET qu'il y en a plus d'une. Sinon, comportement mono-école
+// inchangé (repli EC1 dans connexion.php).
+$ecoles = annuaire_dispo()
+    ? assoc_all("SELECT id, code, nom FROM etablissement WHERE actif=1 ORDER BY nom")
+    : [];
+$choix_ecole = count($ecoles) > 1;
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $login = post('login');
     $mdp   = post('mdp');
 
-    if ($login === '' || $mdp === '') {
+    // Bascule sur la base de l'école choisie AVANT la requête d'auth
+    // (connexion.php a déjà sélectionné la base par défaut à l'inclusion).
+    if ($choix_ecole) {
+        $code = post('ecole');
+        $ec   = $code !== '' ? assoc_one("SELECT * FROM etablissement WHERE code=? AND actif=1", [$code]) : null;
+        if ($ec) {
+            basculer_base_ecole($ec);
+        } else {
+            $erreur = 'Veuillez sélectionner votre établissement.';
+        }
+    }
+
+    if ($erreur !== '') {
+        // établissement manquant — on n'essaie pas d'authentifier
+    } elseif ($login === '' || $mdp === '') {
         $erreur = 'Veuillez remplir tous les champs.';
     } else {
         $u = db_one(
@@ -93,6 +115,22 @@ $etab = get_etablissement();
   <?php endif; ?>
 
   <form method="post" autocomplete="off">
+    <?php if ($choix_ecole): ?>
+    <div class="mb-3">
+      <label class="form-label">Établissement</label>
+      <div class="input-group">
+        <span class="input-group-text" style="background:#f8faff"><i class="bi bi-building" style="color:#6b7280"></i></span>
+        <select name="ecole" class="form-select" required>
+          <option value="">— Choisir —</option>
+          <?php foreach ($ecoles as $ec): ?>
+            <option value="<?= h($ec['code']) ?>" <?= post('ecole') === $ec['code'] ? 'selected' : '' ?>>
+              <?= h($ec['nom']) ?>
+            </option>
+          <?php endforeach; ?>
+        </select>
+      </div>
+    </div>
+    <?php endif; ?>
     <div class="mb-3">
       <label class="form-label">Identifiant</label>
       <div class="input-group">

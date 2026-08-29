@@ -542,3 +542,12 @@ a:hover { color: var(--gold); }
 
 /* ── Progress bars ────────────────────────────────── */
 .progress-bar { background-color: var(--primary); }
+
+/* ── Visite association : lecture seule ───────────────
+   Masque les commandes d'écriture. Le blocage réel est côté serveur
+   (csrf_verifier / db_exec, est_lecture_seule()) ; ceci n'est qu'un
+   garde-fou visuel. */
+body.lecture-seule button[type="submit"]:not([data-filtre]),
+body.lecture-seule input[type="submit"]:not([data-filtre]),
+body.lecture-seule .btn-danger,
+body.lecture-seule [data-ecriture] { display: none !important; }

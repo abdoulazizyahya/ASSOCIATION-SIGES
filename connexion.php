@@ -85,6 +85,13 @@ function db_val(string $sql, array $params = []) {
 
 // Exécute INSERT/UPDATE/DELETE — retourne le nombre de lignes affectées
 function db_exec(string $sql, array $params = []): int {
+    // Filet de sécurité : en visite association (lecture seule), aucune
+    // écriture dans une base école — même hors formulaire (csrf_verifier()
+    // couvre déjà tous les POST). Les SELECT restent permis (db_all/one/val).
+    if (function_exists('est_lecture_seule') && est_lecture_seule()
+        && preg_match('/^\s*(INSERT|UPDATE|DELETE|REPLACE|TRUNCATE|ALTER|DROP|CREATE)\b/i', $sql)) {
+        throw new RuntimeException('Visite association en lecture seule — écriture refusée.');
+    }
     $stmt = _db_stmt($sql, $params);
     $n    = mysqli_stmt_affected_rows($stmt);
     mysqli_stmt_close($stmt);

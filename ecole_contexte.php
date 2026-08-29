@@ -97,3 +97,57 @@ function ecole_courante(): ?array {
     global $ETAB_COURANT;
     return $ETAB_COURANT ?: null;
 }
+
+// ── Bascule de la base « école courante » ───────────────────────────
+//  Pose $_SESSION['ecole'], met à jour $ETAB_COURANT et RE-sélectionne la
+//  base sur $link (connexion.php a déjà tourné à l'inclusion de la page —
+//  cette fonction est appelée plus tard, à la soumission d'un formulaire
+//  de choix d'école ou à l'entrée d'un membre dans une école).
+function basculer_base_ecole(array $etab): void {
+    global $link, $ETAB_COURANT;
+    ecole_session_demarrer();
+    $_SESSION['ecole'] = [
+        'id'      => (int) $etab['id'],
+        'code'    => $etab['code'],
+        'db_name' => $etab['db_name'],
+        'nom'     => $etab['nom'],
+    ];
+    $ETAB_COURANT = $etab;
+    if ($link instanceof mysqli) {
+        mysqli_select_db($link, $etab['db_name']);
+    }
+}
+
+// ── Membre de l'association connecté au portail ─────────────────────
+function membre_connecte(): array {
+    ecole_session_demarrer();
+    return $_SESSION['membre'] ?? [];
+}
+
+function est_membre_association(): bool {
+    ecole_session_demarrer();
+    return !empty($_SESSION['membre']['id']);
+}
+
+/** Garde des pages sous association/ (hors login). */
+function exiger_membre_association(): void {
+    if (!annuaire_dispo()) {
+        die('<div style="font-family:sans-serif;padding:2rem;color:red">
+             Annuaire association non installé (bd/assoc/installer.php).</div>');
+    }
+    if (!est_membre_association()) {
+        header('Location: ' . APP_URL . '/association/login.php');
+        exit;
+    }
+}
+
+/** Journalise une action d'un membre (traçabilité des visites/écritures). */
+function journaliser_action(string $action, ?int $id_etab = null, ?string $cible = null): void {
+    if (!annuaire_dispo()) return;
+    $m = membre_connecte();
+    assoc_exec(
+        "INSERT INTO journal_action (id_membre, id_etablissement, action, cible, ip)
+         VALUES (?, ?, ?, ?, ?)",
+        [$m['id'] ?? null, $id_etab, $action, $cible, $_SERVER['REMOTE_ADDR'] ?? null]
+    );
+}
