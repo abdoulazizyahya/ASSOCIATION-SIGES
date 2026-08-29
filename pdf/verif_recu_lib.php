@@ -11,15 +11,17 @@ if (!defined('RECU_VERIF_SECRET')) {
     // dans config.php, ex. define('RECU_VERIF_SECRET', bin2hex(random_bytes(32)));
     define('RECU_VERIF_SECRET', 'CHANGE_ME_RECU_INSECURE_DEFAULT_SECRET');
 }
+require_once __DIR__ . '/verif_commun.php';
 
 /**
  * Signature d'un reçu (élève + année scolaire + numéro affiché) — le numéro
  * est inclus dans le payload pour que le hash change si jamais le format de
  * numérotation évolue plus tard (voir finances_numero_recu_eleve()).
+ * $secret : forcé à la vérification pour tester le hash legacy (sans école).
  */
-function recu_verif_hash(int $id_eleve, string $val_annee, string $numero): string {
+function recu_verif_hash(int $id_eleve, string $val_annee, string $numero, ?string $secret = null): string {
     $payload = $id_eleve . '|' . $val_annee . '|' . $numero;
-    return substr(hash_hmac('sha256', $payload, RECU_VERIF_SECRET), 0, 20);
+    return substr(hash_hmac('sha256', $payload, $secret ?? verif_secret(RECU_VERIF_SECRET)), 0, 20);
 }
 
 function recu_verif_base_url(): string {
@@ -36,7 +38,7 @@ function recu_verif_base_url(): string {
 
 function recu_verif_url(int $id_eleve, string $val_annee, string $numero): string {
     $h = recu_verif_hash($id_eleve, $val_annee, $numero);
-    return recu_verif_base_url() . '/verif_recu.php?e=' . $id_eleve . '&a=' . urlencode($val_annee) . '&h=' . $h;
+    return verif_ajout_ec(recu_verif_base_url() . '/verif_recu.php?e=' . $id_eleve . '&a=' . urlencode($val_annee) . '&h=' . $h);
 }
 
 /**
@@ -53,7 +55,7 @@ function recu_qr_fichier_temp(int $id_eleve, string $val_annee, string $numero):
     // Le hash de recu_verif_base_url() intègre l'adresse réseau du serveur :
     // sans lui, un QR déjà en cache gardait l'ancienne IP après un changement
     // de réseau/SERVEUR_LAN_HOST (voir bulletin_qr_fichier_temp()).
-    $cle_cache = hash('crc32b', RECU_VERIF_SECRET) . '_' . $id_eleve
+    $cle_cache = hash('crc32b', verif_secret(RECU_VERIF_SECRET)) . '_' . $id_eleve
         . '_' . hash('crc32b', $val_annee . $numero)
         . '_' . hash('crc32b', recu_verif_base_url());
     $dossier_cache = __DIR__ . '/../assets/uploads/qr_recus';
@@ -80,6 +82,9 @@ function recu_verif_valider(int $id_eleve, string $val_annee, string $h_recu): ?
     $eleve = db_one("SELECT * FROM eleve WHERE id_eleve=?", [$id_eleve]);
     if (!$eleve) return null;
     $numero = finances_numero_recu_eleve($id_eleve, $val_annee);
-    $h_attendu = recu_verif_hash($id_eleve, $val_annee, $numero);
-    return hash_equals($h_attendu, $h_recu) ? $eleve : null;
+    // hash « scopé école » (nouveau) OU hash legacy (reçus imprimés avant le
+    // multi-établissement — déjà routés vers la bonne base par ?ec=).
+    if (hash_equals(recu_verif_hash($id_eleve, $val_annee, $numero), $h_recu)) return $eleve;
+    if (hash_equals(recu_verif_hash($id_eleve, $val_annee, $numero, RECU_VERIF_SECRET), $h_recu)) return $eleve;
+    return null;
 }

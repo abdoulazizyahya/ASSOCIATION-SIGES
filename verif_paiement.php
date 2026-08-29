@@ -18,8 +18,7 @@ $paiement = $id_paiement ? db_one(
 
 $authentique = false;
 if ($paiement && $h_recu !== '') {
-    $h_attendu   = paiement_verif_hash((int)$paiement['id'], $paiement['numero_recu']);
-    $authentique = hash_equals($h_attendu, $h_recu);
+    $authentique = paiement_verif_hash_ok((int)$paiement['id'], $paiement['numero_recu'], $h_recu);
 }
 ?>
 <!DOCTYPE html>

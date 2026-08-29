@@ -12,6 +12,7 @@ if (!defined('BULLETIN_VERIF_SECRET')) {
     // forger un QR "authentique" : la vérification n'est alors pas fiable.
     define('BULLETIN_VERIF_SECRET', 'CHANGE_ME_ABZ_MBE_INSECURE_DEFAULT_SECRET');
 }
+require_once __DIR__ . '/verif_commun.php';
 
 /**
  * Calcule la signature d'un bulletin (élève + période + matricule + piste).
@@ -22,10 +23,11 @@ if (!defined('BULLETIN_VERIF_SECRET')) {
  * verif_bulletin.php sache vers quel générateur PDF rediriger. Paramètre
  * optionnel (défaut 'fr') pour ne pas casser les QR déjà en cache disque
  * générés avant son ajout.
+ * $secret : forcé à la vérification pour tester le hash legacy (sans école).
  */
-function bulletin_verif_hash(int $id_eleve, string $vue, int $id_periode, string $matricule, string $piste = 'fr'): string {
+function bulletin_verif_hash(int $id_eleve, string $vue, int $id_periode, string $matricule, string $piste = 'fr', ?string $secret = null): string {
     $payload = $id_eleve . '|' . $vue . '|' . $id_periode . '|' . $matricule . '|' . $piste;
-    return substr(hash_hmac('sha256', $payload, BULLETIN_VERIF_SECRET), 0, 20);
+    return substr(hash_hmac('sha256', $payload, $secret ?? verif_secret(BULLETIN_VERIF_SECRET)), 0, 20);
 }
 
 function b64url_encode(string $bin): string {
@@ -69,8 +71,9 @@ function der_vers_raw_ecdsa(string $der, int $taille = 32): string {
  * désactivé silencieusement plutôt que de faire planter la génération PDF).
  */
 function bulletin_verif_signature_offline(array $champs): string {
-    if (!defined('BULLETIN_VERIF_PRIVATE_KEY_PEM')) return '';
-    $cle = openssl_pkey_get_private(BULLETIN_VERIF_PRIVATE_KEY_PEM);
+    $pem = verif_cle_privee_pem();   // clé de l'école si définie, sinon globale
+    if (!$pem) return '';
+    $cle = openssl_pkey_get_private($pem);
     if (!$cle) return '';
 
     $donnees = implode('|', array_map(fn($v) => str_replace(['|', "\n"], ' ', (string) $v), $champs));
@@ -119,7 +122,7 @@ function bulletin_verif_base_url(): string {
  */
 function bulletin_verif_url(int $id_eleve, string $vue, int $id_periode, string $matricule, string $piste = 'fr', array $donnees_offline = [], bool $chiffres_ar = false): string {
     $h = bulletin_verif_hash($id_eleve, $vue, $id_periode, $matricule, $piste);
-    $url = bulletin_verif_base_url() . '/verif_bulletin.php?e=' . $id_eleve . '&v=' . $vue . '&p=' . $id_periode . '&t=' . $piste . '&h=' . $h;
+    $url = verif_ajout_ec(bulletin_verif_base_url() . '/verif_bulletin.php?e=' . $id_eleve . '&v=' . $vue . '&p=' . $id_periode . '&t=' . $piste . '&h=' . $h);
     if ($donnees_offline) {
         $d = bulletin_verif_signature_offline($donnees_offline);
         if ($d !== '') $url .= '&d=' . $d;
@@ -200,7 +203,7 @@ function bulletin_qr_fichier_temp(array $eleve, string $vue, int $id_periode, st
     if (!$id_eleve) return null;
 
     [$photo_path, $photo_est_temp] = bulletin_photo_pour_qr($eleve);
-    $cle_cache = hash('crc32b', BULLETIN_VERIF_SECRET) . '_' . $id_eleve . '_' . $piste . '_' . $vue . '_' . $id_periode
+    $cle_cache = hash('crc32b', verif_secret(BULLETIN_VERIF_SECRET)) . '_' . $id_eleve . '_' . $piste . '_' . $vue . '_' . $id_periode
         // Hash de la base URL (schéma + hôte réseau + chemin appli) : sans lui,
         // un QR déjà en cache gardait indéfiniment l'ANCIENNE adresse IP même
         // après un changement de réseau ou de SERVEUR_LAN_HOST dans config.php
@@ -255,6 +258,10 @@ function bulletin_verif_valider(int $id_eleve, string $vue, int $id_periode, str
     $piste = in_array($piste, ['fr', 'ar'], true) ? $piste : 'fr';
     $eleve = db_one("SELECT * FROM eleve WHERE id_eleve=?", [$id_eleve]);
     if (!$eleve) return null;
-    $h_attendu = bulletin_verif_hash($id_eleve, $vue, $id_periode, id_affichage_eleve($eleve), $piste);
-    return hash_equals($h_attendu, $h_recu) ? $eleve : null;
+    $mat = id_affichage_eleve($eleve);
+    // hash « scopé école » (nouveau) OU hash legacy (documents antérieurs au
+    // multi-établissement — déjà routés vers la bonne base par ?ec=).
+    if (hash_equals(bulletin_verif_hash($id_eleve, $vue, $id_periode, $mat, $piste), $h_recu)) return $eleve;
+    if (hash_equals(bulletin_verif_hash($id_eleve, $vue, $id_periode, $mat, $piste, BULLETIN_VERIF_SECRET), $h_recu)) return $eleve;
+    return null;
 }

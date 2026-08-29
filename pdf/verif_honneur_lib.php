@@ -11,19 +11,21 @@ if (!defined('HONNEUR_VERIF_SECRET')) {
     // définir dans config.php avant mise en production.
     define('HONNEUR_VERIF_SECRET', 'CHANGE_ME_JAYNITAARE_INSECURE_DEFAULT_SECRET_HONNEUR');
 }
+require_once __DIR__ . '/verif_commun.php';
 
 /**
  * $vue = 'trim' ou 'annee' ; $id_periode = id_trim ou année (voir
  * pdf/certificat_tableau_honneur.php pour la dérivation) ; $piste = 'fr'|'ar'.
+ * $secret : forcé à la vérification pour tester le hash legacy (sans école).
  */
-function honneur_verif_hash(int $id_eleve, string $vue, int $id_periode, string $matricule, string $piste = 'fr'): string {
+function honneur_verif_hash(int $id_eleve, string $vue, int $id_periode, string $matricule, string $piste = 'fr', ?string $secret = null): string {
     $payload = $id_eleve . '|' . $vue . '|' . $id_periode . '|' . $matricule . '|' . $piste;
-    return substr(hash_hmac('sha256', $payload, HONNEUR_VERIF_SECRET), 0, 20);
+    return substr(hash_hmac('sha256', $payload, $secret ?? verif_secret(HONNEUR_VERIF_SECRET)), 0, 20);
 }
 
 function honneur_verif_url(int $id_eleve, string $vue, int $id_periode, string $matricule, string $piste = 'fr'): string {
     $h = honneur_verif_hash($id_eleve, $vue, $id_periode, $matricule, $piste);
-    return bulletin_verif_base_url() . '/verif_honneur.php?e=' . $id_eleve . '&v=' . $vue . '&p=' . $id_periode . '&t=' . $piste . '&h=' . $h;
+    return verif_ajout_ec(bulletin_verif_base_url() . '/verif_honneur.php?e=' . $id_eleve . '&v=' . $vue . '&p=' . $id_periode . '&t=' . $piste . '&h=' . $h);
 }
 
 /**
@@ -35,8 +37,10 @@ function honneur_verif_valider(int $id_eleve, string $vue, int $id_periode, stri
     $piste = in_array($piste, ['fr', 'ar'], true) ? $piste : 'fr';
     $eleve = db_one("SELECT * FROM eleve WHERE id_eleve=?", [$id_eleve]);
     if (!$eleve) return null;
-    $h_attendu = honneur_verif_hash($id_eleve, $vue, $id_periode, id_affichage_eleve($eleve), $piste);
-    return hash_equals($h_attendu, $h_recu) ? $eleve : null;
+    $mat = id_affichage_eleve($eleve);
+    if (hash_equals(honneur_verif_hash($id_eleve, $vue, $id_periode, $mat, $piste), $h_recu)) return $eleve;
+    if (hash_equals(honneur_verif_hash($id_eleve, $vue, $id_periode, $mat, $piste, HONNEUR_VERIF_SECRET), $h_recu)) return $eleve;
+    return null;
 }
 
 /**
@@ -50,7 +54,7 @@ function honneur_qr_fichier_temp(array $eleve, string $vue, int $id_periode, str
     if (!$id_eleve) return null;
 
     [$photo_path, $photo_est_temp] = bulletin_photo_pour_qr($eleve);
-    $cle_cache = hash('crc32b', HONNEUR_VERIF_SECRET) . '_' . $id_eleve . '_' . $piste . '_' . $vue . '_' . $id_periode
+    $cle_cache = hash('crc32b', verif_secret(HONNEUR_VERIF_SECRET)) . '_' . $id_eleve . '_' . $piste . '_' . $vue . '_' . $id_periode
         // Voir bulletin_qr_fichier_temp() (pdf/verif_lib.php) : intègre l'adresse
         // réseau du serveur pour régénérer le QR après un changement d'IP.
         . '_' . hash('crc32b', bulletin_verif_base_url())

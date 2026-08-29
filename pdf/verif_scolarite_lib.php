@@ -9,10 +9,17 @@
 if (!defined('BULLETIN_VERIF_SECRET')) {
     define('BULLETIN_VERIF_SECRET', 'CHANGE_ME_ABZ_MBE_INSECURE_DEFAULT_SECRET');
 }
+require_once __DIR__ . '/verif_commun.php';
 
-function scolarite_verif_hash(int $id_eleve, string $matricule): string {
+function scolarite_verif_hash(int $id_eleve, string $matricule, ?string $secret = null): string {
     $payload = 'scolarite|' . $id_eleve . '|' . $matricule;
-    return substr(hash_hmac('sha256', $payload, BULLETIN_VERIF_SECRET), 0, 20);
+    return substr(hash_hmac('sha256', $payload, $secret ?? verif_secret(BULLETIN_VERIF_SECRET)), 0, 20);
+}
+
+/** Vérifie un hash reçu en acceptant le hash scopé école OU le hash legacy. */
+function scolarite_verif_hash_ok(int $id_eleve, string $matricule, string $recu): bool {
+    return hash_equals(scolarite_verif_hash($id_eleve, $matricule), $recu)
+        || hash_equals(scolarite_verif_hash($id_eleve, $matricule, BULLETIN_VERIF_SECRET), $recu);
 }
 
 function scolarite_verif_base_url(): string {
@@ -29,5 +36,5 @@ function scolarite_verif_base_url(): string {
 
 function scolarite_verif_url(int $id_eleve, string $matricule): string {
     $h = scolarite_verif_hash($id_eleve, $matricule);
-    return scolarite_verif_base_url() . '/verif_scolarite.php?e=' . $id_eleve . '&h=' . $h;
+    return verif_ajout_ec(scolarite_verif_base_url() . '/verif_scolarite.php?e=' . $id_eleve . '&h=' . $h);
 }

@@ -14,8 +14,7 @@ $eleve = $id_eleve ? db_one("SELECT * FROM eleve WHERE id=?", [$id_eleve]) : nul
 
 $authentique = false;
 if ($eleve && $h_recu !== '') {
-    $h_attendu   = scolarite_verif_hash($id_eleve, id_affichage_eleve($eleve));
-    $authentique = hash_equals($h_attendu, $h_recu);
+    $authentique = scolarite_verif_hash_ok($id_eleve, id_affichage_eleve($eleve), $h_recu);
 }
 
 $classe = $authentique ? db_one(

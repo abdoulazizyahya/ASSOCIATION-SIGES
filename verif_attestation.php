@@ -22,8 +22,7 @@ $e = ($type && $mat) ? db_one("SELECT * FROM enseignant WHERE matricule_ens=?", 
 
 $authentique = false;
 if ($e && $type && $h_recu !== '') {
-    $h_attendu   = attestation_verif_hash($type, $mat);
-    $authentique = hash_equals($h_attendu, $h_recu);
+    $authentique = attestation_verif_hash_ok($type, $mat, $h_recu);
 }
 
 // URL du document réel, ouverte uniquement si l'utilisateur clique sur le
