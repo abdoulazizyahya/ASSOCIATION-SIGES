@@ -125,13 +125,15 @@ CREATE TABLE IF NOT EXISTS `personnel` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS `personnel_affectation` (
-  `id`               bigint NOT NULL AUTO_INCREMENT,
-  `matricule`        varchar(30) NOT NULL,
-  `id_etablissement` int NOT NULL,
-  `fonction`         varchar(50) DEFAULT NULL,     -- DIRECTEUR | ENSEIGNANT | SECRETAIRE | COMPTABLE
-  `date_debut`       date DEFAULT NULL,
-  `date_fin`         date DEFAULT NULL,
-  `actif`            tinyint(1) NOT NULL DEFAULT 1,
+  `id`                  bigint NOT NULL AUTO_INCREMENT,
+  `matricule`           varchar(30) NOT NULL,
+  `id_etablissement`    int NOT NULL,
+  `fonction`            varchar(50) DEFAULT NULL,  -- DIRECTEUR | ENSEIGNANT | SECRETAIRE | COMPTABLE
+  `matricule_ens_local` varchar(30) DEFAULT NULL,  -- enseignant.matricule_ens dans la base école
+  `id_user_local`       int DEFAULT NULL,          -- user.id_user dans la base école
+  `date_debut`          date DEFAULT NULL,
+  `date_fin`            date DEFAULT NULL,
+  `actif`               tinyint(1) NOT NULL DEFAULT 1,
   PRIMARY KEY (`id`),
   KEY `k_matricule` (`matricule`),
   KEY `k_etab`      (`id_etablissement`),

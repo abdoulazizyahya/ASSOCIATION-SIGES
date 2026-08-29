@@ -104,3 +104,26 @@ function avec_ecole(int $id_etab, callable $fn) {
         mysqli_close($l);
     }
 }
+
+// ── Helpers requête sur une connexion école arbitraire ($l = mysqli) ──
+//  Utilisés dans les callbacks avec_ecole(). Paramètres liés en « s ».
+function ecole_all(mysqli $l, string $sql, array $params = []): array {
+    $st = mysqli_prepare($l, $sql);
+    if ($params) mysqli_stmt_bind_param($st, str_repeat('s', count($params)), ...$params);
+    mysqli_stmt_execute($st);
+    $r = mysqli_stmt_get_result($st);
+    $rows = $r ? mysqli_fetch_all($r, MYSQLI_ASSOC) : [];
+    mysqli_stmt_close($st);
+    return $rows;
+}
+function ecole_one(mysqli $l, string $sql, array $params = []): ?array {
+    return ecole_all($l, $sql, $params)[0] ?? null;
+}
+function ecole_exec(mysqli $l, string $sql, array $params = []): int {
+    $st = mysqli_prepare($l, $sql);
+    if ($params) mysqli_stmt_bind_param($st, str_repeat('s', count($params)), ...$params);
+    mysqli_stmt_execute($st);
+    $n = mysqli_stmt_affected_rows($st);
+    mysqli_stmt_close($st);
+    return (int) $n;
+}

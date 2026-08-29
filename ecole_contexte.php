@@ -189,6 +189,104 @@ function niu_enregistrer_inscription(string $niu, array $ident): void {
     );
 }
 
+// ── Affectation d'un agent dans la base d'une école ─────────────────
+//  Écrit dans la base école CIBLE (via avec_ecole) : crée/retrouve la
+//  ligne `enseignant`, crée le compte `user` si absent, puis enregistre
+//  l'affectation au central. Retourne [ok, message, login, mdp_temporaire].
+//
+//  $ident : ['nom','prenom','sexe','date_naiss','tel','email']
+function affecter_agent(string $matricule, int $id_etab_cible, string $fonction, array $ident): array {
+    if (!annuaire_dispo()) return [false, 'Annuaire indisponible.', null, null];
+    $fonction = in_array($fonction, ['DIRECTEUR', 'ENSEIGNANT', 'SECRETAIRE', 'COMPTABLE'], true) ? $fonction : 'ENSEIGNANT';
+
+    // 1. personnel central (créé si absent)
+    if (!assoc_val("SELECT COUNT(*) FROM personnel WHERE matricule=?", [$matricule])) {
+        assoc_exec(
+            "INSERT INTO personnel (matricule, nom, prenom, date_naissance, sexe, tel, email)
+             VALUES (?, ?, ?, ?, ?, ?, ?)",
+            [$matricule, $ident['nom'] ?? '', $ident['prenom'] ?? null, $ident['date_naiss'] ?? null,
+             $ident['sexe'] ?? null, $ident['tel'] ?? null, $ident['email'] ?? null]
+        );
+    }
+
+    // 2. écriture dans la base école cible
+    $mdp_clair = bin2hex(random_bytes(4));   // mot de passe temporaire
+    $res = avec_ecole($id_etab_cible, function (mysqli $l) use ($ident, $fonction, $matricule, $mdp_clair) {
+        // enseignant existant ? (mat_ens = matricule central, sinon identité)
+        $ex = ecole_one($l, "SELECT matricule_ens FROM enseignant WHERE mat_ens=? LIMIT 1", [$matricule])
+           ?? ecole_one($l, "SELECT matricule_ens FROM enseignant WHERE nom_ens=? AND COALESCE(prenom_ens,'')=? LIMIT 1",
+                        [$ident['nom'] ?? '', $ident['prenom'] ?? '']);
+        if ($ex) {
+            $mat_ens = (int) $ex['matricule_ens'];
+            ecole_exec($l, "UPDATE enseignant SET id_fonction=?, statut_ens='actif' WHERE matricule_ens=?",
+                       [$fonction, $mat_ens]);
+        } else {
+            ecole_exec($l,
+                "INSERT INTO enseignant (nom_ens, prenom_ens, sexe_ens, date_naiss_ens, tel_ens, mail_ens,
+                        mat_ens, id_fonction, statut_ens)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'actif')",
+                [$ident['nom'] ?? '', $ident['prenom'] ?? null, $ident['sexe'] ?? null, $ident['date_naiss'] ?? null,
+                 $ident['tel'] ?? null, $ident['email'] ?? null, $matricule, $fonction]
+            );
+            $mat_ens = (int) mysqli_insert_id($l);
+        }
+
+        // compte user ?
+        $u = ecole_one($l, "SELECT id_user, login_user FROM user WHERE matricule_ens=? LIMIT 1", [$mat_ens]);
+        if ($u) {
+            return ['mat_ens' => $mat_ens, 'id_user' => (int) $u['id_user'],
+                    'login' => $u['login_user'], 'nouveau_compte' => false];
+        }
+        $slug = strtolower(preg_replace('/[^a-z0-9]/i', '',
+            substr($ident['prenom'] ?? '', 0, 1) . ($ident['nom'] ?? 'agent')));
+        $slug  = $slug !== '' ? $slug : 'agent';
+        $login = $slug; $i = 1;
+        while (ecole_one($l, "SELECT id_user FROM user WHERE login_user=?", [$login])) { $login = $slug . (++$i); }
+        ecole_exec($l, "INSERT INTO user (login_user, pwd_user, matricule_ens) VALUES (?, ?, ?)",
+                   [$login, password_hash($mdp_clair, PASSWORD_DEFAULT), $mat_ens]);
+        return ['mat_ens' => $mat_ens, 'id_user' => (int) mysqli_insert_id($l),
+                'login' => $login, 'nouveau_compte' => true];
+    });
+
+    // 3. affectation centrale (upsert)
+    $aff = assoc_one("SELECT id FROM personnel_affectation WHERE matricule=? AND id_etablissement=?",
+                     [$matricule, $id_etab_cible]);
+    if ($aff) {
+        assoc_exec(
+            "UPDATE personnel_affectation SET fonction=?, matricule_ens_local=?, id_user_local=?,
+                    date_fin=NULL, actif=1 WHERE id=?",
+            [$fonction, $res['mat_ens'], $res['id_user'], $aff['id']]
+        );
+    } else {
+        assoc_exec(
+            "INSERT INTO personnel_affectation
+                (matricule, id_etablissement, fonction, matricule_ens_local, id_user_local, date_debut, actif)
+             VALUES (?, ?, ?, ?, ?, CURDATE(), 1)",
+            [$matricule, $id_etab_cible, $fonction, $res['mat_ens'], $res['id_user']]
+        );
+    }
+
+    $m = "Affecté. Compte « {$res['login']} »";
+    $m .= $res['nouveau_compte'] ? " créé — mot de passe temporaire : $mdp_clair (à changer)." : " (compte existant réutilisé).";
+    return [true, $m, $res['login'], $res['nouveau_compte'] ? $mdp_clair : null];
+}
+
+// Clôt une affectation (désactive le compte user dans la base école source).
+function cloturer_affectation(int $id_affectation): void {
+    if (!annuaire_dispo()) return;
+    $a = assoc_one("SELECT * FROM personnel_affectation WHERE id=?", [$id_affectation]);
+    if (!$a) return;
+    assoc_exec("UPDATE personnel_affectation SET actif=0, date_fin=CURDATE() WHERE id=?", [$id_affectation]);
+    if ($a['matricule_ens_local']) {
+        avec_ecole((int) $a['id_etablissement'], function ($l) use ($a) {
+            $st = mysqli_prepare($l, "UPDATE enseignant SET statut_ens='inactif' WHERE matricule_ens=?");
+            mysqli_stmt_bind_param($st, 's', $a['matricule_ens_local']);
+            mysqli_stmt_execute($st);
+            mysqli_stmt_close($st);
+        });
+    }
+}
+
 function niu_synchroniser_identite(string $niu, array $ident): void {
     if (!annuaire_dispo() || trim($niu) === '') return;
     if (!assoc_val("SELECT COUNT(*) FROM eleve_niu WHERE niu=?", [$niu])) return;
