@@ -1,9 +1,19 @@
 <?php
 // ── Configuration de l'application ───────────────────────────
 define('DB_HOST', '127.0.0.1');
-define('DB_NAME', 'jaynitaare_v2_bd');
+define('DB_NAME', 'jaynitaare_v2_bd');   // repli « école n°1 » si l'annuaire association est absent
 define('DB_USER', 'root');
 define('DB_PASS', '');
+
+// ── Multi-établissement ──────────────────────────────────────
+// Base centrale « annuaire » de l'association (écoles, NIU, personnel,
+// comptes membres). Optionnelle : tant que bd/assoc/installer.php n'a pas
+// tourné, l'application reste mono-école sur DB_NAME. Voir connexion_assoc.php.
+define('DB_NAME_ASSOC', 'jaynitaare_assoc');
+// Domaine racine de l'association pour la résolution par sous-domaine en
+// production (ecole1.assoc.cm). Vide en LAN/WAMP : la résolution se fait
+// alors par session (+ ?ec= pour les pages publiques).
+define('ASSOC_DOMAINE', '');
 
 define('APP_NOM',    'Jaynitaare · Gestion Scolaire');
 define('APP_URL',    '/jaynitaare_v2');       // chemin depuis la racine web

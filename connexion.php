@@ -11,13 +11,33 @@ require_once __DIR__ . '/config.php';
 mysqli_report(MYSQLI_REPORT_ERROR | MYSQLI_REPORT_STRICT);
 
 try {
-    $link = mysqli_connect(DB_HOST, DB_USER, DB_PASS, DB_NAME);
+    // Connexion SANS choix de base : la base « école courante » est
+    // sélectionnée juste après par la résolution multi-établissement.
+    $link = mysqli_connect(DB_HOST, DB_USER, DB_PASS);
     mysqli_set_charset($link, 'utf8mb4');
 } catch (mysqli_sql_exception $e) {
     die('<div style="font-family:sans-serif;padding:2rem;color:red">
          <b>Erreur de connexion à la base de données :</b><br>' . $e->getMessage() . '
          </div>');
 }
+
+// ── Résolution de l'établissement courant (multi-établissement) ──────
+//  L'annuaire association est optionnel : s'il est absent, $ETAB_COURANT
+//  reste null et on retombe sur DB_NAME (installation mono-école).
+require_once __DIR__ . '/connexion_assoc.php';   // $link_assoc (ou null) + assoc_*
+require_once __DIR__ . '/ecole_contexte.php';
+
+/** @var array|null $ETAB_COURANT  Ligne annuaire de l'école active (null = contexte association ou annuaire absent). */
+$ETAB_COURANT = annuaire_dispo() ? resoudre_etablissement() : null;
+
+if ($ETAB_COURANT) {
+    $bd_active = $ETAB_COURANT['db_name'];
+} elseif (annuaire_dispo() && est_contexte_association()) {
+    $bd_active = DB_NAME_ASSOC;           // l'interface association travaille dans l'annuaire
+} else {
+    $bd_active = DB_NAME;                 // repli mono-école
+}
+mysqli_select_db($link, $bd_active);
 
 // ── Helper interne : prépare, lie les paramètres, exécute ────────────
 //  Tous les paramètres sont liés en type « s » (chaîne) : MySQL applique
