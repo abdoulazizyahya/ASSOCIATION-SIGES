@@ -77,6 +77,11 @@ if ($id_existant) {
             [$nom, $nom_arabe, $prenom, $sexe, $date_naiss, $lieu_naiss, $id_arrondissement, $arrondissement, $adresse, $niu, $id]
         );
     }
+    // Registre NIU central (multi-établissement) : identité tenue à jour
+    if ($niu) {
+        niu_synchroniser_identite($niu, ['nom' => $nom, 'prenom' => $prenom,
+            'date_naiss' => $date_naiss, 'sexe' => $sexe, 'lieu_naiss' => $lieu_naiss]);
+    }
     $msg = 'Élève modifié.';
 } else {
     // ── Création ──────────────────────────────────────────
@@ -95,6 +100,10 @@ if ($id_existant) {
         [$mat, $nom, $nom_arabe, $prenom, $sexe, $date_naiss, $lieu_naiss, $id_arrondissement, $arrondissement, $adresse, $niu, $photo_bin]
     );
     $id = (int) db_last_id();
+    // Registre NIU central (multi-établissement) : passe la réservation en
+    // « actif », renseigne l'identité et l'école courante, trace le mouvement.
+    niu_enregistrer_inscription($niu, ['nom' => $nom, 'prenom' => $prenom,
+        'date_naiss' => $date_naiss, 'sexe' => $sexe, 'lieu_naiss' => $lieu_naiss]);
     $msg = 'Élève créé — matricule ' . $mat . '.';
 }
 

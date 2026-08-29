@@ -151,3 +151,52 @@ function journaliser_action(string $action, ?int $id_etab = null, ?string $cible
         [$m['id'] ?? null, $id_etab, $action, $cible, $_SERVER['REMOTE_ADDR'] ?? null]
     );
 }
+
+// ── Registre NIU central (jaynitaare_assoc.eleve_niu) ───────────────
+//  Appelés depuis les pages « école » (pages/eleves/save.php) pour tenir
+//  à jour l'identité et l'école courante d'un élève au niveau association.
+//  Sans annuaire : no-op (mode mono-école).
+//
+//  $ident : ['nom','prenom','date_naiss','sexe','lieu_naiss']
+
+function niu_enregistrer_inscription(string $niu, array $ident): void {
+    if (!annuaire_dispo() || trim($niu) === '') return;
+    $ec = ecole_courante();
+    $id_e = $ec['id'] ?? null;
+    $p = [
+        $ident['nom'] ?? null, $ident['prenom'] ?? null, $ident['date_naiss'] ?? null,
+        $ident['sexe'] ?? null, $ident['lieu_naiss'] ?? null,
+    ];
+    if (assoc_val("SELECT COUNT(*) FROM eleve_niu WHERE niu=?", [$niu])) {
+        assoc_exec(
+            "UPDATE eleve_niu SET nom=?, prenom=?, date_naissance=?, sexe=?, lieu_naissance=?,
+                    id_etab_courant=?, statut='actif'
+             WHERE niu=?",
+            [...$p, $id_e, $niu]
+        );
+    } else {
+        // NIU hors registre (repli mono-école antérieur, import, saisie manuelle)
+        assoc_exec(
+            "INSERT INTO eleve_niu (niu, nom, prenom, date_naissance, sexe, lieu_naissance,
+                    id_etab_origine, id_etab_courant, statut)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'actif')",
+            [$niu, ...$p, $id_e, $id_e]
+        );
+    }
+    assoc_exec(
+        "INSERT INTO eleve_niu_mouvement (niu, id_etab_cible, type, par) VALUES (?, ?, 'inscription', ?)",
+        [$niu, $id_e, 'ecole:' . ($ec['code'] ?? '?')]
+    );
+}
+
+function niu_synchroniser_identite(string $niu, array $ident): void {
+    if (!annuaire_dispo() || trim($niu) === '') return;
+    if (!assoc_val("SELECT COUNT(*) FROM eleve_niu WHERE niu=?", [$niu])) return;
+    assoc_exec(
+        "UPDATE eleve_niu SET nom=?, prenom=?, date_naissance=?, sexe=?, lieu_naissance=? WHERE niu=?",
+        [
+            $ident['nom'] ?? null, $ident['prenom'] ?? null, $ident['date_naiss'] ?? null,
+            $ident['sexe'] ?? null, $ident['lieu_naiss'] ?? null, $niu,
+        ]
+    );
+}

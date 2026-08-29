@@ -42,7 +42,10 @@ $ve = fn(string $k) => $eleve[$k] ?? '';
 // NIU proposé automatiquement pour un NOUVEL élève seulement (voir
 // fonctions.php::gen_niu()) — champ texte normal, reste modifiable/
 // effaçable si le vrai NIU officiel est déjà connu ou à saisir plus tard.
-$niu_propose = $eleve ? '' : gen_niu(get_etablissement()['Initial_Etab'] ?? '');
+// $reserver=false : simple aperçu du prochain NIU, sans créer de
+// réservation au registre central (la frappe réelle a lieu à
+// l'enregistrement, pages/eleves/save.php).
+$niu_propose = $eleve ? '' : gen_niu(get_etablissement()['Initial_Etab'] ?? '', 'PMC', false);
 
 $es_partiel = isset($_GET['partiel']);
 if (!$es_partiel) {

@@ -1175,17 +1175,56 @@ function gen_matricule(string $val_annee, string $niveau): string {
 // doublon même après une ou plusieurs suppressions. Repli sur un numéro
 // aléatoire à 4 chiffres si malgré tout ce NIU existe déjà (ex. deux
 // enregistrements simultanés), même filet de sécurité que gen_matricule().
-function gen_niu(string $initial_etab, string $prefixe = 'PMC'): string {
+// Multi-établissement : quand l'annuaire association est présent, le NIU est
+// FRAPPÉ AU CENTRAL (séquence globale par préfixe sur jaynitaare_assoc.
+// eleve_niu, et non plus la seule table `eleve` locale) — un élève ne peut
+// alors avoir qu'un seul NIU quelle que soit l'école. $reserver=true insère
+// aussitôt une ligne `eleve_niu` (statut « reserve ») pour verrouiller le
+// numéro ; le pré-remplissage du formulaire (form.php) appelle avec
+// $reserver=false pour ne PAS créer de réservation orpheline.
+// Sans annuaire : comportement mono-école historique (séquence locale).
+function gen_niu(string $initial_etab, string $prefixe = 'PMC', bool $reserver = true): string {
     $val_annee = get_annee_active()['val_annee'] ?? '';
     $code_an   = substr(explode('/', $val_annee)[0] ?: $val_annee, 2, 2);
     $base      = $prefixe . strtoupper(trim($initial_etab)) . $code_an;
+    $regex     = '^' . preg_quote($base) . '[0-9]{4}$';
 
+    if (function_exists('annuaire_dispo') && annuaire_dispo()) {
+        $ecole  = function_exists('ecole_courante') ? ecole_courante() : null;
+        $id_e   = $ecole['id'] ?? null;
+        $par    = 'ecole:' . ($ecole['code'] ?? '?');
+        for ($essai = 0; $essai < 6; $essai++) {
+            $max = (int) assoc_val(
+                "SELECT MAX(CAST(SUBSTRING(niu, ?) AS UNSIGNED)) FROM eleve_niu WHERE niu REGEXP ?",
+                [strlen($base) + 1, $regex]
+            );
+            $n   = $essai < 3 ? $max + 1 : random_int(1, 9999);
+            $niu = $base . str_pad((string) $n, 4, '0', STR_PAD_LEFT);
+            if (!$reserver) return $niu;
+            try {
+                assoc_exec(
+                    "INSERT INTO eleve_niu (niu, id_etab_origine, id_etab_courant, statut, cree_par)
+                     VALUES (?, ?, ?, 'reserve', ?)",
+                    [$niu, $id_e, $id_e, $par]
+                );
+                assoc_exec(
+                    "INSERT INTO eleve_niu_mouvement (niu, id_etab_cible, type, par) VALUES (?, ?, 'creation', ?)",
+                    [$niu, $id_e, $par]
+                );
+                return $niu;
+            } catch (\Throwable $e) {
+                // collision de clé primaire : le compteur a bougé, on retente
+            }
+        }
+        return $niu; // très improbable : on rend le dernier candidat calculé
+    }
+
+    // ── Repli mono-école (annuaire absent) : séquence locale sur `eleve` ──
     $max = (int) db_val(
         "SELECT MAX(CAST(SUBSTRING(niu, ?) AS UNSIGNED)) FROM eleve WHERE niu REGEXP ?",
-        [strlen($base) + 1, '^' . preg_quote($base) . '[0-9]{4}$']
+        [strlen($base) + 1, $regex]
     );
     $niu = $base . str_pad((string)($max + 1), 4, '0', STR_PAD_LEFT);
-
     if (db_val("SELECT COUNT(*) FROM eleve WHERE niu=?", [$niu])) {
         $niu = $base . str_pad((string) random_int(1, 9999), 4, '0', STR_PAD_LEFT);
     }
