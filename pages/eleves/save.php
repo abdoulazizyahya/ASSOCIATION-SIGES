@@ -2,7 +2,7 @@
 require_once __DIR__ . '/../../config.php';
 require_once __DIR__ . '/../../connexion.php';
 require_once __DIR__ . '/../../fonctions.php';
-exiger_role(['DIRECTEUR','SECRETAIRE']);
+exiger_role(['DIRECTEUR','SECRETAIRE','COMPTABLE']);
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') rediriger('pages/eleves/liste.php');
 csrf_verifier();

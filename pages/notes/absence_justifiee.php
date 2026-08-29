@@ -24,7 +24,7 @@ require_once __DIR__ . '/../../config.php';
 require_once __DIR__ . '/../../connexion.php';
 require_once __DIR__ . '/../../fonctions.php';
 require_once __DIR__ . '/../../notes_apc.php';
-exiger_connexion();
+exiger_acces_pedagogie();
 exiger_annee_active(); // Année scolaire réellement active requise (18/08/2026) — module Pédagogie/Discipline.
 
 $annee_act = get_annee_active();
@@ -208,8 +208,8 @@ if (!$es_partiel) {
         <label class="form-label">Compétence</label>
         <select name="comp" class="form-select" data-ajax-nav-auto <?= $id_classe_sel ? '' : 'disabled' ?>>
           <option value="">— Choisir —</option>
-          <?php foreach ($competences as $c): ?>
-            <option value="<?= $c['id_comp'] ?>" <?= $id_comp_sel == $c['id_comp'] ? 'selected' : '' ?>><?= h($c['nom_comp']) ?></option>
+          <?php $section_sel = $id_classe_sel ? section_classe($id_classe_sel) : 'Fr'; foreach ($competences as $c): ?>
+            <option value="<?= $c['id_comp'] ?>" <?= $id_comp_sel == $c['id_comp'] ? 'selected' : '' ?>><?= h(libelle_comp_affiche($c, $section_sel)) ?></option>
           <?php endforeach; ?>
         </select>
       </div>

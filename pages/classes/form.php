@@ -21,6 +21,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             flash_set('succes', 'Classe modifiée.');
         } else {
             db_exec("INSERT INTO classe (DesignationClasses, Niveau) VALUES (?, ?)", [$designation, $niveau]);
+            $nouvel_id = (int) db_last_id();
+            // Applique à la nouvelle classe le barème déjà configuré pour son
+            // niveau — no-op si rien de configuré. Les matières n'ont pas
+            // besoin de synchronisation : matieres_classe_arabe() les résout
+            // directement depuis matiere_niveau_arabe via le niveau de la classe.
+            synchroniser_bareme_niveau_arabe($niveau, [$nouvel_id]);
             flash_set('succes', 'Classe créée.');
         }
         rediriger('pages/classes/liste.php');
@@ -35,9 +41,16 @@ $niveaux = db_all(
     [$classe['Niveau'] ?? '']
 );
 
-$titre_page = $id ? 'Modifier la classe' : 'Nouvelle classe';
-require_once __DIR__ . '/../../layout/header.php';
+$es_partiel = isset($_GET['partiel']);
+if (!$es_partiel) {
+    $titre_page = $id ? 'Modifier la classe' : 'Nouvelle classe';
+    require_once __DIR__ . '/../../layout/header.php';
+} else {
+    header('Content-Type: text/html; charset=utf-8');
+}
 ?>
+
+<div id="classe-form-zone">
 
 <div class="page-titre">
   <h4><i class="bi bi-door-open me-1 text-primary"></i><?= $id ? 'Modifier la classe' : 'Nouvelle classe' ?></h4>
@@ -46,7 +59,7 @@ require_once __DIR__ . '/../../layout/header.php';
 <div class="card" style="max-width:520px">
   <div class="card-body">
     <?php if ($erreur): ?><div class="alert alert-danger py-2"><?= h($erreur) ?></div><?php endif; ?>
-    <form method="post">
+    <form method="post" data-ajax-post-form>
       <?= csrf_champ() ?>
       <div class="mb-3">
         <label class="form-label">Désignation</label>
@@ -89,4 +102,9 @@ function majSectionHeritee() {
 majSectionHeritee();
 </script>
 
-<?php require_once __DIR__ . '/../../layout/footer.php'; ?>
+</div><!-- /#classe-form-zone -->
+<?php if ($es_partiel) exit; // rien de plus dans une réponse AJAX partielle. ?>
+
+<?php
+$ajax_zone_id = 'classe-form-zone'; // voir layout/footer.php — initAjaxZone() y est appelé
+require_once __DIR__ . '/../../layout/footer.php';

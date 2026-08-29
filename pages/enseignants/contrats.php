@@ -56,9 +56,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 $contrats = db_all("SELECT * FROM contrat_enseignant WHERE matricule_ens=? ORDER BY date_debut DESC, id DESC", [$mat]);
 
-$titre_page = 'Contrats';
-require_once __DIR__ . '/../../layout/header.php';
+$es_partiel = isset($_GET['partiel']);
+if (!$es_partiel) {
+    $titre_page = 'Contrats';
+    require_once __DIR__ . '/../../layout/header.php';
+} else {
+    header('Content-Type: text/html; charset=utf-8');
+}
 ?>
+
+<div id="contrats-zone">
 
 <div class="page-titre">
   <div>
@@ -73,7 +80,7 @@ require_once __DIR__ . '/../../layout/header.php';
 <div class="card mb-2">
   <div class="card-header py-2" style="background:#f8faff"><span class="fw-semibold" style="font-size:.82rem">Nouveau contrat</span></div>
   <div class="card-body">
-    <form method="post">
+    <form method="post" data-ajax-post-form>
       <?= csrf_champ() ?>
       <input type="hidden" name="action" value="ajouter">
       <div class="row g-2 align-items-end">
@@ -125,14 +132,14 @@ require_once __DIR__ . '/../../layout/header.php';
             <td class="text-muted"><?= h($c['remarques'] ?: '—') ?></td>
             <td class="text-end">
               <?php if ($c['actif']): ?>
-                <form method="post" class="d-inline" onsubmit="return confirm('Clôturer ce contrat ?')">
+                <form method="post" class="d-inline" data-ajax-post-form onsubmit="return confirm('Clôturer ce contrat ?')">
                   <?= csrf_champ() ?>
                   <input type="hidden" name="action" value="cloturer">
                   <input type="hidden" name="id" value="<?= (int) $c['id'] ?>">
                   <button class="btn btn-sm btn-light" style="padding:2px 6px" title="Clôturer"><i class="bi bi-x-circle text-warning" style="font-size:.78rem"></i></button>
                 </form>
               <?php endif; ?>
-              <form method="post" class="d-inline" onsubmit="return confirm('Supprimer ce contrat ?')">
+              <form method="post" class="d-inline" data-ajax-post-form onsubmit="return confirm('Supprimer ce contrat ?')">
                 <?= csrf_champ() ?>
                 <input type="hidden" name="action" value="supprimer">
                 <input type="hidden" name="id" value="<?= (int) $c['id'] ?>">
@@ -146,4 +153,9 @@ require_once __DIR__ . '/../../layout/header.php';
   </div>
 </div>
 
-<?php require_once __DIR__ . '/../../layout/footer.php'; ?>
+</div><!-- /#contrats-zone -->
+<?php if ($es_partiel) exit; // rien de plus dans une réponse AJAX partielle. ?>
+
+<?php
+$ajax_zone_id = 'contrats-zone'; // voir layout/footer.php — initAjaxZone() y est appelé
+require_once __DIR__ . '/../../layout/footer.php';

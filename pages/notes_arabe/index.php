@@ -1,29 +1,12 @@
 <?php
 /**
  * pages/notes_arabe/index.php — Saisie des notes (piste arabe)
- * Miroir strict de pages/notes/index.php (piste française) — même nombre
- * d'onglets (4), même forme/gabarit visuel, même navigation AJAX partielle —
- * seules les DONNÉES changent : ici le modèle réel de la piste arabe
- * (matière + coefficient, UNE seule note /20 par matière/séquence, voir
- * notes_apc_arabe.php) au lieu du modèle à compétences/sous-notes O/É/P/SE
- * de la piste française. Là où pages/notes/index.php a 4 champs + un total
- * par élève, cette page a UN seul champ Note/20 par élève — la piste arabe
- * n'a jamais eu de sous-notes dans le schéma jaynitaare réel.
- *
- * Écart assumé, même politique que la piste française (voir en-tête de
- * pages/notes/index.php) : `dispenser` non peuplée → pas de restriction par
- * enseignant, les 3 rôles voient toutes les classes.
- *
- * Noms d'élèves : colonne « Nom arabe » séparée (eleve.Nom_arabe_elv, v27,
- * pas toujours renseigné ~224/271 élèves) dans les tableaux (grille onglet 1,
- * aperçu onglet 3) — même convention sur les 2 pages de saisie. Le sélecteur
- * <select> élève (onglet 2) et l'en-tête « fiche élève » gardent le format
- * compact « NOM (اسم) » via nom_eleve_aff() (fonctions.php), une colonne
- * n'ayant pas de sens hors tableau.
- *
- * Séquence de saisie : toujours l'évaluation ACTIVE (get_sequence_active()),
- * jamais choisie par l'utilisateur — seule « Copie de notes » (onglet 3)
- * garde des séquences source/destination explicites, par nature.
+ * Modèle matière (pas de coefficient, comme le français) : note unique /20
+ * par défaut (barème implicite 20), ou 3 champs Oral/Écrit/Pratique si un
+ * barème existe pour la matière (voir notes_apc_arabe.php). `dispenser`
+ * non peuplée → pas de restriction par enseignant. Nom arabe affiché via
+ * eleve.Nom_arabe_elv/nom_eleve_aff(). Séquence de saisie : toujours
+ * l'évaluation active, sauf onglet Copie.
  */
 header('Cache-Control: no-store, no-cache, must-revalidate');
 require_once __DIR__ . '/../../config.php';
@@ -31,7 +14,7 @@ require_once __DIR__ . '/../../connexion.php';
 require_once __DIR__ . '/../../fonctions.php';
 require_once __DIR__ . '/../../notes_apc.php';
 require_once __DIR__ . '/../../notes_apc_arabe.php';
-exiger_connexion();
+exiger_acces_pedagogie();
 exiger_annee_active(); // Année scolaire réellement active requise (18/08/2026) — module Pédagogie/Discipline.
 
 $annee_act = get_annee_active();
@@ -111,11 +94,12 @@ $eleves_c = [];
 
 if ($onglet === 'classe') {
     if ($id_cl_c) {
-        $mats_c = matieres_classe_arabe($id_cl_c);
+        $mats_c = matieres_classe_arabe_avec_bareme($id_cl_c, $val_annee);
     }
     if ($id_cl_c && $id_mat_c && $id_seq_c) {
         $eleves_c = db_all(
-            "SELECT e.id_eleve, e.Nom_elv, e.Prenom_elv, e.Nom_arabe_elv, e.Mat_elv, cs.note
+            "SELECT e.id_eleve, e.Nom_elv, e.Prenom_elv, e.Nom_arabe_elv, e.Mat_elv,
+                    cs.note_orale, cs.note_ecrite, cs.note_pratique
              FROM eleve e
              JOIN inscrire i ON i.id_eleve = e.id_eleve
              LEFT JOIN composer_sequence_arabe cs ON cs.id_eleve = e.id_eleve AND cs.id_mat = ? AND cs.classe = ? AND cs.id_seq = ?
@@ -131,26 +115,45 @@ if ($onglet === 'classe') {
         $p_seq    = (int) post('id_seq');
         $p_mat    = (int) post('id_mat');
 
-        $coef = db_val("SELECT coef FROM classe_matiere_arabe WHERE code_classe=? AND id_mat=?", [$p_classe, $p_mat]);
+        $matiere_ok = (int) db_val(
+            "SELECT COUNT(*) FROM classe c JOIN matiere_niveau_arabe mn ON mn.code_niveau=c.Niveau AND mn.actif=1
+             WHERE c.IDClasses=? AND mn.id_mat=?",
+            [$p_classe, $p_mat]
+        ) > 0;
         $id_trim_p = (int) db_val("SELECT id_trim FROM sequence WHERE id_seq=?", [$p_seq]);
-        if ($coef === null || !$id_trim_p) {
+        if (!$matiere_ok || !$id_trim_p) {
             flash_set('erreur', 'Matière ou séquence introuvable.');
             rediriger("pages/notes_arabe/index.php?onglet=classe&classe_c=$p_classe&mat_c=$p_mat");
         }
 
+        // Barème configuré pour cette matière/classe ? Requis pour saisir
+        // (plus de mode note simple /20 — voir migration_v48).
+        $bareme_save = bareme_matiere_classe_arabe($p_classe, $p_mat, $val_annee);
+        if ($bareme_save === null) {
+            flash_set('erreur', "Aucun barème configuré pour cette matière — configurez-le dans « Matières arabe » > Barème par niveau avant de saisir des notes.");
+            rediriger("pages/notes_arabe/index.php?onglet=classe&classe_c=$p_classe&mat_c=$p_mat");
+        }
+
         $touches = 0;
-        foreach ($_POST['notes'] ?? [] as $id_eleve => $val) {
+        $clamp = fn($val, $max) => $val === '' ? null : max(0.0, min((float) $max, (float) str_replace(',', '.', $val)));
+        foreach ($_POST['notes'] ?? [] as $id_eleve => $vals) {
             $id_eleve = (int) $id_eleve;
-            $note = $val === '' ? null : max(0.0, min(20.0, (float) str_replace(',', '.', $val)));
-            if ($note === null) {
+            $o = $clamp($vals['orale'] ?? '', $bareme_save['orale']);
+            $e = $clamp($vals['ecrite'] ?? '', $bareme_save['ecrite']);
+            $p = $clamp($vals['pratique'] ?? '', $bareme_save['pratique']);
+            if ($o === null && $e === null && $p === null) {
                 db_exec("DELETE FROM composer_sequence_arabe WHERE id_eleve=? AND id_mat=? AND classe=? AND id_seq=?",
                     [$id_eleve, $p_mat, $p_classe, $p_seq]);
                 continue;
             }
+            $o ??= 0; $e ??= 0; $p ??= 0;
+            $total = $o + $e + $p;
             db_exec(
-                "INSERT INTO composer_sequence_arabe (id_eleve, id_mat, classe, id_seq, note)
-                 VALUES (?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE note=VALUES(note)",
-                [$id_eleve, $p_mat, $p_classe, $p_seq, $note]
+                "INSERT INTO composer_sequence_arabe (id_eleve, id_mat, classe, id_seq, note_orale, note_ecrite, note_pratique, note_total_points)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                 ON DUPLICATE KEY UPDATE note_orale=VALUES(note_orale), note_ecrite=VALUES(note_ecrite),
+                     note_pratique=VALUES(note_pratique), note_total_points=VALUES(note_total_points)",
+                [$id_eleve, $p_mat, $p_classe, $p_seq, $o, $e, $p, $total]
             );
             $touches++;
         }
@@ -182,14 +185,24 @@ if ($onglet === 'eleve') {
         );
     }
     if ($id_cl_e && $id_eleve && $id_seq_e) {
-        $mats_brutes = matieres_classe_arabe($id_cl_e);
+        $mats_brutes = matieres_classe_arabe_avec_bareme($id_cl_e, $val_annee);
         $notes_idx = [];
         foreach (db_all(
-            "SELECT id_mat, note FROM composer_sequence_arabe WHERE id_eleve=? AND classe=? AND id_seq=?",
+            "SELECT id_mat, note_orale, note_ecrite, note_pratique FROM composer_sequence_arabe WHERE id_eleve=? AND classe=? AND id_seq=?",
             [$id_eleve, $id_cl_e, $id_seq_e]
-        ) as $n) { $notes_idx[(int) $n['id_mat']] = $n['note']; }
+        ) as $n) { $notes_idx[(int) $n['id_mat']] = $n; }
         foreach ($mats_brutes as $m) {
-            $m['note'] = $notes_idx[(int) $m['id_mat']] ?? null;
+            $n = $notes_idx[(int) $m['id_mat']] ?? null;
+            $m['note_orale']    = $n['note_orale'] ?? null;
+            $m['note_ecrite']   = $n['note_ecrite'] ?? null;
+            $m['note_pratique'] = $n['note_pratique'] ?? null;
+            // Note affichée (/20), normalisée sur le barème de la matière.
+            $total_brut = ($m['note_orale'] !== null || $m['note_ecrite'] !== null || $m['note_pratique'] !== null)
+                ? (float) ($m['note_orale'] ?? 0) + (float) ($m['note_ecrite'] ?? 0) + (float) ($m['note_pratique'] ?? 0)
+                : null;
+            $m['note'] = ($total_brut !== null && $m['bareme'] !== null && (float) $m['bareme']['total_points'] > 0)
+                ? round($total_brut / (float) $m['bareme']['total_points'] * 20, 2) : null;
+            $m['total_brut'] = $total_brut;
             $mats_e[] = $m;
         }
     }
@@ -201,19 +214,30 @@ if ($onglet === 'eleve') {
         $p_eleve  = (int) post('id_eleve');
         $id_trim_p = (int) db_val("SELECT id_trim FROM sequence WHERE id_seq=?", [$p_seq]);
 
+        // notes[id_mat][orale|ecrite|pratique]=valeur — barème requis (migration_v48).
+        $clamp = fn($val, $max) => $val === '' ? null : max(0.0, min((float) $max, (float) str_replace(',', '.', $val)));
         $touches = 0;
-        foreach ($_POST['notes'] ?? [] as $id_mat => $val) {
+        foreach ($_POST['notes'] ?? [] as $id_mat => $vals) {
             $id_mat = (int) $id_mat;
-            $note = $val === '' ? null : max(0.0, min(20.0, (float) str_replace(',', '.', $val)));
-            if ($note === null) {
+            if (!is_array($vals)) continue;
+            $bareme_e = bareme_matiere_classe_arabe($p_classe, $id_mat, $val_annee);
+            if ($bareme_e === null) continue; // pas de barème configuré — ignoré
+            $o = $clamp($vals['orale'] ?? '', $bareme_e['orale']);
+            $e = $clamp($vals['ecrite'] ?? '', $bareme_e['ecrite']);
+            $p = $clamp($vals['pratique'] ?? '', $bareme_e['pratique']);
+            if ($o === null && $e === null && $p === null) {
                 db_exec("DELETE FROM composer_sequence_arabe WHERE id_eleve=? AND id_mat=? AND classe=? AND id_seq=?",
                     [$p_eleve, $id_mat, $p_classe, $p_seq]);
                 continue;
             }
+            $o ??= 0; $e ??= 0; $p ??= 0;
+            $total = $o + $e + $p;
             db_exec(
-                "INSERT INTO composer_sequence_arabe (id_eleve, id_mat, classe, id_seq, note)
-                 VALUES (?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE note=VALUES(note)",
-                [$p_eleve, $id_mat, $p_classe, $p_seq, $note]
+                "INSERT INTO composer_sequence_arabe (id_eleve, id_mat, classe, id_seq, note_orale, note_ecrite, note_pratique, note_total_points)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                 ON DUPLICATE KEY UPDATE note_orale=VALUES(note_orale), note_ecrite=VALUES(note_ecrite),
+                     note_pratique=VALUES(note_pratique), note_total_points=VALUES(note_total_points)",
+                [$p_eleve, $id_mat, $p_classe, $p_seq, $o, $e, $p, $total]
             );
             $touches++;
         }
@@ -239,20 +263,26 @@ $mats_cop   = [];
 
 if ($onglet === 'copie') {
     if ($id_cl_cop) {
-        $mats_cop = matieres_classe_arabe($id_cl_cop);
+        $mats_cop = matieres_classe_arabe_avec_bareme($id_cl_cop, $val_annee);
+    }
+    $bareme_cop = null;
+    if ($id_cl_cop && $id_mat_cop) {
+        foreach ($mats_cop as $mc) { if ((int) $mc['id_mat'] === $id_mat_cop) { $bareme_cop = $mc['bareme'] ?? null; break; } }
     }
     if ($id_cl_cop && $id_seq_src && $id_mat_cop) {
-        $preview = db_all(
-            "SELECT e.id_eleve, e.Nom_elv, e.Prenom_elv, e.Nom_arabe_elv, e.Mat_elv,
-                    cs.note AS note_src,
-                    LEAST(20, GREATEST(0, IF(cs.note IS NOT NULL, cs.note + ?, NULL))) AS note_dst
-             FROM eleve e
-             JOIN inscrire i ON i.id_eleve = e.id_eleve AND i.IDClasses = ? AND i.val_annee = ?
-             LEFT JOIN composer_sequence_arabe cs ON cs.id_eleve = e.id_eleve AND cs.id_mat = ? AND cs.classe = ? AND cs.id_seq = ?
-             WHERE e.statut = 'actif'
-             ORDER BY e.Nom_elv, e.Prenom_elv",
-            [$ajust, $id_cl_cop, $val_annee, $id_mat_cop, $id_cl_cop, $id_seq_src]
+        // Note d'aperçu déjà normalisée /20.
+        $preview_brut = db_all(
+            "SELECT e.id_eleve, e.Nom_elv, e.Prenom_elv, e.Nom_arabe_elv, e.Mat_elv
+             FROM eleve e JOIN inscrire i ON i.id_eleve = e.id_eleve AND i.IDClasses = ? AND i.val_annee = ?
+             WHERE e.statut = 'actif' ORDER BY e.Nom_elv, e.Prenom_elv",
+            [$id_cl_cop, $val_annee]
         );
+        foreach ($preview_brut as $pb) {
+            $note_src = note_matiere_sequence_arabe((int) $pb['id_eleve'], $id_mat_cop, $id_cl_cop, $id_seq_src);
+            $pb['note_src'] = $note_src;
+            $pb['note_dst'] = $note_src !== null ? min(20.0, max(0.0, round($note_src + $ajust, 2))) : null;
+            $preview[] = $pb;
+        }
     }
 
     if ($_SERVER['REQUEST_METHOD'] === 'POST' && post('action') === 'exec_copie') {
@@ -263,9 +293,16 @@ if ($onglet === 'copie') {
         $p_mat    = (int) post('id_mat');
         $p_ajust  = (float) str_replace(',', '.', post('ajust') ?? '0');
         $id_trim_dst = (int) db_val("SELECT id_trim FROM sequence WHERE id_seq=?", [$p_dst]);
+        $bareme_exec = bareme_matiere_classe_arabe($p_classe, $p_mat, $val_annee);
+        if ($bareme_exec === null) {
+            flash_set('erreur', "Aucun barème configuré pour cette matière — configurez-le dans « Matières arabe » > Barème par niveau avant de copier des notes.");
+            rediriger("pages/notes_arabe/index.php?onglet=copie&classe_cop=$p_classe&seq_src=$p_src&seq_dst=$p_dst&mat_cop=$p_mat");
+        }
 
+        // Sous-notes redistribuées proportionnellement (même ratio O/É/P
+        // que la source) — préserve la somme = total.
         $rows = db_all(
-            "SELECT cs.id_eleve, cs.note
+            "SELECT cs.id_eleve, cs.note_orale, cs.note_ecrite, cs.note_pratique, cs.note_total_points
              FROM eleve e
              JOIN inscrire i ON i.id_eleve = e.id_eleve AND i.IDClasses = ? AND i.val_annee = ?
              JOIN composer_sequence_arabe cs ON cs.id_eleve = e.id_eleve AND cs.id_mat = ? AND cs.classe = ? AND cs.id_seq = ?
@@ -274,12 +311,19 @@ if ($onglet === 'copie') {
         );
         $nb = 0;
         foreach ($rows as $r) {
-            $ancienne = (float) $r['note'];
-            $nouvelle = min(20.0, max(0.0, round($ancienne + $p_ajust, 2)));
+            $ancien_total = (float) $r['note_total_points'];
+            if ($ancien_total <= 0 && $p_ajust <= 0) continue;
+            $nouveau_total = min((float) $bareme_exec['total_points'], max(0.0, $ancien_total + $p_ajust));
+            $ratio = $ancien_total > 0 ? $nouveau_total / $ancien_total : 0.0;
+            $o = round((float) $r['note_orale'] * $ratio, 2);
+            $e = round((float) $r['note_ecrite'] * $ratio, 2);
+            $p = round((float) $nouveau_total - $o - $e, 2); // absorbe l'arrondi
             db_exec(
-                "INSERT INTO composer_sequence_arabe (id_eleve, id_mat, classe, id_seq, note)
-                 VALUES (?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE note=VALUES(note)",
-                [$r['id_eleve'], $p_mat, $p_classe, $p_dst, $nouvelle]
+                "INSERT INTO composer_sequence_arabe (id_eleve, id_mat, classe, id_seq, note_orale, note_ecrite, note_pratique, note_total_points)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                 ON DUPLICATE KEY UPDATE note_orale=VALUES(note_orale), note_ecrite=VALUES(note_ecrite),
+                     note_pratique=VALUES(note_pratique), note_total_points=VALUES(note_total_points)",
+                [$r['id_eleve'], $p_mat, $p_classe, $p_dst, $o, $e, $p, $nouveau_total]
             );
             $nb++;
         }
@@ -302,18 +346,18 @@ $non_saisis = [];
 
 if ($onglet === 'non_saisis' && $seq_active) {
     $id_seq_ns  = (int) $seq_active['id_seq'];
-    $where_cl_a = $id_cl_ns ? "AND cma.code_classe = " . (int) $id_cl_ns : '';
+    $where_cl_a = $id_cl_ns ? "AND c.IDClasses = " . (int) $id_cl_ns : '';
     $non_saisis = db_all(
-        "SELECT cma.code_classe AS id_classe, c.DesignationClasses AS classe,
+        "SELECT c.IDClasses AS id_classe, c.DesignationClasses AS classe,
                 m.matiere_fr, m.matiere_ar,
-                (SELECT COUNT(*) FROM inscrire ii WHERE ii.IDClasses=cma.code_classe AND ii.val_annee=? AND EXISTS(SELECT 1 FROM eleve ee WHERE ee.id_eleve=ii.id_eleve AND ee.statut='actif')) AS nb_eleves,
-                (SELECT COUNT(*) FROM composer_sequence_arabe nn WHERE nn.id_mat=cma.id_mat AND nn.classe=cma.code_classe AND nn.id_seq=?) AS nb_saisis
-         FROM classe_matiere_arabe cma
-         JOIN classe c ON c.IDClasses=cma.code_classe
-         JOIN matiere_arabe m ON m.id_mat=cma.id_mat
+                (SELECT COUNT(*) FROM inscrire ii WHERE ii.IDClasses=c.IDClasses AND ii.val_annee=? AND EXISTS(SELECT 1 FROM eleve ee WHERE ee.id_eleve=ii.id_eleve AND ee.statut='actif')) AS nb_eleves,
+                (SELECT COUNT(*) FROM composer_sequence_arabe nn WHERE nn.id_mat=mn.id_mat AND nn.classe=c.IDClasses AND nn.id_seq=?) AS nb_saisis
+         FROM classe c
+         JOIN matiere_niveau_arabe mn ON mn.code_niveau=c.Niveau AND mn.actif=1
+         JOIN matiere_arabe m ON m.id_mat=mn.id_mat
          WHERE 1=1 $where_cl_a
          HAVING nb_eleves > 0 AND nb_saisis = 0
-         ORDER BY c.DesignationClasses, cma.ordre",
+         ORDER BY c.DesignationClasses, mn.ordre",
         [$val_annee, $id_seq_ns]
     );
 }
@@ -434,13 +478,20 @@ if (!$es_partiel) {
 <?php if ($id_cl_c && $id_mat_c && !empty($eleves_c)):
   $mat_info = null;
   foreach ($mats_c as $m) { if ($m['id_mat'] == $id_mat_c) { $mat_info = $m; break; } }
-  $saisi = count(array_filter($eleves_c, fn($e) => $e['note'] !== null));
+  $bareme_c = $mat_info['bareme'] ?? null; // requis pour saisir (migration_v48)
+  $saisi = count(array_filter($eleves_c, fn($e) => $e['note_orale'] !== null || $e['note_ecrite'] !== null || $e['note_pratique'] !== null));
 ?>
+<?php if ($bareme_c === null): ?>
+<div class="alert alert-warning">Aucun barème configuré pour cette matière — configurez-le dans « Matières arabe » > Barème par niveau avant de saisir des notes.</div>
+<?php else: ?>
 <div class="d-flex align-items-center gap-2 mb-2 flex-wrap">
   <span class="fw-bold" style="font-size:.88rem"><?= h($mat_info['matiere_fr']) ?></span>
   <span class="badge-code" dir="rtl" lang="ar"><?= h($mat_info['matiere_ar']) ?></span>
   <span style="background:#dbeafe;color:#1e40af;padding:2px 8px;border-radius:10px;font-size:.72rem;font-weight:600">
-    Coefficient <?= (int) $mat_info['coef'] ?> · Note /20
+    <span dir="rtl" lang="ar">شفهي (Oral)</span>/<?= (int) $bareme_c['orale'] ?> ·
+    <span dir="rtl" lang="ar">تحريري (Écrit)</span>/<?= (int) $bareme_c['ecrite'] ?> ·
+    <span dir="rtl" lang="ar">عملي (Pratique)</span>/<?= (int) $bareme_c['pratique'] ?> =
+    <?= (int) $bareme_c['total_points'] ?> <span dir="rtl" lang="ar">(المجموع)</span>
   </span>
   <span style="background:#f3f4f6;color:#6b7280;padding:2px 8px;border-radius:10px;font-size:.72rem">
     <?= $saisi ?>/<?= count($eleves_c) ?> saisi(s)
@@ -462,7 +513,10 @@ if (!$es_partiel) {
               <th style="width:34px">N°</th>
               <th style="width:160px">Nom et Prénom</th>
               <th style="width:150px">Nom arabe</th>
-              <th style="width:120px" class="text-center">Note /20</th>
+              <th style="width:90px" class="text-center" dir="rtl" lang="ar">شفهي (Oral) /<?= (int) $bareme_c['orale'] ?></th>
+              <th style="width:100px" class="text-center" dir="rtl" lang="ar">تحريري (Écrit) /<?= (int) $bareme_c['ecrite'] ?></th>
+              <th style="width:100px" class="text-center" dir="rtl" lang="ar">عملي (Pratique) /<?= (int) $bareme_c['pratique'] ?></th>
+              <th style="width:100px" class="text-center" dir="rtl" lang="ar">المجموع (Total) /<?= (int) $bareme_c['total_points'] ?></th>
               <th style="width:55px" class="text-center">Cote</th>
               <th style="width:70px" class="text-center">Mention</th>
               <th style="width:50px" class="text-center">
@@ -474,19 +528,29 @@ if (!$es_partiel) {
           </thead>
           <tbody>
             <?php foreach ($eleves_c as $i => $el):
-              $mention = $el['note'] !== null ? appreciation_moyenne_arabe((float) $el['note']) : '';
-              $cote_abz = cote_abz20($el['note'] !== null ? (float) $el['note'] : null);
+              $total_brut  = ($el['note_orale'] !== null || $el['note_ecrite'] !== null || $el['note_pratique'] !== null)
+                  ? (float) ($el['note_orale'] ?? 0) + (float) ($el['note_ecrite'] ?? 0) + (float) ($el['note_pratique'] ?? 0)
+                  : null;
+              $note_norm = $total_brut !== null && (float) $bareme_c['total_points'] > 0
+                  ? round($total_brut / (float) $bareme_c['total_points'] * 20, 2) : null;
+              $mention  = $note_norm !== null ? appreciation_moyenne_arabe($note_norm) : '';
+              $cote_abz = cote_abz20($note_norm);
             ?>
               <tr>
                 <td class="text-muted" style="font-size:.72rem"><?= $i + 1 ?></td>
                 <td class="fw-semibold" style="font-size:.82rem"><?= h(mb_strtoupper($el['Nom_elv'])) . ' ' . h($el['Prenom_elv'] ?? '') ?></td>
                 <td class="text-muted" dir="rtl" lang="ar" style="font-size:.82rem"><?= h($el['Nom_arabe_elv'] ?? '') ?: '—' ?></td>
-                <td>
-                  <input type="number" class="form-control form-control-sm note-inp-c text-center"
-                         name="notes[<?= $el['id_eleve'] ?>]"
-                         min="0" max="20" step="0.25"
-                         value="<?= $el['note'] !== null ? (float) $el['note'] : '' ?>"
-                         data-eleve="<?= $el['id_eleve'] ?>" placeholder="—">
+                <?php foreach (['orale', 'ecrite', 'pratique'] as $champ): ?>
+                  <td>
+                    <input type="number" class="form-control form-control-sm note-inp-c-bar text-center"
+                           name="notes[<?= $el['id_eleve'] ?>][<?= $champ ?>]"
+                           min="0" max="<?= (float) $bareme_c[$champ] ?>" step="0.25"
+                           value="<?= $el['note_' . $champ] !== null ? (float) $el['note_' . $champ] : '' ?>"
+                           data-eleve="<?= $el['id_eleve'] ?>" placeholder="—">
+                  </td>
+                <?php endforeach; ?>
+                <td class="text-center fw-bold total-cl" id="total-<?= $el['id_eleve'] ?>" style="color:#1e4fd8">
+                  <?= $total_brut !== null ? $total_brut : '—' ?>
                 </td>
                 <td class="text-center cote-cl" id="cote-<?= $el['id_eleve'] ?>"
                     style="font-size:.8rem;font-weight:700;color:<?= $cote_abz[1] ?>">
@@ -504,11 +568,12 @@ if (!$es_partiel) {
       </div>
       <div class="card-body py-2 border-top d-flex align-items-center gap-2">
         <button class="btn btn-primary btn-sm"><i class="bi bi-save me-1"></i>Enregistrer</button>
-        <span class="ms-auto text-muted" style="font-size:.75rem">Entrée / Tab pour naviguer — laisser le champ vide retire la note</span>
+        <span class="ms-auto text-muted" style="font-size:.75rem">Entrée / Tab pour naviguer — laisser les champs vides retire la note</span>
       </div>
     </form>
   </div>
 </div>
+<?php endif; ?>
 
 <script>
 (function() {
@@ -546,25 +611,48 @@ if (!$es_partiel) {
     if (clamped > max) clamped = max; else if (clamped < min) clamped = min;
     if (clamped !== v) inp.value = clamped;
   }
+  function appliquerMentionCote(idEleve, note /* déjà normalisée /20, ou null */) {
+    var mentionCell = document.getElementById('mention-' + idEleve);
+    var coteCell = document.getElementById('cote-' + idEleve);
+    if (note === null || isNaN(note)) {
+      mentionCell.textContent = '—'; mentionCell.style.color = '#6b7280';
+      coteCell.textContent = '—'; coteCell.style.color = '#6b7280';
+      return;
+    }
+    var m = mention(note);
+    mentionCell.textContent = m; mentionCell.style.color = COLORS[m] || '#6b7280';
+    var c = coteAbz(note);
+    coteCell.textContent = c[1]; coteCell.style.color = c[2];
+  }
   document.querySelectorAll('.note-inp-c').forEach(function(inp) {
     inp.addEventListener('input', function() {
       clamperBareme(this);
       var idEleve = this.dataset.eleve;
-      var mentionCell = document.getElementById('mention-' + idEleve);
-      var coteCell = document.getElementById('cote-' + idEleve);
-      if (this.value === '') {
-        mentionCell.textContent = '—'; mentionCell.style.color = '#6b7280';
-        coteCell.textContent = '—'; coteCell.style.color = '#6b7280';
-        return;
-      }
-      var v = parseFloat(this.value);
-      var m = mention(v);
-      mentionCell.textContent = m; mentionCell.style.color = COLORS[m] || '#6b7280';
-      var c = coteAbz(v);
-      coteCell.textContent = c[1]; coteCell.style.color = c[2];
+      appliquerMentionCote(idEleve, this.value === '' ? null : parseFloat(this.value));
     });
   });
-  var inps = Array.from(document.querySelectorAll('.note-inp-c'));
+  // Mode barème : recalcule le total brut puis la mention/cote sur /20.
+  var BAREME_TOTAL_AR = <?= $bareme_c !== null ? (float) $bareme_c['total_points'] : 'null' ?>;
+  document.querySelectorAll('.note-inp-c-bar').forEach(function(inp) {
+    inp.addEventListener('input', function() {
+      clamperBareme(this);
+      var idEleve = this.dataset.eleve;
+      var row = this.closest('tr');
+      var vals = Array.from(row.querySelectorAll('.note-inp-c-bar')).map(function(i) { return i.value === '' ? null : parseFloat(i.value); });
+      var totalCell = document.getElementById('total-' + idEleve);
+      if (vals.every(function(v) { return v === null; })) {
+        totalCell.textContent = '—';
+        appliquerMentionCote(idEleve, null);
+        return;
+      }
+      var total = vals.reduce(function(s, v) { return s + (v || 0); }, 0);
+      total = Math.round(total * 100) / 100;
+      totalCell.textContent = total;
+      var noteNorm = BAREME_TOTAL_AR > 0 ? Math.round((total / BAREME_TOTAL_AR * 20) * 100) / 100 : null;
+      appliquerMentionCote(idEleve, noteNorm);
+    });
+  });
+  var inps = Array.from(document.querySelectorAll('.note-inp-c, .note-inp-c-bar'));
   inps.forEach(function(inp, idx) {
     inp.addEventListener('keydown', function(e) {
       if (e.key === 'Enter') { e.preventDefault(); if (inps[idx + 1]) inps[idx + 1].focus(); }
@@ -638,9 +726,13 @@ if (!$es_partiel) {
   $saisi_e    = count(array_filter($mats_e, fn($m) => $m['note'] !== null));
   $seq_lbl    = '';
   foreach ($seqs as $s) { if ($s['id_seq'] == $id_seq_e) { $seq_lbl = h($s['libelle_trim'] . ' — ' . $s['libelle_seq']); break; } }
-  $coef_saisi = 0.0; $note_coef = 0.0;
-  foreach ($mats_e as $m) { if ($m['note'] !== null) { $coef_saisi += (float) $m['coef']; $note_coef += (float) $m['note'] * (float) $m['coef']; } }
-  $moy_e = $coef_saisi > 0 ? round($note_coef / $coef_saisi, 2) : null;
+  $total_bareme_e = 0.0; $total_points_e = 0.0;
+  foreach ($mats_e as $m) {
+      if ($m['note'] === null) continue;
+      $total_bareme_e += $m['bareme'] !== null ? (float) $m['bareme']['total_points'] : 20.0;
+      $total_points_e += (float) $m['total_brut'];
+  }
+  $moy_e = $total_bareme_e > 0 ? round($total_points_e / ($total_bareme_e / 20), 2) : null;
 ?>
 
 <div class="card mb-3" style="border-left:4px solid #7c3aed;background:#faf5ff">
@@ -675,7 +767,7 @@ if (!$es_partiel) {
           <thead>
             <tr>
               <th>Matière</th>
-              <th style="width:70px;text-align:center">Coef</th>
+              <th style="width:70px;text-align:center">Barème</th>
               <th style="width:100px;text-align:center">Note /20</th>
               <th style="width:90px;text-align:center">Points</th>
               <th style="width:80px;text-align:center">Mention</th>
@@ -684,20 +776,37 @@ if (!$es_partiel) {
           <tbody>
             <?php foreach ($mats_e as $m):
               $mention = $m['note'] !== null ? appreciation_moyenne_arabe((float) $m['note']) : '';
-              $points  = $m['note'] !== null ? round((float) $m['note'] * (float) $m['coef'], 2) : null;
+              $bareme_em = $m['bareme'] ?? null;
+              $bareme_pts_em = $bareme_em !== null ? (float) $bareme_em['total_points'] : 20.0;
+              $points  = $m['note'] === null ? null : (float) $m['total_brut'];
             ?>
             <tr>
               <td class="fw-semibold" style="font-size:.82rem">
                 <?= h($m['matiere_fr']) ?>
                 <span class="text-muted" dir="rtl" lang="ar" style="font-size:.85em"> (<?= h($m['matiere_ar']) ?>)</span>
+                <?php if ($bareme_em !== null): ?>
+                  <span class="text-muted" dir="rtl" lang="ar" style="font-size:.68rem;display:block">
+                    شفهي (Oral)/<?= (int) $bareme_em['orale'] ?> ·
+                    تحريري (Écrit)/<?= (int) $bareme_em['ecrite'] ?> ·
+                    عملي (Pratique)/<?= (int) $bareme_em['pratique'] ?>
+                  </span>
+                <?php endif; ?>
               </td>
-              <td class="text-center"><?= (int) $m['coef'] ?></td>
+              <td class="text-center"><?= (int) $bareme_pts_em ?></td>
               <td>
-                <input type="number" name="notes[<?= $m['id_mat'] ?>]"
-                       class="form-control form-control-sm eleve-note-ar text-center"
-                       min="0" max="20" step="0.25"
-                       value="<?= $m['note'] !== null ? (float) $m['note'] : '' ?>"
-                       placeholder="—" data-mat="<?= $m['id_mat'] ?>" data-coef="<?= (int) $m['coef'] ?>">
+                <?php if ($bareme_em !== null): ?>
+                  <div class="d-flex align-items-center justify-content-center gap-1 eleve-note-ar-bar" data-mat="<?= $m['id_mat'] ?>" data-bareme="<?= (float) $bareme_pts_em ?>" data-total="<?= (float) $bareme_em['total_points'] ?>">
+                    <?php foreach (['orale', 'ecrite', 'pratique'] as $champ): ?>
+                      <input type="number" name="notes[<?= $m['id_mat'] ?>][<?= $champ ?>]"
+                             class="form-control form-control-sm eleve-note-ar-champ text-center"
+                             min="0" max="<?= (float) $bareme_em[$champ] ?>" step="0.25"
+                             value="<?= $m['note_' . $champ] !== null ? (float) $m['note_' . $champ] : '' ?>"
+                             placeholder="—" data-mat="<?= $m['id_mat'] ?>" style="max-width:60px;padding:.3rem">
+                    <?php endforeach; ?>
+                  </div>
+                <?php else: ?>
+                  <span class="text-muted" style="font-size:.72rem" title="Configurez le barème dans « Matières arabe » > Barème par niveau">Barème manquant</span>
+                <?php endif; ?>
               </td>
               <td class="text-center points-cell-e" id="points-e-<?= $m['id_mat'] ?>" style="font-size:.82rem;font-weight:700;color:#1e4fd8">
                 <?= $points !== null ? $points : '—' ?>
@@ -736,12 +845,20 @@ if (!$es_partiel) {
     return '—';
   }
   var inps = Array.from(document.querySelectorAll('.eleve-note-ar'));
+  var groupesBareme = Array.from(document.querySelectorAll('.eleve-note-ar-bar'));
+  // Points bruts (échelle du barème) de chaque matière à barème, lus par recalcMoyenne().
+  var notesBrutAr = {};
   function recalcMoyenne() {
-    var coefTotal = 0, noteCoef = 0;
+    // Σpoints / (Σbarème/20) — même formule que le calcul serveur, pas de coefficient.
+    var baremeTotal = 0, pointsTotal = 0;
     inps.forEach(function(i) {
-      if (i.value !== '') { var c = parseFloat(i.dataset.coef); coefTotal += c; noteCoef += parseFloat(i.value) * c; }
+      if (i.value !== '') { baremeTotal += parseFloat(i.dataset.bareme); pointsTotal += parseFloat(i.value); }
     });
-    document.getElementById('moy-eleve-ar').textContent = coefTotal > 0 ? Math.round((noteCoef / coefTotal) * 100) / 100 : '—';
+    groupesBareme.forEach(function(g) {
+      var v = notesBrutAr[g.dataset.mat];
+      if (v !== null && v !== undefined) { baremeTotal += parseFloat(g.dataset.bareme); pointsTotal += v; }
+    });
+    document.getElementById('moy-eleve-ar').textContent = baremeTotal > 0 ? Math.round((pointsTotal / (baremeTotal / 20)) * 100) / 100 : '—';
   }
   function clamperBareme(inp) {
     if (inp.value === '') return;
@@ -767,13 +884,46 @@ if (!$es_partiel) {
       var mentionCell = document.getElementById('mention-e-' + idMat);
       if (this.value === '') { pointsCell.textContent = '—'; mentionCell.textContent = '—'; mentionCell.style.color = '#6b7280'; recalcMoyenne(); return; }
       var v = parseFloat(this.value);
-      pointsCell.textContent = Math.round(v * parseFloat(this.dataset.coef) * 100) / 100;
+      pointsCell.textContent = Math.round(v * 100) / 100;
       var m = mention(v);
       mentionCell.textContent = m; mentionCell.style.color = COLORS[m] || '#6b7280';
       recalcMoyenne();
     });
     inp.addEventListener('keydown', function(e) {
       if (e.key === 'Enter') { e.preventDefault(); if (inps[idx + 1]) inps[idx + 1].focus(); }
+    });
+  });
+  // Mode barème : recalcule le total puis la note normalisée /20
+  // (utilisée par Points/Mention et recalcMoyenne() via notesBaremeAr).
+  var champsBaremeAr = Array.from(document.querySelectorAll('.eleve-note-ar-champ'));
+  function recalcGroupeBareme(idMat) {
+    var groupe = document.querySelector('.eleve-note-ar-bar[data-mat="' + idMat + '"]');
+    var champs = Array.from(groupe.querySelectorAll('.eleve-note-ar-champ'));
+    var vals = champs.map(function(i) { return i.value === '' ? null : parseFloat(i.value); });
+    var pointsCell  = document.getElementById('points-e-' + idMat);
+    var mentionCell = document.getElementById('mention-e-' + idMat);
+    if (vals.every(function(v) { return v === null; })) {
+      notesBrutAr[idMat] = null;
+      pointsCell.textContent = '—'; mentionCell.textContent = '—'; mentionCell.style.color = '#6b7280';
+      recalcMoyenne();
+      return;
+    }
+    var totalBrut = vals.reduce(function(s, v) { return s + (v || 0); }, 0);
+    var totalBareme = parseFloat(groupe.dataset.total);
+    var noteNorm = totalBareme > 0 ? Math.round((totalBrut / totalBareme * 20) * 100) / 100 : null;
+    notesBrutAr[idMat] = totalBrut;
+    pointsCell.textContent = Math.round(totalBrut * 100) / 100;
+    var m = noteNorm !== null ? mention(noteNorm) : '—';
+    mentionCell.textContent = m; mentionCell.style.color = COLORS[m] || '#6b7280';
+    recalcMoyenne();
+  }
+  champsBaremeAr.forEach(function(inp, idx) {
+    inp.addEventListener('input', function() {
+      clamperBareme(this);
+      recalcGroupeBareme(this.dataset.mat);
+    });
+    inp.addEventListener('keydown', function(e) {
+      if (e.key === 'Enter') { e.preventDefault(); if (champsBaremeAr[idx + 1]) champsBaremeAr[idx + 1].focus(); }
     });
   });
 })();

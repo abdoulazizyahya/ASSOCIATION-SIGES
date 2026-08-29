@@ -1,14 +1,9 @@
 <?php
 // ── PDF : Bulletin annuel — piste arabe (TCPDF, RTL réel) ──────────
-// Port fidèle de jaynitaare/php/Bulletin_Arabe_Annuel_ParClasse.php —
-// modèle de référence : ara_ann.pdf. Miroir de pdf/bulletin_trimestriel_arabe.php
-// pour l'en-tête/photo/grille élève (mêmes helpers RTL), mais tableau des
-// matières 1er Trim/2è Trim/3è Trim/Moyenne/Rang/Appréciations
-// (note_matiere_annuelle_arabe() donne le détail par trimestre) et bloc
-// RESULTATS DE L'ELEVE avec 4 colonnes (3 trimestres + annuelle) — moteur
-// de calcul déjà entièrement prêt côté notes_apc_arabe.php, aucune fonction
-// à créer ici (calculer_moyenne_annuelle_eleve_arabe/note_matiere_annuelle_arabe/
-// classement_annuel_classe_arabe/rang_eleve_annuel_arabe).
+// En-tête/photo/grille élève communs avec pdf/bulletin_trimestriel_arabe.php.
+// Tableau des matières 1er/2è/3è Trim + Moyenne/Rang/Appréciations
+// (note_matiere_annuelle_arabe() donne le détail par trimestre), bloc
+// RESULTATS DE L'ELEVE en 4 colonnes (3 trimestres + annuelle).
 //
 // GET : id (bulletin d'UN élève) — OU classe (tous les élèves classés).
 require_once __DIR__ . '/../config.php';
@@ -27,7 +22,7 @@ if (($_GET['vh'] ?? '') !== '' && (int) ($_GET['id'] ?? 0) > 0) {
         (int) $_GET['id'], 'annee', (int) substr($val_annee_pub, 0, 4), 'ar', (string) $_GET['vh']
     ) !== null;
 }
-if (!$acces_public) exiger_connexion();
+if (!$acces_public) exiger_acces_pedagogie();
 
 require_once __DIR__ . '/header_pdf.php';
 require_once __DIR__ . '/../pdf/tcpdf/config/tcpdf_config.php';
@@ -42,13 +37,10 @@ if (!$id && !$id_classe) die('Paramètre id (ou classe) manquant.');
 
 $annee     = get_annee_active();
 $val_annee = $annee['val_annee'] ?? '';
-// 🐛 Même correctif que pdf/bulletin_annuel.php (voir son commentaire) :
-// `annee_scolaire` n'a pas de colonne `id`, cette valeur était toujours 0.
+// 🐛 `annee_scolaire` n'a pas de colonne `id` — ne pas y chercher un id_annee.
 $id_annee  = (int) substr($val_annee, 0, 4);
 $etab_brut = get_etablissement();
 $etab      = etab_pour_pdf($etab_brut);
-// En-tête bilingue FR/AR absorbé dans `etablissement` (migration v31,
-// ex-table etablissement_arabe) — déjà présent dans $etab_brut.
 $etab_ar   = $etab_brut;
 
 if ($id) {
@@ -67,8 +59,6 @@ if ($id) {
     $classe = db_one("SELECT DesignationClasses FROM classe WHERE IDClasses=?", [$id_classe]);
     if (!$classe) die('Classe introuvable.');
     $classement = classement_annuel_classe_arabe($id_classe, $val_annee);
-    // Ordre d'impression du lot : voir pdf/bulletin_trimestriel.php (même
-    // correctif du 13/08, même bug — ordre jamais transmis au PDF en lot).
     $lignes_cl = $classement['lignes'];
     if (($_GET['ordre'] ?? '') === 'alpha') {
         usort($lignes_cl, fn($a, $b) => strcmp($a['Nom_elv'] . ' ' . $a['Prenom_elv'], $b['Nom_elv'] . ' ' . $b['Prenom_elv']));
@@ -97,9 +87,7 @@ function dessiner_bulletin_annuel_arabe(
     $matieres = matieres_classe_arabe($id_classe);
     $resultat = rang_eleve_annuel_arabe($id, $id_classe, $val_annee);
 
-    // 🐛 Même correctif que pdf/bulletin_annuel.php : trimestre.id_annee est
-    // un VARCHAR (val_annee), pas un entier — trimestres_de_annee() déjà
-    // mémoïsée (notes_apc.php, require_once via notes_apc_arabe.php).
+    // 🐛 trimestre.id_annee est un VARCHAR (val_annee), pas un entier.
     $trims_ids = trimestres_de_annee($val_annee);
     $r_trim = [];
     foreach ([0, 1, 2] as $i) {
@@ -136,28 +124,22 @@ function dessiner_bulletin_annuel_arabe(
         if (is_file($logo_path)) $pdf->Image($logo_path, 92, 19, 26, 26);
     }
 
+    // En-tête FR/AR — colonnes réelles de `etablissement`.
     tcpdf_colonne_lignes($pdf, [
-        [$etab_ar['republique_fr'] ?? 'REPUBLIQUE DU CAMEROUN', 'helvetica', '', 7, 3.4],
-        [$etab_ar['devise_fr'] ?? 'Paix - Travail - Patrie', 'helvetica', '', 6.5, 3.4],
-        ['**********', 'helvetica', '', 6.5, 3.4],
-        [$etab_ar['ministere_fr'] ?? '', 'helvetica', '', 6.5, 3.4],
-        [$etab_ar['delegation_reg_fr'] ?? '', 'helvetica', '', 6.5, 3.4],
-        [$etab_ar['delegation_dep_fr'] ?? '', 'helvetica', '', 6.5, 3.4],
+        [$etab_ar['pays_etab_fr'] ?? '', 'helvetica', '', 7, 3.4],
+        [$etab_ar['region_etab_fr'] ?? '', 'helvetica', '', 6.5, 3.4],
+        [$etab_ar['departement_fr'] ?? '', 'helvetica', '', 6.5, 3.4],
         [$etab_ar['arrondissement_fr'] ?? '', 'helvetica', '', 6.5, 3.4],
-        ['**********', 'helvetica', '', 6.5, 3.4],
-        [$etab_ar['ecole_fr'] ?? $etab['nom_fr'], 'helvetica', 'B', 7, 3.6],
+        [$etab_ar['Nom_Etab_Fr'] ?? $etab['nom_fr'], 'helvetica', 'B', 9, 3.6],
+        ['B.P. ' . ($etab_ar['boite_postal'] ?? '') . ' ' . ($etab_ar['ville_etab'] ?? '') . ' - Tél.: ' . ($etab_ar['tel_etab'] ?? ''), 'helvetica', '', 6, 3.6],
     ], 10, 14, 82, false);
 
     tcpdf_colonne_lignes($pdf, [
-        [$etab_ar['republique_ar'] ?? '', 'amirib', '', 8, 3.6],
-        [$etab_ar['devise_ar'] ?? '', 'amirib', '', 7.5, 3.6],
-        ['**********', 'helvetica', '', 6.5, 3.4],
-        [$etab_ar['ministere_ar'] ?? '', 'amirib', '', 7.5, 3.6],
-        [$etab_ar['delegation_reg_ar'] ?? '', 'amirib', '', 7.5, 3.6],
-        [$etab_ar['delegation_dep_ar'] ?? '', 'amirib', '', 7.5, 3.6],
+        [$etab_ar['pays_etab_ar'] ?? '', 'amirib', '', 8, 3.6],
+        [$etab_ar['region_ar'] ?? '', 'amirib', '', 7.5, 3.6],
+        [$etab_ar['departement_ar'] ?? '', 'amirib', '', 7.5, 3.6],
         [$etab_ar['arrondissement_ar'] ?? '', 'amirib', '', 7.5, 3.6],
-        ['**********', 'helvetica', '', 6.5, 3.4],
-        [$etab_ar['ecole_ar'] ?? '', 'amirib', 'B', 8.5, 3.8],
+        [$etab_ar['ecole_ar'] ?? '', 'amirib', 'B', 12, 3.8],
     ], 121, 14, 82, true);
 
     $pdf->SetFont('amirib', 'B', 11);
@@ -167,10 +149,7 @@ function dessiner_bulletin_annuel_arabe(
     $pdf->Cell(45, 4, 'العام الدراسي', 0, 0, 'R');
     $pdf->SetRTL(false, false);
 
-    // ── Bandeau titre (forme ruban, comme le modèle de référence) ──────
-    // Reconstruction approximative (pas de source vectorielle du modèle) :
-    // pointes en éventail crantées à chaque extrémité de la pilule pour
-    // évoquer un ruban/parchemin plutôt qu'une simple pilule pleine.
+    // ── Bandeau titre (forme ruban) ──
     [$rt, $gt, $bt] = couleur_pdf('groupe_competence');
     $pdf->SetFillColor($rt, $gt, $bt);
     $pdf->SetDrawColor($rt, $gt, $bt);
@@ -300,9 +279,7 @@ function dessiner_bulletin_annuel_arabe(
         }
         $h_grp = $y - $y_grp_debut;
         $pdf->Rect($x0, $y_grp_debut, $w_grp, $h_grp, 'D');
-        // Libellé de groupe en arabe, pivoté à 90° en une seule ligne (comme
-        // sur le modèle de référence) — voir pdf/bulletin_trimestriel_arabe.php
-        // pour le même correctif (testé et vérifié visuellement le 14/08).
+        // Libellé de groupe en arabe, pivoté à 90° en une seule ligne.
         $cx = $x0 + $w_grp / 2; $cy = $y_grp_debut + $h_grp / 2;
         $pdf->StartTransform();
         $pdf->Rotate(90, $cx, $cy);
@@ -331,11 +308,7 @@ function dessiner_bulletin_annuel_arabe(
     $y += 6;
 
     // ── RESULTATS DE L'ELEVE : bandeau bilingue + 2 tableaux côte à côte
-    // (TRAVAIL à gauche avec cases à cocher, grille 1er/2è/3è Trim/ANNUELLE
-    // à droite) — reconstruit le 14/08 pour suivre le modèle de référence
-    // (Desktop/BD JAYNITARE/modele/ara_ann.pdf), qui présente ces 2 blocs
-    // côte à côte et non la grille seule pleine largeur (le bloc TRAVAIL
-    // était absent du rendu précédent).
+    // (TRAVAIL à gauche avec cases à cocher, grille 1er/2è/3è Trim/ANNUELLE à droite) ──
     $y += 4;
     $w_all = $w_grp + $w_mat + 3 * $w_trim + $w_moy + $w_rang + $w_appr; // = 189
     pdf_fill($pdf, 'entete_bleu');
@@ -390,9 +363,7 @@ function dessiner_bulletin_annuel_arabe(
     $y_trav_fin = $y;
 
     // -- Tableau de droite : 1er Trim / 2è Trim / 3è Trim / ANNUELLE --
-    // Colonne de libellé arabe ajoutée à droite (comme sur le modèle : le
-    // libellé FR est à gauche mais sa traduction arabe suit à droite de la
-    // ligne, ex. "Moyenne ... المعدل") + en-têtes de colonnes bilingues.
+    // Libellé FR à gauche, traduction arabe à droite de la ligne.
     $x_grille = $x0 + $w_trav + 3;
     $w_lbl_ar = 18;
     $w_lbl = 20; $w_col = ($w_all - $w_trav - 3 - $w_lbl - $w_lbl_ar) / 4;
@@ -427,9 +398,7 @@ function dessiner_bulletin_annuel_arabe(
         $pdf->Cell($w_lbl, 5.5, ' ' . $ligne[0], 1, 0, 'L');
         $pdf->SetFont('helvetica', '', 7.5);
         for ($c = 1; $c <= 4; $c++) {
-            // Toute la colonne ANNUELLE mise en évidence (fond pêche), comme
-            // sur le modèle de référence (bd/../modele/ara_ann.pdf) — pas
-            // juste la cellule Moyenne.
+            // Toute la colonne ANNUELLE mise en évidence (fond pêche).
             if ($c === 4) {
                 pdf_fill($pdf, 'colonne_annuelle');
                 if ($ligne[0] === 'Moyenne') $pdf->SetFont('helvetica', 'B', 9);
@@ -484,8 +453,7 @@ function dessiner_bulletin_annuel_arabe(
         $pdf->Image($qr_tmp, 96, $y + 10, 16, 16, 'PNG');
     }
 
-    // Copyright standard du système (pdf/header_pdf_tcpdf.php) — texte unique
-    // sur tous les PDF du projet, voir pdf_copyright()/tcpdf_copyright().
+    // Copyright standard (pdf/header_pdf_tcpdf.php).
     tcpdf_copyright($pdf, 210, 297);
 }
 
@@ -502,16 +470,18 @@ function pdf_signature_appliquer_jn_tcpdf_ann(TCPDF $pdf, string $type_document,
     $pdf->Image($chemin, $x, $y, $w, $h);
 }
 
-// Préchargement en masse (optimisation, voir notes_apc_arabe.php) : évite
-// les requêtes individuelles que note_matiere_trimestre_arabe() ferait
-// sinon pour chaque (élève × matière × trimestre) de la classe — même
-// principe que pdf/bulletin_annuel.php côté français.
+// Préchargement en masse : évite les requêtes individuelles par (élève × matière × trimestre).
 precharger_notes_sequence_classe_arabe($id_classe);
 
 // Enveloppé dans un try/catch : accessible publiquement via le QR du
 // bulletin — voir fonctions.php::pdf_erreur_generation().
 try {
 $pdf = new TCPDF('P', 'mm', 'A4', true, 'UTF-8', false);
+// Police arabe (amirib) embarquée en entier, pas en sous-ensemble — voir le
+// commentaire identique dans bulletin_trimestriel_arabe.php (glyphes arabes
+// vides dans WPS Office et lecteurs PDF non-Adobe avec le sous-ensemble par
+// défaut de TCPDF).
+$pdf->setFontSubsetting(false);
 $pdf->setPrintHeader(false);
 $pdf->setPrintFooter(false);
 $pdf->SetMargins(5, 5, 5);

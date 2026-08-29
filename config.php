@@ -20,6 +20,19 @@ define('APP_URL',    '/jaynitaare_v2');       // chemin depuis la racine web
 // essaie de se connecter à LUI-MÊME (échec / plantage à l'ouverture du
 // document vérifié). Si la détection automatique se trompe (plusieurs
 // cartes réseau, VPN actif...), fixez-la explicitement :
-// define('SERVEUR_LAN_HOST', '192.168.1.50');
+define('SERVEUR_LAN_HOST', '10.248.27.158');
 define('UPLOAD_DIR', __DIR__ . '/assets/uploads/eleves/');
 define('UPLOAD_URL', '/jaynitaare_v2/assets/uploads/eleves/');
+
+// Clé privée ECDSA P-256 pour la signature offline des QR de bulletins
+// (verif_bulletin_hors_ligne.html vérifie avec la clé publique correspondante,
+// embarquée dans ce fichier — voir pdf/verif_lib.php::bulletin_verif_signature_offline()).
+// Générée une fois via bd/generer_cles_verif_offline.php.
+define('BULLETIN_VERIF_PRIVATE_KEY_PEM', <<<'PEM'
+-----BEGIN PRIVATE KEY-----
+MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgq3rkfV2Imq+iUz7t
+PL6/TLUdbOQQ2ECzWl+OetBWZPWhRANCAASE8LkKsdrhieCdfy34Js0ZxQwBMgYn
+UOxQ1vu7uT/Th5/VEOfLSrbs8Lx8mPRwl2lIITMClPOKm4NEfbO/0gnk
+-----END PRIVATE KEY-----
+PEM
+);

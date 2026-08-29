@@ -13,6 +13,18 @@ $seq_act   = get_sequence_active();
 $user      = utilisateur_connecte();
 $role      = role_connecte();
 
+// Rôles "effectifs" pour le filtrage du menu — au-delà du seul $role, un
+// compte COMPTABLE (Agent financier) affecté à enseigner une classe cette
+// année (agent_est_aussi_enseignant(), fonctions.php) hérite aussi de la
+// visibilité ENSEIGNANT (demande explicite du 22/08/2026 : Discipline et
+// Pédagogie ne s'affichent à un Agent financier que s'il est EN MÊME TEMPS
+// enseignant). N'affecte que l'affichage du menu — les pages elles-mêmes
+// gardent leurs propres exiger_role()/exiger_connexion().
+$roles_effectifs = [$role];
+if ($role !== 'ENSEIGNANT' && agent_est_aussi_enseignant()) {
+    $roles_effectifs[] = 'ENSEIGNANT';
+}
+
 // Année RÉELLEMENT active (Etat_annee_scolaire=1), pas juste le repli de
 // get_annee_active() sur l'année la plus récente — demande explicite du
 // 18/08/2026 : tant qu'aucune année n'est explicitement activée, les menus
@@ -35,7 +47,7 @@ $menu = [
     ],
     'Scolarité' => [
         ['Élèves',  'pages/eleves/liste.php',  'people',    []],
-        ['Classes', 'pages/classes/liste.php', 'door-open', ['DIRECTEUR','SECRETAIRE']],
+        ['Classes', 'pages/classes/liste.php', 'door-open', ['DIRECTEUR','SECRETAIRE','COMPTABLE']],
     ],
 	
     // Finances : remontée au-dessus de Pédagogie (demande explicite) — le
@@ -49,24 +61,30 @@ $menu = [
     // fonctions.php::solde_caisse()).
     'Finances' => [
         ['--', 'Gestion des inscriptions'],
-        ['Paiements',        'pages/finances/versement.php',    'cash-coin',            ['DIRECTEUR','SECRETAIRE']],
-        ['Journal de caisse','pages/finances/journal.php',       'journal-text',         ['DIRECTEUR','SECRETAIRE']],
-        ['État par classe',  'pages/finances/etat_classe.php',   'list-check',           ['DIRECTEUR','SECRETAIRE']],
-        ['Répartition par classe', 'pages/finances/repartition_classes.php', 'pie-chart-fill', ['DIRECTEUR','SECRETAIRE']],
-        ['Impayés',          'pages/finances/impayes.php',       'exclamation-triangle', ['DIRECTEUR','SECRETAIRE']],
-        ['Cas sociaux',      'pages/finances/cas_sociaux.php',   'heart',                ['DIRECTEUR','SECRETAIRE']],
-        ['Statistiques',     'pages/finances/statistiques.php',  'bar-chart-line',       ['DIRECTEUR']],
-        ['Obligations',      'pages/finances/obligations.php',   'card-checklist',       ['DIRECTEUR']],
+        ['Paiements',        'pages/finances/versement.php',    'cash-coin',            ['DIRECTEUR','SECRETAIRE','COMPTABLE']],
+        ['Journal de caisse','pages/finances/journal.php',       'journal-text',         ['DIRECTEUR','SECRETAIRE','COMPTABLE']],
+        ['État par classe',  'pages/finances/etat_classe.php',   'list-check',           ['DIRECTEUR','SECRETAIRE','COMPTABLE']],
+        ['Répartition par classe', 'pages/finances/repartition_classes.php', 'pie-chart-fill', ['DIRECTEUR','SECRETAIRE','COMPTABLE']],
+        ['Impayés',          'pages/finances/impayes.php',       'exclamation-triangle', ['DIRECTEUR','SECRETAIRE','COMPTABLE']],
+        ['Cas sociaux',      'pages/finances/cas_sociaux.php',   'heart',                ['DIRECTEUR','SECRETAIRE','COMPTABLE']],
+        ['Statistiques',     'pages/finances/statistiques.php',  'bar-chart-line',       ['DIRECTEUR','COMPTABLE']],
+        ['Obligations',      'pages/finances/obligations.php',   'card-checklist',       ['DIRECTEUR','COMPTABLE']],
 
         ['--', 'Gestion des dépenses'],
-        ['Nouvelle dépense',     'pages/depenses/saisie.php',       'dash-circle',    ['DIRECTEUR','SECRETAIRE']],
-        ['Journal des dépenses', 'pages/depenses/journal.php',      'journal-minus',  ['DIRECTEUR','SECRETAIRE']],
-        ['Répartition par catégorie', 'pages/depenses/repartition_categories.php', 'pie-chart-fill', ['DIRECTEUR','SECRETAIRE']],
-        ['Statistiques',         'pages/depenses/statistiques.php', 'pie-chart',      ['DIRECTEUR']],
-        ['Catégories',           'pages/depenses/categories.php',   'tags',           ['DIRECTEUR']],
+        ['Nouvelle dépense',     'pages/depenses/saisie.php',       'dash-circle',    ['DIRECTEUR','SECRETAIRE','COMPTABLE']],
+        ['Journal des dépenses', 'pages/depenses/journal.php',      'journal-minus',  ['DIRECTEUR','SECRETAIRE','COMPTABLE']],
+        ['Répartition par catégorie', 'pages/depenses/repartition_categories.php', 'pie-chart-fill', ['DIRECTEUR','SECRETAIRE','COMPTABLE']],
+        ['Statistiques',         'pages/depenses/statistiques.php', 'pie-chart',      ['DIRECTEUR','COMPTABLE']],
+        ['Catégories',           'pages/depenses/categories.php',   'tags',           ['DIRECTEUR','COMPTABLE']],
     ],
-	'Discipline' => [
-        ['Absences',   'pages/absences/index.php',    'person-x', []],
+	// Discipline/Pédagogie : rôles listés explicitement (au lieu de [] = tous)
+    // depuis le 22/08/2026 — COMPTABLE (Agent financier) n'a normalement rien
+    // à y faire, sauf s'il est EN MÊME TEMPS enseignant (voir $roles_effectifs
+    // plus haut, agent_est_aussi_enseignant() dans fonctions.php). Ne PAS
+    // ajouter 'COMPTABLE' ici : c'est justement ce que $roles_effectifs
+    // ajoute dynamiquement le cas échéant, sans jamais l'accorder d'office.
+    'Discipline' => [
+        ['Absences',   'pages/absences/index.php',    'person-x', ['DIRECTEUR','ENSEIGNANT','SECRETAIRE']],
     ],
     // Pédagogie : les deux pistes de notation coexistent (l'école est
     // bilingue français/arabe) et sont volontairement regroupées séparément —
@@ -76,52 +94,64 @@ $menu = [
     // côté arabe — voir notes_apc.php / notes_apc_arabe.php) mais les mêmes
     // fonctionnalités. Un séparateur s'écrit ['--', 'Libellé'] (pas un lien).
     'Pédagogie' => [
-        
-        ['Saisie des notes',       'pages/notes/index.php',       'pencil-square', []],
+
+        ['Saisie des notes',       'pages/notes/index.php',       'pencil-square', ['DIRECTEUR','ENSEIGNANT','SECRETAIRE']],
       /*  ['Absences',               'pages/absences/index.php',    'person-x',  []],*/
-        ['Notes justifiées',       'pages/notes/absence_justifiee.php', 'person-x', []],
+        ['Notes justifiées',       'pages/notes/absence_justifiee.php', 'person-x', ['DIRECTEUR','ENSEIGNANT','SECRETAIRE']],
         ['Annulation d\'évaluation','pages/notes/annulation_evaluation.php', 'calendar-x', ['DIRECTEUR']],
-		['Bulletins',              'pages/bulletins/index.php',   'file-earmark-text', []],
-        ['Statistiques',           'pages/statistiques/index.php','bar-chart-line', []],
-        ['Conseil de classe',      'pages/conseil_classe/index.php', 'mortarboard', []],
-        ['Tableau d\'honneur/ Relevé',    'pages/statistiques/documents.php', 'files', []],
-      
-        ['Résultat annuel',        'pages/resultat_annuel/index.php', 'trophy', []],
-		['Groupes de compétences', 'pages/competences/liste.php', 'diagram-3', []],
-		
+		['Bulletins',              'pages/bulletins/index.php',   'file-earmark-text', ['DIRECTEUR','ENSEIGNANT','SECRETAIRE']],
+        ['Statistiques',           'pages/statistiques/index.php','bar-chart-line', ['DIRECTEUR','ENSEIGNANT','SECRETAIRE']],
+        ['Conseil de classe',      'pages/conseil_classe/index.php', 'mortarboard', ['DIRECTEUR','ENSEIGNANT','SECRETAIRE']],
+        ['Tableau d\'honneur/ Relevé',    'pages/statistiques/documents.php', 'files', ['DIRECTEUR','ENSEIGNANT','SECRETAIRE']],
+
+        ['Résultat annuel',        'pages/resultat_annuel/index.php', 'trophy', ['DIRECTEUR','ENSEIGNANT','SECRETAIRE']],
+		['Groupes de compétences', 'pages/competences/liste.php', 'diagram-3', ['DIRECTEUR','ENSEIGNANT','SECRETAIRE']],
+
 
         ['--', 'Arabe'],
-        ['Saisie des notes',    'pages/notes_arabe/index.php',            'pencil-square',     []],
-        ['Notes justifiées',    'pages/notes_arabe/absence_justifiee.php','person-x',          []],
-		['Bulletins',           'pages/bulletins_arabe/index.php',        'file-earmark-text', []],
+        ['Saisie des notes',    'pages/notes_arabe/index.php',            'pencil-square',     ['DIRECTEUR','ENSEIGNANT','SECRETAIRE']],
+        ['Notes justifiées',    'pages/notes_arabe/absence_justifiee.php','person-x',          ['DIRECTEUR','ENSEIGNANT','SECRETAIRE']],
+		['Bulletins',           'pages/bulletins_arabe/index.php',        'file-earmark-text', ['DIRECTEUR','ENSEIGNANT','SECRETAIRE']],
         // 'Classement' (pages/notes_arabe/classement.php) retiré du menu (14/08/2026) —
         // redondant : rang+moyenne par élève déjà dans Bulletins ci-dessus, stats de
         // classe (effectif/moy./admis/taux réussite/1er/dernier) déjà dans Statistiques
         // ci-dessous, recalcul déjà automatique à chaque enregistrement de notes
         // (pages/notes_arabe/index.php). Fichier conservé tel quel, juste plus lié ici.
-        ['Statistiques',        'pages/statistiques_arabe/index.php',     'bar-chart-line',    []],
-        ['Documents de classe', 'pages/statistiques_arabe/documents.php', 'files',             []],
-		['Conseil de classe',   'pages/conseil_classe_arabe/index.php',   'mortarboard',       []],
-        ['Résultat annuel',     'pages/resultat_annuel_arabe/index.php',  'trophy',            []],
-        ['Groupes de matières', 'pages/matieres_arabe/liste.php',         'diagram-3',         []],
+        ['Statistiques',        'pages/statistiques_arabe/index.php',     'bar-chart-line',    ['DIRECTEUR','ENSEIGNANT','SECRETAIRE']],
+        ['Documents de classe', 'pages/statistiques_arabe/documents.php', 'files',             ['DIRECTEUR','ENSEIGNANT','SECRETAIRE']],
+		['Conseil de classe',   'pages/conseil_classe_arabe/index.php',   'mortarboard',       ['DIRECTEUR','ENSEIGNANT','SECRETAIRE']],
+        ['Résultat annuel',     'pages/resultat_annuel_arabe/index.php',  'trophy',            ['DIRECTEUR','ENSEIGNANT','SECRETAIRE']],
+        ['Groupes de matières', 'pages/matieres_arabe/liste.php',         'diagram-3',         ['DIRECTEUR','ENSEIGNANT','SECRETAIRE']],
     ],
     // RH complète (15/08/2026) : fiche + contrats + congés + paie. Les
     // pages ci-dessous vivent dans pages/enseignants/ (RH) et pages/paie/
-    // (paie à proprement parler) — regroupées dans la même section menu,
-    // toutes DIRECTEUR uniquement (personnel/salaires = plus sensible que
-    // les élèves dans ce projet, déjà le cas pour Enseignant(e)s avant ce
-    // chantier). 'Mes bulletins de paie' est la seule entrée ENSEIGNANT
-    // (self-service, lecture seule — pages/paie/mes_bulletins.php).
+    // (paie à proprement parler) — regroupées dans la même section menu, la
+    // gestion complète (fiches, grille, paie, avances) reste DIRECTEUR
+    // uniquement (personnel/salaires = plus sensible que les élèves dans ce
+    // projet). 'Mes informations' et 'Mes bulletins de paie' sont le
+    // libre-service (identité/contact/banque en écriture, bulletins en
+    // lecture seule) ouvert à DIRECTEUR/ENSEIGNANT/SECRETAIRE/COMPTABLE —
+    // demande explicite du 22/08/2026 : chaque rôle non-Directeur ne voit
+    // QUE ses propres informations dans ce menu, jamais la liste du
+    // personnel ni la paie des autres (pages/enseignants/mon_profil.php,
+    // pages/paie/mes_bulletins.php).
     'Ressources humaines' => [
         ['Enseignant(e)s',        'pages/enseignants/liste.php', 'person-badge',   ['DIRECTEUR']],
         ['Grille salariale',      'pages/paie/grille.php',       'table',          ['DIRECTEUR']],
         ['Paie',                  'pages/paie/index.php',        'cash-stack',     ['DIRECTEUR']],
         ['Avances sur salaire',   'pages/paie/avances.php',      'cash',           ['DIRECTEUR']],
-        ['Mes bulletins de paie', 'pages/paie/mes_bulletins.php','receipt',        ['ENSEIGNANT']],
+        ['Mes informations',      'pages/enseignants/mon_profil.php', 'person-vcard', ['DIRECTEUR','ENSEIGNANT','SECRETAIRE','COMPTABLE']],
+        ['Mes bulletins de paie', 'pages/paie/mes_bulletins.php','receipt',        ['ENSEIGNANT','SECRETAIRE','COMPTABLE']],
     ],
+    // Paramètres : 'Mon compte' (login/mot de passe/questions secrètes,
+    // profil.php) est un libre-service ouvert à TOUS (demande explicite du
+    // 22/08/2026) — 'Configurations'/'Utilisateurs' restent DIRECTEUR
+    // uniquement (paramétrage global de l'établissement, gestion des
+    // comptes d'autrui).
     'Paramètres' => [
-        ['Configurations',   'pages/parametres/index.php',   'gear',        ['DIRECTEUR']],
-        ['Utilisateurs', 'pages/utilisateurs/liste.php', 'person-gear', ['DIRECTEUR']],
+        ['Mon compte',        'profil.php',                    'key', []],
+        ['Configurations',    'pages/parametres/index.php',    'gear',        ['DIRECTEUR']],
+        ['Utilisateurs',      'pages/utilisateurs/liste.php',  'person-gear', ['DIRECTEUR']],
     ],
 	
 	
@@ -180,10 +210,9 @@ function lien_actif(string $url): string {
   <?php if (!empty($etab['logo']) && is_file(__DIR__ . '/../assets/uploads/' . $etab['logo'])): ?>
     <link rel="icon" href="<?= APP_URL ?>/assets/uploads/<?= h($etab['logo']) ?>">
   <?php endif; ?>
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap">
+  <link rel="stylesheet" href="<?= APP_URL ?>/assets/vendor/bootstrap/css/bootstrap.min.css">
+  <link rel="stylesheet" href="<?= APP_URL ?>/assets/vendor/bootstrap-icons/bootstrap-icons.min.css">
+  <link rel="stylesheet" href="<?= APP_URL ?>/assets/vendor/inter/inter.css">
   <?php
   // Cache-buster automatique (mtime du fichier) : sans lui, le navigateur
   // peut servir indéfiniment une VERSION EN CACHE de style.css même après
@@ -222,8 +251,8 @@ function lien_actif(string $url): string {
     <nav class="abz-nav">
       <?php foreach ($menu as $groupe => $items): ?>
         <?php
-        $visibles = array_filter($items, function($it) use ($role) {
-            return $it[0] === '--' || empty($it[3]) || in_array($role, $it[3], true);
+        $visibles = array_filter($items, function($it) use ($roles_effectifs) {
+            return $it[0] === '--' || empty($it[3]) || array_intersect($roles_effectifs, $it[3]);
         });
         // Un séparateur seul (tous les liens qui le suivent masqués par les
         // rôles) ne doit pas afficher une section vide avec juste un titre.

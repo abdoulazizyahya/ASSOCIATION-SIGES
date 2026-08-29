@@ -7,7 +7,7 @@ require_once __DIR__ . '/../../config.php';
 require_once __DIR__ . '/../../connexion.php';
 require_once __DIR__ . '/../../fonctions.php';
 require_once __DIR__ . '/../../paie_fonctions.php';
-exiger_role(['ENSEIGNANT']);
+exiger_role(['ENSEIGNANT','SECRETAIRE','COMPTABLE']);
 
 $mon_matricule = (int) (utilisateur_connecte()['matricule_ens'] ?? 0);
 $bulletins = $mon_matricule ? db_all(

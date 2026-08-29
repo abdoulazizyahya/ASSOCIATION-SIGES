@@ -17,11 +17,11 @@ $f_niveau    = trim((string) ($_GET['niveau'] ?? ''));
 $annee       = get_annee_active();
 $val_annee   = $annee['val_annee'] ?? '';
 
+// Tous les niveaux actifs, avec ou sans classe (une classe qui sera créée
+// plus tard reprend automatiquement le barème déjà configuré ici) — même
+// requête que pages/competences/excel_bareme.php (export Excel jumeau).
 $niveaux_liste = db_all(
-    "SELECT DISTINCT n.LibelleNiveau, n.OrdreNiveau FROM niveau n
-     JOIN classe c ON c.Niveau = n.LibelleNiveau
-     WHERE n.actif = 1
-     ORDER BY n.OrdreNiveau"
+    "SELECT LibelleNiveau, OrdreNiveau FROM niveau WHERE actif = 1 ORDER BY OrdreNiveau"
 );
 if ($f_niveau) {
     $niveaux_liste = array_values(array_filter($niveaux_liste, fn($n) => $n['LibelleNiveau'] === $f_niveau));
@@ -88,7 +88,7 @@ function dessiner_bareme_niveau_pdf(FPDF $pdf, array $etab, string $code_niveau,
             $active = $ligne['actif'] === null || (int) $ligne['actif'] === 1;
             if (!$active) $pdf->SetTextColor(150);
             $pdf->Cell($w[0], 5, pdf_u($ligne['code_comp']), 1, 0, 'C');
-            $pdf->Cell($w[1], 5, pdf_u($ligne['nom_comp']), 1, 0, 'L');
+            $pdf->Cell($w[1], 5, pdf_u($ligne['nom_comp_affiche'] ?? $ligne['nom_comp']), 1, 0, 'L');
             foreach (['orale', 'ecrite', 'pratique', 'savoir_etre'] as $i => $champ) {
                 $v = $ligne[$champ] !== null ? (float) $ligne[$champ] : 0;
                 $pdf->Cell($w[$i + 2], 5, number_format($v, 1, ',', ''), 1, 0, 'C');

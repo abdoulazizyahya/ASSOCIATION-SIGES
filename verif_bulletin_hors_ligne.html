@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Vérification hors ligne — Jaynitaare</title>
+<style>
+  body { background:#0f1a3a; min-height:100vh; margin:0; display:flex; align-items:center; justify-content:center; font-family:system-ui,sans-serif; padding:1.2rem; box-sizing:border-box; }
+  .carte { background:#fff; border-radius:16px; padding:1.8rem; max-width:460px; width:100%; box-shadow:0 10px 40px rgba(0,0,0,.35); }
+  h1 { font-size:1.15rem; margin:0 0 .3rem; color:#0f1a3a; }
+  p.sub { color:#6b7280; font-size:.85rem; margin:0 0 1.1rem; }
+  textarea { width:100%; box-sizing:border-box; min-height:90px; border:1px solid #d1d5db; border-radius:8px; padding:.6rem; font-size:.85rem; font-family:monospace; resize:vertical; }
+  .btns { display:flex; gap:.5rem; margin-top:.7rem; }
+  button { flex:1; border:0; border-radius:8px; padding:.6rem; font-size:.9rem; font-weight:600; cursor:pointer; }
+  #btn-verifier { background:#0f1a3a; color:#fff; }
+  #btn-camera { background:#e5e7eb; color:#0f1a3a; }
+  button:disabled { opacity:.5; cursor:not-allowed; }
+  video { width:100%; border-radius:8px; margin-top:.7rem; display:none; background:#000; }
+  #vue-verif { text-align:center; }
+  #vue-verif.hidden, #vue-bulletin.hidden { display:none; }
+  .verif-icon { font-size:3.2rem; margin-top:.4rem; }
+  .verif-icon.ok { color:#166534; }
+  .verif-icon.ko { color:#991b1b; }
+  #btn-ouvrir { background:#166534; color:#fff; margin-top:1rem; width:100%; padding:.7rem; }
+  #erreur { margin-top:1rem; color:#991b1b; font-size:.85rem; display:none; }
+  .note { margin-top:1.2rem; font-size:.72rem; color:#9ca3af; line-height:1.4; }
+
+  /* Vue bulletin reconstruit */
+  #vue-bulletin .entete { text-align:center; border-bottom:2px solid #0f1a3a; padding-bottom:.7rem; margin-bottom:.9rem; }
+  #vue-bulletin .entete h2 { margin:0 0 .2rem; font-size:1.05rem; color:#0f1a3a; }
+  #vue-bulletin .entete .periode { color:#6b7280; font-size:.85rem; }
+  #vue-bulletin table { width:100%; border-collapse:collapse; font-size:.85rem; margin-bottom:.9rem; }
+  #vue-bulletin th, #vue-bulletin td { text-align:left; padding:.4rem .3rem; border-bottom:1px solid #f0f0f0; }
+  #vue-bulletin th { color:#6b7280; font-weight:600; font-size:.78rem; text-transform:uppercase; }
+  #vue-bulletin td.note { text-align:right; font-weight:700; color:#0f1a3a; }
+  .synthese { display:flex; justify-content:space-between; background:#f8faff; border-radius:10px; padding:.7rem 1rem; font-weight:700; color:#0f1a3a; }
+  .synthese span.lbl { display:block; font-size:.72rem; color:#6b7280; font-weight:500; }
+  #btn-retour { background:#e5e7eb; color:#0f1a3a; margin-top:1rem; width:100%; padding:.55rem; }
+  .filigrane { text-align:center; font-size:.7rem; color:#9ca3af; margin-top:.8rem; }
+</style>
+</head>
+<body>
+<div class="carte">
+
+  <div id="vue-verif">
+    <h1>Vérification hors ligne d'un bulletin</h1>
+    <p class="sub">Collez le texte/lien du QR scanné (ou scannez avec l'appareil photo si disponible) — aucune connexion réseau requise.</p>
+
+    <textarea id="entree" placeholder="Collez ici le contenu du QR..."></textarea>
+    <div class="btns">
+      <button id="btn-verifier">Vérifier</button>
+      <button id="btn-camera">Scanner (caméra)</button>
+    </div>
+    <video id="video" playsinline></video>
+
+    <div id="resultat" style="display:none">
+      <div id="badge-icon" class="verif-icon"></div>
+      <h4 id="badge-titre" style="margin:.3rem 0"></h4>
+      <p id="badge-sous" style="color:#6b7280;font-size:.85rem;margin:0"></p>
+      <button id="btn-ouvrir" style="display:none">Ouvrir le bulletin</button>
+    </div>
+    <div id="erreur"></div>
+
+    <p class="note">
+      Cet outil vérifie une signature cryptographique intégrée dans le QR
+      (clé publique embarquée ci-dessous) — il n'a besoin d'aucune connexion
+      au serveur. Le bulletin ouvert est reconstitué à partir des données
+      signées (pas le PDF original — un QR ne peut pas contenir un fichier
+      entier), mais les valeurs affichées sont garanties non modifiées.
+    </p>
+  </div>
+
+  <div id="vue-bulletin" class="hidden">
+    <div class="entete">
+      <h2 id="b-nom"></h2>
+      <div class="periode">Matricule <span id="b-matricule"></span> · NIU <span id="b-niu"></span> · <span id="b-periode"></span></div>
+    </div>
+    <table>
+      <tbody>
+        <tr><th>Date et lieu de naissance</th><td id="b-naissance"></td></tr>
+        <tr><th>Moyenne UA1</th><td class="note" id="b-moy-ua1"></td></tr>
+        <tr><th>Moyenne UA2</th><td class="note" id="b-moy-ua2"></td></tr>
+      </tbody>
+    </table>
+    <table id="b-tbl-matieres">
+      <thead><tr><th>Matière</th><th style="text-align:right">Moyenne</th><th style="text-align:right">Cote</th></tr></thead>
+      <tbody id="b-matieres"></tbody>
+    </table>
+    <div class="synthese">
+      <div><span class="lbl">Moyenne trimestre</span><span id="b-moyenne"></span></div>
+      <div><span class="lbl">Rang</span><span id="b-rang"></span></div>
+    </div>
+    <div class="filigrane">✓ Authenticité vérifiée hors ligne — reconstitution à partir du QR signé</div>
+    <button id="btn-retour">← Retour</button>
+  </div>
+
+</div>
+
+<script>
+// Clé publique ECDSA P-256 (générée une fois via bd/generer_cles_verif_offline.php)
+// — publique par nature, aucun risque à la diffuser : elle permet de
+// VÉRIFIER une signature, jamais d'en fabriquer une nouvelle.
+const CLE_PUBLIQUE_JWK = {
+  kty: 'EC', crv: 'P-256', ext: true, key_ops: ['verify'],
+  x: 'hPC5CrHa4YngnX8t-CbNGcUMATIGJ1DsUNb7u7k_04c',
+  y: 'n9UQ58tKtuzwvHyY9HCXaUghMwKU84qbg0R9s7_SCeQ'
+};
+
+function b64urlToBytes(s) {
+  s = s.replace(/-/g, '+').replace(/_/g, '/');
+  while (s.length % 4) s += '=';
+  const bin = atob(s);
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return bytes;
+}
+
+function extraireCharge(texte) {
+  texte = texte.trim();
+  let d = null;
+  try {
+    const u = new URL(texte);
+    d = u.searchParams.get('d');
+  } catch (e) {
+    if (texte.includes('.')) d = texte;
+  }
+  if (!d) throw new Error("Aucun paramètre de vérification hors ligne (« d= ») trouvé dans le texte collé — ce QR n'a peut-être pas été généré avec la signature offline, ou le texte est incomplet.");
+  const parts = d.split('.');
+  if (parts.length !== 2) throw new Error('Format de signature invalide.');
+  return { donnees: b64urlToBytes(parts[0]), signature: b64urlToBytes(parts[1]) };
+}
+
+let champsVerifies = null;
+
+async function verifier() {
+  const $resultat = document.getElementById('resultat');
+  const $erreur = document.getElementById('erreur');
+  const $icon = document.getElementById('badge-icon');
+  const $titre = document.getElementById('badge-titre');
+  const $sous = document.getElementById('badge-sous');
+  const $btnOuvrir = document.getElementById('btn-ouvrir');
+  $resultat.style.display = 'none';
+  $erreur.style.display = 'none';
+  $btnOuvrir.style.display = 'none';
+  champsVerifies = null;
+
+  try {
+    const texte = document.getElementById('entree').value;
+    const { donnees, signature } = extraireCharge(texte);
+
+    const clePub = await crypto.subtle.importKey(
+      'jwk', CLE_PUBLIQUE_JWK, { name: 'ECDSA', namedCurve: 'P-256' }, false, ['verify']
+    );
+    const valide = await crypto.subtle.verify(
+      { name: 'ECDSA', hash: 'SHA-256' }, clePub, signature, donnees
+    );
+
+    const texteDonnees = new TextDecoder('utf-8').decode(donnees);
+    const [matricule, niu, nom, naissance, periode, moyUa1, moyUa2, moyenne, rang, matieresStr] = texteDonnees.split('|');
+    // 10e champ facultatif (QR générés avant le 26/08/2026 n'en ont pas) :
+    // "nom~moyenne~cote" par matière, séparées par ";".
+    const matieres = (matieresStr || '').split(';').filter(Boolean).map(m => {
+      const [nom, moy, cote] = m.split('~');
+      return { nom, moy, cote };
+    });
+
+    if (valide) {
+      $icon.className = 'verif-icon ok';
+      $icon.textContent = '✓';
+      $titre.textContent = 'Document authentique';
+      $sous.textContent = 'Bulletin de ' + nom + ' — Matricule ' + matricule;
+      champsVerifies = { matricule, niu, nom, naissance, periode, moyUa1, moyUa2, moyenne, rang, matieres };
+      $btnOuvrir.style.display = 'block';
+    } else {
+      $icon.className = 'verif-icon ko';
+      $icon.textContent = '✗';
+      $titre.textContent = 'Document non vérifié';
+      $sous.textContent = "Ce document n'a pas pu être authentifié. Il peut être falsifié, périmé ou incomplet.";
+    }
+    $resultat.style.display = 'block';
+  } catch (e) {
+    $erreur.textContent = e.message || String(e);
+    $erreur.style.display = 'block';
+  }
+}
+
+function ouvrirBulletin() {
+  if (!champsVerifies) return;
+  const { matricule, niu, nom, naissance, periode, moyUa1, moyUa2, moyenne, rang, matieres } = champsVerifies;
+  document.getElementById('b-nom').textContent = nom;
+  document.getElementById('b-matricule').textContent = matricule;
+  document.getElementById('b-niu').textContent = niu;
+  document.getElementById('b-periode').textContent = periode;
+  document.getElementById('b-naissance').textContent = naissance;
+  document.getElementById('b-moy-ua1').textContent = moyUa1;
+  document.getElementById('b-moy-ua2').textContent = moyUa2;
+  document.getElementById('b-moyenne').textContent = moyenne;
+  document.getElementById('b-rang').textContent = rang;
+
+  // Tableau des matières — absent (QR généré avant le 26/08/2026) : la
+  // table entière se masque plutôt que de rester vide.
+  const $tbl = document.getElementById('b-tbl-matieres');
+  const $corps = document.getElementById('b-matieres');
+  $corps.innerHTML = '';
+  if (matieres && matieres.length) {
+    $tbl.style.display = '';
+    matieres.forEach(m => {
+      const tr = document.createElement('tr');
+      const tdNom = document.createElement('td'); tdNom.textContent = m.nom;
+      const tdMoy = document.createElement('td'); tdMoy.className = 'note'; tdMoy.textContent = m.moy;
+      const tdCote = document.createElement('td'); tdCote.className = 'note'; tdCote.textContent = m.cote;
+      tr.append(tdNom, tdMoy, tdCote);
+      $corps.appendChild(tr);
+    });
+  } else {
+    $tbl.style.display = 'none';
+  }
+
+  document.getElementById('vue-verif').classList.add('hidden');
+  document.getElementById('vue-bulletin').classList.remove('hidden');
+}
+
+document.getElementById('btn-verifier').addEventListener('click', verifier);
+document.getElementById('btn-ouvrir').addEventListener('click', ouvrirBulletin);
+document.getElementById('btn-retour').addEventListener('click', () => {
+  document.getElementById('vue-bulletin').classList.add('hidden');
+  document.getElementById('vue-verif').classList.remove('hidden');
+});
+
+// Scan caméra : amélioration progressive via BarcodeDetector natif
+// (Chrome/Edge Android). Aucune dépendance externe — si absent, le bouton
+// explique qu'il faut coller le texte manuellement (chemin garanti partout).
+const $video = document.getElementById('video');
+const $btnCamera = document.getElementById('btn-camera');
+let flux = null, boucle = null;
+
+$btnCamera.addEventListener('click', async () => {
+  if (!('BarcodeDetector' in window)) {
+    alert("Le scan caméra n'est pas disponible sur ce navigateur — collez le texte scanné dans le champ ci-dessus (fonctionne partout).");
+    return;
+  }
+  if (flux) { arreterCamera(); return; }
+  try {
+    flux = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+    $video.srcObject = flux;
+    $video.style.display = 'block';
+    await $video.play();
+    const detecteur = new BarcodeDetector({ formats: ['qr_code'] });
+    boucle = setInterval(async () => {
+      try {
+        const codes = await detecteur.detect($video);
+        if (codes.length) {
+          document.getElementById('entree').value = codes[0].rawValue;
+          arreterCamera();
+          verifier();
+        }
+      } catch (e) { /* frame ignorée */ }
+    }, 400);
+  } catch (e) {
+    alert("Impossible d'accéder à la caméra : " + e.message);
+  }
+});
+
+function arreterCamera() {
+  if (boucle) { clearInterval(boucle); boucle = null; }
+  if (flux) { flux.getTracks().forEach(t => t.stop()); flux = null; }
+  $video.style.display = 'none';
+}
+</script>
+</body>
+</html>

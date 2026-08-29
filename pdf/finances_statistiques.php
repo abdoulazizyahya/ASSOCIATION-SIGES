@@ -5,7 +5,7 @@
 require_once __DIR__ . '/../config.php';
 require_once __DIR__ . '/../connexion.php';
 require_once __DIR__ . '/../fonctions.php';
-exiger_role(['DIRECTEUR']);
+exiger_role(['DIRECTEUR', 'COMPTABLE']);
 
 require_once __DIR__ . '/fpdf.php';
 require_once __DIR__ . '/header_pdf.php';
@@ -38,9 +38,9 @@ foreach (db_all(
     [$val_annee]
 ) as $r) { $paye_par_niveau[$r['Niveau']] = (float) $r['paye']; }
 
+// Tous les niveaux actifs, avec ou sans classe (voir pages/finances/statistiques.php).
 $niveaux = db_all(
-    "SELECT DISTINCT n.LibelleNiveau, n.OrdreNiveau FROM niveau n
-     JOIN classe c ON c.Niveau=n.LibelleNiveau WHERE n.actif=1 ORDER BY n.OrdreNiveau"
+    "SELECT LibelleNiveau, OrdreNiveau FROM niveau WHERE actif=1 ORDER BY OrdreNiveau"
 );
 $stats_niveau = []; $total_du_general = 0.0; $total_paye_general = 0.0;
 foreach ($niveaux as $n) {

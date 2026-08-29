@@ -133,31 +133,25 @@ $sections_etab = [
         ['Email',           $etab['email_etab'] ?? ''],
     ],
     'Localisation administrative' => [
-        // Libellés corrigés le 20/08/2026 — delegation_regional_fr/en et
-        // delegation_departemental_fr/en contiennent en réalité le
-        // Département et l'Arrondissement (noms de colonnes trompeurs
-        // hérités du legacy, voir fonctions.php::etab_pour_pdf()), à ne pas
-        // confondre avec les champs "Délégation régionale/départementale"
-        // de la section "En-tête bilingue" plus bas — contenu réellement
-        // différent (nom d'office de délégation, pas le simple nom du
-        // département/arrondissement).
+        // departement_fr/en et arrondissement_fr/en (corrigé le 28/08/2026 —
+        // ne plus lire delegation_regional_fr/en ni delegation_departemental_fr/en,
+        // colonnes qui n'existent plus dans `etablissement`, voir
+        // pages/parametres/index.php).
         ['Pays (FR)', $etab['pays_etab_fr'] ?? ''], ['Country (EN)', $etab['pays_etab_en'] ?? ''],
         ['Région (FR)', $etab['region_etab_fr'] ?? ''], ['Region (EN)', $etab['region_etab_en'] ?? ''],
-        ['Département (FR)', $etab['delegation_regional_fr'] ?? ''], ['Department (EN)', $etab['delegation_regional_en'] ?? ''],
-        ['Arrondissement (FR)', $etab['delegation_departemental_fr'] ?? ''], ['Arrondissement (EN)', $etab['delegation_departemental_en'] ?? ''],
+        ['Département (FR)', $etab['departement_fr'] ?? ''], ['Department (EN)', $etab['departement_en'] ?? ''],
+        ['Arrondissement (FR)', $etab['arrondissement_fr'] ?? ''], ['Arrondissement (EN)', $etab['arrondissement_en'] ?? ''],
     ],
     'Direction' => [
         ['Fonction du dirigeant (FR)', $etab['fonction_dirigeant_fr'] ?? ''],
         ['Fonction du dirigeant (EN)', $etab['fonction_dirigeant_en'] ?? ''],
     ],
     "En-tête bilingue — bulletins/certificats piste arabe" => [
-        ['République (FR)', $etab['republique_fr'] ?? ''], ['République (AR)', $etab['republique_ar'] ?? ''],
-        ['Devise (FR)', $etab['devise_fr'] ?? ''], ['Devise (AR)', $etab['devise_ar'] ?? ''],
-        ['Ministère (FR)', $etab['ministere_fr'] ?? ''], ['Ministère (AR)', $etab['ministere_ar'] ?? ''],
-        ['Délégation régionale (FR)', $etab['delegation_reg_fr'] ?? ''], ['Délégation régionale (AR)', $etab['delegation_reg_ar'] ?? ''],
-        ['Délégation départementale (FR)', $etab['delegation_dep_fr'] ?? ''], ['Délégation départementale (AR)', $etab['delegation_dep_ar'] ?? ''],
-        ['Arrondissement (FR)', $etab['arrondissement_fr'] ?? ''], ['Arrondissement (AR)', $etab['arrondissement_ar'] ?? ''],
-        ["Nom de l'école (FR)", $etab['ecole_fr'] ?? ''], ["Nom de l'école (AR)", $etab['ecole_ar'] ?? ''],
+        // Réduit le 28/08/2026 à l'arabe de l'arrondissement + nom de
+        // l'école (les autres champs faisaient doublon avec Pays/Nom
+        // ci-dessus, voir pages/parametres/index.php).
+        ['Arrondissement (AR)', $etab['arrondissement_ar'] ?? ''],
+        ["Nom de l'école (AR)", $etab['ecole_ar'] ?? ''],
     ],
     'Contexte de ce fichier' => [
         ['Année scolaire', $val_annee],

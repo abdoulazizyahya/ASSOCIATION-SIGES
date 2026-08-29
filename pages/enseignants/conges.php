@@ -59,9 +59,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 $conges = db_all("SELECT * FROM conge_enseignant WHERE matricule_ens=? ORDER BY date_debut DESC, id DESC", [$mat]);
 
-$titre_page = 'Congés / Absences';
-require_once __DIR__ . '/../../layout/header.php';
+$es_partiel = isset($_GET['partiel']);
+if (!$es_partiel) {
+    $titre_page = 'Congés / Absences';
+    require_once __DIR__ . '/../../layout/header.php';
+} else {
+    header('Content-Type: text/html; charset=utf-8');
+}
 ?>
+
+<div id="conges-zone">
 
 <div class="page-titre">
   <div>
@@ -76,7 +83,7 @@ require_once __DIR__ . '/../../layout/header.php';
 <div class="card mb-2">
   <div class="card-header py-2" style="background:#f8faff"><span class="fw-semibold" style="font-size:.82rem">Nouveau congé / absence</span></div>
   <div class="card-body">
-    <form method="post">
+    <form method="post" data-ajax-post-form>
       <?= csrf_champ() ?>
       <input type="hidden" name="action" value="ajouter">
       <div class="row g-2 align-items-end">
@@ -138,7 +145,7 @@ require_once __DIR__ . '/../../layout/header.php';
               <?php endif; ?>
             </td>
             <td class="text-end">
-              <form method="post" class="d-inline" onsubmit="return confirm('Supprimer ce congé ?')">
+              <form method="post" class="d-inline" data-ajax-post-form onsubmit="return confirm('Supprimer ce congé ?')">
                 <?= csrf_champ() ?>
                 <input type="hidden" name="action" value="supprimer">
                 <input type="hidden" name="id" value="<?= (int) $c['id'] ?>">
@@ -153,12 +160,20 @@ require_once __DIR__ . '/../../layout/header.php';
 </div>
 
 <script>
-const TYPES_DEDUCTIBLES = <?= json_encode($TYPES_DEDUCTIBLES_DEFAUT) ?>;
+// var (pas const) : ce script est réexécuté à chaque rechargement AJAX de
+// la zone (voir injecterHtmlDansZone(), layout/footer.php) — une
+// redéclaration via const lèverait une erreur au 2e rechargement.
+var TYPES_DEDUCTIBLES = <?= json_encode($TYPES_DEDUCTIBLES_DEFAUT) ?>;
 function majDeduction() {
-    const type = document.getElementById('type_conge').value;
+    var type = document.getElementById('type_conge').value;
     document.getElementById('deduit_paie').checked = TYPES_DEDUCTIBLES.includes(type);
 }
 majDeduction();
 </script>
 
-<?php require_once __DIR__ . '/../../layout/footer.php'; ?>
+</div><!-- /#conges-zone -->
+<?php if ($es_partiel) exit; // rien de plus dans une réponse AJAX partielle. ?>
+
+<?php
+$ajax_zone_id = 'conges-zone'; // voir layout/footer.php — initAjaxZone() y est appelé
+require_once __DIR__ . '/../../layout/footer.php';

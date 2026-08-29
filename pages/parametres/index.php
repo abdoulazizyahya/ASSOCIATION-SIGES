@@ -72,15 +72,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         }
 
+        // Colonnes réelles de `etablissement` (28/08/2026) : le champ
+        // "Département/Arrondissement" de la carte "Localisation
+        // administrative" s'écrit dans departement_fr/en et
+        // arrondissement_fr/en (pas delegation_regional_fr/en ni
+        // delegation_departemental_fr/en, noms hérités du legacy qui
+        // n'existent plus dans ce schéma — UPDATE en échec silencieux
+        // sinon). La carte "En-tête bilingue" a par ailleurs été réduite à
+        // Arrondissement (déjà repris ci-dessus) et Nom de l'école (AR) :
+        // République/Devise/Ministère/Délégations/École (FR) faisaient
+        // doublon avec Pays/Nom ci-dessus (voir pdf_entete()/tcpdf_entete(),
+        // aucun document ne les lit) et leurs colonnes ont été supprimées.
         db_exec(
             "UPDATE etablissement SET
                 Nom_Etab_Fr=?, Nom_Etab_An=?, Initial_Etab=?, Immatriculation_Etab=?, boite_postal=?, ville_etab=?,
                 tel_etab=?, email_etab=?,
-                pays_etab_fr=?, region_etab_fr=?, delegation_regional_fr=?, delegation_departemental_fr=?,
-                pays_etab_en=?, region_etab_en=?, delegation_regional_en=?, delegation_departemental_en=?,
+                pays_etab_fr=?, region_etab_fr=?, departement_fr=?, arrondissement_fr=?,
+                pays_etab_en=?, region_etab_en=?, departement_en=?, arrondissement_en=?,
                 lieu_etab=?, fonction_dirigeant_fr=?, fonction_dirigeant_en=?, logo=?, signature=?,
-                republique_fr=?, devise_fr=?, ministere_fr=?, delegation_reg_fr=?, delegation_dep_fr=?, arrondissement_fr=?, ecole_fr=?,
-                republique_ar=?, devise_ar=?, ministere_ar=?, delegation_reg_ar=?, delegation_dep_ar=?, arrondissement_ar=?, ecole_ar=?
+                arrondissement_ar=?, ecole_ar=?
              WHERE IDEtablissement=?",
             [
                 post('nom_fr'), post('nom_en'), post('sigle'), post('immatriculation'), post('boite_postale'), post('ville'),
@@ -88,8 +98,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 post('pays_fr'), post('region_fr'), post('delegation_regionale_fr'), post('delegation_departementale_fr'),
                 post('pays_en'), post('region_en'), post('delegation_regionale_en'), post('delegation_departementale_en'),
                 post('lieu'), post('fonction_dirigeant_fr'), post('fonction_dirigeant_en'), $logo, $signature,
-                post('republique_fr'), post('devise_fr'), post('ministere_fr'), post('delegation_reg_fr'), post('delegation_dep_fr'), post('arrondissement_fr'), post('ecole_fr'),
-                post('republique_ar'), post('devise_ar'), post('ministere_ar'), post('delegation_reg_ar'), post('delegation_dep_ar'), post('arrondissement_ar'), post('ecole_ar'),
+                post('arrondissement_ar'), post('ecole_ar'),
                 $etab['IDEtablissement'],
             ]
         );
@@ -393,22 +402,22 @@ if (!$es_partiel) {
                    un champ différent au contenu réellement différent
                    ("DELEGATION REGIONALE DE ..."). -->
               <label class="form-label">Département (FR)</label>
-              <input type="text" name="delegation_regionale_fr" class="form-control" value="<?= h($ve('delegation_regional_fr')) ?>">
+              <input type="text" name="delegation_regionale_fr" class="form-control" value="<?= h($ve('departement_fr')) ?>">
             </div>
             <div class="col-md-6">
               <label class="form-label">Department (EN)</label>
-              <input type="text" name="delegation_regionale_en" class="form-control" value="<?= h($ve('delegation_regional_en')) ?>">
+              <input type="text" name="delegation_regionale_en" class="form-control" value="<?= h($ve('departement_en')) ?>">
             </div>
             <div class="col-md-6">
               <!-- Même correction : delegation_departemental_fr contient en
                    réalité l'ARRONDISSEMENT (ex. "ARRONDISEMNET DE NGAOUNDERE
                    I"), pas une délégation départementale. -->
               <label class="form-label">Arrondissement (FR)</label>
-              <input type="text" name="delegation_departementale_fr" class="form-control" value="<?= h($ve('delegation_departemental_fr')) ?>">
+              <input type="text" name="delegation_departementale_fr" class="form-control" value="<?= h($ve('arrondissement_fr')) ?>">
             </div>
             <div class="col-md-6">
               <label class="form-label">Arrondissement (EN)</label>
-              <input type="text" name="delegation_departementale_en" class="form-control" value="<?= h($ve('delegation_departemental_en')) ?>">
+              <input type="text" name="delegation_departementale_en" class="form-control" value="<?= h($ve('arrondissement_en')) ?>">
             </div>
           </div>
         </div>
@@ -434,29 +443,21 @@ if (!$es_partiel) {
         <div class="card-body">
           <div class="section-titre"><i class="bi bi-translate me-1"></i>En-tête bilingue (bulletins/certificats — piste arabe)</div>
           <p style="font-size:.75rem;color:#6b7280;margin-top:-4px">
-            Texte affiché en haut des bulletins/certificats de la piste arabe (colonne française à gauche, arabe à droite —
-            voir <code>pdf/header_pdf_tcpdf.php</code>). Indépendant des champs ci-dessus : ces libellés sont ceux affichés
-            tels quels sur ces documents précis, pas une reprise automatique de l'identité de l'établissement.
+            Colonne arabe affichée en haut des bulletins/certificats de la piste arabe (voir
+            <code>pdf/header_pdf_tcpdf.php</code>). Réduit le 28/08/2026 à l'arabe de l'arrondissement et au nom de
+            l'école : République/Devise/Ministère/Délégations/École (FR) faisaient doublon avec Pays et Nom de
+            l'établissement ci-dessus (aucun document ne les lisait) — leurs colonnes ont été supprimées de la table
+            <code>etablissement</code>.
           </p>
           <div class="row g-compact">
-            <?php foreach ([
-                ['republique_fr',     'republique_ar',     'République',              'REPUBLIQUE DU CAMEROUN'],
-                ['devise_fr',         'devise_ar',         'Devise',                  'Paix - Travail - Patrie'],
-                ['ministere_fr',      'ministere_ar',      'Ministère',               ''],
-                ['delegation_reg_fr', 'delegation_reg_ar', 'Délégation régionale',    ''],
-                ['delegation_dep_fr', 'delegation_dep_ar', 'Délégation départementale', ''],
-                ['arrondissement_fr', 'arrondissement_ar', 'Arrondissement',          ''],
-                ['ecole_fr',          'ecole_ar',          "Nom de l'école",          ''],
-            ] as [$champ_fr, $champ_ar, $label, $placeholder]): ?>
             <div class="col-md-6">
-              <label class="form-label"><?= h($label) ?> (FR)</label>
-              <input type="text" name="<?= $champ_fr ?>" class="form-control" value="<?= h($ve($champ_fr)) ?>" placeholder="<?= h($placeholder) ?>">
+              <label class="form-label">Arrondissement (AR)</label>
+              <input type="text" name="arrondissement_ar" class="form-control" dir="rtl" value="<?= h($ve('arrondissement_ar')) ?>">
             </div>
             <div class="col-md-6">
-              <label class="form-label"><?= h($label) ?> (AR)</label>
-              <input type="text" name="<?= $champ_ar ?>" class="form-control" dir="rtl" value="<?= h($ve($champ_ar)) ?>">
+              <label class="form-label">Nom de l'école (AR)</label>
+              <input type="text" name="ecole_ar" class="form-control" dir="rtl" value="<?= h($ve('ecole_ar')) ?>">
             </div>
-            <?php endforeach; ?>
           </div>
         </div>
       </div>

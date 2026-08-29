@@ -233,7 +233,7 @@ require_once __DIR__ . '/../../layout/header.php';
 </div>
 <?php endif; ?>
 
-<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="<?= APP_URL ?>/assets/vendor/xlsx/xlsx.full.min.js"></script>
 <script>
 const STATS_SOUS_ONGLET = <?= json_encode($sous_onglet) ?>;
 const STATS_TITRES = {

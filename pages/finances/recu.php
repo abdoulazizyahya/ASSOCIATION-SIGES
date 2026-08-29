@@ -37,7 +37,7 @@ if (($_GET['vh'] ?? '') !== '' && (int) ($_GET['eleve'] ?? 0) > 0) {
     $val_annee_pub = get_annee_active()['val_annee'] ?? '';
     $acces_public = recu_verif_valider((int) $_GET['eleve'], $val_annee_pub, (string) $_GET['vh']) !== null;
 }
-if (!$acces_public) exiger_role(['DIRECTEUR', 'SECRETAIRE']);
+if (!$acces_public) exiger_role(['DIRECTEUR', 'SECRETAIRE', 'COMPTABLE']);
 
 require_once __DIR__ . '/../../pdf/fpdf.php';
 require_once __DIR__ . '/../../pdf/header_pdf.php';
@@ -113,7 +113,10 @@ $dessiner_copie = function (float $offY, string $etiquette) use (
     // En-tête bilingue (3 lignes FR gauche / EN droite)
     $pdf->SetTextColor(0);
     $pdf->SetFont('Arial', '', 8);
-    $pdf->Text(23.35, 7.55 + $offY, $u($etab_brut['republique_fr'] ?: 'REPUBLIQUE DU CAMEROUN'));
+    // pays_etab_fr (pas republique_fr, colonne supprimée de `etablissement`
+    // — voir pdf/bulletin_trimestriel_arabe.php pour le même remplacement)
+    // contient déjà le texte complet "RÉPUBLIQUE DU CAMEROUN".
+    $pdf->Text(23.35, 7.55 + $offY, $u($etab_brut['pays_etab_fr'] ?? 'REPUBLIQUE DU CAMEROUN'));
     $pdf->Text(149.39, 7.55 + $offY, $u('REPUBLIC OF CAMEROON'));
     $pdf->Text(26.06, 10.95 + $offY, $u($etab_brut['region_etab_fr'] ?: "REGION DE L'ADAMAOUA"));
     $pdf->Text(154.25, 10.95 + $offY, $u($etab_brut['region_etab_en'] ?: 'ADAMAWA REGION'));

@@ -1,4 +1,9 @@
 <?php
+// mot_de_passe_oublie.php — réinitialisation du mot de passe via les 2
+// questions secrètes du compte (voir configurer_securite.php,
+// bd/migration_v45.sql). Accessible depuis login.php. Limité à
+// MAX_TENTATIVES réponses incorrectes avant de devoir recommencer la
+// procédure depuis le début (anti brute-force sur les réponses).
 require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/connexion.php';
 require_once __DIR__ . '/fonctions.php';
@@ -12,7 +17,6 @@ const MAX_TENTATIVES = 5;
 
 $etape  = $_SESSION['reset_etape'] ?? 'login';
 $erreur = '';
-$succes = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     csrf_verifier();
@@ -20,31 +24,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if ($action === 'chercher') {
         $login = post('login');
-        $u = db_one("SELECT id FROM utilisateur WHERE login = ? AND actif = 1", [$login]);
+        $u = db_one("SELECT id_user FROM user WHERE login_user = ?", [$login]);
         $questions = $u ? db_all(
-            "SELECT q.id, q.libelle FROM utilisateur_question_secrete uqs
+            "SELECT q.id, q.libelle FROM user_question_secrete uqs
              JOIN question_secrete q ON q.id = uqs.id_question
-             WHERE uqs.id_utilisateur = ? ORDER BY uqs.id", [$u['id']]
+             WHERE uqs.id_user = ? ORDER BY uqs.id", [$u['id_user']]
         ) : [];
 
         if ($u && count($questions) >= 2) {
-            $_SESSION['reset_uid']    = $u['id'];
-            $_SESSION['reset_qids']   = [$questions[0]['id'], $questions[1]['id']];
-            $_SESSION['reset_tries']  = 0;
-            $_SESSION['reset_etape']  = 'questions';
+            $_SESSION['reset_uid']   = $u['id_user'];
+            $_SESSION['reset_qids']  = [$questions[0]['id'], $questions[1]['id']];
+            $_SESSION['reset_tries'] = 0;
+            $_SESSION['reset_etape'] = 'questions';
             header('Location: ' . APP_URL . '/mot_de_passe_oublie.php'); exit;
         }
-        $erreur = "Compte introuvable ou récupération indisponible pour ce compte. Contactez un administrateur.";
+        $erreur = "Compte introuvable ou récupération indisponible pour ce compte. Contactez le Directeur.";
         $etape  = 'login';
     }
 
     if ($action === 'verifier' && $etape === 'questions') {
-        $uid  = (int)($_SESSION['reset_uid'] ?? 0);
+        $uid  = (int) ($_SESSION['reset_uid'] ?? 0);
         $rep1 = post('reponse_1');
         $rep2 = post('reponse_2');
         $qids = $_SESSION['reset_qids'] ?? [0, 0];
 
-        $hashes = db_all("SELECT id_question, reponse_hash FROM utilisateur_question_secrete WHERE id_utilisateur = ?", [$uid]);
+        $hashes = db_all("SELECT id_question, reponse_hash FROM user_question_secrete WHERE id_user = ?", [$uid]);
         $map = [];
         foreach ($hashes as $h) { $map[$h['id_question']] = $h['reponse_hash']; }
 
@@ -52,7 +56,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $ok2 = isset($map[$qids[1]]) && password_verify(normaliser_reponse($rep2), $map[$qids[1]]);
 
         if ($ok1 && $ok2) {
-            $_SESSION['reset_ok']   = true;
+            $_SESSION['reset_ok']    = true;
             $_SESSION['reset_etape'] = 'nouveau';
             header('Location: ' . APP_URL . '/mot_de_passe_oublie.php'); exit;
         }
@@ -69,7 +73,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     if ($action === 'definir' && $etape === 'nouveau') {
-        $uid  = (int)($_SESSION['reset_uid'] ?? 0);
+        $uid  = (int) ($_SESSION['reset_uid'] ?? 0);
         $mdp  = post('mot_de_passe');
         $conf = post('confirmer_mdp');
 
@@ -80,7 +84,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $erreur = "Les mots de passe ne correspondent pas.";
             $etape  = 'nouveau';
         } else {
-            db_exec("UPDATE utilisateur SET mot_de_passe = ? WHERE id = ?", [password_hash($mdp, PASSWORD_DEFAULT), $uid]);
+            db_exec("UPDATE user SET pwd_user = ? WHERE id_user = ?", [password_hash($mdp, PASSWORD_DEFAULT), $uid]);
             unset($_SESSION['reset_uid'], $_SESSION['reset_qids'], $_SESSION['reset_tries'], $_SESSION['reset_ok'], $_SESSION['reset_etape']);
             flash_set('succes', 'Mot de passe réinitialisé. Vous pouvez vous connecter.');
             header('Location: ' . APP_URL . '/login.php'); exit;
@@ -88,9 +92,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-// Récupère les libellés des 2 questions pour l'étape "questions"
-// (dans l'ordre exact de $_SESSION['reset_qids'], pour que reponse_1/reponse_2
-// corresponde bien à qids[0]/qids[1] au moment de la vérification)
+// Récupère les libellés des 2 questions pour l'étape "questions" (dans
+// l'ordre exact de $_SESSION['reset_qids'], pour que reponse_1/reponse_2
+// corresponde bien à qids[0]/qids[1] au moment de la vérification).
 $questions_a_afficher = [];
 if ($etape === 'questions' && !empty($_SESSION['reset_qids'])) {
     foreach ($_SESSION['reset_qids'] as $qid) {
@@ -98,17 +102,20 @@ if ($etape === 'questions' && !empty($_SESSION['reset_qids'])) {
     }
 }
 
-$etab = db_one("SELECT * FROM etablissement LIMIT 1") ?? [];
+$etab = get_etablissement();
 ?>
 <!DOCTYPE html>
 <html lang="fr">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Mot de passe oublié — <?= h($etab['sigle'] ?? 'ABZ') ?></title>
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap">
+  <title>Mot de passe oublié — <?= h($etab['Initial_Etab'] ?: 'Jaynitaare') ?></title>
+  <?php if (!empty($etab['logo']) && is_file(__DIR__ . '/assets/uploads/' . $etab['logo'])): ?>
+    <link rel="icon" href="<?= APP_URL ?>/assets/uploads/<?= h($etab['logo']) ?>">
+  <?php endif; ?>
+  <link rel="stylesheet" href="<?= APP_URL ?>/assets/vendor/bootstrap/css/bootstrap.min.css">
+  <link rel="stylesheet" href="<?= APP_URL ?>/assets/vendor/bootstrap-icons/bootstrap-icons.min.css">
+  <link rel="stylesheet" href="<?= APP_URL ?>/assets/vendor/inter/inter.css">
   <style>
     body { font-family:'Inter',sans-serif; background:linear-gradient(135deg,#0f1a3a 0%,#1e4fd8 100%); min-height:100vh; display:flex; align-items:center; justify-content:center; margin:0; }
     .login-box { background:#fff; border-radius:16px; padding:2.2rem 2rem; width:min(96vw,420px); box-shadow:0 20px 60px rgba(0,0,0,.35); }
@@ -125,7 +132,7 @@ $etab = db_one("SELECT * FROM etablissement LIMIT 1") ?? [];
 <div class="login-box">
   <div class="login-etab">
     <strong>Mot de passe oublié</strong>
-    <?= h($etab['nom_fr'] ?? 'Système de Gestion Scolaire') ?>
+    <?= h($etab['Nom_Etab_Fr'] ?? 'Système de Gestion Scolaire') ?>
   </div>
 
   <?php if ($erreur): ?>

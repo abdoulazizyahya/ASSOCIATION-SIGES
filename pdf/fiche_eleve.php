@@ -4,6 +4,7 @@ require_once __DIR__ . '/../config.php';
 require_once __DIR__ . '/../connexion.php';
 require_once __DIR__ . '/../fonctions.php';
 exiger_connexion();
+interdire_role('COMPTABLE', "Ce document n'est pas accessible au profil Agent financier / Comptable.");
 
 require_once __DIR__ . '/fpdf.php';
 require_once __DIR__ . '/header_pdf.php';

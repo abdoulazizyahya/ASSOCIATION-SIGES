@@ -5,7 +5,7 @@
 require_once __DIR__ . '/../config.php';
 require_once __DIR__ . '/../connexion.php';
 require_once __DIR__ . '/../fonctions.php';
-exiger_role(['DIRECTEUR', 'SECRETAIRE']);
+exiger_role(['DIRECTEUR', 'SECRETAIRE', 'COMPTABLE']);
 
 require_once __DIR__ . '/fpdf.php';
 require_once __DIR__ . '/header_pdf.php';

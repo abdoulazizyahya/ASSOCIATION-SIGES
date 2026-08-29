@@ -38,10 +38,10 @@ function session_init() {
 //
 // Retourne l'hôte à utiliser : inchangé si ce n'est pas localhost/127.0.0.1
 // (accès déjà via une vraie adresse réseau) ; sinon la constante
-// SERVEUR_LAN_HOST si définie dans config.php (ex.
-// define('SERVEUR_LAN_HOST', '192.168.1.50') — à renseigner si la
-// détection automatique se trompe, plusieurs cartes réseau/VPN actif) ;
-// sinon détection automatique de l'IP LAN de la machine Windows.
+// SERVEUR_LAN_HOST si définie dans config.php (à ne renseigner QUE si le
+// serveur a une IP LAN fixe — sinon la laisser commentée : une valeur figée
+// devient fausse dès que le réseau change et fait échouer tous les scans) ;
+// sinon détection automatique de l'IP LAN réelle de la machine.
 function hote_verif_reseau(): string {
     $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
     $nom_hote = explode(':', $host)[0]; // retire un éventuel :port
@@ -51,12 +51,58 @@ function hote_verif_reseau(): string {
     if (defined('SERVEUR_LAN_HOST') && SERVEUR_LAN_HOST !== '') {
         return SERVEUR_LAN_HOST;
     }
-    static $ip_detectee = null;
-    if ($ip_detectee === null) {
-        $ip = @gethostbyname(gethostname());
-        $ip_detectee = ($ip && $ip !== gethostname() && $ip !== '127.0.0.1') ? $ip : $host;
+    $ip = detecter_ip_lan();
+    return $ip ?? $host;
+}
+
+// Détection de l'IP LAN réelle de la machine (interface qui porte la route
+// par défaut — celle qu'un téléphone sur le même WiFi doit joindre).
+// Recalculée à chaque appel PENDANT une requête donnée mais mémoïsée pour
+// cette requête (static) : le réseau ne change pas en cours de requête, mais
+// il PEUT changer entre deux générations de documents (partage de connexion
+// coupé/rétabli, changement de WiFi...) — c'est justement le cas à gérer.
+function detecter_ip_lan(): ?string {
+    static $cache = false;
+    if ($cache !== false) return $cache;
+
+    $valide = static function ($ip): bool {
+        return is_string($ip)
+            && filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4)
+            && !str_starts_with($ip, '127.')
+            && $ip !== '0.0.0.0';
+    };
+
+    // 1) Socket UDP "connecté" vers une cible externe : AUCUN paquet n'est
+    //    réellement émis (UDP sans handshake), mais l'OS choisit l'interface
+    //    de sortie selon la table de routage et lui attribue une IP locale
+    //    qu'on lit ici. Fonctionne SANS Internet tant qu'une passerelle est
+    //    configurée (cas normal en WiFi/LAN, même box sans accès Internet).
+    foreach (['8.8.8.8:53', '1.1.1.1:53', '192.168.1.1:53'] as $cible) {
+        $s = @stream_socket_client("udp://$cible", $errno, $errstr, 1);
+        if (!$s) continue;
+        $nom = @stream_socket_get_name($s, false); // "IP:port"
+        fclose($s);
+        if ($nom && ($pos = strrpos($nom, ':')) !== false) {
+            $ip = substr($nom, 0, $pos);
+            if ($valide($ip)) return $cache = $ip;
+        }
     }
-    return $ip_detectee;
+
+    // 2) Repli : résolution du nom d'hôte de la machine.
+    $ip = @gethostbyname(gethostname());
+    if ($valide($ip)) return $cache = $ip;
+
+    // 3) Dernier repli (Windows) : première IPv4 privée retournée par ipconfig.
+    if (stripos(PHP_OS, 'WIN') === 0) {
+        $sortie = @shell_exec('ipconfig');
+        if ($sortie && preg_match_all('/IPv4[^:]*:\s*([0-9]{1,3}(?:\.[0-9]{1,3}){3})/i', $sortie, $m)) {
+            foreach ($m[1] as $ip) {
+                if ($valide($ip)) return $cache = $ip;
+            }
+        }
+    }
+
+    return $cache = null;
 }
 
 // Page d'erreur conviviale pour un échec de GÉNÉRATION de PDF (FPDF/TCPDF
@@ -78,8 +124,8 @@ function pdf_erreur_generation(Throwable $e): never {
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Document indisponible — <?= h(APP_NOM) ?></title>
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+  <link rel="stylesheet" href="<?= APP_URL ?>/assets/vendor/bootstrap/css/bootstrap.min.css">
+  <link rel="stylesheet" href="<?= APP_URL ?>/assets/vendor/bootstrap-icons/bootstrap-icons.min.css">
   <style>
     body { background:#0f1a3a; min-height:100vh; display:flex; align-items:center; justify-content:center; font-family:system-ui,sans-serif; }
     .verif-card { background:#fff; border-radius:16px; padding:2.2rem 1.8rem; max-width:460px; width:92%; text-align:center; box-shadow:0 10px 40px rgba(0,0,0,.35); }
@@ -122,9 +168,22 @@ function est_connecte(): bool {
     return !empty($_SESSION['user_id']);
 }
 
+// Configuration des 2 questions secrètes obligatoire dès la 1ère connexion
+// (demande explicite du 22/08/2026, même principe qu'ABZ_MBE) : tant qu'un
+// compte n'a pas ses 2 questions, exiger_connexion() le redirige vers
+// configurer_securite.php avant de le laisser accéder à quoi que ce soit
+// d'autre. Liste d'exemption courte et explicite (jamais de boucle de
+// redirection possible) : la page de configuration elle-même et la
+// déconnexion.
 function exiger_connexion(): void {
     if (!est_connecte()) {
         header('Location: ' . APP_URL . '/login.php');
+        exit;
+    }
+    $script_courant = basename($_SERVER['SCRIPT_NAME'] ?? '');
+    $exemptes = ['configurer_securite.php', 'logout.php'];
+    if (!in_array($script_courant, $exemptes, true) && !utilisateur_a_questions((int) ($_SESSION['user_id'] ?? 0))) {
+        header('Location: ' . APP_URL . '/configurer_securite.php');
         exit;
     }
 }
@@ -138,11 +197,79 @@ function role_connecte(): string {
     return $_SESSION['user']['role'] ?? '';
 }
 
+/** matricule_ens de l'utilisateur connecté (null si personne connectée). */
+function matricule_ens_courant(): ?string {
+    session_init();
+    $mat = $_SESSION['user']['matricule_ens'] ?? null;
+    return $mat !== null && $mat !== '' ? (string) $mat : null;
+}
+
+// Un compte non-ENSEIGNANT (ex. COMPTABLE) est-il par ailleurs affecté à
+// enseigner une classe cette année ? (demande explicite du 22/08/2026 : les
+// menus Discipline/Pédagogie ne s'affichent pour un Agent financier QUE
+// s'il est EN MÊME TEMPS enseignant). Le rôle du compte reste unique
+// (user.matricule_ens -> enseignant.id_fonction, un seul rôle "officiel"),
+// donc le signal factuel retenu est une affectation réelle dans
+// enseignat_classe/enseignat_classe_arabe pour l'année active — pas un 2e
+// rôle qui n'existe pas dans ce modèle de données.
+function agent_est_aussi_enseignant(): bool {
+    $mat = matricule_ens_courant();
+    if (!$mat) return false;
+    $val_annee = get_annee_active()['val_annee'] ?? '';
+    if (!$val_annee) return false;
+    $nb = (int) db_val("SELECT COUNT(*) FROM enseignat_classe WHERE matricule_ens=? AND val_annee=?", [$mat, $val_annee]);
+    if ($nb > 0) return true;
+    return (int) db_val("SELECT COUNT(*) FROM enseignat_classe_arabe WHERE matricule_ens=? AND val_annee=?", [$mat, $val_annee]) > 0;
+}
+
+// ── Questions secrètes (récupération de mot de passe — migration_v45) ────
+
+function utilisateur_a_questions(int $id_user): bool {
+    if (!$id_user) return false;
+    return (int) db_val("SELECT COUNT(*) FROM user_question_secrete WHERE id_user = ?", [$id_user]) >= 2;
+}
+
+function normaliser_reponse(string $r): string {
+    return mb_strtolower(trim($r), 'UTF-8');
+}
+
 function exiger_role(array $roles): void {
     exiger_connexion();
     if (!in_array(role_connecte(), $roles, true)) {
         die('<div style="font-family:sans-serif;padding:2rem;color:red">
              Accès refusé. Vous n\'avez pas les droits nécessaires.</div>');
+    }
+}
+
+// Garde d'accès SERVEUR (pas seulement le masquage de menu de
+// layout/header.php) pour tout le module Pédagogie/Discipline — notes,
+// absences, bulletins, statistiques, conseils de classe, résultats annuels,
+// compétences/matières, pistes française ET arabe. Verrouillage explicite
+// demandé le 22/08/2026 (suite à l'ajout du rôle COMPTABLE) : un Agent
+// financier ne doit PAS pouvoir accéder à ces pages même en devinant l'URL
+// directe, sauf s'il est EN MÊME TEMPS affecté à enseigner une classe cette
+// année (agent_est_aussi_enseignant()) — exactement la même règle que la
+// visibilité du menu, appliquée ici côté serveur pour ne plus dépendre
+// uniquement de l'affichage. À appeler à la place de exiger_connexion() (pas
+// en plus : l'appelle déjà en interne).
+function exiger_acces_pedagogie(): void {
+    exiger_connexion();
+    if (in_array(role_connecte(), ['DIRECTEUR', 'ENSEIGNANT', 'SECRETAIRE'], true)) return;
+    if (agent_est_aussi_enseignant()) return;
+    die('<div style="font-family:sans-serif;padding:2rem;color:red">
+         Accès refusé. Vous n\'avez pas les droits nécessaires.</div>');
+}
+
+// Écarte explicitement UN rôle précis d'une page par ailleurs ouverte à tous
+// les connectés (exiger_connexion()) — utilisé pour les 3 documents élève
+// que le profil COMPTABLE (Agent financier) ne doit jamais imprimer (fiche
+// PDF, certificat de scolarité, carte scolaire — demande explicite du
+// 22/08/2026), sans avoir à réénumérer DIRECTEUR/ENSEIGNANT/SECRETAIRE (et
+// tout futur rôle) dans un exiger_role() à liste blanche. À appeler APRÈS
+// exiger_connexion() (suppose déjà un utilisateur connecté).
+function interdire_role(string $role_interdit, string $message = 'Accès refusé.'): void {
+    if (role_connecte() === $role_interdit) {
+        die('<div style="font-family:sans-serif;padding:2rem;color:red">' . h($message) . '</div>');
     }
 }
 
@@ -410,6 +537,48 @@ function reporter_bareme_annee(string $annee_precedente, string $nouvelle_annee)
     return count($rows);
 }
 
+// ── Section (Fr/An) d'une classe ou d'un niveau — bascule d'affichage ───
+// Un niveau anglophone (niveau.Section='An') n'affecte QUE l'affichage des
+// libellés de compétences/groupes (le jeu langue='An', simple jumeau
+// bilingue de code_comp/ordre_affichage — voir notes_apc.php) : la saisie
+// et le calcul restent TOUJOURS sur le jeu langue='Fr' (competences_classe(),
+// discipline, composer_sequence). Point d'entrée UNIQUE pour cette bascule
+// — plusieurs endroits du code (saisie de notes, relevés, barème par
+// niveau, bulletins) la réimplémentaient chacun séparément avant le
+// 26/08/2026, avec le risque qu'un endroit oublie la bascule et affiche du
+// français pour une classe/un niveau anglophone (plusieurs cas trouvés et
+// corrigés ce jour-là) — centralisé ici pour que les prochains endroits
+// n'aient plus à la redéfinir. bulletin_trimestriel.php/bulletin_annuel.php
+// gardent leur propre cache local historique (déjà correct, non touché
+// pour ne pas risquer une régression sur du code qui fonctionne).
+function section_niveau(string $code_niveau): string {
+    static $cache = [];
+    if (!array_key_exists($code_niveau, $cache)) {
+        $cache[$code_niveau] = (string) (db_val("SELECT Section FROM niveau WHERE LibelleNiveau=?", [$code_niveau]) ?: 'Fr');
+    }
+    return $cache[$code_niveau];
+}
+function section_classe(int $id_classe): string {
+    static $cache = [];
+    if (!array_key_exists($id_classe, $cache)) {
+        $cache[$id_classe] = (string) (db_val(
+            "SELECT n.Section FROM classe c JOIN niveau n ON n.LibelleNiveau = c.Niveau WHERE c.IDClasses=?",
+            [$id_classe]
+        ) ?: 'Fr');
+    }
+    return $cache[$id_classe];
+}
+// Libellé à afficher pour une ligne competences_classe()/bareme_par_niveau()
+// (nom_comp_en si section anglophone et libellé EN disponible, sinon repli
+// sur le français — un jumeau EN manquant ne doit jamais produire un blanc).
+function libelle_comp_affiche(array $c, string $section): string {
+    return ($section === 'An' && !empty($c['nom_comp_en'])) ? $c['nom_comp_en'] : $c['nom_comp'];
+}
+function libelle_groupe_comp_affiche(array $c, string $section): string {
+    if ($section !== 'An') return $c['libelle_groupe_comp'];
+    return !empty($c['libelle_groupe_comp_en']) ? $c['libelle_groupe_comp_en'] : $c['libelle_groupe_comp'];
+}
+
 // ── Visibilité pédagogique (compétences / groupes) par niveau ───
 // Ajouté avec pages/competences/liste.php (onglet Barème par niveau) : une
 // compétence peut être désactivée pour un niveau donné (`discipline.actif`,
@@ -476,15 +645,32 @@ function groupe_competence_est_visible(int $id_groupe_comp, string $code_niveau,
 function bareme_par_niveau(string $code_niveau, string $val_annee, ?int $id_classe_valeurs = null): array {
     $resultat = ['classes' => [], 'groupes' => [], 'divergent' => false, 'assigne' => false];
 
-    $groupes_assignes_ids = array_map('intval', array_column(
+    // « Groupes par niveau » (pages/competences/liste.php) filtre les groupes
+    // proposés par SECTION du niveau : un niveau anglophone n'y assigne QUE
+    // des groupes langue='An' (jamais les 'Fr'). Mais seul le côté langue=
+    // 'Fr' porte réellement la notation (discipline/composer_sequence ne
+    // référencent jamais les id_comp du côté 'An' — commentaire plus haut).
+    // Pour un niveau anglophone, on résout donc les groupes assignés vers
+    // leur équivalent 'Fr' via ordre_affichage (convention explicite du
+    // formulaire de l'onglet Groupes : un groupe Fr et son homologue An
+    // partagent le même ordre) — sinon les groupes assignés ('An') ne
+    // matchaient jamais rien ici et le barème restait vide malgré
+    // l'assignation (bug signalé le 26/08/2026).
+    $ordres_assignes = array_map('intval', array_column(
         array_filter(
-            db_all("SELECT id_groupe_comp, actif FROM groupe_competence_niveau WHERE code_niveau=?", [$code_niveau]),
+            db_all(
+                "SELECT gcn.id_groupe_comp, gcn.actif, g.ordre_affichage
+                 FROM groupe_competence_niveau gcn
+                 JOIN groupe_competence g ON g.id_groupe_comp = gcn.id_groupe_comp
+                 WHERE gcn.code_niveau=?",
+                [$code_niveau]
+            ),
             fn($a) => (int) $a['actif'] === 1
         ),
-        'id_groupe_comp'
+        'ordre_affichage'
     ));
-    $resultat['assigne'] = !empty($groupes_assignes_ids);
-    if (!$groupes_assignes_ids) return $resultat;
+    $resultat['assigne'] = !empty($ordres_assignes);
+    if (!$ordres_assignes) return $resultat;
 
     $classes_du_niveau = db_all("SELECT IDClasses, DesignationClasses FROM classe WHERE Niveau=? ORDER BY IDClasses", [$code_niveau]);
     $resultat['classes'] = $classes_du_niveau;
@@ -493,18 +679,37 @@ function bareme_par_niveau(string $code_niveau, string $val_annee, ?int $id_clas
     $ids_classes = array_column($classes_du_niveau, 'IDClasses');
     $id_classe_valeurs ??= (int) $ids_classes[0]; // classe la plus ancienne du niveau = valeurs affichées par défaut
 
-    $in_grp = implode(',', array_fill(0, count($groupes_assignes_ids), '?'));
+    // Libellés à AFFICHER : le côté langue='Fr' reste la source de vérité
+    // pour id_comp/code_comp/discipline (seul côté noté, voir plus haut) —
+    // mais un niveau anglophone doit voir ses libellés en anglais, pas en
+    // français (bug signalé le 26/08/2026 : « Barème par niveau » montrait
+    // toujours le français pour un niveau An, même si « Groupes par niveau »
+    // avait bien les bons groupes 'An' assignés). Jumeau EN résolu par
+    // ordre_affichage (groupe) puis code_comp (compétence dans ce groupe EN
+    // précis — pas un simple `code_comp=code_comp` global, qui matcherait
+    // aussi le côté Fr lui-même si les codes se recoupent entre groupes).
+    $section_niveau = (string) (db_val("SELECT Section FROM niveau WHERE LibelleNiveau=?", [$code_niveau]) ?: 'Fr');
+    $section_en     = $section_niveau === 'An';
+
+    $in_ord = implode(',', array_fill(0, count($ordres_assignes), '?'));
     $bareme = db_all(
         "SELECT c.id_comp, c.code_comp, c.nom_comp,
                 g.id_groupe_comp, g.libelle_groupe_comp, g.ordre_affichage,
+                g_en.libelle_groupe_comp AS libelle_groupe_comp_en, c_en.nom_comp AS nom_comp_en,
                 d.orale, d.ecrite, d.pratique, d.savoir_etre, d.total_points, d.actif
          FROM competence c
          JOIN groupe_competence g ON g.id_groupe_comp = c.id_groupe_comp
+         LEFT JOIN groupe_competence g_en ON g_en.ordre_affichage = g.ordre_affichage AND g_en.langue = 'An'
+         LEFT JOIN competence c_en ON c_en.id_groupe_comp = g_en.id_groupe_comp AND c_en.code_comp = c.code_comp
          LEFT JOIN discipline d ON d.id_comp = c.id_comp AND d.IDClasses = ? AND d.annee_scol = ?
-         WHERE g.langue = 'Fr' AND g.id_groupe_comp IN ($in_grp)
+         WHERE g.langue = 'Fr' AND g.ordre_affichage IN ($in_ord)
          ORDER BY g.ordre_affichage, c.code_comp",
-        array_merge([$id_classe_valeurs, $val_annee], $groupes_assignes_ids)
+        array_merge([$id_classe_valeurs, $val_annee], $ordres_assignes)
     );
+    foreach ($bareme as &$b) {
+        $b['nom_comp_affiche'] = ($section_en && !empty($b['nom_comp_en'])) ? $b['nom_comp_en'] : $b['nom_comp'];
+    }
+    unset($b);
 
     if (count($ids_classes) > 1) {
         $in    = implode(',', array_fill(0, count($ids_classes), '?'));
@@ -521,7 +726,8 @@ function bareme_par_niveau(string $code_niveau, string $val_annee, ?int $id_clas
     foreach ($bareme as $b) {
         $idg = (int) $b['id_groupe_comp'];
         if (!isset($groupes[$idg])) {
-            $groupes[$idg] = ['libelle' => $b['libelle_groupe_comp'], 'ordre' => (int) $b['ordre_affichage'], 'lignes' => []];
+            $libelle_grp = ($section_en && !empty($b['libelle_groupe_comp_en'])) ? $b['libelle_groupe_comp_en'] : $b['libelle_groupe_comp'];
+            $groupes[$idg] = ['libelle' => $libelle_grp, 'ordre' => (int) $b['ordre_affichage'], 'lignes' => []];
         }
         $groupes[$idg]['lignes'][] = $b;
     }
@@ -540,6 +746,115 @@ function bareme_par_niveau(string $code_niveau, string $val_annee, ?int $id_clas
     unset($grp);
     $resultat['groupes'] = $groupes;
     return $resultat;
+}
+
+// ── Piste arabe — barème par niveau (Oral/Écrit/Pratique). Groupé par
+// matiere_arabe.id_groupe. Bucket clé 0 = matière sans groupe.
+function bareme_matiere_par_niveau(string $code_niveau, string $val_annee, ?int $id_classe_valeurs = null): array {
+    $resultat = ['classes' => [], 'groupes' => [], 'divergent' => false, 'assigne' => false];
+
+    $matieres_assignees_ids = array_map('intval', array_column(
+        array_filter(
+            db_all("SELECT id_mat, actif FROM matiere_niveau_arabe WHERE code_niveau=?", [$code_niveau]),
+            fn($a) => (int) $a['actif'] === 1
+        ),
+        'id_mat'
+    ));
+    $resultat['assigne'] = !empty($matieres_assignees_ids);
+    if (!$matieres_assignees_ids) return $resultat;
+
+    $classes_du_niveau = db_all("SELECT IDClasses, DesignationClasses FROM classe WHERE Niveau=? ORDER BY IDClasses", [$code_niveau]);
+    $resultat['classes'] = $classes_du_niveau;
+    if (!$classes_du_niveau) return $resultat;
+
+    $ids_classes = array_column($classes_du_niveau, 'IDClasses');
+    $id_classe_valeurs ??= (int) $ids_classes[0]; // classe la plus ancienne du niveau = valeurs affichées par défaut
+
+    $in_mat = implode(',', array_fill(0, count($matieres_assignees_ids), '?'));
+    $bareme = db_all(
+        "SELECT m.id_mat, m.matiere_fr, m.matiere_ar, m.id_groupe, mn.ordre,
+                d.orale, d.ecrite, d.pratique, d.total_points, d.actif
+         FROM matiere_arabe m
+         JOIN matiere_niveau_arabe mn ON mn.id_mat = m.id_mat AND mn.code_niveau = ?
+         LEFT JOIN discipline_arabe d ON d.id_mat = m.id_mat AND d.IDClasses = ? AND d.annee_scol = ?
+         WHERE m.id_mat IN ($in_mat)
+         ORDER BY mn.ordre, m.matiere_fr",
+        array_merge([$code_niveau, $id_classe_valeurs, $val_annee], $matieres_assignees_ids)
+    );
+
+    if (count($ids_classes) > 1) {
+        $in    = implode(',', array_fill(0, count($ids_classes), '?'));
+        $check = db_all(
+            "SELECT id_mat, COUNT(DISTINCT CONCAT(orale,'/',ecrite,'/',pratique,'/',actif)) AS nb_variantes
+             FROM discipline_arabe WHERE IDClasses IN ($in) AND annee_scol=?
+             GROUP BY id_mat HAVING nb_variantes > 1",
+            array_merge($ids_classes, [$val_annee])
+        );
+        $resultat['divergent'] = !empty($check);
+    }
+
+    $groupes = [];
+    foreach ($bareme as $b) {
+        $idg = $b['id_groupe'] !== null ? (int) $b['id_groupe'] : 0; // 0 = bucket "غير مصنفة" (non classée)
+        if (!isset($groupes[$idg])) {
+            $groupes[$idg] = ['libelle' => $idg === 0 ? 'غير مصنفة' : '', 'lignes' => []];
+        }
+        $groupes[$idg]['lignes'][] = $b;
+    }
+    // Libellé arabe en priorité, repli sur le français si vide.
+    $ids_grp_reels = array_filter(array_keys($groupes), fn($k) => $k !== 0);
+    if ($ids_grp_reels) {
+        $in_g = implode(',', array_fill(0, count($ids_grp_reels), '?'));
+        foreach (db_all("SELECT id_groupe, nom_groupe_fr, nom_groupe_ar FROM groupe_matiere_arabe WHERE id_groupe IN ($in_g)", array_values($ids_grp_reels)) as $g) {
+            $groupes[(int) $g['id_groupe']]['libelle'] = $g['nom_groupe_ar'] ?: $g['nom_groupe_fr'];
+        }
+    }
+    foreach ($groupes as &$grp) {
+        // Pas encore de ligne discipline_arabe pour une matière = active par
+        // défaut (comme discipline côté français, colonne DEFAULT 1).
+        $a_une_active = false;
+        foreach ($grp['lignes'] as $ligne) {
+            if ($ligne['actif'] === null || (int) $ligne['actif'] === 1) { $a_une_active = true; break; }
+        }
+        $grp['a_une_active'] = $a_une_active;
+        $grp['visible']      = $a_une_active;
+    }
+    unset($grp);
+    $resultat['groupes'] = $groupes;
+    return $resultat;
+}
+
+// ── Piste arabe — copie le barème (discipline_arabe) d'un niveau vers des
+// classes ciblées (défaut : toutes celles du niveau). Classe de référence =
+// la plus ancienne du niveau ; no-op si elle n'a pas encore de barème.
+function synchroniser_bareme_niveau_arabe(string $code_niveau, ?array $ids_classes = null): void {
+    $classes_du_niveau = array_column(db_all("SELECT IDClasses FROM classe WHERE Niveau=? ORDER BY IDClasses", [$code_niveau]), 'IDClasses');
+    if (!$classes_du_niveau) return;
+    $id_classe_ref = (int) $classes_du_niveau[0];
+    $ids_classes ??= $classes_du_niveau;
+
+    $annee     = get_annee_active();
+    $val_annee = $annee['val_annee'] ?? '';
+    if ($val_annee === '') return;
+
+    $bareme_ref = db_all(
+        "SELECT id_mat, orale, ecrite, pratique, total_points, actif FROM discipline_arabe WHERE IDClasses=? AND annee_scol=?",
+        [$id_classe_ref, $val_annee]
+    );
+    if (!$bareme_ref) return;
+
+    foreach ($ids_classes as $id_classe) {
+        if ((int) $id_classe === $id_classe_ref) continue;
+        foreach ($bareme_ref as $b) {
+            db_exec(
+                "INSERT INTO discipline_arabe (IDClasses, id_mat, annee_scol, orale, ecrite, pratique, total_points, actif)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                 ON DUPLICATE KEY UPDATE orale=VALUES(orale), ecrite=VALUES(ecrite), pratique=VALUES(pratique),
+                                         total_points=VALUES(total_points), actif=VALUES(actif)",
+                [(int) $id_classe, (int) $b['id_mat'], $val_annee, (float) $b['orale'], (float) $b['ecrite'], (float) $b['pratique'], (float) $b['total_points'], (int) $b['actif']]
+            );
+        }
+    }
 }
 
 // Identifiant d'affichage d'un élève (matricule — clé métier de `eleve`)
@@ -596,6 +911,7 @@ function libelle_role(string $role): string {
         'DIRECTEUR'  => 'Directeur/Directrice',
         'ENSEIGNANT' => 'Enseignant(e)',
         'SECRETAIRE' => 'Secrétaire',
+        'COMPTABLE'  => 'Agent financier / Comptable',
         default      => $role,
     };
 }
@@ -846,24 +1162,14 @@ function etab_pour_pdf(array $etab): array {
         // ANNUEL_CLASSE.php (jaynitaare legacy) affiche à cet endroit.
         'lieu'              => $etab['lieu_etab'] ?? '',
         'region_fr'         => $etab['region_etab_fr'] ?? '',
-        // Correction du 20/08/2026 : ces deux lignes étaient inversées depuis
-        // le portage initial (mapping fait par ressemblance de nom de colonne
-        // — "departemental" ~ "departement_fr" — sans vérifier le contenu
-        // réel). En base, `delegation_regional_fr` contient en fait le
-        // DÉPARTEMENT (ex. "DEPARTEMENT DE LA VINA") et
-        // `delegation_departemental_fr` contient en fait l'ARRONDISSEMENT
-        // (ex. "ARRONDISEMNET DE NGAOUNDERE I") — noms de colonnes trompeurs
-        // hérités du legacy jaynitaare, non révisés avant migration_v31 (voir
-        // aussi pages/parametres/index.php, libellés du formulaire renommés
-        // en même temps). Sans cette correction, tous les documents piste
-        // FR/EN (bulletins, attestations, cartes, exports Excel — tout ce qui
-        // passe par cette fonction) affichaient Département et Arrondissement
-        // permutés.
-        'departement_fr'    => $etab['delegation_regional_fr'] ?? '',
-        'arrondissement_fr' => $etab['delegation_departemental_fr'] ?? '',
+        // `departement_fr`/`arrondissement_fr` : colonnes réelles de
+        // `etablissement` — pas `delegation_regional_fr`/
+        // `delegation_departemental_fr`, qui n'existent plus.
+        'departement_fr'    => $etab['departement_fr'] ?? '',
+        'arrondissement_fr' => $etab['arrondissement_fr'] ?? '',
         'region_en'         => $etab['region_etab_en'] ?? '',
-        'division_en'       => $etab['delegation_regional_en'] ?? '',
-        'subdivision_en'    => $etab['delegation_departemental_en'] ?? '',
+        'division_en'       => $etab['departement_en'] ?? '',
+        'subdivision_en'    => $etab['arrondissement_en'] ?? '',
         'chef_etablissement'=> $etab['fonction_dirigeant_fr'] ?? '',
         'chef_etablissement_en' => $etab['fonction_dirigeant_en'] ?? '',
         'logo'              => $etab['logo'] ?? '',

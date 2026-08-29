@@ -41,9 +41,16 @@ if ($ens && $ens['arrondissement_ens']) {
 
 $ve = fn(string $k) => $ens[$k] ?? '';
 
-$titre_page = $ens ? 'Modifier un membre du personnel' : 'Nouveau membre du personnel';
-require_once __DIR__ . '/../../layout/header.php';
+$es_partiel = isset($_GET['partiel']);
+if (!$es_partiel) {
+    $titre_page = $ens ? 'Modifier un membre du personnel' : 'Nouveau membre du personnel';
+    require_once __DIR__ . '/../../layout/header.php';
+} else {
+    header('Content-Type: text/html; charset=utf-8');
+}
 ?>
+
+<div id="enseignant-form-zone">
 
 <div class="d-flex align-items-center gap-2 mb-3">
   <a href="<?= APP_URL ?>/pages/enseignants/liste.php" class="btn btn-sm btn-light">
@@ -55,7 +62,7 @@ require_once __DIR__ . '/../../layout/header.php';
   </div>
 </div>
 
-<form method="post" action="<?= APP_URL ?>/pages/enseignants/save.php">
+<form method="post" action="<?= APP_URL ?>/pages/enseignants/save.php" data-ajax-post-form>
   <?= csrf_champ() ?>
   <input type="hidden" name="mat" value="<?= $ens ? (int) $ens['matricule_ens'] : '' ?>">
 
@@ -279,4 +286,9 @@ initLieuCascade({
 });
 </script>
 
-<?php require_once __DIR__ . '/../../layout/footer.php'; ?>
+</div><!-- /#enseignant-form-zone -->
+<?php if ($es_partiel) exit; // rien de plus dans une réponse AJAX partielle. ?>
+
+<?php
+$ajax_zone_id = 'enseignant-form-zone'; // voir layout/footer.php — initAjaxZone() y est appelé
+require_once __DIR__ . '/../../layout/footer.php';

@@ -49,6 +49,31 @@ function competences_classe(int $id_classe, string $val_annee): array {
     $cle = $id_classe . '|' . $val_annee;
     if (isset($cache[$cle])) return $cache[$cle];
 
+    // Seules les compétences dont le GROUPE est réellement assigné au niveau
+    // de cette classe (onglet « Groupes par niveau ») sont chargées — même
+    // résolution Fr↔An par ordre_affichage que fonctions.php::bareme_par_niveau()
+    // (un niveau anglophone n'assigne que des groupes langue='An', jamais
+    // 'Fr' directement, voir ce commentaire là-bas). Sans ce filtre, une
+    // ligne `discipline` restée d'un ancien découpage (groupe depuis retiré
+    // de l'assignation du niveau) continuait à apparaître en saisie — bug
+    // signalé le 26/08/2026 ("de mauvaises compétences s'affichent").
+    $code_niveau     = (string) db_val("SELECT Niveau FROM classe WHERE IDClasses=?", [$id_classe]);
+    $ordres_assignes = $code_niveau ? array_map('intval', array_column(
+        array_filter(
+            db_all(
+                "SELECT gcn.id_groupe_comp, gcn.actif, g.ordre_affichage
+                 FROM groupe_competence_niveau gcn
+                 JOIN groupe_competence g ON g.id_groupe_comp = gcn.id_groupe_comp
+                 WHERE gcn.code_niveau=?",
+                [$code_niveau]
+            ),
+            fn($a) => (int) $a['actif'] === 1
+        ),
+        'ordre_affichage'
+    )) : [];
+    if (!$ordres_assignes) return $cache[$cle] = [];
+
+    $in_ord = implode(',', array_fill(0, count($ordres_assignes), '?'));
     $lignes = db_all(
         "SELECT m.id_comp, m.code_comp, m.nom_comp, m.id_groupe_comp,
                 g.libelle_groupe_comp, g.ordre_affichage,
@@ -56,9 +81,9 @@ function competences_classe(int $id_classe, string $val_annee): array {
          FROM competence m
          JOIN discipline d ON d.id_comp = m.id_comp
          JOIN groupe_competence g ON g.id_groupe_comp = m.id_groupe_comp
-         WHERE d.IDClasses = ? AND d.annee_scol = ? AND g.langue = 'Fr' AND d.actif = 1
+         WHERE d.IDClasses = ? AND d.annee_scol = ? AND g.langue = 'Fr' AND g.ordre_affichage IN ($in_ord) AND d.actif = 1
          ORDER BY g.ordre_affichage, m.code_comp",
-        [$id_classe, $val_annee]
+        array_merge([$id_classe, $val_annee], $ordres_assignes)
     );
 
     // Libellés EN : une seule requête groupée (IN (...)) au lieu d'une
@@ -75,8 +100,23 @@ function competences_classe(int $id_classe, string $val_annee): array {
         );
         foreach ($rows_en as $r) { $noms_en[$r['code_comp']] = $r['nom_comp']; }
     }
+    // Libellés EN des GROUPES (jumeau par ordre_affichage, pas code_comp —
+    // voir libelle_groupe_competence_en()) : nécessaire pour que la saisie
+    // affiche des libellés anglais pour une classe de section anglophone
+    // (bug signalé le 26/08/2026 — la saisie montrait toujours le français,
+    // même pour une classe An, alors que « Groupes par niveau » assigne bien
+    // les groupes 'An' à ces niveaux-là).
+    $ordres = array_values(array_unique(array_column($lignes, 'ordre_affichage')));
+    $libelles_groupe_en = [];
+    if ($ordres) {
+        $placeholders_o = implode(',', array_fill(0, count($ordres), '?'));
+        foreach (db_all("SELECT ordre_affichage, libelle_groupe_comp FROM groupe_competence WHERE langue='An' AND ordre_affichage IN ($placeholders_o)", $ordres) as $r) {
+            $libelles_groupe_en[(int) $r['ordre_affichage']] = $r['libelle_groupe_comp'];
+        }
+    }
     foreach ($lignes as &$l) {
-        $l['nom_comp_en'] = $noms_en[$l['code_comp']] ?? '';
+        $l['nom_comp_en']           = $noms_en[$l['code_comp']] ?? '';
+        $l['libelle_groupe_comp_en'] = $libelles_groupe_en[(int) $l['ordre_affichage']] ?? '';
     }
     unset($l);
 
@@ -229,6 +269,21 @@ function appreciation_fr(?float $note, float $bareme): string {
     if ($pct < 0.75) return 'ECA';
     if ($pct < 0.90) return 'A';
     return 'A+';
+}
+
+// Équivalent arabe de appreciation_fr() — mêmes seuils/principe (0.55/0.75/0.90
+// du barème). Retourne un code, pas les emoji directement : aucune police
+// embarquée dans le projet n'a de glyphes couleur ❌⏳🥇⭐ (TCPDF/amirib —
+// vérifié, les cellules restaient vides), affichés via assets/img/pdf/cote_*.png
+// (capturés depuis le rendu Chrome, seul rendu couleur disponible ici) —
+// voir cote_icone_chemin() dans pdf/bulletin_trimestriel_arabe.php.
+function appreciation_fr_arabe(?float $note, float $bareme): string {
+    if ($note === null || $bareme <= 0) return '';
+    $pct = $note / $bareme;
+    if ($pct < 0.55) return 'na';    // ❌ Non acquis
+    if ($pct < 0.75) return 'eca';   // ⏳ En cours d’acquisition
+    if ($pct < 0.90) return 'a';     // 🥇 Acquis
+    return 'aplus';                  // ⭐ Acquis avec facilité
 }
 
 // ── Jours d'absence NON JUSTIFIÉS d'un élève ────────────────────────
@@ -684,7 +739,7 @@ function classement_sur_sequences(int $id_classe, array $seqs, string $val_annee
         if ($moy_premier === null) $moy_premier = $moy;
         $moy_dernier = $moy;
         if ($moy_precedente === null || abs($moy - $moy_precedente) > 0.001) $rang_du_groupe = $nb_classes_val;
-        $l['rang'] = $rang_du_groupe . 'e' . ($rang_du_groupe < $nb_classes_val ? ' ex' : '');
+        $l['rang'] = $rang_du_groupe . ($rang_du_groupe < $nb_classes_val ? 'ex' : 'e');
         $moy_precedente = $moy;
     }
     unset($l);
@@ -1431,7 +1486,7 @@ function classement_trimestre_classe(int $id_classe, int $id_trim, string $val_a
         if ($moy_precedente === null || abs($moy - $moy_precedente) > 0.001) {
             $rang_du_groupe = $nb_classes_val;
         }
-        $l['rang'] = $rang_du_groupe . 'e' . ($rang_du_groupe < $nb_classes_val ? ' ex' : '');
+        $l['rang'] = $rang_du_groupe . ($rang_du_groupe < $nb_classes_val ? 'ex' : 'e');
         $moy_precedente = $moy;
     }
     unset($l);
@@ -1596,7 +1651,7 @@ function rang_eleve_competence_annuelle(int $id_eleve, int $id_comp, int $id_cla
         foreach ($moyennes as $id_courant => $moy) {
             $i++;
             if ($moy_precedente === null || abs($moy - $moy_precedente) > 0.001) $rang_du_groupe = $i;
-            $rangs[$id_courant] = $rang_du_groupe . 'e' . ($rang_du_groupe < $i ? ' ex' : '');
+            $rangs[$id_courant] = $rang_du_groupe . ($rang_du_groupe < $i ? 'ex' : 'e');
             $moy_precedente = $moy;
         }
         $cache[$cle_groupe] = $rangs;
@@ -1638,7 +1693,7 @@ function classement_annuel_classe(int $id_classe, string $val_annee): array {
         $somme += $moy; $nb_classes_val++;
         if ($moy >= 10) $nb_admis++;
         if ($moy_precedente === null || abs($moy - $moy_precedente) > 0.001) { $rang_du_groupe = $nb_classes_val; }
-        $l['rang'] = $rang_du_groupe . 'e' . ($rang_du_groupe < $nb_classes_val ? ' ex' : '');
+        $l['rang'] = $rang_du_groupe . ($rang_du_groupe < $nb_classes_val ? 'ex' : 'e');
         $moy_precedente = $moy;
     }
     unset($l);

@@ -6,7 +6,7 @@
 require_once __DIR__ . '/../../config.php';
 require_once __DIR__ . '/../../connexion.php';
 require_once __DIR__ . '/../../fonctions.php';
-exiger_role(['DIRECTEUR']);
+exiger_role(['DIRECTEUR', 'COMPTABLE']);
 
 $annee     = get_annee_active();
 $val_annee = $annee['val_annee'] ?? '';
@@ -40,9 +40,11 @@ foreach (db_all(
     [$val_annee]
 ) as $r) { $paye_par_niveau[$r['Niveau']] = (float) $r['paye']; }
 
+// Tous les niveaux actifs, avec ou sans classe (un niveau sans classe
+// apparaît avec des totaux à 0 — transparence sur les niveaux configurés
+// mais pas encore peuplés, cohérent avec le reste du projet).
 $niveaux = db_all(
-    "SELECT DISTINCT n.LibelleNiveau, n.OrdreNiveau FROM niveau n
-     JOIN classe c ON c.Niveau=n.LibelleNiveau WHERE n.actif=1 ORDER BY n.OrdreNiveau"
+    "SELECT LibelleNiveau, OrdreNiveau FROM niveau WHERE actif=1 ORDER BY OrdreNiveau"
 );
 $du_reel_par_niveau = []; // niveau => somme des 'du' réels (après réduction) — pour "Par niveau" et sa réutilisation ci-dessous
 foreach ($tous_eleves_du as $e) {
@@ -156,9 +158,9 @@ $par_agent = db_all(
 $titre_page = 'Statistiques';
 require_once __DIR__ . '/../../layout/header.php';
 ?>
-<!-- Chart.js chargé uniquement sur cette page (pas dans layout/header.php),
-     même CDN jsdelivr déjà utilisé pour Bootstrap/icônes. -->
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<!-- Chart.js chargé uniquement sur cette page (pas dans layout/header.php) —
+     copie locale (assets/vendor/) pour fonctionner sans connexion Internet. -->
+<script src="<?= APP_URL ?>/assets/vendor/chart/chart.umd.min.js"></script>
 
 <div class="page-titre d-flex justify-content-between align-items-center flex-wrap gap-2">
   <div>

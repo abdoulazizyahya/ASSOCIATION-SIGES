@@ -9,7 +9,7 @@ require_once __DIR__ . '/../../connexion.php';
 require_once __DIR__ . '/../../fonctions.php';
 require_once __DIR__ . '/../../notes_apc.php';
 require_once __DIR__ . '/../../notes_apc_arabe.php';
-exiger_connexion();
+exiger_acces_pedagogie();
 exiger_annee_active(); // Année scolaire réellement active requise (18/08/2026) — module Pédagogie/Discipline.
 
 header('Cache-Control: no-store, no-cache, must-revalidate');
@@ -21,7 +21,7 @@ $val_annee = $annee_act['val_annee'] ?? '';
 $seq_act   = get_sequence_active();
 
 $onglet = $_GET['onglet'] ?? 'eleves';
-$allowed_onglets = ['eleves', 'matieres', 'effectifs', 'niveau', 'matiere', 'enseignants'];
+$allowed_onglets = ['eleves', 'matieres', 'effectifs', 'niveau', 'matiere', 'non_evalue', 'enseignants'];
 if (!in_array($onglet, $allowed_onglets, true)) $onglet = 'eleves';
 if ($onglet === 'enseignants' && !$is_admin) $onglet = 'eleves';
 
@@ -120,6 +120,7 @@ $q = fn(string $o) => "?onglet=$o&vue=$vue&classe=$id_classe";
   <li class="nav-item"><a class="nav-link <?= $onglet === 'effectifs' ? 'active' : '' ?>" data-ajax-nav href="<?= h($q('effectifs')) ?>"><i class="bi bi-diagram-3 me-1"></i>Effectifs / Niveaux</a></li>
   <li class="nav-item"><a class="nav-link <?= $onglet === 'niveau' ? 'active' : '' ?>" data-ajax-nav href="<?= h($q('niveau')) ?>"><i class="bi bi-bar-chart-steps me-1"></i>Par niveau</a></li>
   <li class="nav-item"><a class="nav-link <?= $onglet === 'matiere' ? 'active' : '' ?>" data-ajax-nav href="<?= h($q('matiere')) ?>"><i class="bi bi-journal-text me-1"></i>Par matière</a></li>
+  <li class="nav-item"><a class="nav-link <?= $onglet === 'non_evalue' ? 'active' : '' ?>" data-ajax-nav href="<?= h($q('non_evalue')) ?>"><i class="bi bi-exclamation-triangle me-1"></i>Non évalués</a></li>
   <?php if ($is_admin): ?><li class="nav-item"><a class="nav-link <?= $onglet === 'enseignants' ? 'active' : '' ?>" data-ajax-nav href="<?= h($q('enseignants')) ?>"><i class="bi bi-person-badge me-1"></i>Enseignants</a></li><?php endif; ?>
 </ul>
 
@@ -239,18 +240,20 @@ $classes_show = $id_classe ? array_filter($classes, fn($c) => (int) $c['IDClasse
 foreach ($classes_show as $c):
     $stats_c = stats_par_matiere_arabe([(int) $c['IDClasses']], $val_annee, $vue, $id_trim);
     if (empty($stats_c)) continue;
-    $coefs = [];
-    foreach (matieres_classe_arabe((int) $c['IDClasses']) as $m) { $coefs[$m['matiere_fr']] = (int) $m['coef']; }
+    $baremes = [];
+    foreach (matieres_classe_arabe_avec_bareme((int) $c['IDClasses'], $val_annee) as $m) {
+        $baremes[$m['matiere_fr']] = $m['bareme'] !== null ? (int) $m['bareme']['total_points'] : 20;
+    }
 ?>
   <h6 class="fw-bold mt-3" style="color:#1a3c6b"><i class="bi bi-door-open me-1"></i><?= h($c['DesignationClasses']) ?></h6>
   <div class="table-responsive mb-3">
   <table class="table tbl-stat table-hover mb-0">
-    <thead><tr><th>Matière</th><th>Coef.</th><th>Nb évalués</th><th>Moyenne classe</th><th>Min</th><th>Max</th><th>Admis</th><th>Taux</th></tr></thead>
+    <thead><tr><th>Matière</th><th>Barème</th><th>Nb évalués</th><th>Moyenne classe</th><th>Min</th><th>Max</th><th>Admis</th><th>Taux</th></tr></thead>
     <tbody>
     <?php foreach ($stats_c as $d): ?>
     <tr>
       <td class="fw-semibold"><?= h($d['matiere']) ?></td>
-      <td><?= $coefs[$d['matiere']] ?? '—' ?></td>
+      <td><?= $baremes[$d['matiere']] ?? '—' ?></td>
       <td><?= $d['nb'] ?></td>
       <td class="fw-bold <?= $d['moy'] !== null && $d['moy'] >= 10 ? 'text-success' : 'text-danger' ?>"><?= $fmt($d['moy']) ?></td>
       <td><?= $fmt($d['min']) ?></td><td><?= $fmt($d['max']) ?></td><td><?= $d['admis'] ?></td>
@@ -331,6 +334,60 @@ $mat_stats = stats_par_matiere_arabe(array_map('intval', array_column($classes_s
   <?php endforeach; ?>
   <?php if (empty($mat_stats)): ?><tr><td colspan="6" class="text-center text-muted">Aucune donnée.</td></tr><?php endif; ?>
   </tbody>
+</table>
+</div>
+
+<?php elseif ($onglet === 'non_evalue'): ?>
+<!-- Onglet Non évalués : écart entre inscrits et élèves évalués, liste
+     nominative par classe avec la raison. -->
+<?php
+$classes_show_ne = $id_classe ? array_filter($classes, fn($c) => (int) $c['IDClasses'] === $id_classe) : $classes;
+
+$lignes_ne = []; $total_inscrits = 0;
+foreach ($classes_show_ne as $c) {
+    $nb_inscrits = (int) db_val(
+        "SELECT COUNT(*) FROM inscrire i JOIN eleve e ON e.id_eleve=i.id_eleve WHERE i.IDClasses=? AND i.val_annee=? AND e.statut='actif'",
+        [(int) $c['IDClasses'], $val_annee]
+    );
+    $total_inscrits += $nb_inscrits;
+    $ne = eleves_non_evalues_classe_arabe((int) $c['IDClasses'], $val_annee, $vue, $id_trim);
+    foreach ($ne as $e) { $lignes_ne[] = $e + ['classe' => $c['DesignationClasses']]; }
+}
+$total_gap     = count($lignes_ne);
+$total_evalues = $total_inscrits - $total_gap;
+?>
+<div class="row g-2 mb-3 cartes-genre">
+  <div class="col-md-4">
+    <div class="stat-card"><div class="stat-lbl mb-1">Effectif inscrit</div><div class="stat-num"><?= $total_inscrits ?></div></div>
+  </div>
+  <div class="col-md-4">
+    <div class="stat-card"><div class="stat-lbl mb-1">Élèves évalués</div><div class="stat-num text-success"><?= $total_evalues ?></div></div>
+  </div>
+  <div class="col-md-4">
+    <div class="stat-card"><div class="stat-lbl mb-1">Non évalué (écart)</div><div class="stat-num text-danger"><?= $total_gap ?></div></div>
+  </div>
+</div>
+
+<div class="table-responsive">
+<table class="table tbl-stat table-hover mb-0" style="font-size:.8rem">
+  <thead><tr><th>Classe</th><th>Matricule</th><th>Nom et prénom</th><th>Sexe</th><th>Raison</th></tr></thead>
+  <tbody>
+    <?php foreach ($lignes_ne as $e): ?>
+    <tr>
+      <td class="fw-semibold"><?= h($e['classe']) ?></td>
+      <td><?= h($e['Mat_elv']) ?></td>
+      <td><?= h($e['Nom_elv'] . ' ' . ($e['Prenom_elv'] ?? '')) ?></td>
+      <td><?= stripos($e['Sexe_elv'] ?? '', 'F') === 0 ? 'F' : 'M' ?></td>
+      <td><span class="badge bg-danger"><?= h($e['raison']) ?></span></td>
+    </tr>
+    <?php endforeach; ?>
+    <?php if (!$lignes_ne): ?>
+      <tr><td colspan="5" class="text-center text-muted py-3">Aucun écart pour cette sélection — tous les élèves inscrits sont évalués.</td></tr>
+    <?php endif; ?>
+  </tbody>
+  <?php if ($lignes_ne): ?>
+  <tfoot><tr style="background:#e8f0fe;font-weight:700"><td colspan="4">TOTAL</td><td><?= count($lignes_ne) ?> élève<?= count($lignes_ne) > 1 ? 's' : '' ?></td></tr></tfoot>
+  <?php endif; ?>
 </table>
 </div>
 

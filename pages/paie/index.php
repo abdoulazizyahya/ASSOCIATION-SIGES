@@ -17,6 +17,44 @@ exiger_role(['DIRECTEUR']);
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     csrf_verifier();
+    $action = post('action');
+
+    // ── Modifier une période (mois/année) — seulement si aucun bulletin
+    //    n'y a encore été généré (sinon les bulletins déjà figés ne
+    //    correspondraient plus au mois affiché) ─────────────────────────
+    if ($action === 'periode_modifier') {
+        $id    = (int) post('id');
+        $mois  = (int) post('mois');
+        $annee = (int) post('annee');
+        $nb_bulletins = (int) db_val("SELECT COUNT(*) FROM bulletin_paie WHERE id_periode=?", [$id]);
+        if ($nb_bulletins > 0) {
+            flash_set('erreur', "Impossible de modifier : $nb_bulletins bulletin(s) déjà généré(s) pour cette période — supprimez-les d'abord (voir la période) ou créez-en une nouvelle.");
+        } elseif ($mois < 1 || $mois > 12 || $annee < 2000) {
+            flash_set('erreur', 'Mois et année invalides.');
+        } elseif (db_val("SELECT id FROM periode_paie WHERE mois=? AND annee=? AND id<>?", [$mois, $annee, $id])) {
+            flash_set('erreur', 'Une période existe déjà pour ce mois/cette année.');
+        } else {
+            $libelle = libelle_mois($mois) . ' ' . $annee;
+            db_exec("UPDATE periode_paie SET mois=?, annee=?, libelle=? WHERE id=?", [$mois, $annee, $libelle, $id]);
+            flash_set('succes', "Période renommée « $libelle ».");
+        }
+        rediriger('pages/paie/index.php');
+    }
+
+    // ── Supprimer une période — seulement si aucun bulletin généré ──────
+    if ($action === 'periode_supprimer') {
+        $id = (int) post('id');
+        $nb_bulletins = (int) db_val("SELECT COUNT(*) FROM bulletin_paie WHERE id_periode=?", [$id]);
+        if ($nb_bulletins > 0) {
+            flash_set('erreur', "Impossible de supprimer : $nb_bulletins bulletin(s) déjà généré(s) pour cette période — supprimez-les d'abord (voir la période).");
+        } else {
+            db_exec("DELETE FROM periode_paie WHERE id=?", [$id]);
+            flash_set('succes', 'Période supprimée.');
+        }
+        rediriger('pages/paie/index.php');
+    }
+
+    // ── Créer / ouvrir une période (comportement existant, inchangé) ───
     $mois  = (int) post('mois');
     $annee = (int) post('annee');
     if ($mois < 1 || $mois > 12 || $annee < 2000) {
@@ -104,6 +142,24 @@ require_once __DIR__ . '/../../layout/header.php';
               <a href="<?= APP_URL ?>/pages/paie/periode.php?id=<?= (int) $p['id'] ?>" class="btn btn-sm" style="background:#eef2ff;color:#1e4fd8;padding:3px 7px">
                 <i class="bi bi-eye" style="font-size:.78rem"></i> Ouvrir
               </a>
+              <?php if ((int) $p['nb_bulletins'] === 0): ?>
+                <button type="button" class="btn btn-sm btn-light" style="padding:3px 6px" title="Modifier le mois/l'année"
+                        onclick='ouvrirModifierPeriode(<?= json_encode(['id' => (int) $p['id'], 'mois' => (int) $p['mois'], 'annee' => (int) $p['annee']]) ?>)'>
+                  <i class="bi bi-pencil-square text-success" style="font-size:.75rem"></i>
+                </button>
+                <form method="post" class="d-inline" onsubmit="return confirm('Supprimer la période « <?= h(addslashes($p['libelle'])) ?> » ?')">
+                  <?= csrf_champ() ?>
+                  <input type="hidden" name="action" value="periode_supprimer">
+                  <input type="hidden" name="id" value="<?= (int) $p['id'] ?>">
+                  <button class="btn btn-sm btn-light" style="padding:3px 6px" title="Supprimer">
+                    <i class="bi bi-trash text-danger" style="font-size:.75rem"></i>
+                  </button>
+                </form>
+              <?php else: ?>
+                <span class="text-muted" style="padding:3px 6px;display:inline-block" title="Modification/suppression impossibles : des bulletins ont déjà été générés pour cette période">
+                  <i class="bi bi-lock" style="font-size:.75rem"></i>
+                </span>
+              <?php endif; ?>
             </td>
           </tr>
         <?php endforeach; endif; ?>
@@ -111,5 +167,48 @@ require_once __DIR__ . '/../../layout/header.php';
     </table>
   </div>
 </div>
+
+<!-- Modale Modifier une période -->
+<div class="modal fade" id="modalModifierPeriode" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header py-2" style="background:#f8faff">
+        <h6 class="modal-title fw-bold"><i class="bi bi-pencil-square me-1 text-primary"></i>Modifier la période</h6>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <form method="post">
+        <?= csrf_champ() ?>
+        <input type="hidden" name="action" value="periode_modifier">
+        <input type="hidden" name="id" id="mp-per-id">
+        <div class="modal-body row g-2">
+          <div class="col-md-6">
+            <label class="form-label">Mois</label>
+            <select name="mois" id="mp-per-mois" class="form-select form-select-sm">
+              <?php for ($m = 1; $m <= 12; $m++): ?>
+                <option value="<?= $m ?>"><?= h(libelle_mois($m)) ?></option>
+              <?php endfor; ?>
+            </select>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Année</label>
+            <input type="number" name="annee" id="mp-per-annee" class="form-control form-control-sm" min="2020" max="2100">
+          </div>
+        </div>
+        <div class="modal-footer py-2">
+          <button class="btn btn-primary btn-sm"><i class="bi bi-check-lg me-1"></i>Enregistrer</button>
+          <button type="button" class="btn btn-light btn-sm" data-bs-dismiss="modal">Annuler</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+<script>
+function ouvrirModifierPeriode(p) {
+    document.getElementById('mp-per-id').value = p.id;
+    document.getElementById('mp-per-mois').value = p.mois;
+    document.getElementById('mp-per-annee').value = p.annee;
+    new bootstrap.Modal(document.getElementById('modalModifierPeriode')).show();
+}
+</script>
 
 <?php require_once __DIR__ . '/../../layout/footer.php'; ?>

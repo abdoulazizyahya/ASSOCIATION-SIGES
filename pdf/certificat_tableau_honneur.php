@@ -29,7 +29,7 @@ if (($_GET['vh'] ?? '') !== '' && (int) ($_GET['eleve'] ?? 0) > 0) {
     $periode_pub = $vue_pub === 'annee' ? (int) substr($val_annee_pub, 0, 4) : (int) ($_GET['trim'] ?? 0);
     $acces_public = honneur_verif_valider((int) $_GET['eleve'], $vue_pub, $periode_pub, 'fr', (string) $_GET['vh']) !== null;
 }
-if (!$acces_public) exiger_connexion();
+if (!$acces_public) exiger_acces_pedagogie();
 
 require_once __DIR__ . '/fpdf.php';
 require_once __DIR__ . '/header_pdf.php';

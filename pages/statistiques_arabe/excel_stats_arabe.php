@@ -3,8 +3,8 @@
  * Export Excel (.xlsx) des statistiques — piste arabe. Miroir de
  * pages/statistiques/excel_stats.php (même en-tête logo+filigrane, mêmes
  * couleurs exactes qu'ABZ_MBE : groupe B7CDF3, sous-total DEC58A) — seules
- * les DONNÉES viennent de notes_apc_arabe.php (matière+coefficient, pas
- * compétences). GET : onglet (niveau|matiere|eleves), vue (trim|annee), trim, classe
+ * les DONNÉES viennent de notes_apc_arabe.php (matière, pas compétences).
+ * GET : onglet (niveau|matiere|eleves), vue (trim|annee), trim, classe
  */
 require_once __DIR__ . '/../../config.php';
 require_once __DIR__ . '/../../connexion.php';
@@ -12,7 +12,7 @@ require_once __DIR__ . '/../../fonctions.php';
 require_once __DIR__ . '/../../notes_apc_arabe.php';
 require_once __DIR__ . '/../../vendor/autoload.php';
 require_once __DIR__ . '/../conseil_classe/excel_releve_commun.php'; // generer_filigrane_excel(), fmt2()
-exiger_connexion();
+exiger_acces_pedagogie();
 
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\RichText\RichText;

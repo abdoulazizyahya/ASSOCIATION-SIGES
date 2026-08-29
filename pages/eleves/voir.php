@@ -8,7 +8,12 @@ $id    = (int)($_GET['id'] ?? 0);
 $eleve = db_one("SELECT * FROM eleve WHERE id_eleve=?", [$id]);
 if (!$eleve) { flash_set('erreur', 'Élève introuvable.'); rediriger('pages/eleves/liste.php'); }
 
-$peut_gerer = in_array(role_connecte(), ['DIRECTEUR','SECRETAIRE'], true);
+$peut_gerer = in_array(role_connecte(), ['DIRECTEUR','SECRETAIRE','COMPTABLE'], true);
+// Fiche PDF / Certificat de scolarité / Carte scolaire : jamais pour le
+// profil COMPTABLE (Agent financier) — demande explicite du 22/08/2026, voir
+// interdire_role() dans pdf/fiche_eleve.php, certificat_scolarite.php,
+// cartes.php (le blocage réel est là ; ce flag n'évite qu'un clic dans le vide).
+$peut_voir_documents = role_connecte() !== 'COMPTABLE';
 
 $inscriptions = db_all(
     "SELECT i.*, c.DesignationClasses
@@ -86,6 +91,7 @@ if (!$es_partiel) {
       <?php endif; ?>
     </div>
   </div>
+  <?php if ($peut_voir_documents): ?>
   <div class="d-flex gap-1 flex-wrap">
     <button type="button" class="btn btn-outline-danger btn-sm"
             onclick="afficherApercu('<?= APP_URL ?>/pdf/fiche_eleve.php?id=<?= $id ?>', 'Fiche élève', 'fiche_eleve', 'portrait')">
@@ -99,6 +105,7 @@ if (!$es_partiel) {
       <i class="bi bi-credit-card me-1"></i>Carte scolaire
     </button>
   </div>
+  <?php endif; ?>
   <?php if ($peut_gerer): ?>
   <div class="d-flex gap-1 flex-wrap">
     <a href="<?= APP_URL ?>/pages/eleves/form.php?id=<?= $id ?>" class="btn btn-primary btn-sm">

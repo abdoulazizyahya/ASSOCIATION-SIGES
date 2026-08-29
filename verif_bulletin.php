@@ -22,21 +22,49 @@ $vue        = in_array($vue_recue, ['trim', 'annee'], true) ? $vue_recue : 'anne
 $id_periode = (int) ($_GET['p'] ?? 0);
 $piste      = ($_GET['t'] ?? 'fr') === 'ar' ? 'ar' : 'fr';
 $h_recu     = (string) ($_GET['h'] ?? '');
+$chiffres_ar = ($_GET['chiffres_ar'] ?? '0') === '1'; // préférence d'affichage, pas signée — voir pdf/verif_lib.php::bulletin_verif_url().
 
 $eleve       = bulletin_verif_valider($id_eleve, $vue, $id_periode, $piste, $h_recu);
 $authentique = $eleve !== null;
 
+// Bulletin FR d'une classe de section anglophone : réouvre
+// pdf/bulletin_{trimestriel,annuel}_anglais.php (demande du 26/08/2026),
+// jamais les fichiers français — même piste de données 'fr' (voir plus
+// haut). Section résolue sur l'inscription de l'ANNÉE DU BULLETIN consulté
+// (pas juste la plus récente : un élève promu depuis a une inscription plus
+// récente dans une autre classe/section, qui ne concerne pas CE bulletin —
+// bug trouvé en testant ce correctif). $id_periode = id_trim (vue 'trim',
+// trimestre.id_annee = val_annee) ou l'entier dérivé de val_annee (vue
+// 'annee', voir pdf/bulletin_annuel.php::$id_annee — reconstruit ici via
+// annee_scolaire.val_annee LIKE '{id_annee}/%').
+$anglais = false;
+if ($authentique && $piste === 'fr') {
+    $val_annee_periode = $vue === 'trim'
+        ? (string) (db_val("SELECT id_annee FROM trimestre WHERE id_trim=?", [$id_periode]) ?? '')
+        : (string) (db_val("SELECT val_annee FROM annee_scolaire WHERE val_annee LIKE ?", [$id_periode . '/%']) ?? '');
+    if ($val_annee_periode !== '') {
+        $anglais = db_val(
+            "SELECT n.Section FROM inscrire i
+             JOIN classe c ON c.IDClasses = i.IDClasses
+             JOIN niveau n ON n.LibelleNiveau = c.Niveau
+             WHERE i.id_eleve = ? AND i.val_annee = ? LIMIT 1",
+            [$id_eleve, $val_annee_periode]
+        ) === 'An';
+    }
+}
+
 // URL du bulletin réel, ouverte uniquement si l'utilisateur clique sur le
 // bouton "Ouvrir le bulletin" (jamais automatiquement). Le jeton "vh" (= le
-// hash déjà vérifié ci-dessus) permet aux 4 générateurs de bulletin
-// (pdf/bulletin_{annuel,trimestriel}{,_arabe}.php) de servir CE bulletin
-// précis sans exiger de connexion — voir leur en-tête, même mécanisme.
+// hash déjà vérifié ci-dessus) permet aux générateurs de bulletin
+// (pdf/bulletin_{annuel,trimestriel}{,_arabe,_anglais}.php) de servir CE
+// bulletin précis sans exiger de connexion — voir leur en-tête, même mécanisme.
 $pdf_url = '';
 if ($authentique) {
-    $fichier = 'bulletin_' . ($vue === 'annee' ? 'annuel' : 'trimestriel') . ($piste === 'ar' ? '_arabe' : '');
+    $fichier = 'bulletin_' . ($vue === 'annee' ? 'annuel' : 'trimestriel') . ($piste === 'ar' ? '_arabe' : ($anglais ? '_anglais' : ''));
     $pdf_url = APP_URL . '/pdf/' . $fichier . '.php?id=' . $id_eleve
              . ($vue === 'trim' ? '&trim=' . $id_periode : '')
-             . '&vh=' . urlencode($h_recu);
+             . '&vh=' . urlencode($h_recu)
+             . ($chiffres_ar ? '&chiffres_ar=1' : '');
 }
 ?>
 <!DOCTYPE html>
@@ -45,8 +73,8 @@ if ($authentique) {
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Vérification de bulletin — <?= h(APP_NOM) ?></title>
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+  <link rel="stylesheet" href="<?= APP_URL ?>/assets/vendor/bootstrap/css/bootstrap.min.css">
+  <link rel="stylesheet" href="<?= APP_URL ?>/assets/vendor/bootstrap-icons/bootstrap-icons.min.css">
   <style>
     body { background:#0f1a3a; min-height:100vh; display:flex; align-items:center; justify-content:center; font-family:system-ui,sans-serif; }
     .verif-card { background:#fff; border-radius:16px; padding:2.2rem 1.8rem; max-width:420px; width:92%; text-align:center; box-shadow:0 10px 40px rgba(0,0,0,.35); }

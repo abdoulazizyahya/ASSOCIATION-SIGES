@@ -60,9 +60,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     rediriger('pages/demandes/index.php');
 }
 
-$titre_page = 'Nouvelle demande de document';
-require_once __DIR__ . '/../../layout/header.php';
+$es_partiel = isset($_GET['partiel']);
+if (!$es_partiel) {
+    $titre_page = 'Nouvelle demande de document';
+    require_once __DIR__ . '/../../layout/header.php';
+} else {
+    header('Content-Type: text/html; charset=utf-8');
+}
 ?>
+<?php if (!$es_partiel): ?>
 <style>
 .btn-abz-primary{background:#1a3c6b;color:#fff;border:none;}
 .btn-abz-outline{background:#fff;color:#1a3c6b;border:1.5px solid #1a3c6b;}
@@ -71,6 +77,9 @@ require_once __DIR__ . '/../../layout/header.php';
 .type-card:hover{background:#f0f4ff}
 .type-card input:checked ~ .type-inner, .type-card.checked{border-color:#1a3c6b;background:#f0f4ff}
 </style>
+<?php endif; ?>
+
+<div id="demande-nouvelle-zone">
 
 <div class="page-titre d-flex align-items-center justify-content-between flex-wrap gap-2">
   <h4><i class="bi bi-file-earmark-plus me-2" style="color:#1a3c6b"></i>Nouvelle demande de document</h4>
@@ -81,7 +90,7 @@ require_once __DIR__ . '/../../layout/header.php';
 
 <div class="card" style="border-color:#c7d8f0;max-width:640px">
   <div class="card-body">
-    <form method="post">
+    <form method="post" data-ajax-post-form>
       <?= csrf_champ() ?>
       <label class="form-label fw-semibold mb-2">Type de document souhaité</label>
       <div class="d-flex flex-column gap-2 mb-3">
@@ -113,4 +122,9 @@ require_once __DIR__ . '/../../layout/header.php';
   </div>
 </div>
 
-<?php require_once __DIR__ . '/../../layout/footer.php'; ?>
+</div><!-- /#demande-nouvelle-zone -->
+<?php if ($es_partiel) exit; // rien de plus dans une réponse AJAX partielle. ?>
+
+<?php
+$ajax_zone_id = 'demande-nouvelle-zone'; // voir layout/footer.php — initAjaxZone() y est appelé
+require_once __DIR__ . '/../../layout/footer.php';

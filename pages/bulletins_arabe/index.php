@@ -12,7 +12,7 @@ require_once __DIR__ . '/../../config.php';
 require_once __DIR__ . '/../../connexion.php';
 require_once __DIR__ . '/../../fonctions.php';
 require_once __DIR__ . '/../../notes_apc_arabe.php';
-exiger_connexion();
+exiger_acces_pedagogie();
 exiger_annee_active(); // Année scolaire réellement active requise (18/08/2026) — module Pédagogie/Discipline.
 
 $es_partiel = isset($_GET['partiel']);
@@ -39,6 +39,8 @@ $id_classe = (int) ($_GET['classe'] ?? 0);
 $vue       = in_array($_GET['vue'] ?? '', ['trim', 'annee'], true) ? $_GET['vue'] : 'trim';
 $id_eleve  = (int) ($_GET['eleve'] ?? 0);
 $ordre     = in_array($_GET['ordre'] ?? '', ['alpha', 'merite'], true) ? $_GET['ordre'] : 'alpha';
+$chiffres_ar = ($_GET['chiffres_ar'] ?? '') === '1'; // ٠١٢٣... plutôt que 0123... dans le PDF — choix explicite de l'utilisateur, pas la valeur par défaut.
+$qs_chiffres = $chiffres_ar ? '&chiffres_ar=1' : '';
 $voir_tous = isset($_GET['voir_tous']);
 $id_trim   = (int) ($_GET['trim'] ?? $trim_actif);
 
@@ -85,18 +87,20 @@ $fmt = fn(?float $v): string => $v === null ? '—' : rtrim(rtrim(number_format(
 $chemin_sig = signature_etablissement_chemin();
 $peut_configurer_sig = role_connecte() === 'DIRECTEUR';
 
-function pdf_url_bull_arabe(int $id_eleve, string $vue, int $id_trim, bool $dl = false): string {
+function pdf_url_bull_arabe(int $id_eleve, string $vue, int $id_trim, bool $dl = false, bool $chiffres_ar = false): string {
     $base = $vue === 'annee'
         ? APP_URL . '/pdf/bulletin_annuel_arabe.php?id=' . $id_eleve
         : APP_URL . '/pdf/bulletin_trimestriel_arabe.php?id=' . $id_eleve . '&trim=' . $id_trim;
+    if ($chiffres_ar) $base .= '&chiffres_ar=1';
     if ($dl) $base .= '&dl=1';
     return $base;
 }
-function url_classe_bull_arabe(int $id_classe, string $vue, int $id_trim, string $ordre, bool $dl = false): string {
+function url_classe_bull_arabe(int $id_classe, string $vue, int $id_trim, string $ordre, bool $dl = false, bool $chiffres_ar = false): string {
     $base = $vue === 'annee'
         ? APP_URL . '/pdf/bulletin_annuel_arabe.php?classe=' . $id_classe
         : APP_URL . '/pdf/bulletin_trimestriel_arabe.php?classe=' . $id_classe . '&trim=' . $id_trim;
     $base .= '&ordre=' . $ordre;
+    if ($chiffres_ar) $base .= '&chiffres_ar=1';
     if ($dl) $base .= '&dl=1';
     return $base;
 }
@@ -135,6 +139,7 @@ if (!$es_partiel) {
   <div class="card-body py-2">
     <form method="get" class="row g-2 align-items-end" data-ajax-nav-form action="<?= APP_URL ?>/pages/bulletins_arabe/index.php">
       <input type="hidden" name="ordre" value="<?= h($ordre) ?>">
+      <?php if ($chiffres_ar): ?><input type="hidden" name="chiffres_ar" value="1"><?php endif; ?>
       <?php if ($id_eleve): ?><input type="hidden" name="eleve" value="<?= $id_eleve ?>"><?php endif; ?>
 
       <div class="col-md-3">
@@ -186,13 +191,23 @@ if (!$es_partiel) {
       <div class="col-auto">
         <label class="form-label mb-1" style="font-size:.78rem;font-weight:600;color:#1a3c6b">Ordre</label>
         <div class="d-flex gap-1">
-          <a href="?vue=<?= $vue ?>&classe=<?= $id_classe ?>&trim=<?= $id_trim ?>&ordre=alpha<?= $id_eleve ? '&eleve=' . $id_eleve : '' ?>" data-ajax-nav
+          <a href="?vue=<?= $vue ?>&classe=<?= $id_classe ?>&trim=<?= $id_trim ?>&ordre=alpha<?= $id_eleve ? '&eleve=' . $id_eleve : '' ?><?= $qs_chiffres ?>" data-ajax-nav
              class="ordre-btn <?= $ordre === 'alpha' ? 'active' : '' ?>">
             <i class="bi bi-sort-alpha-down me-1"></i>Alphabétique
           </a>
-          <a href="?vue=<?= $vue ?>&classe=<?= $id_classe ?>&trim=<?= $id_trim ?>&ordre=merite<?= $id_eleve ? '&eleve=' . $id_eleve : '' ?>" data-ajax-nav
+          <a href="?vue=<?= $vue ?>&classe=<?= $id_classe ?>&trim=<?= $id_trim ?>&ordre=merite<?= $id_eleve ? '&eleve=' . $id_eleve : '' ?><?= $qs_chiffres ?>" data-ajax-nav
              class="ordre-btn <?= $ordre === 'merite' ? 'active' : '' ?>">
             <i class="bi bi-trophy me-1"></i>Mérite
+          </a>
+        </div>
+      </div>
+
+      <div class="col-auto">
+        <label class="form-label mb-1" style="font-size:.78rem;font-weight:600;color:#1a3c6b">Chiffres</label>
+        <div class="d-flex gap-1">
+          <a href="?vue=<?= $vue ?>&classe=<?= $id_classe ?>&trim=<?= $id_trim ?>&ordre=<?= $ordre ?><?= $id_eleve ? '&eleve=' . $id_eleve : '' ?><?= $chiffres_ar ? '' : '&chiffres_ar=1' ?>" data-ajax-nav
+             class="ordre-btn <?= $chiffres_ar ? 'active' : '' ?>" title="Afficher les chiffres du bulletin en arabe oriental (٠١٢٣...)">
+            <i class="bi bi-translate me-1"></i>Convertir
           </a>
         </div>
       </div>
@@ -212,7 +227,7 @@ if (!$es_partiel) {
 
 <?php elseif ($voir_tous): ?>
 <!-- ══ VISUALISATION TOUTE LA CLASSE ══ -->
-<?php $url_cl = url_classe_bull_arabe($id_classe, $vue, $id_trim, $ordre); ?>
+<?php $url_cl = url_classe_bull_arabe($id_classe, $vue, $id_trim, $ordre, false, $chiffres_ar); ?>
 <div class="card" style="border-color:#c7d8f0">
   <div class="card-header py-2 d-flex align-items-center justify-content-between flex-wrap gap-2" style="background:#f0f4ff">
     <span class="fw-semibold" style="color:#1a3c6b">
@@ -231,9 +246,9 @@ if (!$es_partiel) {
       </button>
       <?php endif; ?>
       <?php endif; ?>
-      <a href="?vue=<?= $vue ?>&classe=<?= $id_classe ?>&trim=<?= $id_trim ?>&ordre=<?= $ordre ?>" data-ajax-nav
+      <a href="?vue=<?= $vue ?>&classe=<?= $id_classe ?>&trim=<?= $id_trim ?>&ordre=<?= $ordre ?><?= $qs_chiffres ?>" data-ajax-nav
          class="btn btn-sm btn-abz-outline"><i class="bi bi-list me-1"></i>Retour liste</a>
-      <a id="lienDlCl" href="<?= h(url_classe_bull_arabe($id_classe, $vue, $id_trim, $ordre, true)) ?>"
+      <a id="lienDlCl" href="<?= h(url_classe_bull_arabe($id_classe, $vue, $id_trim, $ordre, true, $chiffres_ar)) ?>"
          class="btn btn-sm btn-abz-primary"><i class="bi bi-download me-1"></i>Télécharger PDF</a>
       <button onclick="document.getElementById('iframe-cl').contentWindow.print()"
               class="btn btn-sm btn-abz-outline"><i class="bi bi-printer me-1"></i>Imprimer</button>
@@ -247,7 +262,7 @@ if (!$es_partiel) {
 <script>
 function appliquerSigCl() {
   const base = <?= json_encode($url_cl) ?>;
-  const baseDl = <?= json_encode(url_classe_bull_arabe($id_classe, $vue, $id_trim, $ordre, true)) ?>;
+  const baseDl = <?= json_encode(url_classe_bull_arabe($id_classe, $vue, $id_trim, $ordre, true, $chiffres_ar)) ?>;
   const sig = document.getElementById('chkSigCl').checked;
   const sep = base.includes('?') ? '&' : '?';
   const sepDl = baseDl.includes('?') ? '&' : '?';
@@ -260,9 +275,9 @@ function appliquerSigCl() {
 <!-- ══ APERÇU BULLETIN ÉLÈVE ══ -->
 <?php
 $eleve_sel = db_one("SELECT Nom_elv, Prenom_elv FROM eleve WHERE id_eleve=?", [$id_eleve]);
-$url_pdf   = pdf_url_bull_arabe($id_eleve, $vue, $id_trim);
-$url_dl    = pdf_url_bull_arabe($id_eleve, $vue, $id_trim, true);
-$back_url  = '?vue=' . $vue . '&classe=' . $id_classe . '&trim=' . $id_trim . '&ordre=' . $ordre;
+$url_pdf   = pdf_url_bull_arabe($id_eleve, $vue, $id_trim, false, $chiffres_ar);
+$url_dl    = pdf_url_bull_arabe($id_eleve, $vue, $id_trim, true, $chiffres_ar);
+$back_url  = '?vue=' . $vue . '&classe=' . $id_classe . '&trim=' . $id_trim . '&ordre=' . $ordre . $qs_chiffres;
 ?>
 <div class="card" style="border-color:#c7d8f0">
   <div class="card-header py-2 d-flex align-items-center justify-content-between flex-wrap gap-2" style="background:#f0f4ff">
@@ -320,11 +335,11 @@ function appliquerSigEl() {
       <span class="fw-normal text-muted"><?= h($label_periode) ?></span>
     </span>
     <div class="d-flex gap-2 flex-wrap">
-      <a href="?vue=<?= $vue ?>&classe=<?= $id_classe ?>&trim=<?= $id_trim ?>&ordre=<?= $ordre ?>&voir_tous=1" data-ajax-nav
+      <a href="?vue=<?= $vue ?>&classe=<?= $id_classe ?>&trim=<?= $id_trim ?>&ordre=<?= $ordre ?>&voir_tous=1<?= $qs_chiffres ?>" data-ajax-nav
          class="btn btn-sm btn-abz-outline">
         <i class="bi bi-eye me-1"></i>Visualiser tous les bulletins
       </a>
-      <a href="<?= h(url_classe_bull_arabe($id_classe, $vue, $id_trim, $ordre, true)) ?>" class="btn btn-sm btn-abz-primary">
+      <a href="<?= h(url_classe_bull_arabe($id_classe, $vue, $id_trim, $ordre, true, $chiffres_ar)) ?>" class="btn btn-sm btn-abz-primary">
         <i class="bi bi-download me-1"></i>Télécharger tous
       </a>
     </div>
@@ -346,8 +361,8 @@ function appliquerSigEl() {
       <tbody>
         <?php foreach ($eleves as $i => $el): ?>
         <?php
-        $url_ap = '?vue=' . $vue . '&classe=' . $id_classe . '&trim=' . $id_trim . '&ordre=' . $ordre . '&eleve=' . $el['id'];
-        $url_d  = pdf_url_bull_arabe((int) $el['id'], $vue, $id_trim, true);
+        $url_ap = '?vue=' . $vue . '&classe=' . $id_classe . '&trim=' . $id_trim . '&ordre=' . $ordre . '&eleve=' . $el['id'] . $qs_chiffres;
+        $url_d  = pdf_url_bull_arabe((int) $el['id'], $vue, $id_trim, true, $chiffres_ar);
         $moy    = $el['moy'] ?? null;
         $rang   = $el['rang'] ?? null;
         $dn     = $el['date_naiss'] ? date('d/m/Y', strtotime($el['date_naiss'])) : '—';

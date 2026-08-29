@@ -16,7 +16,16 @@ require_once __DIR__ . '/paie_fonctions.php'; // solde_avance()
 exiger_connexion();
 
 $role      = role_connecte();
-$is_admin  = in_array($role, ['DIRECTEUR', 'SECRETAIRE'], true);
+// Visibilité par rôle (demande explicite du 22/08/2026, suite à l'ajout du
+// rôle COMPTABLE) : Finances/Dépenses = mêmes rôles que le menu Finances
+// (DIRECTEUR/SECRETAIRE/COMPTABLE) ; Paie/RH reste DIRECTEUR/SECRETAIRE
+// uniquement (COMPTABLE n'a jamais accès à ce module — layout/header.php) ;
+// Pédagogie masquée pour COMPTABLE SAUF s'il est EN MÊME TEMPS affecté à
+// enseigner (agent_est_aussi_enseignant(), même règle que le menu).
+$peut_voir_finances  = in_array($role, ['DIRECTEUR', 'SECRETAIRE', 'COMPTABLE'], true);
+$peut_voir_paie      = in_array($role, ['DIRECTEUR', 'SECRETAIRE'], true);
+$peut_voir_pedagogie = $role !== 'COMPTABLE' || agent_est_aussi_enseignant();
+$is_admin            = $peut_voir_finances; // alias conservé : encore utilisé plus bas pour Finances/Dépenses
 
 $annee     = get_annee_active();
 $val_annee = $annee['val_annee'] ?? '';
@@ -104,29 +113,117 @@ if ($id_trim) {
     );
 }
 
-// ── Finances (inscriptions/paiements) + Cas sociaux — DIRECTEUR/SECRETAIRE ──
+// ── Finances (inscriptions/paiements) + Cas sociaux + situation par élève —
+//    DIRECTEUR/SECRETAIRE/COMPTABLE. La répartition Payé/Avance/Solde
+//    partiel/Insolvable réutilise finances_du_par_eleve() (source de vérité
+//    unique, déjà utilisée par Impayés/État par classe/Statistiques — voir
+//    fonctions.php) : une SEULE passe sur les élèves, jamais 2 définitions
+//    différentes de "qui doit quoi" qui pourraient diverger. Seuil de 0.009
+//    F pour les égalités flottantes (même tolérance que pages/finances/
+//    impayes.php).
 $total_du = 0.0; $total_normal = 0.0; $total_paye = 0.0; $nb_cas_sociaux = 0;
-if ($is_admin) {
-    foreach (finances_du_par_eleve($val_annee) as $e) {
-        $total_du     += $e['du'];
-        $total_normal += $e['montant_normal'];
-        if ($e['cas_social']) $nb_cas_sociaux++;
+$nb_payes_integral = 0; $nb_avance = 0; $montant_avance = 0.0;
+$nb_partiel = 0; $montant_solde_partiel = 0.0;
+$nb_insolvables = 0; $montant_insolvables = 0.0;
+// Détail par classe (demande explicite du 22/08/2026 : montant dû/encaissé/
+// reste/taux de recouvrement/cas sociaux par classe, affiché dans le
+// tableau "Effectifs par classe") — accumulé dans la MÊME passe que le
+// total établissement, jamais une 2e requête qui pourrait diverger.
+$finance_par_classe = [];
+// Top débiteurs (demande explicite du 23/08/2026 : liste actionnable des
+// plus gros soldes impayés, directement sur le dashboard) — même seuil
+// (0.009 F) et même logique que pages/finances/impayes.php, construite dans
+// la MÊME passe que le reste (pas de requête supplémentaire).
+$tous_soldes = [];
+if ($peut_voir_finances) {
+    $paye_par_eleve = [];
+    foreach (db_all("SELECT id_eleve, SUM(montant_paiement) AS paye FROM paiement_frais WHERE val_annee=? GROUP BY id_eleve", [$val_annee]) as $r) {
+        $paye_par_eleve[(int) $r['id_eleve']] = (float) $r['paye'];
     }
-    $total_paye = (float) db_val("SELECT COALESCE(SUM(montant_paiement),0) FROM paiement_frais WHERE val_annee=?", [$val_annee]);
+    foreach (finances_du_par_eleve($val_annee) as $e) {
+        $du   = $e['du'];
+        $paye = $paye_par_eleve[(int) $e['id_eleve']] ?? 0.0;
+        $total_du     += $du;
+        $total_normal += $e['montant_normal'];
+        $total_paye   += $paye;
+        if ($e['cas_social']) $nb_cas_sociaux++;
+
+        $ecart = $paye - $du;
+        if ($ecart > 0.009)        { $nb_avance++;      $montant_avance        += $ecart; }
+        elseif (abs($ecart) <= 0.009 && $du > 0.009) { $nb_payes_integral++; }
+        elseif ($paye <= 0.009)    { $nb_insolvables++; $montant_insolvables   += $du; }
+        else                        { $nb_partiel++;     $montant_solde_partiel += ($du - $paye); }
+
+        $idc = (int) $e['IDClasses'];
+        $finance_par_classe[$idc] ??= ['du' => 0.0, 'paye' => 0.0, 'cas_sociaux' => 0];
+        $finance_par_classe[$idc]['du']    += $du;
+        $finance_par_classe[$idc]['paye']  += $paye;
+        if ($e['cas_social']) $finance_par_classe[$idc]['cas_sociaux']++;
+
+        $solde = $du - $paye;
+        if ($solde > 0.009) {
+            $tous_soldes[] = [
+                'id_eleve' => (int) $e['id_eleve'], 'nom' => $e['Nom_elv'], 'prenom' => $e['Prenom_elv'],
+                'mat' => $e['Mat_elv'], 'classe' => $e['DesignationClasses'], 'solde' => $solde,
+            ];
+        }
+    }
+    usort($tous_soldes, fn($a, $b) => $b['solde'] <=> $a['solde']);
 }
+$top_impayes = array_slice($tous_soldes, 0, 10);
 $taux_recouvrement = $total_du > 0 ? round($total_paye / $total_du * 100, 1) : 0;
 $reduction_cas_sociaux = $total_normal - $total_du;
 
-// ── Dépenses — DIRECTEUR/SECRETAIRE ─────────────────────────────────
+// Encaissements par mois (demande du 23/08/2026) — groupés sur les mois
+// RÉELLEMENT présents dans les données (pas de calendrier scolaire supposé,
+// annee_scolaire n'a pas de date de début/fin — voir fonctions.php), ordre
+// chronologique.
+$encaissements_par_mois = [];
+if ($peut_voir_finances) {
+    $encaissements_par_mois = db_all(
+        "SELECT DATE_FORMAT(date_paiement, '%Y-%m') AS mois, SUM(montant_paiement) AS total
+         FROM paiement_frais WHERE val_annee=? GROUP BY mois ORDER BY mois",
+        [$val_annee]
+    );
+}
+
+// Dépenses par catégorie (demande du 23/08/2026).
+$depenses_par_categorie = [];
+if ($peut_voir_finances) {
+    $depenses_par_categorie = db_all(
+        "SELECT c.libelle, SUM(d.montant) AS total FROM depense d
+         JOIN categorie_depense c ON c.id_categorie=d.id_categorie
+         WHERE d.val_annee=? GROUP BY c.id_categorie ORDER BY total DESC",
+        [$val_annee]
+    );
+}
+
+// Données du diagramme "Taux de recouvrement par classe" (même ordre que le
+// tableau Effectifs — par niveau), classes sans obligation due (dû=0)
+// exclues (taux non défini, éviterait une barre à 0% trompeuse).
+$chart_recouvrement_classe = [];
+if ($peut_voir_finances) {
+    foreach ($par_classe as $c) {
+        $fc = $finance_par_classe[(int) $c['IDClasses']] ?? ['du' => 0.0, 'paye' => 0.0];
+        if ($fc['du'] <= 0.009) continue;
+        $chart_recouvrement_classe[] = [
+            'nom'  => $c['DesignationClasses'],
+            'taux' => round($fc['paye'] / $fc['du'] * 100, 1),
+        ];
+    }
+}
+
+// ── Dépenses — mêmes rôles que Finances (DIRECTEUR/SECRETAIRE/COMPTABLE) ──
 $total_depenses = 0.0; $solde_caisse_val = 0.0;
-if ($is_admin) {
+if ($peut_voir_finances) {
     $total_depenses   = (float) db_val("SELECT COALESCE(SUM(montant),0) FROM depense WHERE val_annee=?", [$val_annee]);
     $solde_caisse_val = solde_caisse($val_annee);
 }
 
-// ── Paie / RH — dernière période créée — DIRECTEUR/SECRETAIRE ──────────
+// ── Paie / RH — dernière période créée — DIRECTEUR/SECRETAIRE UNIQUEMENT
+//    (jamais COMPTABLE, voir $peut_voir_paie plus haut) ──────────────────
 $derniere_periode = null; $avances_encours = 0.0;
-if ($is_admin) {
+if ($peut_voir_paie) {
     $derniere_periode = db_one(
         "SELECT p.*, COUNT(b.id) AS nb_bulletins, COALESCE(SUM(b.net_a_payer),0) AS total_net,
                 SUM(CASE WHEN b.statut='Payé' THEN 1 ELSE 0 END) AS nb_payes
@@ -248,6 +345,7 @@ require_once __DIR__ . '/layout/header.php';
     </div>
   </div>
   <?php endif; ?>
+  <?php if ($peut_voir_pedagogie): ?>
   <div class="hero-divider"></div>
   <div class="hero-zone">
     <div class="hero-zone-head"><i class="bi bi-mortarboard-fill"></i>Pédagogie</div>
@@ -261,10 +359,85 @@ require_once __DIR__ . '/layout/header.php';
       <?php endif; ?>
     </div>
   </div>
+  <?php endif; ?>
 </div>
 
-<?php if ($is_admin): ?>
-<!-- ── 1. Paiements et dépenses ── -->
+<?php if ($peut_voir_finances): ?>
+<!-- ── 1. Situation financière des élèves — qui a payé, qui est en avance,
+     en solde partiel ou insolvable (demande explicite du 22/08/2026, pour
+     que le tableau de bord de l'Agent financier — qui ne voit jamais la
+     Pédagogie — donne une vue complète de la situation financière). ── -->
+<div class="row g-2 mb-3">
+  <div class="col-12">
+    <div class="card">
+      <div class="card-header d-flex justify-content-between align-items-center" style="background:#f8faff">
+        <span class="fw-semibold" style="font-size:.85rem"><i class="bi bi-people-fill me-1" style="color:var(--ok)"></i>Situation financière des élèves</span>
+        <a href="<?= APP_URL ?>/pages/finances/impayes.php" class="btn btn-sm btn-abz-outline" style="font-size:.7rem">Impayés <i class="bi bi-arrow-right ms-1"></i></a>
+      </div>
+      <div class="card-body">
+        <div class="pedago-chips">
+          <div class="pedago-chip" style="background:var(--hover-bg);border-color:var(--border)">
+            <i class="bi bi-check-circle text-success"></i>
+            <div><b><?= $nb_payes_integral ?></b><span>Payés (intégral)</span></div>
+          </div>
+          <div class="pedago-chip" style="background:var(--hover-bg);border-color:var(--border)">
+            <i class="bi bi-graph-up-arrow" style="color:#0d6efd"></i>
+            <div><b><?= $nb_avance ?></b><span>En avance<?= $nb_avance > 0 ? ' · +' . $fmt_f($montant_avance) : '' ?></span></div>
+          </div>
+          <div class="pedago-chip" style="background:var(--hover-bg);border-color:var(--border)">
+            <i class="bi bi-hourglass-split" style="color:var(--warn)"></i>
+            <div><b><?= $nb_partiel ?></b><span>Solde partiel<?= $nb_partiel > 0 ? ' · ' . $fmt_f($montant_solde_partiel) : '' ?></span></div>
+          </div>
+          <div class="pedago-chip" style="background:var(--hover-bg);border-color:var(--border)">
+            <i class="bi bi-x-octagon text-danger"></i>
+            <div><b><?= $nb_insolvables ?></b><span>Insolvables (rien payé)<?= $nb_insolvables > 0 ? ' · ' . $fmt_f($montant_insolvables) : '' ?></span></div>
+          </div>
+          <div class="pedago-chip" style="background:var(--hover-bg);border-color:var(--border)">
+            <i class="bi bi-heart" style="color:var(--danger)"></i>
+            <div><b><?= $nb_cas_sociaux ?></b><span>Cas sociaux<?= $nb_cas_sociaux > 0 ? ' · -' . $fmt_f($reduction_cas_sociaux) : '' ?></span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<?php if ($top_impayes): ?>
+<!-- ── Top élèves à relancer — plus gros soldes impayés (demande du
+     23/08/2026), action rapide sans passer par la page Impayés. ── -->
+<div class="row g-2 mb-3">
+  <div class="col-12">
+    <div class="card">
+      <div class="card-header d-flex justify-content-between align-items-center" style="background:#f8faff">
+        <span class="fw-semibold" style="font-size:.85rem"><i class="bi bi-exclamation-diamond me-1" style="color:var(--danger)"></i>Top élèves à relancer</span>
+        <a href="<?= APP_URL ?>/pages/finances/impayes.php" class="btn btn-sm btn-abz-outline" style="font-size:.7rem">Voir tous les impayés <i class="bi bi-arrow-right ms-1"></i></a>
+      </div>
+      <div class="table-responsive">
+        <table class="table table-abz table-hover align-middle mb-0" style="font-size:.82rem">
+          <thead><tr><th>#</th><th>Élève</th><th>Matricule</th><th>Classe</th><th class="text-end">Solde dû</th></tr></thead>
+          <tbody>
+            <?php foreach ($top_impayes as $i => $e): ?>
+            <tr>
+              <td class="text-muted"><?= $i + 1 ?></td>
+              <td class="fw-semibold">
+                <a href="<?= APP_URL ?>/pages/eleves/voir.php?id=<?= $e['id_eleve'] ?>" class="text-decoration-none">
+                  <?= h(mb_strtoupper($e['nom'])) ?> <?= h($e['prenom'] ?? '') ?>
+                </a>
+              </td>
+              <td class="text-muted"><?= h($e['mat']) ?></td>
+              <td><?= h($e['classe']) ?></td>
+              <td class="text-end fw-bold text-danger"><?= $fmt_f($e['solde']) ?></td>
+            </tr>
+            <?php endforeach; ?>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+<?php endif; ?>
+
+<!-- ── 2. Paiements et dépenses ── -->
 <div class="row g-2 mb-3">
   <!-- ── Finances ── -->
   <div class="col-lg-4">
@@ -306,6 +479,7 @@ require_once __DIR__ . '/layout/header.php';
     </div>
   </div>
 
+  <?php if ($peut_voir_paie): ?>
   <!-- ── Paie / RH ── -->
   <div class="col-lg-4">
     <div class="card h-100">
@@ -331,10 +505,39 @@ require_once __DIR__ . '/layout/header.php';
       </div>
     </div>
   </div>
+  <?php endif; ?>
 </div>
 <?php endif; ?>
 
-<!-- ── 2. Pédagogie (détail) — moyenne/réussite déjà au bandeau du haut,
+<?php if ($peut_voir_finances && ($depenses_par_categorie || $encaissements_par_mois)): ?>
+<!-- ── Dépenses par catégorie + Évolution des encaissements (demande du
+     23/08/2026). ── -->
+<div class="row g-2 mb-3">
+  <?php if ($depenses_par_categorie): ?>
+  <div class="col-lg-5">
+    <div class="card h-100">
+      <div class="card-header fw-semibold" style="font-size:.85rem"><i class="bi bi-pie-chart me-1" style="color:var(--warn)"></i>Dépenses par catégorie</div>
+      <div class="card-body">
+        <div style="height:200px"><canvas id="chartDepensesCategorie"></canvas></div>
+      </div>
+    </div>
+  </div>
+  <?php endif; ?>
+  <?php if ($encaissements_par_mois): ?>
+  <div class="<?= $depenses_par_categorie ? 'col-lg-7' : 'col-12' ?>">
+    <div class="card h-100">
+      <div class="card-header fw-semibold" style="font-size:.85rem"><i class="bi bi-graph-up-arrow me-1" style="color:var(--ok)"></i>Évolution des encaissements</div>
+      <div class="card-body">
+        <div style="height:200px"><canvas id="chartEncaissementsMois"></canvas></div>
+      </div>
+    </div>
+  </div>
+  <?php endif; ?>
+</div>
+<?php endif; ?>
+
+<?php if ($peut_voir_pedagogie): ?>
+<!-- ── 3. Pédagogie (détail) — moyenne/réussite déjà au bandeau du haut,
      ici le détail : chiffres clés, répartition par niveau, palmarès ── -->
 <div class="card">
   <div class="card-header d-flex justify-content-between align-items-center" style="background:#f8faff">
@@ -402,33 +605,75 @@ require_once __DIR__ . '/layout/header.php';
     <?php endif; ?>
   </div>
 </div>
+<?php endif; ?>
 
-<!-- ── 3. Scolarité : effectifs par classe (renvoyé en bas, demande du 20/08/2026) ── -->
+<!-- ── 4. Scolarité : effectifs par classe (renvoyé en bas, demande du
+     20/08/2026), enrichi le 22/08/2026 avec le détail financier par classe
+     (dû/encaissé/reste/taux de recouvrement/cas sociaux) quand le rôle y a
+     accès — mêmes données que finance_par_classe calculé plus haut, jamais
+     une 2e requête. ── -->
 <div class="row g-2 mt-3">
-  <div class="col-lg-8">
+  <div class="<?= $peut_voir_finances ? 'col-12' : 'col-lg-8' ?>">
     <div class="card">
-      <div class="card-header fw-semibold" style="font-size:.85rem"><i class="bi bi-bar-chart-line me-1"></i>Effectifs par classe</div>
+      <div class="card-header fw-semibold" style="font-size:.85rem"><i class="bi bi-bar-chart-line me-1"></i>Effectifs<?= $peut_voir_finances ? ' & finances' : '' ?> par classe</div>
       <div class="table-responsive">
-        <table class="table table-abz table-hover align-middle mb-0">
+        <table class="table table-abz table-hover align-middle mb-0" style="font-size:.82rem">
           <thead>
-            <tr><th>Classe</th><th class="text-center">G</th><th class="text-center">F</th><th class="text-center fw-bold">Total</th></tr>
+            <tr>
+              <th>Classe</th><th class="text-center">G</th><th class="text-center">F</th><th class="text-center fw-bold">Total</th>
+              <?php if ($peut_voir_finances): ?>
+              <th class="text-end">Dû</th><th class="text-end">Encaissé</th><th class="text-end">Reste</th>
+              <th class="text-center">Recouvr.</th><th class="text-center">Cas sociaux</th>
+              <?php endif; ?>
+            </tr>
           </thead>
           <tbody>
-            <?php foreach ($par_classe as $c): ?>
+            <?php foreach ($par_classe as $c):
+              $fc = $finance_par_classe[(int) $c['IDClasses']] ?? ['du' => 0.0, 'paye' => 0.0, 'cas_sociaux' => 0];
+              $reste_c = max(0.0, $fc['du'] - $fc['paye']);
+              $taux_c  = $fc['du'] > 0 ? round($fc['paye'] / $fc['du'] * 100, 1) : 0;
+            ?>
             <tr>
               <td class="fw-semibold"><?= h($c['DesignationClasses']) ?></td>
               <td class="text-center"><span class="badge-m"><?= (int)$c['nb_m'] ?></span></td>
               <td class="text-center"><span class="badge-f"><?= (int)$c['nb_f'] ?></span></td>
               <td class="text-center fw-bold"><?= (int)$c['effectif'] ?></td>
+              <?php if ($peut_voir_finances): ?>
+              <td class="text-end"><?= $fmt_f($fc['du']) ?></td>
+              <td class="text-end text-success"><?= $fmt_f($fc['paye']) ?></td>
+              <td class="text-end <?= $reste_c > 0.009 ? 'text-danger' : '' ?>"><?= $fmt_f($reste_c) ?></td>
+              <td class="text-center">
+                <span class="fw-bold" style="color:<?= $taux_c >= 80 ? '#1e7c50' : ($taux_c >= 50 ? '#c8960a' : '#dc3545') ?>"><?= $taux_c ?>%</span>
+              </td>
+              <td class="text-center"><?= $fc['cas_sociaux'] ?: '—' ?></td>
+              <?php endif; ?>
             </tr>
             <?php endforeach; ?>
           </tbody>
+          <?php if ($peut_voir_finances): ?>
+          <tfoot>
+            <tr class="fw-bold" style="background:var(--hover-bg)">
+              <td>Total</td>
+              <td class="text-center"><?= $nb_garcons ?></td>
+              <td class="text-center"><?= $nb_filles ?></td>
+              <td class="text-center"><?= $nb_eleves ?></td>
+              <td class="text-end"><?= $fmt_f($total_du) ?></td>
+              <td class="text-end text-success"><?= $fmt_f($total_paye) ?></td>
+              <td class="text-end <?= ($total_du - $total_paye) > 0.009 ? 'text-danger' : '' ?>"><?= $fmt_f(max(0.0, $total_du - $total_paye)) ?></td>
+              <td class="text-center"><?= $taux_recouvrement ?>%</td>
+              <td class="text-center"><?= $nb_cas_sociaux ?></td>
+            </tr>
+          </tfoot>
+          <?php endif; ?>
         </table>
       </div>
     </div>
   </div>
+</div>
+
+<div class="row g-2 mt-2">
   <div class="col-lg-4">
-    <div class="card">
+    <div class="card h-100">
       <div class="card-header fw-semibold" style="font-size:.85rem"><i class="bi bi-person-badge me-1"></i>Personnel</div>
       <div class="card-body">
         <div class="d-flex justify-content-between py-1" style="font-size:.82rem">
@@ -441,11 +686,21 @@ require_once __DIR__ . '/layout/header.php';
       </div>
     </div>
   </div>
+  <?php if ($chart_recouvrement_classe): ?>
+  <div class="col-lg-8">
+    <div class="card h-100">
+      <div class="card-header fw-semibold" style="font-size:.85rem"><i class="bi bi-graph-up me-1"></i>Taux de recouvrement par classe</div>
+      <div class="card-body">
+        <div style="height:<?= max(90, count($chart_recouvrement_classe) * 24) ?>px"><canvas id="chartRecouvrementClasse"></canvas></div>
+      </div>
+    </div>
+  </div>
+  <?php endif; ?>
 </div>
 
 </div><!-- /.dash-page -->
 
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<script src="<?= APP_URL ?>/assets/vendor/chart/chart.umd.min.js"></script>
 <script>
 Chart.defaults.font.family = "'Segoe UI','Inter',system-ui,sans-serif";
 Chart.defaults.font.size = 11;
@@ -464,9 +719,11 @@ function gaugeDoughnut(id, valeur, seuilBon) {
         options: { cutout: '72%', plugins: { legend: { display: false }, tooltip: { enabled: false } }, animation: { duration: 400 } }
     });
 }
+<?php if ($peut_voir_pedagogie): ?>
 gaugeDoughnut('chartReussite', <?= (float) $taux_reussite_ecole ?>, 50);
+<?php endif; ?>
 
-<?php if ($par_niveau_moy): ?>
+<?php if ($peut_voir_pedagogie && $par_niveau_moy): ?>
 new Chart(document.getElementById('chartNiveaux'), {
     type: 'bar',
     data: {
@@ -488,10 +745,34 @@ new Chart(document.getElementById('chartNiveaux'), {
 });
 <?php endif; ?>
 
-<?php if ($is_admin): ?>
+<?php if ($peut_voir_finances): ?>
 gaugeDoughnut('chartRecouvrementTop', <?= (float) $taux_recouvrement ?>, 50);
 gaugeDoughnut('chartRecouvrement', <?= (float) $taux_recouvrement ?>, 50);
-gaugeDoughnut('chartBulletins', <?= (float) $taux_bulletins_payes ?>, 100);
+
+<?php if ($chart_recouvrement_classe): ?>
+new Chart(document.getElementById('chartRecouvrementClasse'), {
+    type: 'bar',
+    data: {
+        labels: <?= json_encode(array_map(fn($c) => $c['nom'], $chart_recouvrement_classe)) ?>,
+        datasets: [{
+            data: <?= json_encode(array_map(fn($c) => $c['taux'], $chart_recouvrement_classe)) ?>,
+            backgroundColor: <?= json_encode(array_map(
+                fn($c) => $c['taux'] >= 80 ? '#1e7c50' : ($c['taux'] >= 50 ? '#c8960a' : '#dc3545'),
+                $chart_recouvrement_classe
+            )) ?>,
+            borderRadius: 4, barThickness: 14,
+        }]
+    },
+    options: {
+        indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => ctx.parsed.x + '% encaissé' } } },
+        scales: {
+            x: { beginAtZero: true, max: 100, ticks: { callback: v => v + '%' }, grid: { color: '#e2ded0' } },
+            y: { grid: { display: false } },
+        },
+    },
+});
+<?php endif; ?>
 
 new Chart(document.getElementById('chartDepenses'), {
     type: 'bar',
@@ -512,6 +793,56 @@ new Chart(document.getElementById('chartDepenses'), {
         },
     },
 });
+
+<?php if ($depenses_par_categorie): ?>
+new Chart(document.getElementById('chartDepensesCategorie'), {
+    type: 'doughnut',
+    data: {
+        labels: <?= json_encode(array_map(fn($d) => $d['libelle'], $depenses_par_categorie)) ?>,
+        datasets: [{
+            data: <?= json_encode(array_map(fn($d) => (float) $d['total'], $depenses_par_categorie)) ?>,
+            backgroundColor: ['#6b7280', '#c8960a', '#7c3aed', '#0d6efd', '#dc3545', '#1e7c50', '#0891b2', '#d97706'],
+            borderWidth: 0,
+        }]
+    },
+    options: {
+        cutout: '55%', maintainAspectRatio: false,
+        plugins: {
+            legend: { position: 'right', labels: { boxWidth: 10, font: { size: 10 } } },
+            tooltip: { callbacks: { label: ctx => ctx.label + ' : ' + ctx.parsed.toLocaleString('fr-FR') + ' F' } },
+        },
+    },
+});
+<?php endif; ?>
+
+<?php if ($encaissements_par_mois): ?>
+new Chart(document.getElementById('chartEncaissementsMois'), {
+    type: 'line',
+    data: {
+        labels: <?= json_encode(array_map(fn($m) => $m['mois'], $encaissements_par_mois)) ?>,
+        datasets: [{
+            data: <?= json_encode(array_map(fn($m) => (float) $m['total'], $encaissements_par_mois)) ?>,
+            borderColor: '#1e7c50', backgroundColor: 'rgba(30,124,80,.12)',
+            fill: true, tension: 0.3, pointRadius: 3, pointBackgroundColor: '#1e7c50',
+        }]
+    },
+    options: {
+        maintainAspectRatio: false,
+        plugins: {
+            legend: { display: false },
+            tooltip: { callbacks: { label: ctx => ctx.parsed.y.toLocaleString('fr-FR') + ' F' } },
+        },
+        scales: {
+            y: { beginAtZero: true, ticks: { callback: v => v.toLocaleString('fr-FR') + ' F' }, grid: { color: '#f2f0e8' } },
+            x: { grid: { display: false } },
+        },
+    },
+});
+<?php endif; ?>
+<?php endif; ?>
+
+<?php if ($peut_voir_paie): ?>
+gaugeDoughnut('chartBulletins', <?= (float) $taux_bulletins_payes ?>, 100);
 <?php endif; ?>
 
 // Répartition Garçons/Filles — diagramme circulaire compact du bandeau

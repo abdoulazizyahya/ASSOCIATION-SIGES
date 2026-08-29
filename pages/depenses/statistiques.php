@@ -5,7 +5,7 @@
 require_once __DIR__ . '/../../config.php';
 require_once __DIR__ . '/../../connexion.php';
 require_once __DIR__ . '/../../fonctions.php';
-exiger_role(['DIRECTEUR']);
+exiger_role(['DIRECTEUR', 'COMPTABLE']);
 
 $annee     = get_annee_active();
 $val_annee = $annee['val_annee'] ?? '';

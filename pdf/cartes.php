@@ -21,7 +21,10 @@ if (($_GET['vh'] ?? '') !== '' && (int) ($_GET['eleve'] ?? 0) > 0) {
     $val_annee_pub = (string) ($_GET['annee'] ?? '');
     $acces_public = carte_verif_valider((int) $_GET['eleve'], $val_annee_pub, (string) $_GET['vh']) !== null;
 }
-if (!$acces_public) exiger_connexion();
+if (!$acces_public) {
+    exiger_connexion();
+    interdire_role('COMPTABLE', "Ce document n'est pas accessible au profil Agent financier / Comptable.");
+}
 
 require_once __DIR__ . '/fpdf.php';
 require_once __DIR__ . '/header_pdf.php';

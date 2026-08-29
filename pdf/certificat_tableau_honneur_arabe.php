@@ -28,7 +28,7 @@ if (($_GET['vh'] ?? '') !== '' && (int) ($_GET['eleve'] ?? 0) > 0) {
     $periode_pub = $vue_pub === 'annee' ? (int) substr($val_annee_pub, 0, 4) : (int) ($_GET['trim'] ?? 0);
     $acces_public = honneur_verif_valider((int) $_GET['eleve'], $vue_pub, $periode_pub, 'ar', (string) $_GET['vh']) !== null;
 }
-if (!$acces_public) exiger_connexion();
+if (!$acces_public) exiger_acces_pedagogie();
 
 $id_classe       = (int) ($_GET['classe'] ?? 0);
 $vue             = (($_GET['vue'] ?? '') === 'annee') ? 'annee' : 'trim';
@@ -109,6 +109,11 @@ try {
 if ($modele === 2) {
     // ══════════════════════════ MODÈLE 2 — ORNÉ, BILINGUE ══════════════════
     $pdf = new TCPDF('L', 'mm', 'A4', true, 'UTF-8', false);
+    // Police arabe (amirib) embarquée en entier, pas en sous-ensemble — voir
+    // le commentaire identique dans bulletin_trimestriel_arabe.php (glyphes
+    // arabes vides dans WPS Office et lecteurs PDF non-Adobe avec le
+    // sous-ensemble par défaut de TCPDF).
+    $pdf->setFontSubsetting(false);
     $pdf->setPrintHeader(false);
     $pdf->setPrintFooter(false);
     $pdf->SetMargins(0, 0, 0);

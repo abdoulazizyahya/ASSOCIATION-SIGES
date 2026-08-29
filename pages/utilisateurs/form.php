@@ -47,9 +47,16 @@ $sans_compte = db_all(
      ORDER BY e.nom_ens"
 );
 
-$titre_page = $id ? 'Réinitialiser un compte' : 'Nouveau compte';
-require_once __DIR__ . '/../../layout/header.php';
+$es_partiel = isset($_GET['partiel']);
+if (!$es_partiel) {
+    $titre_page = $id ? 'Réinitialiser un compte' : 'Nouveau compte';
+    require_once __DIR__ . '/../../layout/header.php';
+} else {
+    header('Content-Type: text/html; charset=utf-8');
+}
 ?>
+
+<div id="utilisateur-form-zone">
 
 <div class="page-titre">
   <h4><i class="bi bi-person-gear me-1 text-primary"></i><?= $id ? 'Réinitialiser le mot de passe' : 'Nouveau compte' ?></h4>
@@ -58,7 +65,7 @@ require_once __DIR__ . '/../../layout/header.php';
 <div class="card" style="max-width:520px">
   <div class="card-body">
     <?php if ($erreur): ?><div class="alert alert-danger py-2"><?= h($erreur) ?></div><?php endif; ?>
-    <form method="post">
+    <form method="post" data-ajax-post-form>
       <?= csrf_champ() ?>
       <?php if ($id): ?>
         <div class="mb-3">
@@ -97,4 +104,9 @@ require_once __DIR__ . '/../../layout/header.php';
   </div>
 </div>
 
-<?php require_once __DIR__ . '/../../layout/footer.php'; ?>
+</div><!-- /#utilisateur-form-zone -->
+<?php if ($es_partiel) exit; // rien de plus dans une réponse AJAX partielle. ?>
+
+<?php
+$ajax_zone_id = 'utilisateur-form-zone'; // voir layout/footer.php — initAjaxZone() y est appelé
+require_once __DIR__ . '/../../layout/footer.php';

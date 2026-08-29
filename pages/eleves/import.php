@@ -174,9 +174,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $rapport = ['ok' => $ok, 'erreurs' => $erreurs, 'total' => $total];
 }
 
-$titre_page = 'Importer des élèves';
-require_once __DIR__ . '/../../layout/header.php';
+$es_partiel = isset($_GET['partiel']);
+if (!$es_partiel) {
+    $titre_page = 'Importer des élèves';
+    require_once __DIR__ . '/../../layout/header.php';
+} else {
+    header('Content-Type: text/html; charset=utf-8');
+}
 ?>
+
+<div id="import-eleves-zone">
 
 <div class="d-flex align-items-center gap-2 mb-3">
   <a href="<?= APP_URL ?>/pages/eleves/liste.php" class="btn btn-sm btn-light">
@@ -238,7 +245,7 @@ require_once __DIR__ . '/../../layout/header.php';
     <div class="card">
       <div class="card-body">
         <div class="section-titre"><i class="bi bi-2-circle me-1"></i>Étape 2 — Importer le fichier rempli</div>
-        <form method="post" enctype="multipart/form-data" class="mt-2">
+        <form method="post" enctype="multipart/form-data" class="mt-2" data-ajax-post-form>
           <?= csrf_champ() ?>
           <label class="form-label">Fichier Excel (.xlsx)</label>
           <input type="file" name="fichier" accept=".xlsx" class="form-control form-control-sm" required>
@@ -250,4 +257,9 @@ require_once __DIR__ . '/../../layout/header.php';
   </div>
 </div>
 
-<?php require_once __DIR__ . '/../../layout/footer.php'; ?>
+</div><!-- /#import-eleves-zone -->
+<?php if ($es_partiel) exit; // rien de plus dans une réponse AJAX partielle. ?>
+
+<?php
+$ajax_zone_id = 'import-eleves-zone'; // voir layout/footer.php — initAjaxZone() y est appelé
+require_once __DIR__ . '/../../layout/footer.php';

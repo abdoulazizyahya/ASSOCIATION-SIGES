@@ -9,7 +9,7 @@ require_once __DIR__ . '/../config.php';
 require_once __DIR__ . '/../connexion.php';
 require_once __DIR__ . '/../fonctions.php';
 require_once __DIR__ . '/../notes_apc.php';
-exiger_connexion();
+exiger_acces_pedagogie();
 
 require_once __DIR__ . '/fpdf.php';
 require_once __DIR__ . '/header_pdf.php';
@@ -31,6 +31,11 @@ $etab      = etab_pour_pdf($etab_brut);
 precharger_notes_sequence_classe($id_classe, $val_annee);
 
 $competences = competences_classe($id_classe, $val_annee);
+// Section anglophone (même convention que pdf/bulletin_trimestriel.php) :
+// seule la légende des compétences bascule en anglais — saisie/calcul
+// restent sur le jeu langue='Fr' dans tous les cas (competences_classe()).
+// Section rattachée au NIVEAU, pas à la classe (migration_v42).
+$section_en = db_val("SELECT n.Section FROM niveau n WHERE n.LibelleNiveau=?", [$classe['Niveau']]) === 'An';
 $classement  = classement_annuel_classe($id_classe, $val_annee);
 $decisions   = db_all("SELECT id_eleve, decision, observation FROM decision_conseil_annuel WHERE classe=? AND val_annee=?", [$id_classe, $val_annee]);
 $dec_idx = [];
@@ -76,7 +81,10 @@ $pdf->SetTextColor(0);
 $pdf->SetFont('Arial', '', 6);
 $pdf->SetX(8);
 $legende = [];
-foreach ($competences as $c) { $legende[] = $c['code_comp'] . '=' . mb_strimwidth($c['nom_comp'], 0, 22, '…'); }
+foreach ($competences as $c) {
+    $nom_aff = ($section_en && !empty($c['nom_comp_en'])) ? $c['nom_comp_en'] : $c['nom_comp'];
+    $legende[] = $c['code_comp'] . '=' . mb_strimwidth($nom_aff, 0, 22, '…');
+}
 $pdf->MultiCell($uw, 3, pdf_u(implode('  |  ', $legende)), 0, 'L');
 $pdf->Ln(1);
 

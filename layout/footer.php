@@ -113,10 +113,10 @@
   </div>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="<?= APP_URL ?>/assets/vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
+<script src="<?= APP_URL ?>/assets/vendor/pdfjs/pdf.min.js"></script>
 <script>
-  pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+  pdfjsLib.GlobalWorkerOptions.workerSrc = '<?= APP_URL ?>/assets/vendor/pdfjs/pdf.worker.min.js';
 </script>
 <script>
 // Point d'entrée commun pour afficher un PDF généré par l'appli dans la
@@ -394,6 +394,12 @@ function chargerPartiel(url, containerId) {
             if (html === null) return;
             container.innerHTML = html;
             container.style.opacity = '';
+            // Filet de sécurité si un lien data-ajax-nav était cliqué depuis
+            // l'intérieur d'une modale Bootstrap encore ouverte (rare mais
+            // possible) — voir le commentaire détaillé sur
+            // nettoyerModalsOrphelines() plus bas, même cause que pour
+            // soumettreFormulaireAjax().
+            nettoyerModalsOrphelines();
             // Les <script> injectés via innerHTML ne s'exécutent JAMAIS
             // automatiquement (sécurité navigateur) — recréés puis rattachés
             // un par un pour qu'ils s'exécutent malgré tout. Ces scripts
@@ -417,6 +423,26 @@ function chargerPartiel(url, containerId) {
 // introuvable dans la réponse (page d'erreur, accès refusé, structure
 // inattendue...) : dans ce cas l'appelant doit retomber sur une navigation
 // normale plutôt que d'injecter un HTML de page complète dans une simple div.
+// Un formulaire soumis en AJAX (soumettreFormulaireAjax()) est très souvent
+// À L'INTÉRIEUR d'une modale Bootstrap ouverte (« Modifier », « Générer »...).
+// Remplacer container.innerHTML détruit le nœud DOM de cette modale SANS
+// jamais passer par bootstrap.Modal.hide() — Bootstrap ne peut alors jamais
+// retirer le fond assombri (.modal-backdrop, ajouté à <body>, donc HORS de
+// `container`) ni la classe `modal-open`/le style `overflow:hidden` qu'il
+// pose sur <body>. Résultat déjà constaté : la page reste visuellement
+// grisée et totalement inerte au clic — lue par un utilisateur comme
+// « le système plante ». On ne peut pas compter sur le hide() animé de
+// Bootstrap ici (sa transition peut se terminer APRÈS que ce nœud ait déjà
+// disparu) : nettoyage inconditionnel après coup, à chaque injection.
+function nettoyerModalsOrphelines() {
+    document.querySelectorAll('.modal-backdrop').forEach((b) => b.remove());
+    if (!document.querySelector('.modal.show')) {
+        document.body.classList.remove('modal-open');
+        document.body.style.removeProperty('overflow');
+        document.body.style.removeProperty('padding-right');
+    }
+}
+
 function injecterHtmlDansZone(html, container) {
     const doc = new DOMParser().parseFromString(html, 'text/html');
     const nouvelleZone = doc.getElementById(container.id);
@@ -428,6 +454,7 @@ function injecterHtmlDansZone(html, container) {
     const flashActuel = document.getElementById('flash-zone');
     if (nouveauFlash && flashActuel) flashActuel.innerHTML = nouveauFlash.innerHTML;
     container.innerHTML = nouvelleZone.innerHTML;
+    nettoyerModalsOrphelines();
     // Les <script> injectés via innerHTML ne s'exécutent JAMAIS automatiquement
     // (sécurité navigateur) — recréés puis rattachés un par un pour qu'ils
     // s'exécutent malgré tout. Ces scripts doivent utiliser des déclarations

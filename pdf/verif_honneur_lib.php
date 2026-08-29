@@ -51,6 +51,9 @@ function honneur_qr_fichier_temp(array $eleve, string $vue, int $id_periode, str
 
     [$photo_path, $photo_est_temp] = bulletin_photo_pour_qr($eleve);
     $cle_cache = hash('crc32b', HONNEUR_VERIF_SECRET) . '_' . $id_eleve . '_' . $piste . '_' . $vue . '_' . $id_periode
+        // Voir bulletin_qr_fichier_temp() (pdf/verif_lib.php) : intègre l'adresse
+        // réseau du serveur pour régénérer le QR après un changement d'IP.
+        . '_' . hash('crc32b', bulletin_verif_base_url())
         . '_' . ($photo_path !== '' && is_file($photo_path) ? hash_file('crc32b', $photo_path) : 'none');
     $dossier_cache = __DIR__ . '/../assets/uploads/qr_honneur';
     if (!is_dir($dossier_cache)) @mkdir($dossier_cache, 0755, true);

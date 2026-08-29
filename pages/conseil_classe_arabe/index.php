@@ -22,7 +22,7 @@ require_once __DIR__ . '/../../config.php';
 require_once __DIR__ . '/../../connexion.php';
 require_once __DIR__ . '/../../fonctions.php';
 require_once __DIR__ . '/../../notes_apc_arabe.php';
-exiger_connexion();
+exiger_acces_pedagogie();
 exiger_annee_active(); // Année scolaire réellement active requise (18/08/2026) — module Pédagogie/Discipline.
 
 $role      = role_connecte();
@@ -232,7 +232,7 @@ $titre_page = 'Conseil de Classe (arabe)';
 if (!$es_partiel) {
     require_once __DIR__ . '/../../layout/header.php';
     ?>
-    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <script src="<?= APP_URL ?>/assets/vendor/xlsx/xlsx.full.min.js"></script>
     <?php
 } else {
     header('Content-Type: text/html; charset=utf-8');

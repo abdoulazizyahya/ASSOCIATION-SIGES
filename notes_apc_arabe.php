@@ -1,65 +1,104 @@
 <?php
 // ── Moteur de calcul — module Notes/Bulletins APC (piste arabe) ─────
-// Miroir de notes_apc.php (piste française), mais modèle matière+coefficient
-// classique (pas de compétences/barème orale-écrite-pratique-savoir_etre) —
-// c'est le modèle réel de la piste arabe dans jaynitaare : `matiere_arabe`
-// (16 matières FR+AR) groupées par `groupe_matiere_arabe` (Éducation
-// islamique / Langue arabe), pondérées par `classe_matiere_arabe.coef`.
-// Formule vérifiée contre les vraies données déjà en cache (session 5,
-// avant le chantier Pédagogie) : Σ(note×coef) / Σ(coef) sur les matières
-// RÉELLEMENT composées (pas de ligne composer_sequence_arabe = matière
-// exclue du calcul, jamais comptée à 0 — vérifié exact sur 13 élèves réels,
-// séquence et trimestre confondus). La règle des « 2/3 du coefficient
-// composé » du système legacy (Moyenne_seq_eleve_arabe(), classement N.C
-// si pas assez de matières composées) n'a JAMAIS déclenché sur les
-// véritables données de cette école (tous les élèves qui composent
-// composent la totalité) — non reproduite ici, même simplification que la
-// piste française (coef>0 suffit à être classable).
+// Modèle matière (pas de compétences) : `matiere_arabe` groupées par
+// `groupe_matiere_arabe`. Moyenne = Σpoints / (Σbarème/20), même formule
+// que la piste française (pas de coefficient — chaque matière est pondérée
+// par son propre barème discipline_arabe, 20 par défaut) — sur les
+// matières réellement composées (pas de ligne = exclue, jamais notée 0).
 require_once __DIR__ . '/fonctions.php';
 require_once __DIR__ . '/notes_apc.php'; // sequences_du_trimestre(), appreciation_moyenne(), libelle_appreciation()
 
 // ── Structure : matières d'une classe (groupées, bilingues FR/AR) ──
+// Résolues via le NIVEAU de la classe (matiere_niveau_arabe), pas d'affectation
+// par classe : plus de classe_matiere_arabe (table supprimée) — assigner une
+// matière à un niveau (pages/matieres_arabe/liste.php, onglet « Matières par
+// niveau ») l'applique automatiquement à toutes ses classes.
 function matieres_classe_arabe(int $id_classe): array {
     return db_all(
-        "SELECT cma.id_mat, cma.coef, cma.ordre, cma.id_groupe,
+        "SELECT mn.id_mat, mn.ordre, m.id_groupe,
                 m.matiere_fr, m.matiere_ar,
                 g.nom_groupe_fr, g.nom_groupe_ar
-         FROM classe_matiere_arabe cma
-         JOIN matiere_arabe m ON m.id_mat = cma.id_mat
-         JOIN groupe_matiere_arabe g ON g.id_groupe = cma.id_groupe
-         WHERE cma.code_classe = ?
-         ORDER BY cma.ordre",
+         FROM classe c
+         JOIN matiere_niveau_arabe mn ON mn.code_niveau = c.Niveau AND mn.actif = 1
+         JOIN matiere_arabe m ON m.id_mat = mn.id_mat
+         JOIN groupe_matiere_arabe g ON g.id_groupe = m.id_groupe
+         WHERE c.IDClasses = ?
+         ORDER BY mn.ordre",
         [$id_classe]
     );
 }
 
-// ── Note brute d'une matière pour une séquence (ou null si non composée) ──
-// Consulte le préchargement de classe s'il a été fait (voir
-// precharger_notes_sequence_classe_arabe() ci-dessous) — même optimisation
-// que note_competence_trimestre() côté français, mêmes gains (bulletins en
-// lot : classe entière × ~16 matières × 3 trimestres, avant : 1 requête par
-// (élève, matière, trimestre) ⇒ des milliers de requêtes individuelles).
+// Même liste, chaque ligne enrichie d'une clé 'bareme' (null, ou le tableau
+// orale/ecrite/pratique/total_points/actif de discipline_arabe) — utilisée
+// par pages/notes_arabe/index.php pour basculer 1 champ /20 ↔ 3 champs.
+function matieres_classe_arabe_avec_bareme(int $id_classe, string $val_annee): array {
+    $mats = matieres_classe_arabe($id_classe);
+    foreach ($mats as &$m) {
+        $m['bareme'] = bareme_matiere_classe_arabe($id_classe, (int) $m['id_mat'], $val_annee);
+    }
+    unset($m);
+    return $mats;
+}
+
+// ── Barème (Oral/Écrit/Pratique) d'une classe, en cache. Une matière sans
+// ligne discipline_arabe active reste sur l'ancien modèle (note unique /20).
+function &_cache_bareme_arabe_classe(): array {
+    static $cache = [];
+    return $cache;
+}
+function bareme_matiere_classe_arabe(int $id_classe, int $id_mat, string $val_annee): ?array {
+    $cache = &_cache_bareme_arabe_classe();
+    $cle_classe = $id_classe . '|' . $val_annee;
+    if (!isset($cache[$cle_classe])) {
+        $index = [];
+        foreach (db_all("SELECT id_mat, orale, ecrite, pratique, total_points, actif FROM discipline_arabe WHERE IDClasses=? AND annee_scol=?", [$id_classe, $val_annee]) as $d) {
+            if ((int) $d['actif'] === 1 && (float) $d['total_points'] > 0) {
+                $index[(int) $d['id_mat']] = $d;
+            }
+        }
+        $cache[$cle_classe] = $index;
+    }
+    return $cache[$cle_classe][$id_mat] ?? null;
+}
+
+// ── Note d'une matière pour une séquence (null si non composée, ou si
+// aucun barème n'est configuré pour cette matière/classe/année). Consulte
+// le préchargement de classe s'il existe (perf, évite 1 requête/élève).
+// Normalise les 3 sous-notes sur /20 (total_obtenu / total_bareme * 20).
 function note_matiere_sequence_arabe(int $id_eleve, int $id_mat, int $id_classe, int $id_seq): ?float {
     $preload = _cache_composer_sequence_classe_arabe()[$id_classe] ?? null;
     if ($preload !== null) {
-        $v = $preload[$id_eleve . '|' . $id_mat . '|' . $id_seq] ?? null;
-        return $v !== null ? (float) $v : null;
+        $row = $preload[$id_eleve . '|' . $id_mat . '|' . $id_seq] ?? null;
+    } else {
+        $row = db_one(
+            "SELECT note_orale, note_ecrite, note_pratique FROM composer_sequence_arabe WHERE id_eleve=? AND id_mat=? AND classe=? AND id_seq=?",
+            [$id_eleve, $id_mat, $id_classe, $id_seq]
+        ) ?: null;
     }
-    $note = db_val(
-        "SELECT note FROM composer_sequence_arabe WHERE id_eleve=? AND id_mat=? AND classe=? AND id_seq=?",
-        [$id_eleve, $id_mat, $id_classe, $id_seq]
-    );
-    return $note !== null ? (float) $note : null;
+    if ($row === null) return null;
+    if ($row['note_orale'] === null && $row['note_ecrite'] === null && $row['note_pratique'] === null) return null;
+
+    $val_annee = annee_de_sequence_arabe($id_seq);
+    $bareme    = $val_annee !== '' ? bareme_matiere_classe_arabe($id_classe, $id_mat, $val_annee) : null;
+    if ($bareme === null) return null;
+
+    $total = (float) ($row['note_orale'] ?? 0) + (float) ($row['note_ecrite'] ?? 0) + (float) ($row['note_pratique'] ?? 0);
+    return round($total / (float) $bareme['total_points'] * 20, 2);
 }
 
-// ── Préchargement en masse (piste arabe) — miroir de
-// precharger_notes_sequence_classe() dans notes_apc.php. Note : contrairement
-// à composer_sequence (FR), composer_sequence_arabe n'a pas de colonne
-// val_annee (sa clé primaire est id_eleve/id_seq/id_mat/classe — l'année est
-// déjà portée par id_seq via sequence.id_trim/trimestre.id_annee) — le
-// préchargement filtre donc uniquement par classe, ce qui reste correct :
-// note_matiere_trimestre_arabe() ne consulte jamais que des id_seq déjà
-// bornés au trimestre/année demandés (sequences_du_trimestre()).
+// Année scolaire d'une séquence (via sequence -> trimestre).
+function annee_de_sequence_arabe(int $id_seq): string {
+    static $cache = [];
+    if (!array_key_exists($id_seq, $cache)) {
+        $cache[$id_seq] = (string) (db_val(
+            "SELECT t.id_annee FROM sequence s JOIN trimestre t ON t.id_trim = s.id_trim WHERE s.id_seq = ?",
+            [$id_seq]
+        ) ?? '');
+    }
+    return $cache[$id_seq];
+}
+
+// ── Préchargement en masse par classe (perf, bulletins en lot).
 function &_cache_composer_sequence_classe_arabe(): array {
     static $cache = [];
     return $cache;
@@ -68,28 +107,51 @@ function precharger_notes_sequence_classe_arabe(int $id_classe): void {
     $cache = &_cache_composer_sequence_classe_arabe();
     if (isset($cache[$id_classe])) return;
     $rows = db_all(
-        "SELECT id_eleve, id_mat, id_seq, note FROM composer_sequence_arabe WHERE classe=?",
+        "SELECT id_eleve, id_mat, id_seq, note_orale, note_ecrite, note_pratique FROM composer_sequence_arabe WHERE classe=?",
         [$id_classe]
     );
     $index = [];
     foreach ($rows as $r) {
-        $index[$r['id_eleve'] . '|' . $r['id_mat'] . '|' . $r['id_seq']] = $r['note'];
+        $index[$r['id_eleve'] . '|' . $r['id_mat'] . '|' . $r['id_seq']] = $r;
     }
     $cache[$id_classe] = $index;
 }
 
-// ── Moyenne d'une séquence pour un élève (Σnote×coef/Σcoef) ─────────
-// Mise en cache dans moyenne_sequence_arabe (upsert, migration_v7).
+// Points bruts d'une matière pour une séquence, sur l'échelle de son propre
+// barème (Oral+Écrit+Pratique). Équivalent arabe de note_total_points côté
+// français (note_competence_sur_sequences()).
+function points_matiere_sequence_arabe(int $id_eleve, int $id_mat, int $id_classe, int $id_seq): ?float {
+    $preload = _cache_composer_sequence_classe_arabe()[$id_classe] ?? null;
+    if ($preload !== null) {
+        $row = $preload[$id_eleve . '|' . $id_mat . '|' . $id_seq] ?? null;
+    } else {
+        $row = db_one(
+            "SELECT note_orale, note_ecrite, note_pratique FROM composer_sequence_arabe WHERE id_eleve=? AND id_mat=? AND classe=? AND id_seq=?",
+            [$id_eleve, $id_mat, $id_classe, $id_seq]
+        ) ?: null;
+    }
+    if ($row === null) return null;
+    if ($row['note_orale'] === null && $row['note_ecrite'] === null && $row['note_pratique'] === null) return null;
+    return (float) ($row['note_orale'] ?? 0) + (float) ($row['note_ecrite'] ?? 0) + (float) ($row['note_pratique'] ?? 0);
+}
+
+// ── Moyenne d'une séquence pour un élève : Σpoints / (Σbarème/20), même
+// formule que moyenne_eleve_sur_sequences() côté français (pas de
+// coefficient — chaque matière est pondérée par son propre barème, 20 par
+// défaut). Mise en cache dans moyenne_sequence_arabe (upsert, migration_v7).
 function calculer_moyenne_sequence_eleve_arabe(int $id_eleve, int $id_seq, int $id_classe, string $val_annee): ?float {
     $matieres = matieres_classe_arabe($id_classe);
-    $coef = 0.0; $note_coef = 0.0;
+    $total_bareme = 0.0; $total_points = 0.0;
     foreach ($matieres as $mt) {
-        $note = note_matiere_sequence_arabe($id_eleve, (int) $mt['id_mat'], $id_classe, $id_seq);
-        if ($note === null) continue;
-        $coef += (float) $mt['coef'];
-        $note_coef += $note * (float) $mt['coef'];
+        $id_mat = (int) $mt['id_mat'];
+        $pts = points_matiere_sequence_arabe($id_eleve, $id_mat, $id_classe, $id_seq);
+        if ($pts === null) continue;
+        $bareme = bareme_matiere_classe_arabe($id_classe, $id_mat, $val_annee);
+        $total_bareme += $bareme ? (float) $bareme['total_points'] : 20.0;
+        $total_points += $pts;
     }
-    $moyenne = $coef > 0 ? round($note_coef / $coef, 2) : null;
+    $coef = $total_bareme / 20;
+    $moyenne = $coef > 0 ? round($total_points / $coef, 2) : null;
 
     if ($moyenne === null) {
         db_exec("DELETE FROM moyenne_sequence_arabe WHERE id_eleve=? AND id_seq=? AND classe=? AND val_annee=?",
@@ -125,21 +187,34 @@ function note_matiere_trimestre_arabe(int $id_eleve, int $id_mat, int $id_classe
     return ['note1' => $n1, 'note2' => $n2, 'moyenne' => $moyenne];
 }
 
-// ── Moyenne trimestrielle : moyenne des (1 à 2) moyennes de séquence ────
-// Lit le cache moyenne_sequence_arabe (rafraîchi par recalculer_moyennes_
-// sequence_classe_arabe()) plutôt que de resommer les notes brutes — même
-// principe que Moyenne_trimestrielle_Arabe() du legacy.
-function calculer_moyenne_trimestre_eleve_arabe(int $id_eleve, int $id_trim, int $id_classe, string $val_annee): ?float {
+// Points bruts d'une matière pour un trimestre (moyenne des 1-2 séquences,
+// sur l'échelle du barème) — équivalent arabe de note_competence_trimestre().
+function points_matiere_trimestre_arabe(int $id_eleve, int $id_mat, int $id_classe, int $id_trim, string $val_annee): ?float {
     $seqs = sequences_du_trimestre($id_trim);
-    $valeurs = [];
-    foreach ($seqs as $id_seq) {
-        $moy = db_val(
-            "SELECT moy FROM moyenne_sequence_arabe WHERE id_eleve=? AND id_seq=? AND classe=? AND val_annee=?",
-            [$id_eleve, $id_seq, $id_classe, $val_annee]
-        );
-        if ($moy !== null && $moy !== '') $valeurs[] = (float) $moy;
+    $n1 = isset($seqs[0]) ? points_matiere_sequence_arabe($id_eleve, $id_mat, $id_classe, $seqs[0]) : null;
+    $n2 = isset($seqs[1]) ? points_matiere_sequence_arabe($id_eleve, $id_mat, $id_classe, $seqs[1]) : null;
+    if ($n1 === null && $n2 === null) return null;
+    if ($n1 !== null && $n2 !== null) return round(($n1 + $n2) / 2, 2);
+    return $n1 ?? $n2;
+}
+
+// ── Moyenne trimestrielle : Σpoints / (Σbarème/20) sur les matières
+// composées au moins une fois dans le trimestre — même formule que
+// calculer_moyenne_trimestre_eleve() côté français (sans le zéro
+// automatique : piste arabe, matière non composée = exclue, jamais notée 0).
+function calculer_moyenne_trimestre_eleve_arabe(int $id_eleve, int $id_trim, int $id_classe, string $val_annee): ?float {
+    $matieres = matieres_classe_arabe($id_classe);
+    $total_bareme = 0.0; $total_points = 0.0;
+    foreach ($matieres as $mt) {
+        $id_mat = (int) $mt['id_mat'];
+        $pts = points_matiere_trimestre_arabe($id_eleve, $id_mat, $id_classe, $id_trim, $val_annee);
+        if ($pts === null) continue;
+        $bareme = bareme_matiere_classe_arabe($id_classe, $id_mat, $val_annee);
+        $total_bareme += $bareme ? (float) $bareme['total_points'] : 20.0;
+        $total_points += $pts;
     }
-    $moyenne = $valeurs ? round(array_sum($valeurs) / count($valeurs), 2) : null;
+    $coef = $total_bareme / 20;
+    $moyenne = $coef > 0 ? round($total_points / $coef, 2) : null;
 
     if ($moyenne === null) {
         db_exec("DELETE FROM moyenne_trimestre_arabe WHERE id_eleve=? AND id_trim=? AND classe=? AND val_annee=?",
@@ -155,8 +230,7 @@ function calculer_moyenne_trimestre_eleve_arabe(int $id_eleve, int $id_trim, int
 }
 
 function recalculer_moyennes_trimestre_classe_arabe(int $id_classe, int $id_trim, string $val_annee): int {
-    // Rafraîchit d'abord le cache séquence (les 2 séquences du trimestre),
-    // puis le cache trimestre qui en dépend.
+    // Rafraîchit le cache séquence (utilisé par le rang par UA) puis le cache trimestre.
     foreach (sequences_du_trimestre($id_trim) as $id_seq) {
         recalculer_moyennes_sequence_classe_arabe($id_classe, $id_seq, $val_annee);
     }
@@ -170,13 +244,9 @@ function recalculer_moyennes_trimestre_classe_arabe(int $id_classe, int $id_trim
 }
 
 // ── Classement d'une classe pour un trimestre (piste arabe) ─────────
-// Même algorithme « 1224 » que classement_trimestre_classe() (piste
-// française), JOIN sur inscrire dès le départ (correctif déjà connu).
-//
-// Bug de tri lexicographique détecté ICI en premier (classe 5/trim 1 :
-// moy_classe=14.83 mais le "1er" affiché avait moy=9.97 — impossible),
-// moyenne_trimestre_arabe.moy était VARCHAR, confirmé identique côté
-// français. Corrigé à la source par la migration v29 (decimal(4,2)).
+// Algorithme « 1224 » comme classement_trimestre_classe() (piste française).
+// Piège déjà rencontré : moyenne_trimestre_arabe.moy doit être decimal(4,2),
+// pas VARCHAR (tri lexicographique sinon) — corrigé par migration v29.
 function classement_trimestre_classe_arabe(int $id_classe, int $id_trim, string $val_annee): array {
     $lignes = db_all(
         "SELECT mt.id_eleve, mt.moy, e.Nom_elv, e.Prenom_elv
@@ -197,7 +267,7 @@ function classement_trimestre_classe_arabe(int $id_classe, int $id_trim, string 
         $somme += $moy; $nb_classes_val++;
         if ($moy >= 10) $nb_admis++;
         if ($moy_precedente === null || abs($moy - $moy_precedente) > 0.001) { $rang_du_groupe = $nb_classes_val; }
-        $l['rang'] = $rang_du_groupe . 'e' . ($rang_du_groupe < $nb_classes_val ? ' ex' : '');
+        $l['rang'] = $rang_du_groupe . ($rang_du_groupe < $nb_classes_val ? 'ex' : 'e');
         $moy_precedente = $moy;
     }
     unset($l);
@@ -217,7 +287,8 @@ function rang_eleve_trimestre_arabe(int $id_eleve, int $id_classe, int $id_trim,
         if ((int) $l['id_eleve'] === $id_eleve) {
             return [
                 'moyenne' => $l['moy'] !== null ? (float) $l['moy'] : null, 'rang' => $l['rang'],
-                'effectif' => $classement['effectif'], 'moy_classe' => $classement['moy_classe'],
+                'effectif' => $classement['effectif'], 'nb_classes' => $classement['nb_classes'],
+                'moy_classe' => $classement['moy_classe'],
                 'moy_premier' => $classement['moy_premier'], 'moy_dernier' => $classement['moy_dernier'],
                 'taux_reussite' => $classement['taux_reussite'],
             ];
@@ -225,9 +296,71 @@ function rang_eleve_trimestre_arabe(int $id_eleve, int $id_classe, int $id_trim,
     }
     return [
         'moyenne' => null, 'rang' => '', 'effectif' => $classement['effectif'],
+        'nb_classes' => $classement['nb_classes'],
         'moy_classe' => $classement['moy_classe'], 'moy_premier' => $classement['moy_premier'],
         'moy_dernier' => $classement['moy_dernier'], 'taux_reussite' => $classement['taux_reussite'],
     ];
+}
+
+// ── Classement sur une ou plusieurs séquences (rang par UA) ─────────
+// Miroir de moyenne_eleve_sur_sequences()/classement_sur_sequences() côté
+// français : Σpoints / (Σbarème/20), moyenne d'une matière sur les
+// séquences données puis pondération par barème sur toutes les matières.
+function moyenne_eleve_sur_sequences_arabe(int $id_eleve, int $id_classe, array $seqs, string $val_annee): array {
+    $matieres = matieres_classe_arabe($id_classe);
+    $total_bareme = 0.0; $total_points = 0.0; $nb_composees = 0;
+    foreach ($matieres as $mt) {
+        $id_mat = (int) $mt['id_mat'];
+        $pts = [];
+        foreach ($seqs as $id_seq) {
+            $p = points_matiere_sequence_arabe($id_eleve, $id_mat, $id_classe, (int) $id_seq);
+            if ($p !== null) $pts[] = $p;
+        }
+        if (!$pts) continue;
+        $bareme = bareme_matiere_classe_arabe($id_classe, $id_mat, $val_annee);
+        $total_bareme += $bareme ? (float) $bareme['total_points'] : 20.0;
+        $total_points += array_sum($pts) / count($pts);
+        $nb_composees++;
+    }
+    $coef = $total_bareme / 20;
+    $moyenne = $coef > 0 ? round($total_points / $coef, 2) : null;
+    $classable = count($matieres) > 0 && ($nb_composees / count($matieres)) >= 0.5;
+    return ['moyenne' => $moyenne, 'classable' => $classable];
+}
+
+function classement_sur_sequences_arabe(int $id_classe, array $seqs, string $val_annee): array {
+    static $cache = [];
+    $cle = $id_classe . '|' . $val_annee . '|' . implode(',', $seqs);
+    if (isset($cache[$cle])) return $cache[$cle];
+
+    $eleves = db_all(
+        "SELECT e.id_eleve FROM eleve e JOIN inscrire i ON i.id_eleve = e.id_eleve
+         WHERE i.IDClasses = ? AND i.val_annee = ? AND e.statut = 'actif'",
+        [$id_classe, $val_annee]
+    );
+    $lignes = [];
+    foreach ($eleves as $e) {
+        $r = moyenne_eleve_sur_sequences_arabe((int) $e['id_eleve'], $id_classe, $seqs, $val_annee);
+        $lignes[] = ['id_eleve' => $e['id_eleve'], 'moy' => $r['moyenne'], 'classable' => $r['classable']];
+    }
+    usort($lignes, function ($a, $b) {
+        if ($a['moy'] === null && $b['moy'] === null) return 0;
+        if ($a['moy'] === null) return 1;
+        if ($b['moy'] === null) return -1;
+        return $b['moy'] <=> $a['moy'];
+    });
+
+    $nb_classes_val = 0; $rang_du_groupe = 0; $moy_precedente = null;
+    foreach ($lignes as &$l) {
+        if ($l['moy'] === null || !$l['classable']) { $l['rang'] = ''; continue; }
+        $nb_classes_val++;
+        if ($moy_precedente === null || abs($l['moy'] - $moy_precedente) > 0.001) { $rang_du_groupe = $nb_classes_val; }
+        $l['rang'] = $rang_du_groupe . ($rang_du_groupe < $nb_classes_val ? 'ex' : 'e');
+        $moy_precedente = $l['moy'];
+    }
+    unset($l);
+
+    return $cache[$cle] = ['lignes' => $lignes, 'effectif' => count($lignes), 'nb_classes' => $nb_classes_val];
 }
 
 // ── Moyenne annuelle (piste arabe) ──────────────────────────────────
@@ -252,12 +385,8 @@ function calculer_moyenne_annuelle_eleve_arabe(int $id_eleve, int $id_classe, st
     return ['moyenne' => $moyenne, 'nb_trimestres' => $nb];
 }
 
-// ── Note d'une matière pour l'année (bulletin annuel arabe) ─────────
-// Moyenne des moyennes trimestrielles de cette matière (1 à 3 valeurs) —
-// même principe que note_competence_annuelle() côté français.
-// Mémoïsée par requête (même principe et mêmes gains que
-// note_competence_annuelle() côté français — voir son commentaire dans
-// notes_apc.php pour le détail de l'explosion combinatoire évitée).
+// ── Note d'une matière pour l'année — moyenne des moyennes trimestrielles
+// (1 à 3 valeurs). Mémoïsée par requête.
 function note_matiere_annuelle_arabe(int $id_eleve, int $id_mat, int $id_classe, string $val_annee): array {
     static $cache = [];
     $cle = $id_eleve . '|' . $id_mat . '|' . $id_classe . '|' . $val_annee;
@@ -275,10 +404,8 @@ function note_matiere_annuelle_arabe(int $id_eleve, int $id_mat, int $id_classe,
     return $cache[$cle] = ['par_trim' => $valeurs, 'moyenne' => $moyenne];
 }
 
-// ── Classement annuel d'une classe (piste arabe) ─────────────────────
-// Même algorithme « 1224 » et même correctif de tri numérique que
-// classement_trimestre_classe_arabe() — moyenne_annuelle_arabe.moy est déjà
-// FLOAT (contrairement à moyenne_trimestre_arabe), pas besoin du "+0".
+// ── Classement annuel d'une classe (piste arabe) — même algorithme que
+// classement_trimestre_classe_arabe(). moyenne_annuelle_arabe.moy est FLOAT.
 function classement_annuel_classe_arabe(int $id_classe, string $val_annee): array {
     $lignes = db_all(
         "SELECT ma.id_eleve, ma.moy, ma.Nb_trim, e.Nom_elv, e.Prenom_elv
@@ -299,7 +426,7 @@ function classement_annuel_classe_arabe(int $id_classe, string $val_annee): arra
         $somme += $moy; $nb_classes_val++;
         if ($moy >= 10) $nb_admis++;
         if ($moy_precedente === null || abs($moy - $moy_precedente) > 0.001) { $rang_du_groupe = $nb_classes_val; }
-        $l['rang'] = $rang_du_groupe . 'e' . ($rang_du_groupe < $nb_classes_val ? ' ex' : '');
+        $l['rang'] = $rang_du_groupe . ($rang_du_groupe < $nb_classes_val ? 'ex' : 'e');
         $moy_precedente = $moy;
     }
     unset($l);
@@ -330,6 +457,35 @@ function rang_eleve_annuel_arabe(int $id_eleve, int $id_classe, string $val_anne
         'moy_classe' => $classement['moy_classe'], 'moy_premier' => $classement['moy_premier'],
         'moy_dernier' => $classement['moy_dernier'], 'taux_reussite' => $classement['taux_reussite'],
     ];
+}
+
+// ── Élèves inscrits mais non évalués (piste arabe) — pour l'onglet
+// « Non évalués » de pages/statistiques_arabe/index.php. Un seul motif
+// possible : aucune moyenne calculée pour cette vue.
+function eleves_non_evalues_classe_arabe(int $id_classe, string $val_annee, string $vue = 'trim', int $id_trim = 0): array {
+    $inscrits = db_all(
+        "SELECT e.id_eleve, e.Mat_elv, e.Nom_elv, e.Prenom_elv, e.Sexe_elv
+         FROM eleve e JOIN inscrire i ON i.id_eleve = e.id_eleve
+         WHERE i.IDClasses = ? AND i.val_annee = ? AND e.statut = 'actif'
+         ORDER BY e.Nom_elv, e.Prenom_elv",
+        [$id_classe, $val_annee]
+    );
+    if (empty($inscrits)) return [];
+
+    $classement = $vue === 'annee'
+        ? classement_annuel_classe_arabe($id_classe, $val_annee)
+        : classement_trimestre_classe_arabe($id_classe, $id_trim, $val_annee);
+    $idx = [];
+    foreach ($classement['lignes'] as $l) { $idx[(int) $l['id_eleve']] = $l; }
+
+    $resultat = [];
+    foreach ($inscrits as $e) {
+        $l = $idx[(int) $e['id_eleve']] ?? null;
+        if ($l === null || $l['moy'] === null) {
+            $resultat[] = $e + ['raison' => 'Aucune moyenne calculée', 'moy' => $l['moy'] ?? null];
+        }
+    }
+    return $resultat;
 }
 
 // ── Bilan M/F/T d'une classe (piste arabe) — miroir de bilan_classe_genre()
@@ -406,7 +562,7 @@ function stats_par_matiere_arabe(array $id_classes, string $val_annee, string $v
     $in_c = implode(',', array_fill(0, count($id_classes), '?'));
     $in_s = implode(',', array_fill(0, count($seqs), '?'));
     $rows = db_all(
-        "SELECT cs.id_mat, cs.id_eleve, cs.note, m.matiere_fr
+        "SELECT cs.id_mat, cs.id_eleve, cs.classe, cs.id_seq, m.matiere_fr
          FROM composer_sequence_arabe cs
          JOIN matiere_arabe m ON m.id_mat = cs.id_mat
          JOIN inscrire i ON i.id_eleve = cs.id_eleve AND i.IDClasses = cs.classe AND i.val_annee = ?
@@ -416,8 +572,10 @@ function stats_par_matiere_arabe(array $id_classes, string $val_annee, string $v
 
     $par_mat = [];
     foreach ($rows as $r) {
+        $note = note_matiere_sequence_arabe((int) $r['id_eleve'], (int) $r['id_mat'], (int) $r['classe'], (int) $r['id_seq']);
+        if ($note === null) continue;
         $par_mat[$r['id_mat']]['nom'] = $r['matiere_fr'];
-        $par_mat[$r['id_mat']]['vals'][$r['id_eleve']][] = (float) $r['note'];
+        $par_mat[$r['id_mat']]['vals'][$r['id_eleve']][] = $note;
     }
     $stats = [];
     foreach ($par_mat as $info) {

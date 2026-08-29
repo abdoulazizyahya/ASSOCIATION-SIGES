@@ -28,6 +28,58 @@ function bulletin_verif_hash(int $id_eleve, string $vue, int $id_periode, string
     return substr(hash_hmac('sha256', $payload, BULLETIN_VERIF_SECRET), 0, 20);
 }
 
+function b64url_encode(string $bin): string {
+    return rtrim(strtr(base64_encode($bin), '+/', '-_'), '=');
+}
+
+// Signature ECDSA P-256/SHA-256 → r||s brut sur 64 octets (format WebCrypto/
+// IEEE P1363), PAS le DER que renvoie openssl_sign() nativement (ASN.1
+// SEQUENCE{INTEGER r, INTEGER s}, longueur variable ~70-72 octets) —
+// crypto.subtle.verify() de la piste offline (verif_bulletin_hors_ligne.html)
+// exige le format brut, d'où cette conversion.
+function der_vers_raw_ecdsa(string $der, int $taille = 32): string {
+    $pos = 0;
+    if (ord($der[$pos++]) !== 0x30) throw new RuntimeException('DER invalide (pas une SEQUENCE)');
+    $seqLen = ord($der[$pos++]);
+    if ($seqLen & 0x80) {
+        $n = $seqLen & 0x7F; $seqLen = 0;
+        for ($i = 0; $i < $n; $i++) $seqLen = ($seqLen << 8) | ord($der[$pos++]);
+    }
+    $lireEntier = function () use (&$pos, $der, $taille): string {
+        if (ord($der[$pos++]) !== 0x02) throw new RuntimeException('DER invalide (pas un INTEGER)');
+        $l = ord($der[$pos++]);
+        $octets = substr($der, $pos, $l);
+        $pos += $l;
+        while (strlen($octets) > $taille && ord($octets[0]) === 0) $octets = substr($octets, 1);
+        return str_pad($octets, $taille, "\x00", STR_PAD_LEFT);
+    };
+    return $lireEntier() . $lireEntier();
+}
+
+/**
+ * Signe les données clés d'un bulletin (nom/matricule/période/moyenne/rang)
+ * avec la clé privée ECDSA P-256 (config.php::BULLETIN_VERIF_PRIVATE_KEY_PEM)
+ * — vérifiable HORS LIGNE avec la clé publique correspondante, embarquée
+ * dans verif_bulletin_hors_ligne.html (voir ce fichier). Contrairement à
+ * bulletin_verif_hash() (HMAC symétrique, nécessite de recontacter le
+ * serveur), une signature asymétrique se vérifie sans réseau — c'est le
+ * but recherché. N'affecte jamais bulletin_verif_hash()/bulletin_verif_valider()
+ * (mode en ligne, inchangé).
+ * Retourne '' si BULLETIN_VERIF_PRIVATE_KEY_PEM n'est pas définie (offline
+ * désactivé silencieusement plutôt que de faire planter la génération PDF).
+ */
+function bulletin_verif_signature_offline(array $champs): string {
+    if (!defined('BULLETIN_VERIF_PRIVATE_KEY_PEM')) return '';
+    $cle = openssl_pkey_get_private(BULLETIN_VERIF_PRIVATE_KEY_PEM);
+    if (!$cle) return '';
+
+    $donnees = implode('|', array_map(fn($v) => str_replace(['|', "\n"], ' ', (string) $v), $champs));
+    if (!openssl_sign($donnees, $sig_der, $cle, OPENSSL_ALGO_SHA256)) return '';
+    $sig_raw = der_vers_raw_ecdsa($sig_der);
+
+    return b64url_encode($donnees) . '.' . b64url_encode($sig_raw);
+}
+
 /**
  * Base absolue (schéma + hôte + chemin de l'appli) pour les URL encodées dans
  * un QR code : contrairement à un lien HTML classique, un lecteur de QR code
@@ -50,11 +102,30 @@ function bulletin_verif_base_url(): string {
 }
 
 /**
- * Construit l'URL de vérification à encoder dans le QR code.
+ * Construit l'URL de vérification à encoder dans le QR code. $donnees_offline
+ * (optionnel) : [matricule, niu, nom, naissance, periode_libelle, moy_ua1,
+ * moy_ua2, moyenne, rang, matieres] — le 10e champ (facultatif, appelants plus
+ * anciens sans lui) est le détail par matière : "nom~moyenne~cote" séparés
+ * par ";" (demande du 26/08/2026 — priorité au contenu complet plutôt qu'à
+ * la légèreté du QR, voir pdf/bulletin_trimestriel_arabe.php). Si fourni,
+ * ajoute un paramètre `d=`
+ * signé (ECDSA, voir bulletin_verif_signature_offline()) vérifiable hors
+ * ligne, sans toucher au paramètre `h=` (mode en ligne, inchangé).
+ * $chiffres_ar : préférence d'affichage (chiffres arabe oriental ٠١٢٣...,
+ * bouton "Convertir" de pages/bulletins_arabe/index.php) — pas une donnée
+ * de sécurité, non signée, juste reportée sur le lien "Ouvrir le bulletin"
+ * de verif_bulletin.php pour que le PDF rouvert depuis le QR garde la même
+ * préférence que celui imprimé/exporté.
  */
-function bulletin_verif_url(int $id_eleve, string $vue, int $id_periode, string $matricule, string $piste = 'fr'): string {
+function bulletin_verif_url(int $id_eleve, string $vue, int $id_periode, string $matricule, string $piste = 'fr', array $donnees_offline = [], bool $chiffres_ar = false): string {
     $h = bulletin_verif_hash($id_eleve, $vue, $id_periode, $matricule, $piste);
-    return bulletin_verif_base_url() . '/verif_bulletin.php?e=' . $id_eleve . '&v=' . $vue . '&p=' . $id_periode . '&t=' . $piste . '&h=' . $h;
+    $url = bulletin_verif_base_url() . '/verif_bulletin.php?e=' . $id_eleve . '&v=' . $vue . '&p=' . $id_periode . '&t=' . $piste . '&h=' . $h;
+    if ($donnees_offline) {
+        $d = bulletin_verif_signature_offline($donnees_offline);
+        if ($d !== '') $url .= '&d=' . $d;
+    }
+    if ($chiffres_ar) $url .= '&chiffres_ar=1';
+    return $url;
 }
 
 /**
@@ -123,14 +194,26 @@ function bulletin_photo_pour_qr(array $eleve): array {
  * assets/uploads/qr_bulletins/ — l'appelant ne doit PLUS le supprimer après
  * usage (voir les 4 générateurs de bulletin, @unlink retiré).
  */
-function bulletin_qr_fichier_temp(array $eleve, string $vue, int $id_periode, string $piste = 'fr'): ?string {
+function bulletin_qr_fichier_temp(array $eleve, string $vue, int $id_periode, string $piste = 'fr', array $donnees_offline = [], bool $chiffres_ar = false): ?string {
     require_once __DIR__ . '/qrcode.php';
     $id_eleve = (int) ($eleve['id_eleve'] ?? 0);
     if (!$id_eleve) return null;
 
     [$photo_path, $photo_est_temp] = bulletin_photo_pour_qr($eleve);
     $cle_cache = hash('crc32b', BULLETIN_VERIF_SECRET) . '_' . $id_eleve . '_' . $piste . '_' . $vue . '_' . $id_periode
-        . '_' . ($photo_path !== '' && is_file($photo_path) ? hash_file('crc32b', $photo_path) : 'none');
+        // Hash de la base URL (schéma + hôte réseau + chemin appli) : sans lui,
+        // un QR déjà en cache gardait indéfiniment l'ANCIENNE adresse IP même
+        // après un changement de réseau ou de SERVEUR_LAN_HOST dans config.php
+        // (cause réelle d'échec de scan : le téléphone visait une IP qui
+        // n'existait plus sur le réseau). Change automatiquement le fichier de
+        // cache dès que l'adresse du serveur change — aucune purge manuelle.
+        . '_' . hash('crc32b', bulletin_verif_base_url())
+        . '_' . ($photo_path !== '' && is_file($photo_path) ? hash_file('crc32b', $photo_path) : 'none')
+        // Inclut les données offline (moyenne/rang...) : un bulletin régénéré
+        // après correction de note doit régénérer son QR, sinon la signature
+        // offline embarquée resterait périmée silencieusement.
+        . '_' . ($donnees_offline ? hash('crc32b', implode('|', $donnees_offline)) : 'noffl')
+        . '_' . ($chiffres_ar ? 'car1' : 'car0');
     $dossier_cache = __DIR__ . '/../assets/uploads/qr_bulletins';
     if (!is_dir($dossier_cache)) @mkdir($dossier_cache, 0755, true);
     $chemin_cache = $dossier_cache . '/' . $cle_cache . '.png';
@@ -140,8 +223,15 @@ function bulletin_qr_fichier_temp(array $eleve, string $vue, int $id_periode, st
         return $chemin_cache;
     }
 
-    $verif_url = bulletin_verif_url($id_eleve, $vue, $id_periode, (string) ($eleve['Mat_elv'] ?? ''), $piste);
-    $qr_gen = new QRCode($verif_url, ['s' => 'qr-h']);
+    // Niveau Q (25% de correction), pas H (30%) : la photo incrustée ne
+    // couvre qu'environ 5% de la surface (côté de la case = 22% de la
+    // largeur, donc 0.22² ≈ 5% de l'aire) — Q laisse une marge confortable
+    // (~20%) pour l'usure réelle tout en réduisant nettement le nombre de
+    // modules par rapport à H (mesuré : ~117 vs ~129 pour un même contenu),
+    // important maintenant que $donnees_offline peut inclure le détail par
+    // matière (25/08/2026).
+    $verif_url = bulletin_verif_url($id_eleve, $vue, $id_periode, (string) ($eleve['Mat_elv'] ?? ''), $piste, $donnees_offline, $chiffres_ar);
+    $qr_gen = new QRCode($verif_url, ['s' => 'qr-q']);
     $qr_img = $qr_gen->render_image();
     qr_incruster_photo($qr_img, $photo_path);
     imagepng($qr_img, $chemin_cache);

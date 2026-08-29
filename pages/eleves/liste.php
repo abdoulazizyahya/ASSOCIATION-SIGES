@@ -75,7 +75,12 @@ function th_tri(string $col, string $label, string $tri_actuel, string $ordre_ac
     return '<a href="#" onclick="triListe(\'' . $col . '\',\'' . $o . '\');return false" class="text-white text-decoration-none">' . $label . $icon . '</a>';
 }
 
-$peut_gerer = in_array(role_connecte(), ['DIRECTEUR','SECRETAIRE'], true);
+$peut_gerer  = in_array(role_connecte(), ['DIRECTEUR','SECRETAIRE','COMPTABLE'], true);
+// L'import en masse reste hors du périmètre COMPTABLE (demande du 22/08/2026
+// : ajouter/modifier/activer/désactiver UN élève à la fois, pas d'import) —
+// distinct de $peut_gerer pour ne pas afficher un lien menant à un
+// "Accès refusé" (pages/eleves/import.php reste ['DIRECTEUR','SECRETAIRE']).
+$peut_importer = in_array(role_connecte(), ['DIRECTEUR','SECRETAIRE'], true);
 
 // ═══ Réponse AJAX (partiel=1) : uniquement onglets + tableau + pagination,
 // jamais la barre de recherche/filtres (qui reste stable côté client pour
@@ -103,9 +108,11 @@ require_once __DIR__ . '/../../layout/header.php';
   </div>
   <?php if ($peut_gerer): ?>
   <div class="d-flex gap-2 flex-wrap">
+    <?php if ($peut_importer): ?>
     <a href="<?= APP_URL ?>/pages/eleves/import.php" class="btn btn-outline-primary btn-sm">
       <i class="bi bi-upload me-1"></i>Importer
     </a>
+    <?php endif; ?>
     <a href="<?= APP_URL ?>/pages/eleves/form.php" class="btn btn-primary btn-sm">
       <i class="bi bi-plus-lg me-1"></i> Nouvel élève
     </a>
@@ -158,10 +165,12 @@ require_once __DIR__ . '/../../layout/header.php';
              title="<?= $id_classe ? h('Liste des élèves de ' . $classe_nom_choisie) : 'Liste des élèves de toutes les classes' ?>">
             <i class="bi bi-file-earmark-excel me-1"></i>Excel
           </a>
+          <?php if (role_connecte() !== 'COMPTABLE'): ?>
           <button type="button" class="btn btn-outline-primary btn-sm <?= $id_classe ? '' : 'd-none' ?>" id="btnCartesListe"
                   data-bs-toggle="modal" data-bs-target="#modalCartes">
             <i class="bi bi-credit-card me-1"></i>Cartes
           </button>
+          <?php endif; ?>
         </div>
       </div>
     </div>

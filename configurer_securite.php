@@ -1,22 +1,28 @@
 <?php
+// configurer_securite.php — 2 questions secrètes par compte (mot_de_passe_
+// oublie.php s'en sert pour réinitialiser un mot de passe sans passer par le
+// Directeur). Configuration OBLIGATOIRE dès la 1ère connexion — voir
+// exiger_connexion() (fonctions.php), qui redirige ici tant que
+// utilisateur_a_questions() est faux. Reconfigurable ensuite à tout moment
+// (lien « Modifier mes questions », profil.php). Voir bd/migration_v45.sql.
 require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/connexion.php';
 require_once __DIR__ . '/fonctions.php';
 exiger_connexion();
 
-$user_id  = (int)$_SESSION['user_id'];
-$retour   = $_GET['retour'] ?? 'dashboard.php';
+$user_id     = (int) $_SESSION['user_id'];
+$retour      = $_GET['retour'] ?? 'dashboard.php';
 $obligatoire = !utilisateur_a_questions($user_id);
 
 $questions_dispo = db_all("SELECT id, libelle FROM question_secrete WHERE actif = 1 ORDER BY libelle");
-$actuelles       = db_all("SELECT id_question FROM utilisateur_question_secrete WHERE id_utilisateur = ?", [$user_id]);
-$id_q1_actuel    = $actuelles[0]['id_question'] ?? '';
-$id_q2_actuel    = $actuelles[1]['id_question'] ?? '';
+$actuelles        = db_all("SELECT id_question FROM user_question_secrete WHERE id_user = ?", [$user_id]);
+$id_q1_actuel     = $actuelles[0]['id_question'] ?? '';
+$id_q2_actuel     = $actuelles[1]['id_question'] ?? '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     csrf_verifier();
-    $id_q1 = (int)post('id_question_1');
-    $id_q2 = (int)post('id_question_2');
+    $id_q1 = (int) post('id_question_1');
+    $id_q2 = (int) post('id_question_2');
     $rep1  = post('reponse_1');
     $rep2  = post('reponse_2');
 
@@ -29,10 +35,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         rediriger('configurer_securite.php' . ($retour !== 'dashboard.php' ? '?retour=' . urlencode($retour) : ''));
     }
 
-    db_exec("DELETE FROM utilisateur_question_secrete WHERE id_utilisateur = ?", [$user_id]);
-    db_exec("INSERT INTO utilisateur_question_secrete (id_utilisateur, id_question, reponse_hash) VALUES (?,?,?)",
+    db_exec("DELETE FROM user_question_secrete WHERE id_user = ?", [$user_id]);
+    db_exec("INSERT INTO user_question_secrete (id_user, id_question, reponse_hash) VALUES (?,?,?)",
             [$user_id, $id_q1, password_hash(normaliser_reponse($rep1), PASSWORD_DEFAULT)]);
-    db_exec("INSERT INTO utilisateur_question_secrete (id_utilisateur, id_question, reponse_hash) VALUES (?,?,?)",
+    db_exec("INSERT INTO user_question_secrete (id_user, id_question, reponse_hash) VALUES (?,?,?)",
             [$user_id, $id_q2, password_hash(normaliser_reponse($rep2), PASSWORD_DEFAULT)]);
 
     flash_set('succes', 'Vos questions de sécurité ont été enregistrées.');
@@ -49,7 +55,7 @@ require_once __DIR__ . '/layout/header.php';
 <?php if ($obligatoire): ?>
 <div class="alert alert-warning py-2" style="font-size:.85rem">
   <i class="bi bi-exclamation-triangle me-1"></i>
-  Configuration obligatoire avant de continuer : ces 2 questions permettront de récupérer votre mot de passe en cas d'oubli, sans passer par un administrateur.
+  Configuration obligatoire avant de continuer : ces 2 questions permettront de récupérer votre mot de passe en cas d'oubli, sans passer par le Directeur.
 </div>
 <?php endif; ?>
 
@@ -62,7 +68,7 @@ require_once __DIR__ . '/layout/header.php';
         <select name="id_question_1" class="form-select" required>
           <option value="">— Choisir —</option>
           <?php foreach ($questions_dispo as $q): ?>
-            <option value="<?= $q['id'] ?>" <?= (string)$q['id'] === (string)$id_q1_actuel ? 'selected' : '' ?>><?= h($q['libelle']) ?></option>
+            <option value="<?= $q['id'] ?>" <?= (string) $q['id'] === (string) $id_q1_actuel ? 'selected' : '' ?>><?= h($q['libelle']) ?></option>
           <?php endforeach; ?>
         </select>
       </div>
@@ -75,7 +81,7 @@ require_once __DIR__ . '/layout/header.php';
         <select name="id_question_2" class="form-select" required>
           <option value="">— Choisir —</option>
           <?php foreach ($questions_dispo as $q): ?>
-            <option value="<?= $q['id'] ?>" <?= (string)$q['id'] === (string)$id_q2_actuel ? 'selected' : '' ?>><?= h($q['libelle']) ?></option>
+            <option value="<?= $q['id'] ?>" <?= (string) $q['id'] === (string) $id_q2_actuel ? 'selected' : '' ?>><?= h($q['libelle']) ?></option>
           <?php endforeach; ?>
         </select>
       </div>

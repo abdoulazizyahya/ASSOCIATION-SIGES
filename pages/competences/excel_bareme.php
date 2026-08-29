@@ -10,7 +10,7 @@ require_once __DIR__ . '/../../connexion.php';
 require_once __DIR__ . '/../../fonctions.php';
 require_once __DIR__ . '/../../vendor/autoload.php';
 require_once __DIR__ . '/../conseil_classe/excel_releve_commun.php'; // generer_filigrane_excel()
-exiger_connexion(); // même politique d'accès que l'écran (lecture) — pages/competences/liste.php
+exiger_acces_pedagogie(); // même politique d'accès que l'écran (lecture) — pages/competences/liste.php
 
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\RichText\RichText;
@@ -27,10 +27,7 @@ $annee     = get_annee_active();
 $val_annee = $annee['val_annee'] ?? '';
 
 $niveaux_liste = db_all(
-    "SELECT DISTINCT n.LibelleNiveau, n.OrdreNiveau FROM niveau n
-     JOIN classe c ON c.Niveau = n.LibelleNiveau
-     WHERE n.actif = 1
-     ORDER BY n.OrdreNiveau"
+    "SELECT LibelleNiveau, OrdreNiveau FROM niveau WHERE actif = 1 ORDER BY OrdreNiveau"
 );
 if ($f_niveau) {
     $niveaux_liste = array_values(array_filter($niveaux_liste, fn($n) => $n['LibelleNiveau'] === $f_niveau));
@@ -135,7 +132,7 @@ function ecrire_feuille_bareme_excel(
         foreach ($grp['lignes'] as $ligne) {
             $active = $ligne['actif'] === null || (int) $ligne['actif'] === 1;
             $sheet->setCellValue("A{$row}", $ligne['code_comp']);
-            $sheet->setCellValue("B{$row}", $ligne['nom_comp']);
+            $sheet->setCellValue("B{$row}", $ligne['nom_comp_affiche'] ?? $ligne['nom_comp']);
             $sheet->setCellValue("C{$row}", $ligne['orale'] !== null ? (float) $ligne['orale'] : 0);
             $sheet->setCellValue("D{$row}", $ligne['ecrite'] !== null ? (float) $ligne['ecrite'] : 0);
             $sheet->setCellValue("E{$row}", $ligne['pratique'] !== null ? (float) $ligne['pratique'] : 0);

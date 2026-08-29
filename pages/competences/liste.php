@@ -33,7 +33,7 @@
 require_once __DIR__ . '/../../config.php';
 require_once __DIR__ . '/../../connexion.php';
 require_once __DIR__ . '/../../fonctions.php';
-exiger_connexion();
+exiger_acces_pedagogie();
 exiger_annee_active(); // Année scolaire réellement active requise (18/08/2026) — module Pédagogie/Discipline.
 
 $role          = role_connecte();
@@ -44,13 +44,10 @@ $val_annee     = $annee['val_annee'] ?? '';
 $onglet = $_GET['onglet'] ?? 'groupes';
 if (!in_array($onglet, ['groupes', 'groupes_niveau', 'competences', 'bareme'], true)) $onglet = 'groupes';
 
-// Niveaux réellement utilisés (au moins une classe) — évite de proposer des
-// niveaux du catalogue (`niveau`) jamais affectés à aucune classe.
+// Tous les niveaux actifs, avec ou sans classe (une classe qui sera créée
+// plus tard reprend automatiquement les groupes/compétences déjà configurés).
 $niveaux_liste = db_all(
-    "SELECT DISTINCT n.LibelleNiveau, n.OrdreNiveau FROM niveau n
-     JOIN classe c ON c.Niveau = n.LibelleNiveau
-     WHERE n.actif = 1
-     ORDER BY n.OrdreNiveau"
+    "SELECT LibelleNiveau, OrdreNiveau FROM niveau WHERE actif = 1 ORDER BY OrdreNiveau"
 );
 
 // ══════════════════════════════════════════════════════════════
@@ -321,6 +318,17 @@ if ($f_niveau_bareme && $val_annee) {
     $bareme_par_groupe         = $bareme_niveau['groupes'];
     $bareme_divergent          = $bareme_niveau['divergent'];
     $niveau_a_groupes_assignes = $bareme_niveau['assigne'];
+}
+
+// Total général des points du niveau — somme du « Total » de chaque
+// compétence active (recalculé en JS à chaque modification, voir plus bas) —
+// même affichage que pages/matieres_arabe/liste.php (onglet Barème, côté arabe).
+$total_general = 0.0;
+foreach ($bareme_par_groupe as $grp) {
+    foreach ($grp['lignes'] as $b) {
+        $active = $b['actif'] === null || (int) $b['actif'] === 1;
+        if ($active) $total_general += (float) ($b['total_points'] ?? 0);
+    }
 }
 
 $es_partiel = isset($_GET['partiel']);
@@ -846,10 +854,15 @@ function reinitCompForm() {
   <input type="hidden" name="code_niveau" value="<?= h($f_niveau_bareme) ?>">
 
   <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
-    <span class="fw-bold" style="font-size:.85rem;color:#374151">
-      Barème — Niveau <?= h($f_niveau_bareme) ?>
-      (<?= h(implode(', ', array_column($classes_du_niveau, 'DesignationClasses'))) ?>) — <?= h($val_annee) ?>
-    </span>
+    <div class="d-flex align-items-center gap-2 flex-wrap">
+      <span class="fw-bold" style="font-size:.85rem;color:#374151">
+        Barème — Niveau <?= h($f_niveau_bareme) ?>
+        (<?= h(implode(', ', array_column($classes_du_niveau, 'DesignationClasses'))) ?>) — <?= h($val_annee) ?>
+      </span>
+      <span id="total-general" class="badge" style="background:#dcfce7;color:#166534;font-size:.75rem;padding:5px 10px;border-radius:8px">
+        <?= h(rtrim(rtrim(number_format($total_general, 2, '.', ''), '0'), '.')) ?> points
+      </span>
+    </div>
     <?php if ($peut_modifier): ?>
     <div class="d-flex gap-2">
       <button type="button" class="btn btn-sm btn-outline-secondary" id="btn-bareme-tout-cocher"><i class="bi bi-check-all me-1"></i>Tout cocher</button>
@@ -907,7 +920,7 @@ function reinitCompForm() {
                 <?php endif; ?>
               </td>
               <td><span class="badge-code"><?= h($b['code_comp']) ?></span></td>
-              <td style="white-space:normal"><?= h($b['nom_comp']) ?></td>
+              <td style="white-space:normal"><?= h($b['nom_comp_affiche'] ?? $b['nom_comp']) ?></td>
               <?php foreach (['orale', 'ecrite', 'pratique', 'savoir_etre'] as $champ): ?>
                 <td class="text-center">
                   <?php if ($peut_modifier): ?>
@@ -936,6 +949,17 @@ function reinitCompForm() {
 
 <?php if ($peut_modifier): ?>
 <script>
+// Total général du niveau — somme du « Total » des lignes actives,
+// recalculée à chaque frappe/coche (valeur initiale déjà fournie par PHP).
+function recalculerTotalGeneral() {
+  let total = 0;
+  document.querySelectorAll('tr.bareme-ligne').forEach(tr => {
+    if (tr.classList.contains('bareme-ligne-inactive')) return;
+    tr.querySelectorAll('.bareme-input').forEach(i => total += parseFloat(i.value) || 0);
+  });
+  const el = document.getElementById('total-general');
+  if (el) el.textContent = (Math.round(total * 100) / 100) + ' points';
+}
 // Recalcule le total affiché (Oral+Écrit+Pratique+Savoir-être) en direct,
 // juste pour le confort visuel — le vrai total est recalculé côté serveur
 // à l'enregistrement (jamais fait confiance à une valeur postée par le client).
@@ -945,6 +969,7 @@ document.querySelectorAll('.bareme-input').forEach(inp => {
     let total = 0;
     document.querySelectorAll(`.bareme-input[data-comp="${id}"]`).forEach(i => total += parseFloat(i.value) || 0);
     document.getElementById('total-' + id).textContent = total;
+    recalculerTotalGeneral();
   });
 });
 // Grise/dégrise la ligne en direct quand on (dés)active une compétence —
@@ -953,6 +978,7 @@ document.querySelectorAll('.bareme-actif').forEach(chk => {
   chk.addEventListener('change', () => {
     const tr = document.querySelector(`tr.bareme-ligne[data-comp="${chk.dataset.comp}"]`);
     if (tr) tr.classList.toggle('bareme-ligne-inactive', !chk.checked);
+    recalculerTotalGeneral();
   });
 });
 // Tout cocher / Tout décocher — coche ou décoche toutes les compétences

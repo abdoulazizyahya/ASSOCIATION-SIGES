@@ -13,7 +13,7 @@ require_once __DIR__ . '/../../config.php';
 require_once __DIR__ . '/../../connexion.php';
 require_once __DIR__ . '/../../fonctions.php';
 require_once __DIR__ . '/../../notes_apc.php';
-exiger_connexion();
+exiger_acces_pedagogie();
 exiger_annee_active(); // Année scolaire réellement active requise (18/08/2026) — module Pédagogie/Discipline.
 
 // Mode "partiel" (AJAX) : réponse limitée au contenu de #bull-zone — voir
@@ -92,17 +92,23 @@ $fmt = fn(?float $v): string => $v === null ? '—' : rtrim(rtrim(number_format(
 $chemin_sig = signature_etablissement_chemin();
 $peut_configurer_sig = role_connecte() === 'DIRECTEUR';
 
-function pdf_url_bull(int $id_eleve, string $vue, int $id_trim, bool $dl = false): string {
+// $id_classe : nécessaire pour choisir le bon fichier PDF — pdf/
+// bulletin_{trimestriel,annuel}_anglais.php (demande du 26/08/2026) pour
+// une classe de niveau anglophone (section_classe(), fonctions.php), sinon
+// les fichiers français inchangés.
+function pdf_url_bull(int $id_eleve, int $id_classe, string $vue, int $id_trim, bool $dl = false): string {
+    $anglais = section_classe($id_classe) === 'An';
     $base = $vue === 'annee'
-        ? APP_URL . '/pdf/bulletin_annuel.php?id=' . $id_eleve
-        : APP_URL . '/pdf/bulletin_trimestriel.php?id=' . $id_eleve . '&trim=' . $id_trim;
+        ? APP_URL . '/pdf/bulletin_annuel' . ($anglais ? '_anglais' : '') . '.php?id=' . $id_eleve
+        : APP_URL . '/pdf/bulletin_trimestriel' . ($anglais ? '_anglais' : '') . '.php?id=' . $id_eleve . '&trim=' . $id_trim;
     if ($dl) $base .= '&dl=1';
     return $base;
 }
 function url_classe_bull(int $id_classe, string $vue, int $id_trim, string $ordre, bool $dl = false): string {
+    $anglais = section_classe($id_classe) === 'An';
     $base = $vue === 'annee'
-        ? APP_URL . '/pdf/bulletin_annuel.php?classe=' . $id_classe
-        : APP_URL . '/pdf/bulletin_trimestriel.php?classe=' . $id_classe . '&trim=' . $id_trim;
+        ? APP_URL . '/pdf/bulletin_annuel' . ($anglais ? '_anglais' : '') . '.php?classe=' . $id_classe
+        : APP_URL . '/pdf/bulletin_trimestriel' . ($anglais ? '_anglais' : '') . '.php?classe=' . $id_classe . '&trim=' . $id_trim;
     $base .= '&ordre=' . $ordre;
     if ($dl) $base .= '&dl=1';
     return $base;
@@ -274,8 +280,8 @@ function appliquerSigCl() {
 <!-- ══ APERÇU BULLETIN ÉLÈVE ══ -->
 <?php
 $eleve_sel = db_one("SELECT Nom_elv, Prenom_elv FROM eleve WHERE id_eleve=?", [$id_eleve]);
-$url_pdf   = pdf_url_bull($id_eleve, $vue, $id_trim);
-$url_dl    = pdf_url_bull($id_eleve, $vue, $id_trim, true);
+$url_pdf   = pdf_url_bull($id_eleve, $id_classe, $vue, $id_trim);
+$url_dl    = pdf_url_bull($id_eleve, $id_classe, $vue, $id_trim, true);
 $back_url  = '?vue=' . $vue . '&classe=' . $id_classe . '&trim=' . $id_trim . '&ordre=' . $ordre;
 ?>
 <div class="card" style="border-color:#c7d8f0">
@@ -361,7 +367,7 @@ function appliquerSigEl() {
         <?php foreach ($eleves as $i => $el): ?>
         <?php
         $url_ap = '?vue=' . $vue . '&classe=' . $id_classe . '&trim=' . $id_trim . '&ordre=' . $ordre . '&eleve=' . $el['id'];
-        $url_d  = pdf_url_bull((int) $el['id'], $vue, $id_trim, true);
+        $url_d  = pdf_url_bull((int) $el['id'], $id_classe, $vue, $id_trim, true);
         $moy    = $el['moy'] ?? null;
         $rang   = $el['rang'] ?? null;
         $dn     = $el['date_naiss'] ? date('d/m/Y', strtotime($el['date_naiss'])) : '—';

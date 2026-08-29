@@ -385,11 +385,27 @@ function pdf_bandeau(FPDF $pdf, string $titre_fr, string $titre_en, float $page_
 // À appeler juste avant $pdf->Output() pour un document simple, ou une fois
 // par page/carte pour un document à pages ou cartes multiples (voir les
 // appelants — même principe que pdf_filigrane()) ; ne touche pas
-// SetAutoPageBreak ni la position du curseur au-delà de son propre Cell().
+// SetAutoPageBreak ni la position du curseur au-delà de son propre appel.
+//
+// Text() plutôt que Cell() (corrigé le 28/08/2026) : Cell() teste
+// $y+$h > PageBreakTrigger avant de dessiner, et avec SetAutoPageBreak(true, N)
+// (quasi tous les appelants sauf ceux qui dessinent depuis Footer()) ce test
+// est presque toujours vrai tout en bas de page -> FPDF ajoutait une page
+// vierge supplémentaire rien que pour cette ligne (mention seule sur une
+// dernière page en trop, certificat_scolarite.php passant ainsi à 2 pages
+// alors qu'il tient sur 1). Text() ne fait pas ce test ; le calcul de $x/$y
+// ci-dessous reproduit à l'identique le centrage que faisait Cell(align='C').
 function pdf_copyright(FPDF $pdf, float $page_w, float $page_h, float $marge_bas = 8): void {
     $pdf->SetFont('Arial', 'I', 6.5);
     $pdf->SetTextColor(120, 120, 120);
-    $pdf->SetXY(0, $page_h - $marge_bas);
-    $pdf->Cell($page_w, 4, pdf_u('Copyright © SIGES-V2 ABZ'), 0, 0, 'C');
+    $texte = pdf_u('Copyright © SIGES-V2 ABZ');
+    $h = 4;
+    // Taille de police (mm) = 6.5pt / (72/25.4) — $k n'est pas exposé par ce
+    // fork de FPDF (propriété protected, pas de GetFontSize()), mais la
+    // police est fixe ci-dessus donc pas besoin de le lire dynamiquement.
+    $taille_police_mm = 6.5 / (72 / 25.4);
+    $x = ($page_w - $pdf->GetStringWidth($texte)) / 2;
+    $y = ($page_h - $marge_bas) + .5 * $h + .3 * $taille_police_mm;
+    $pdf->Text($x, $y, $texte);
     $pdf->SetTextColor(0, 0, 0);
 }

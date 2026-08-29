@@ -26,7 +26,7 @@ if (($_GET['vh'] ?? '') !== '' && (int) ($_GET['id'] ?? 0) > 0) {
         (int) $_GET['id'], 'annee', (int) substr($val_annee_pub, 0, 4), 'fr', (string) $_GET['vh']
     ) !== null;
 }
-if (!$acces_public) exiger_connexion();
+if (!$acces_public) exiger_acces_pedagogie();
 
 require_once __DIR__ . '/fpdf.php';
 require_once __DIR__ . '/header_pdf.php';
@@ -503,7 +503,10 @@ function dessiner_bulletin_annuel(
     pdf_fill($pdf, 'entete_bleu');
     $pdf->SetXY(158.1, $rtA2);
     $pdf->SetFont('Arial', 'B', 14);
-    $pdf->Cell(46, $H_ANN, ($moy_gen !== null ? sprintf('%05.2f', $moy_gen) : '—') . ' / 20', 1, 1, 'C', 1);
+    // pdf_u() indispensable ici : FPDF n'affiche que du Windows-1252, un
+    // « — » UTF-8 brut passé à Cell() sans conversion s'affiche en
+    // caractères parasites (« â€" ») — bug trouvé le 26/08/2026.
+    $pdf->Cell(46, $H_ANN, ($moy_gen !== null ? sprintf('%05.2f', $moy_gen) : pdf_u('—')) . ' / 20', 1, 1, 'C', 1);
 
     $pdf->SetXY(158.1, $rtA3);
     pdf_fill($pdf, 'cellule_resultat');

@@ -8,7 +8,7 @@ require_once __DIR__ . '/../config.php';
 require_once __DIR__ . '/../connexion.php';
 require_once __DIR__ . '/../fonctions.php';
 require_once __DIR__ . '/../pages/resultat_annuel_arabe/commun_arabe.php';
-exiger_connexion();
+exiger_acces_pedagogie();
 
 require_once __DIR__ . '/fpdf.php';
 require_once __DIR__ . '/header_pdf.php';

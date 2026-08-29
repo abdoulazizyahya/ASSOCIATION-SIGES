@@ -2,7 +2,7 @@
 require_once __DIR__ . '/../../config.php';
 require_once __DIR__ . '/../../connexion.php';
 require_once __DIR__ . '/../../fonctions.php';
-exiger_role(['DIRECTEUR','SECRETAIRE']);
+exiger_role(['DIRECTEUR','SECRETAIRE','COMPTABLE']);
 
 $id    = (int)($_GET['id'] ?? 0);
 $eleve = $id ? db_one("SELECT * FROM eleve WHERE id_eleve=?", [$id]) : null;
@@ -44,10 +44,17 @@ $ve = fn(string $k) => $eleve[$k] ?? '';
 // effaçable si le vrai NIU officiel est déjà connu ou à saisir plus tard.
 $niu_propose = $eleve ? '' : gen_niu(get_etablissement()['Initial_Etab'] ?? '');
 
-$titre_page = $eleve ? 'Modifier un élève' : 'Nouvel élève';
-require_once __DIR__ . '/../../layout/header.php';
+$es_partiel = isset($_GET['partiel']);
+if (!$es_partiel) {
+    $titre_page = $eleve ? 'Modifier un élève' : 'Nouvel élève';
+    require_once __DIR__ . '/../../layout/header.php';
+} else {
+    header('Content-Type: text/html; charset=utf-8');
+}
 ?>
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cropperjs@1.6.2/dist/cropper.min.css">
+<?php if (!$es_partiel): ?><link rel="stylesheet" href="<?= APP_URL ?>/assets/vendor/cropper/cropper.min.css"><?php endif; ?>
+
+<div id="eleve-form-zone">
 
 <div class="d-flex align-items-center gap-2 mb-3">
   <a href="<?= APP_URL ?>/pages/eleves/liste.php" class="btn btn-sm btn-light">
@@ -59,7 +66,7 @@ require_once __DIR__ . '/../../layout/header.php';
   </div>
 </div>
 
-<form method="post" action="<?= APP_URL ?>/pages/eleves/save.php" enctype="multipart/form-data">
+<form method="post" action="<?= APP_URL ?>/pages/eleves/save.php" enctype="multipart/form-data" data-ajax-post-form>
   <?= csrf_champ() ?>
   <input type="hidden" name="id" value="<?= $eleve ? (int)$eleve['id_eleve'] : '' ?>">
   <input type="hidden" name="photo_b64" id="photo_b64">
@@ -235,9 +242,13 @@ require_once __DIR__ . '/../../layout/header.php';
   </div>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/cropperjs@1.6.2/dist/cropper.min.js"></script>
+<script src="<?= APP_URL ?>/assets/vendor/cropper/cropper.min.js"></script>
 <script>
-let cropper = null, rawSrc = null;
+// var (pas let) : ce script est réexécuté à chaque rechargement AJAX de la
+// zone en cas d'erreur de validation (voir injecterHtmlDansZone(),
+// layout/footer.php) — une redéclaration via let lèverait une erreur au 2e
+// rechargement.
+var cropper = null, rawSrc = null;
 function onFichierChoisi(e) {
   const file = e.target.files[0];
   if (!file) return;
@@ -290,4 +301,9 @@ initLieuCascade({
 });
 </script>
 
-<?php require_once __DIR__ . '/../../layout/footer.php'; ?>
+</div><!-- /#eleve-form-zone -->
+<?php if ($es_partiel) exit; // rien de plus dans une réponse AJAX partielle. ?>
+
+<?php
+$ajax_zone_id = 'eleve-form-zone'; // voir layout/footer.php — initAjaxZone() y est appelé
+require_once __DIR__ . '/../../layout/footer.php';

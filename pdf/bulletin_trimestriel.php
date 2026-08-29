@@ -24,7 +24,7 @@ if (($_GET['vh'] ?? '') !== '' && (int) ($_GET['id'] ?? 0) > 0 && (int) ($_GET['
         (int) $_GET['id'], 'trim', (int) $_GET['trim'], 'fr', (string) $_GET['vh']
     ) !== null;
 }
-if (!$acces_public) exiger_connexion();
+if (!$acces_public) exiger_acces_pedagogie();
 
 require_once __DIR__ . '/fpdf.php';
 require_once __DIR__ . '/header_pdf.php';
@@ -497,7 +497,11 @@ function dessiner_bulletin_trimestriel(
     $y2 = $pdf->GetY();
     $al8 = ['L', 'C', 'C', 'C', 'L', 'C', 'L', 'C'];
     $w2  = [29, 7, 1.7, 6, 31, 1.7, 28, 14.5];
-    $fmt2 = fn(?float $v): string => $v === null ? '—' : sprintf('%05.2f', $v);
+    // pdf_u() indispensable ici : FPDF n'affiche que du Windows-1252, un
+    // « — » UTF-8 brut passé à Cell()/table_gd() sans conversion s'affiche
+    // en caractères parasites (« â€" ») — bug trouvé le 26/08/2026 sur un
+    // bulletin sans note encore saisie (placeholder affiché).
+    $fmt2 = fn(?float $v): string => $v === null ? pdf_u('—') : sprintf('%05.2f', $v);
     // Libellés des colonnes 0/4/6 (FR) mis à blanc ici — demande du
     // 20/08/2026 : bilingue FR (gras)/EN (italique dessous), comme le bloc
     // d'identification de l'élève plus haut. table_gd()/MultiCell() ne gère
@@ -515,7 +519,7 @@ function dessiner_bulletin_trimestriel(
         ['', (string) (int) $jours, '', '', '', '', '', $fmt2($resultat['moy_premier'])],
         ['', $exclusion !== null ? (string) $exclusion : '', '', '', '', '', '', $fmt2($resultat['moy_dernier'])],
         ['', '', '', '', '', '', '', (string) $resultat['nb_classes']],
-        ['', '', '', '', '', '', '', $resultat['taux_reussite'] !== null ? $resultat['taux_reussite'] . '%' : '—'],
+        ['', '', '', '', '', '', '', $resultat['taux_reussite'] !== null ? $resultat['taux_reussite'] . '%' : pdf_u('—')],
     ];
     $pdf->Ln(6);
     $pdf->SetX(5);
@@ -608,7 +612,7 @@ function dessiner_bulletin_trimestriel(
     $pdf->Cell(38, $H_RES, sprintf('%05.2f', $T_points) . ' / ' . (int) $T_bareme, 1, 1, 'C', 1);
     pdf_fill($pdf, 'entete_section');
     $pdf->SetXY(166, $rt2);
-    $pdf->Cell(38, $H_RES, ($moy_gen !== null ? sprintf('%05.2f', $moy_gen) : '—') . ' / 20', 1, 1, 'C', 1);
+    $pdf->Cell(38, $H_RES, ($moy_gen !== null ? sprintf('%05.2f', $moy_gen) : pdf_u('—')) . ' / 20', 1, 1, 'C', 1);
     $pdf->SetXY(166, $rt3);
     pdf_fill($pdf, 'cellule_resultat');
     $pdf->Cell(38, $H_RES, '', 1, 1, 'C', 1);

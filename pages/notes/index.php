@@ -33,7 +33,7 @@ require_once __DIR__ . '/../../config.php';
 require_once __DIR__ . '/../../connexion.php';
 require_once __DIR__ . '/../../fonctions.php';
 require_once __DIR__ . '/../../notes_apc.php';
-exiger_connexion();
+exiger_acces_pedagogie();
 exiger_annee_active(); // Année scolaire réellement active requise (18/08/2026) — module Pédagogie/Discipline.
 
 $annee_act = get_annee_active();
@@ -77,6 +77,32 @@ $seqs_copie = $seqs;
 // dans notes_apc.php — 4 crans au lieu des 7 A+/A/B+/B/C+/C/D d'ABZ_MBE).
 function jn_cote_color(string $cote): string {
     return match ($cote) { 'A+' => '#15803d', 'A' => '#1d4ed8', 'ECA' => '#d97706', 'NA' => '#dc2626', default => '#6b7280' };
+}
+
+// Section anglophone d'une classe (même convention que pdf/bulletin_trimestriel.php
+// — section rattachée au NIVEAU, pas à la classe) : détermine si la saisie
+// doit afficher les libellés anglais des compétences/groupes plutôt que les
+// français — la saisie/le calcul restent TOUJOURS sur le jeu langue='Fr'
+// (voir competences_classe()), seul l'affichage change. Bug signalé le
+// 26/08/2026 : la liste déroulante « Compétence » montrait toujours le
+// français, même pour une classe de section anglophone.
+function jn_section_en(int $id_classe): bool {
+    static $cache = [];
+    if (!array_key_exists($id_classe, $cache)) {
+        $cache[$id_classe] = db_val(
+            "SELECT n.Section FROM classe c JOIN niveau n ON n.LibelleNiveau = c.Niveau WHERE c.IDClasses=?",
+            [$id_classe]
+        ) === 'An';
+    }
+    return $cache[$id_classe];
+}
+// Libellé à afficher pour une ligne de competences_classe() (nom_comp_en si
+// section anglophone et libellé EN disponible, sinon repli sur le français).
+function jn_libelle_comp(array $c, bool $section_en): string {
+    return ($section_en && !empty($c['nom_comp_en'])) ? $c['nom_comp_en'] : $c['nom_comp'];
+}
+function jn_libelle_groupe_comp(array $c, bool $section_en): string {
+    return ($section_en && !empty($c['libelle_groupe_comp_en'])) ? $c['libelle_groupe_comp_en'] : $c['libelle_groupe_comp'];
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -367,16 +393,23 @@ if (!in_array($id_seq_ns, array_column($seqs_trim_actif_ns, 'id_seq'), true)) {
 
 if ($onglet === 'non_saisis' && $seq_active) {
     $where_cl_a = $id_cl_ns ? "AND d.IDClasses = " . (int) $id_cl_ns : '';
+    // n.Section + m_en.nom_comp (jumeau par code_comp) : ce tableau croise
+    // plusieurs classes à la fois, potentiellement Fr et An mélangées — même
+    // bascule de libellé que jn_libelle_comp()/jn_section_en() plus haut,
+    // mais ici par ligne (chaque classe peut avoir sa propre section).
     $non_saisis = db_all(
-        "SELECT d.IDClasses AS id_classe, c.DesignationClasses AS classe,
-                m.nom_comp AS competence, m.code_comp,
+        "SELECT d.IDClasses AS id_classe, c.DesignationClasses AS classe, n.Section AS section,
+                m.nom_comp AS competence, m_en.nom_comp AS competence_en, m.code_comp,
                 (SELECT COUNT(*) FROM inscrire ii WHERE ii.IDClasses=d.IDClasses AND ii.val_annee=? AND EXISTS(SELECT 1 FROM eleve ee WHERE ee.id_eleve=ii.id_eleve AND ee.statut='actif')) AS nb_eleves,
                 (SELECT COUNT(*) FROM composer_sequence nn
                  WHERE nn.id_comp=d.id_comp AND nn.IDClasses=d.IDClasses AND nn.id_seq=? AND nn.val_annee=?) AS nb_saisis
          FROM discipline d
          JOIN classe c ON c.IDClasses=d.IDClasses
+         LEFT JOIN niveau n ON n.LibelleNiveau=c.Niveau
          JOIN competence m ON m.id_comp=d.id_comp
          JOIN groupe_competence g ON g.id_groupe_comp=m.id_groupe_comp AND g.langue='Fr'
+         LEFT JOIN groupe_competence g_en ON g_en.ordre_affichage=g.ordre_affichage AND g_en.langue='An'
+         LEFT JOIN competence m_en ON m_en.id_groupe_comp=g_en.id_groupe_comp AND m_en.code_comp=m.code_comp
          WHERE d.annee_scol=? AND d.actif=1 $where_cl_a
          HAVING nb_eleves > 0 AND nb_saisis = 0
          ORDER BY c.DesignationClasses, g.ordre_affichage, m.code_comp",
@@ -480,14 +513,14 @@ if (!$es_partiel) {
         <label class="form-label fw-semibold">Compétence</label>
         <select name="comp_c" class="form-select" data-ajax-nav-auto>
           <option value="">— Choisir —</option>
-          <?php $groupe_courant = null; foreach ($comps_c as $c):
+          <?php $section_c = jn_section_en($id_cl_c); $groupe_courant = null; foreach ($comps_c as $c):
             if ($c['id_groupe_comp'] !== $groupe_courant) {
                 if ($groupe_courant !== null) echo '</optgroup>';
                 $groupe_courant = $c['id_groupe_comp'];
-                echo '<optgroup label="' . h(mb_strtoupper(mb_substr($c['libelle_groupe_comp'], 0, 45))) . '">';
+                echo '<optgroup label="' . h(mb_strtoupper(mb_substr(jn_libelle_groupe_comp($c, $section_c), 0, 45))) . '">';
             } ?>
             <option value="<?= $c['id_comp'] ?>" <?= $id_comp_c == $c['id_comp'] ? 'selected' : '' ?>>
-              <?= h($c['code_comp'] . ' — ' . $c['nom_comp']) ?> (/<?= (int) $c['total_points'] ?>)
+              <?= h($c['code_comp'] . ' — ' . jn_libelle_comp($c, $section_c)) ?> (/<?= (int) $c['total_points'] ?>)
             </option>
           <?php endforeach; if ($groupe_courant !== null) echo '</optgroup>'; ?>
         </select>
@@ -519,10 +552,13 @@ if (!$es_partiel) {
   $champs_labels_c = ['orale' => 'Orale', 'ecrite' => 'Écrite', 'pratique' => 'Pratique', 'savoir_etre' => 'Savoir-être'];
   $champs_actifs_c = array_filter($champs_labels_c, fn($champ) => (float) $comp_info[$champ] > 0, ARRAY_FILTER_USE_KEY);
   $seq_lbl_c = ''; foreach ($seqs_trim_actif_c as $s) { if ($s['id_seq'] == $id_seq_c) { $seq_lbl_c = $s['libelle_trim'] . ' — ' . $s['libelle_seq']; break; } }
+  $section_c_hdr = jn_section_en($id_cl_c);
 ?>
 <div class="d-flex align-items-center gap-2 mb-2 flex-wrap">
-  <span class="fw-bold" style="font-size:.88rem"><?= h($comp_info['code_comp'] . ' — ' . $comp_info['nom_comp']) ?></span>
-  <span class="badge-code"><?= h($comp_info['nom_comp_en']) ?></span>
+  <span class="fw-bold" style="font-size:.88rem"><?= h($comp_info['code_comp'] . ' — ' . jn_libelle_comp($comp_info, $section_c_hdr)) ?></span>
+  <?php $autre_langue_c = $section_c_hdr ? $comp_info['nom_comp'] : $comp_info['nom_comp_en']; if ($autre_langue_c !== ''): ?>
+  <span class="badge-code"><?= h($autre_langue_c) ?></span>
+  <?php endif; ?>
   <span style="background:#dbeafe;color:#1e40af;padding:2px 8px;border-radius:10px;font-size:.72rem;font-weight:600">
     Barème : O/<?= (int) $comp_info['orale'] ?> · É/<?= (int) $comp_info['ecrite'] ?> · P/<?= (int) $comp_info['pratique'] ?> · SE/<?= (int) $comp_info['savoir_etre'] ?> = <?= (int) $comp_info['total_points'] ?>
   </span>
@@ -772,11 +808,11 @@ if (!$es_partiel) {
             </tr>
           </thead>
           <tbody>
-            <?php foreach ($comps_e as $c):
+            <?php $section_e = jn_section_en($id_cl_e); foreach ($comps_e as $c):
               $cote = $c['note_total'] !== null ? appreciation_fr((float) $c['note_total'], (float) $c['total_points']) : '';
             ?>
             <tr>
-              <td class="fw-semibold" style="font-size:.82rem"><?= h($c['code_comp'] . ' — ' . $c['nom_comp']) ?></td>
+              <td class="fw-semibold" style="font-size:.82rem"><?= h($c['code_comp'] . ' — ' . jn_libelle_comp($c, $section_e)) ?></td>
               <?php foreach (['orale', 'ecrite', 'pratique', 'savoir_etre'] as $champ):
                 $max_champ = rtrim(rtrim(number_format((float) $c[$champ], 2, '.', ''), '0'), '.');
               ?>
@@ -916,8 +952,8 @@ if (!$es_partiel) {
             <label class="form-label">Compétence</label>
             <select name="comp_cop" class="form-select form-select-sm" data-ajax-nav-auto>
               <option value="">— Choisir —</option>
-              <?php foreach ($comps_cop as $c): ?>
-                <option value="<?= $c['id_comp'] ?>" <?= $id_comp_cop == $c['id_comp'] ? 'selected' : '' ?>><?= h($c['code_comp'] . ' — ' . $c['nom_comp']) ?></option>
+              <?php $section_cop = jn_section_en($id_cl_cop); foreach ($comps_cop as $c): ?>
+                <option value="<?= $c['id_comp'] ?>" <?= $id_comp_cop == $c['id_comp'] ? 'selected' : '' ?>><?= h($c['code_comp'] . ' — ' . jn_libelle_comp($c, $section_cop)) ?></option>
               <?php endforeach; ?>
             </select>
           </div>
@@ -976,7 +1012,7 @@ if (!$es_partiel) {
 <div class="card mb-3" style="border:1px solid #d1fae5;background:#f0fdf4">
   <div class="card-body py-2 d-flex align-items-center justify-content-between flex-wrap gap-2">
     <div style="font-size:.82rem;color:#065f46">
-      <strong><?= h($bareme_cop['code_comp'] . ' — ' . $bareme_cop['nom_comp']) ?></strong> —
+      <strong><?= h($bareme_cop['code_comp'] . ' — ' . jn_libelle_comp($bareme_cop, jn_section_en($id_cl_cop))) ?></strong> —
       <span class="badge" style="background:#fde68a;color:#92400e"><?= $src_inf ? h($src_inf['libelle_trim'] . ' — ' . $src_inf['libelle_seq']) : '' ?></span>
       <i class="bi bi-arrow-right mx-1"></i>
       <span class="badge" style="background:#a7f3d0;color:#065f46"><?= $dst_inf ? h($dst_inf['libelle_trim'] . ' — ' . $dst_inf['libelle_seq']) : '' ?></span>
@@ -1148,7 +1184,7 @@ if (!$es_partiel) {
               </span>
             </td>
             <?php endif; ?>
-            <td class="fw-semibold"><?= h($r['code_comp'] . ' — ' . $r['competence']) ?></td>
+            <td class="fw-semibold"><?= h($r['code_comp'] . ' — ' . (($r['section'] === 'An' && !empty($r['competence_en'])) ? $r['competence_en'] : $r['competence'])) ?></td>
             <td>
               <span class="text-muted fst-italic" style="font-size:.75rem">Non assigné</span>
             </td>

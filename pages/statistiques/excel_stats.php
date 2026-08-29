@@ -13,7 +13,7 @@ require_once __DIR__ . '/../../fonctions.php';
 require_once __DIR__ . '/../../notes_apc.php';
 require_once __DIR__ . '/../../vendor/autoload.php';
 require_once __DIR__ . '/../conseil_classe/excel_releve_commun.php'; // generer_filigrane_excel(), fmt2()
-exiger_connexion();
+exiger_acces_pedagogie();
 
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\RichText\RichText;

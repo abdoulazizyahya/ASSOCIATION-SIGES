@@ -6,7 +6,7 @@ require_once __DIR__ . '/../../connexion.php';
 require_once __DIR__ . '/../../fonctions.php';
 require_once __DIR__ . '/../../notes_apc.php';
 require_once __DIR__ . '/../../notes_apc_arabe.php';
-exiger_connexion();
+exiger_acces_pedagogie();
 
 $annee     = get_annee_active();
 $val_annee = $annee['val_annee'] ?? '';

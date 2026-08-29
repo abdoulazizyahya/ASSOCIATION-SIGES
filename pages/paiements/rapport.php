@@ -374,7 +374,7 @@ function ouvrirApercuStatut() {
     </table>
   </div>
 </div>
-<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="<?= APP_URL ?>/assets/vendor/xlsx/xlsx.full.min.js"></script>
 <script>
 function ouvrirApercuInsolvables() {
     const url = <?= json_encode(APP_URL . '/pages/paiements/pdf_insolvables.php?classe=' . $id_classe . '&obligation=' . $id_obligation) ?>;
