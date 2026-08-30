@@ -153,6 +153,13 @@ $etab = get_etablissement();
   <div class="text-hint" style="font-size:.75rem;text-align:center;margin-top:1rem">
     <a href="<?= APP_URL ?>/mot_de_passe_oublie.php" style="color:#3a6cff;text-decoration:none">Mot de passe oublié ?</a>
   </div>
+  <?php if (annuaire_dispo()): ?>
+  <div style="border-top:1px solid #eef0f4;margin-top:1rem;padding-top:.9rem;text-align:center">
+    <a href="<?= APP_URL ?>/association/login.php" style="font-size:.78rem;color:#6b7280;text-decoration:none">
+      <i class="bi bi-buildings me-1"></i>Espace association
+    </a>
+  </div>
+  <?php endif; ?>
 </div>
 <script src="<?= APP_URL ?>/assets/vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
 </body>
