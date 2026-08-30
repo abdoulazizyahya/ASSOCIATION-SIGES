@@ -11,6 +11,9 @@ $ecoles = assoc_all("SELECT * FROM etablissement ORDER BY actif DESC, nom");
 asso_haut('Établissements de l\'association');
 ?>
 <div class="d-flex flex-wrap gap-2 mb-3">
+  <a href="<?= APP_URL ?>/association/etablissement_nouveau.php" class="btn btn-primary btn-sm">
+    <i class="bi bi-plus-lg me-1"></i>Nouvel établissement
+  </a>
   <a href="<?= APP_URL ?>/association/niu/index.php" class="btn btn-outline-light btn-sm">
     <i class="bi bi-person-vcard me-1"></i>Registre NIU
   </a>
@@ -22,10 +25,13 @@ asso_haut('Établissements de l\'association');
 <div class="row g-3">
   <?php foreach ($ecoles as $e): ?>
     <div class="col-12 col-md-6">
-      <div class="ecole-card h-100 <?= $e['actif'] ? '' : 'opacity-50' ?>">
+      <div class="ecole-card h-100 position-relative <?= $e['actif'] ? '' : 'opacity-50' ?>">
         <div class="d-flex align-items-start gap-2">
           <div class="flex-grow-1">
-            <div class="fw-bold"><?= h($e['nom']) ?></div>
+            <a href="<?= APP_URL ?>/association/etablissement.php?id=<?= (int) $e['id'] ?>"
+               class="fw-bold text-decoration-none stretched-link" style="color:#e5e9f0">
+              <?= h($e['nom']) ?>
+            </a>
             <div class="small text-muted2">
               <span class="badge badge-soft me-1"><?= h($e['code']) ?></span>
               <?= h($e['ville'] ?? '') ?>
@@ -35,7 +41,11 @@ asso_haut('Établissements de l\'association');
           </div>
         </div>
         <?php if ($e['actif']): ?>
-        <div class="mt-3 d-flex gap-2">
+        <div class="mt-3 d-flex gap-2 position-relative" style="z-index:2">
+          <a href="<?= APP_URL ?>/association/etablissement.php?id=<?= (int) $e['id'] ?>"
+             class="btn btn-outline-light btn-sm">
+            <i class="bi bi-bar-chart me-1"></i>Fiche
+          </a>
           <a href="<?= APP_URL ?>/association/entrer_ecole.php?id=<?= (int) $e['id'] ?>"
              class="btn btn-primary btn-sm">
             <i class="bi bi-box-arrow-in-right me-1"></i>Ouvrir (lecture seule)
