@@ -183,11 +183,11 @@ $csrf = csrf_generer();
         « Lecture seule » = visite sans modification.
       </div>
 
-      <div class="border rounded p-2 mb-2" style="border-color:#23304d!important">
+      <div class="border rounded p-2 mb-2" style="border-color:var(--border)">
         <?php ligne_acces('global', 'Toutes les écoles (accès global)', $niveau_courant['global'], $csrf); ?>
       </div>
 
-      <div class="border rounded p-2" style="border-color:#23304d!important">
+      <div class="border rounded p-2" style="border-color:var(--border)">
         <div class="small text-muted2 mb-1">Par école</div>
         <?php foreach ($ecoles as $e):
           $cle = (string) $e['id'];

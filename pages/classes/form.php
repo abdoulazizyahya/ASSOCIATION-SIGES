@@ -22,10 +22,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } else {
             db_exec("INSERT INTO classe (DesignationClasses, Niveau) VALUES (?, ?)", [$designation, $niveau]);
             $nouvel_id = (int) db_last_id();
-            // Applique à la nouvelle classe le barème déjà configuré pour son
-            // niveau — no-op si rien de configuré. Les matières n'ont pas
-            // besoin de synchronisation : matieres_classe_arabe() les résout
-            // directement depuis matiere_niveau_arabe via le niveau de la classe.
+            // Barème de la nouvelle classe pour l'année active :
+            //  1. gabarit de référence livré avec l'application (bareme_reference) ;
+            //  2. barème déjà configuré pour ce niveau sur d'autres classes
+            //     (year courante) — prime sur le gabarit, d'où l'ordre.
+            $annee_active = get_annee_active()['val_annee'] ?? '';
+            if ($annee_active !== '') {
+                appliquer_bareme_reference($annee_active, [$nouvel_id]);
+            }
+            // Les matières arabes n'ont pas besoin de synchronisation :
+            // matieres_classe_arabe() les résout directement depuis
+            // matiere_niveau_arabe via le niveau de la classe.
             synchroniser_bareme_niveau_arabe($niveau, [$nouvel_id]);
             flash_set('succes', 'Classe créée.');
         }

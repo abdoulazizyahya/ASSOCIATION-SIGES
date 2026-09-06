@@ -26,7 +26,7 @@ asso_haut('Établissements de l\'association');
         <div class="d-flex align-items-start gap-2">
           <div class="flex-grow-1">
             <a href="<?= APP_URL ?>/association/etablissement.php?id=<?= (int) $e['id'] ?>"
-               class="fw-bold text-decoration-none stretched-link" style="color:#e5e9f0">
+               class="fw-bold text-decoration-none stretched-link">
               <?= h($e['nom']) ?>
             </a>
             <div class="small text-muted2">

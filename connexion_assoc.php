@@ -183,6 +183,11 @@ function charger_schema_ecole(mysqli $l, array $seed): int {
         throw new RuntimeException("Schéma incomplet ($nbTables tables).");
     }
 
+    // Données de référence communes (niveaux, compétences Fr/An, disciplines
+    // arabes, géographie, grades, barème APC par niveau…) — voir
+    // bd/assoc/seed_ref_ecole.sql. Absence tolérée (rétro-compat).
+    charger_seed_ref_ecole($l);
+
     $st = mysqli_prepare($l,
         "INSERT INTO etablissement (IDEtablissement, Nom_Etab_Fr, Nom_Etab_An, Initial_Etab, ville_etab)
          VALUES (1, ?, ?, ?, ?)
@@ -193,6 +198,37 @@ function charger_schema_ecole(mysqli $l, array $seed): int {
     mysqli_stmt_close($st);
     return $nbTables;
 }
+
+// Charge les données de référence (bd/assoc/seed_ref_ecole.sql) dans la base
+// école $l (déjà sélectionnée). Idempotent (DELETE + INSERT dans le fichier).
+// Retourne le nombre de lignes de référence chargées, 0 si le fichier est
+// absent (ancienne installation) ou en cas d'erreur non bloquante.
+function charger_seed_ref_ecole(mysqli $l): int {
+    $f = __DIR__ . '/bd/assoc/seed_ref_ecole.sql';
+    $sql = @file_get_contents($f);
+    if ($sql === false || trim($sql) === '') return 0;
+    if (mysqli_multi_query($l, $sql)) {
+        do { /* consommer */ } while (mysqli_next_result($l));
+    }
+    if (mysqli_errno($l)) {
+        // Non bloquant : l'école reste utilisable, la référence sera
+        // rechargeable via bd/assoc/reseeder_ecole.php.
+        error_log('charger_seed_ref_ecole: ' . mysqli_error($l));
+        return 0;
+    }
+    $n = 0;
+    foreach (['niveau', 'competence', 'groupe_competence_niveau', 'arrondissement', 'bareme_reference'] as $t) {
+        $r = mysqli_query($l, "SELECT COUNT(*) FROM `$t`");
+        if ($r) $n += (int) mysqli_fetch_row($r)[0];
+    }
+    return $n;
+}
+
+// NB : l'application du gabarit `bareme_reference` vers la table de travail
+// `discipline` se fait côté « école » (à la création d'une classe et à
+// l'ouverture de la 1re année) — voir appliquer_bareme_reference() dans
+// fonctions.php. Rien à faire ici : charger_seed_ref_ecole() a suffi à
+// installer la table et son contenu de référence.
 
 // Best-effort : vide toutes les tables d'une base (restaure une base du
 // pool à l'état « vide » après un chargement de schéma échoué).
@@ -476,6 +512,29 @@ function supprimer_etablissement(int $id, array $opts = []): array {
             . "Cochez « supprimer aussi les NIU » pour confirmer la destruction de ces identités."];
     }
 
+    // ── Sauvegarde de sécurité COMPLÈTE avant toute destruction ──────
+    //  Une suppression d'école est irréversible : on archive d'abord la
+    //  base (SQL) ET les fichiers uploadés (logos/signatures/dossiers)
+    //  dans bd/sauvegardes/avant_suppression_<db>_<horo>.zip. Si la base
+    //  n'existe déjà plus (fantôme d'annuaire), rien à sauvegarder.
+    require_once __DIR__ . '/bd/lib/ecole_maintenance.php';
+    $backup_securite = null;
+    if (ecole_base_etat($db)['existe']) {
+        try {
+            $dir = __DIR__ . '/bd/sauvegardes';
+            if (!is_dir($dir)) @mkdir($dir, 0775, true);
+            $cand = $dir . '/avant_suppression_' . preg_replace('/[^A-Za-z0-9_]/', '', $db)
+                  . '_' . date('Ymd_His') . '.zip';
+            $rb = ecole_export_zip($id, $cand);
+            $backup_securite = ($rb['ok'] && is_file($cand))
+                ? $cand
+                : ecole_maint_backup_securite($db, 'avant_suppression');
+        } catch (\Throwable $ex) {
+            return ['ok' => false, 'db_name' => null,
+                    'message' => "Sauvegarde de sécurité impossible avant suppression ({$ex->getMessage()}) — suppression annulée."];
+        }
+    }
+
     $pool = false;
     try { $pool = (bool) assoc_val("SELECT COUNT(*) FROM bd_pool WHERE db_name=?", [$db]); }
     catch (\Throwable $ex) { /* pas de pool en LAN */ }
@@ -507,6 +566,15 @@ function supprimer_etablissement(int $id, array $opts = []): array {
             mysqli_query($srv, "DROP DATABASE IF EXISTS `" . str_replace('`', '', $db) . "`");
             mysqli_close($srv);
         }
+
+        // 6. Dossiers de fichiers uploadés de l'école (déjà inclus dans la
+        //    sauvegarde de sécurité $backup_securite).
+        $slug = strtolower(preg_replace('/[^a-z0-9]/i', '', (string) $e['code']));
+        if ($slug !== '' && function_exists('ecole_maint_rmdir_recursif')) {
+            $up = __DIR__ . '/assets/uploads';
+            ecole_maint_rmdir_recursif("$up/etab/$slug");
+            ecole_maint_rmdir_recursif("$up/dossiers_eleves/etab/$slug");
+        }
     } catch (\Throwable $ex) {
         return ['ok' => false, 'db_name' => $db,
                 'message' => "Erreur pendant la suppression : " . $ex->getMessage()
@@ -516,8 +584,10 @@ function supprimer_etablissement(int $id, array $opts = []): array {
     return [
         'ok'      => true,
         'db_name' => $db,
+        'backup'  => $backup_securite,
         'message' => "Établissement « {$e['nom']} » supprimé. "
-                   . ($pool ? "Base « $db » vidée et remise au pool." : "Base « $db » supprimée."),
+                   . ($pool ? "Base « $db » vidée et remise au pool." : "Base « $db » supprimée.")
+                   . ($backup_securite ? " Sauvegarde de sécurité : " . basename($backup_securite) . "." : ""),
     ];
 }
 

@@ -120,7 +120,7 @@ asso_haut('Journal d\'audit');
 
 <div class="asso-card p-0">
   <div class="table-responsive">
-  <table class="table table-dark table-sm mb-0 align-middle" style="font-size:.82rem">
+  <table class="table table-sm mb-0 align-middle" style="font-size:.82rem">
     <thead><tr class="text-muted2">
       <th>Date</th><th>Membre</th><th>Action</th><th>École</th><th>Détail</th><th>IP</th>
     </tr></thead>

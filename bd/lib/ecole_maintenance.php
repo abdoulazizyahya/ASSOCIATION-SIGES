@@ -27,14 +27,26 @@ require_once __DIR__ . '/../../connexion_assoc.php';
 const ECOLE_MAINT_DIR_BACKUP = __DIR__ . '/../sauvegardes';
 
 // ── Garde-fous ─────────────────────────────────────────────────────
-// Valide le nom et refuse les bases protégées. NE vérifie PAS l'existence.
+// Bases SYSTÈME jamais touchées par ces opérations. Volontairement plus
+// restreint que _bases_protegees() : DB_NAME n'y figure PAS, car en
+// mono→multi la base historique (promeducam_jaynitaare) EST l'école n°1
+// de l'annuaire et doit rester exportable / sauvegardable / restaurable.
+// La destruction complète (supprimer_etablissement) garde, elle, la
+// protection _bases_protegees() de connexion_assoc.php.
+function ecole_maint_bases_systeme(): array {
+    $p = ['information_schema', 'mysql', 'performance_schema', 'sys', 'phpmyadmin'];
+    if (defined('DB_NAME_ASSOC')) $p[] = DB_NAME_ASSOC;
+    return array_map('strtolower', $p);
+}
+
+// Valide le nom et refuse les bases système. NE vérifie PAS l'existence.
 function ecole_maint_garde_nom(string $db): void {
     $db = trim($db);
     if ($db === '' || !preg_match('/^[A-Za-z0-9_]+$/', $db)) {
         throw new RuntimeException("Nom de base invalide : « $db ».");
     }
-    if (in_array(strtolower($db), _bases_protegees(), true)) {
-        throw new RuntimeException("Base « $db » protégée (base principale ou annuaire) — opération refusée.");
+    if (in_array(strtolower($db), ecole_maint_bases_systeme(), true)) {
+        throw new RuntimeException("Base « $db » système (annuaire / MySQL) — opération refusée.");
     }
 }
 
@@ -396,4 +408,275 @@ function ecole_creer_base(int $id_etab): array {
     return ['ok' => true, 'tables' => $nb,
             'message' => "Base « $db » créée et initialisée au schéma de référence "
                        . "($nb tables, schéma v$vmax). L'école « {$e['nom']} » est maintenant opérationnelle."];
+}
+
+// ═══════════════════════════════════════════════════════════════════
+//  Sauvegarde COMPLÈTE (SQL + fichiers uploadés) et restauration
+// ═══════════════════════════════════════════════════════════════════
+
+// Slug de dossier d'upload d'une école (= upload_prefixe_etab() sans le
+// « etab/ » ni le « / » final) : code en minuscules, alphanumérique.
+function ecole_maint_slug_upload(string $code): string {
+    return strtolower(preg_replace('/[^a-z0-9]/i', '', $code));
+}
+
+// Dossiers de fichiers uploadés propres à une école :
+//   [chemin absolu => préfixe dans l'archive].
+function ecole_maint_dossiers_uploads(string $code): array {
+    $slug = ecole_maint_slug_upload($code);
+    if ($slug === '') return [];
+    $racine = realpath(__DIR__ . '/../../assets/uploads') ?: (__DIR__ . '/../../assets/uploads');
+    return [
+        $racine . '/etab/' . $slug                => 'uploads/etab/' . $slug,
+        $racine . '/dossiers_eleves/etab/' . $slug => 'uploads/dossiers_eleves/etab/' . $slug,
+    ];
+}
+
+// Ajoute récursivement le contenu d'un dossier à une archive ZIP ouverte.
+function ecole_maint_zip_ajouter(\ZipArchive $zip, string $dir, string $prefixe): int {
+    if (!is_dir($dir)) return 0;
+    $n = 0;
+    $it = new \RecursiveIteratorIterator(
+        new \RecursiveDirectoryIterator($dir, \FilesystemIterator::SKIP_DOTS),
+        \RecursiveIteratorIterator::SELF_FIRST
+    );
+    foreach ($it as $item) {
+        $rel = str_replace('\\', '/', substr($item->getPathname(), strlen($dir) + 1));
+        if ($item->isDir()) {
+            $zip->addEmptyDir($prefixe . '/' . $rel);
+        } else {
+            $zip->addFile($item->getPathname(), $prefixe . '/' . $rel);
+            $n++;
+        }
+    }
+    return $n;
+}
+
+// Export COMPLET d'une école vers un .zip : dump.sql.gz + manifest.json +
+// uploads/… (logos, signatures, pièces de dossier). Les photos d'élèves
+// sont en BLOB dans la table `eleve` → déjà dans le dump SQL.
+//  Retour : ['ok'=>bool, 'message'=>string, 'fichiers'=>int, 'octets'=>int]
+function ecole_export_zip(int $id_etab, string $dest_zip): array {
+    if (!annuaire_dispo()) {
+        return ['ok' => false, 'message' => 'Annuaire association absent.', 'fichiers' => 0, 'octets' => 0];
+    }
+    $e = assoc_one("SELECT * FROM etablissement WHERE id=?", [$id_etab]);
+    if (!$e) return ['ok' => false, 'message' => 'Établissement introuvable.', 'fichiers' => 0, 'octets' => 0];
+    $db = $e['db_name'];
+    try { ecole_maint_garde_base($db); }
+    catch (\Throwable $ex) { return ['ok' => false, 'message' => $ex->getMessage(), 'fichiers' => 0, 'octets' => 0]; }
+
+    $tmp_sql = tempnam(sys_get_temp_dir(), 'siges_expsql_');
+    $nb_fichiers = 0;
+    try {
+        ecole_dump_vers_fichier($db, $tmp_sql, function_exists('gzopen'));
+
+        $zip = new \ZipArchive();
+        if ($zip->open($dest_zip, \ZipArchive::CREATE | \ZipArchive::OVERWRITE) !== true) {
+            throw new RuntimeException("Impossible de créer l'archive $dest_zip.");
+        }
+        $nom_dump = function_exists('gzopen') ? 'dump.sql.gz' : 'dump.sql';
+        $zip->addFile($tmp_sql, $nom_dump);
+
+        foreach (ecole_maint_dossiers_uploads($e['code']) as $abs => $prefixe) {
+            $nb_fichiers += ecole_maint_zip_ajouter($zip, $abs, $prefixe);
+        }
+
+        $zip->addFromString('manifest.json', json_encode([
+            'type'     => 'siges-export-ecole',
+            'code'     => $e['code'],
+            'db_name'  => $db,
+            'nom'      => $e['nom'],
+            'dump'     => $nom_dump,
+            'fichiers' => $nb_fichiers,
+            'date'     => date('c'),
+        ], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
+
+        $zip->close();
+    } catch (\Throwable $ex) {
+        @unlink($tmp_sql);
+        @unlink($dest_zip);
+        return ['ok' => false, 'message' => "Export interrompu : " . $ex->getMessage(), 'fichiers' => 0, 'octets' => 0];
+    }
+    @unlink($tmp_sql);
+
+    return ['ok' => true, 'fichiers' => $nb_fichiers, 'octets' => (int) @filesize($dest_zip),
+            'message' => "Archive créée ($nb_fichiers fichier(s) joints)."];
+}
+
+// Restauration d'une école depuis un .zip produit par ecole_export_zip() :
+//  1) ecole_importer_sql() (qui écrit son propre backup de sécurité) ;
+//  2) restauration des fichiers uploadés (le dossier de l'école est purgé
+//     puis réécrit d'après l'archive).
+//  Retour : ['ok','message','backup','tables','fichiers']
+function ecole_importer_zip(int $id_etab, string $zip_path): array {
+    if (!annuaire_dispo()) {
+        return ['ok' => false, 'message' => 'Annuaire absent.', 'backup' => null, 'tables' => 0, 'fichiers' => 0];
+    }
+    $e = assoc_one("SELECT * FROM etablissement WHERE id=?", [$id_etab]);
+    if (!$e) return ['ok' => false, 'message' => 'Établissement introuvable.', 'backup' => null, 'tables' => 0, 'fichiers' => 0];
+    $db = $e['db_name'];
+
+    if (!is_file($zip_path)) {
+        return ['ok' => false, 'message' => 'Archive introuvable.', 'backup' => null, 'tables' => 0, 'fichiers' => 0];
+    }
+    $zip = new \ZipArchive();
+    if ($zip->open($zip_path) !== true) {
+        return ['ok' => false, 'message' => 'Archive .zip illisible.', 'backup' => null, 'tables' => 0, 'fichiers' => 0];
+    }
+
+    $nom_dump = null;
+    foreach (['dump.sql.gz', 'dump.sql'] as $cand) {
+        if ($zip->locateName($cand) !== false) { $nom_dump = $cand; break; }
+    }
+    if ($nom_dump === null) {
+        $zip->close();
+        return ['ok' => false, 'message' => "Archive invalide : aucun dump.sql(.gz).", 'backup' => null, 'tables' => 0, 'fichiers' => 0];
+    }
+    $sql = $zip->getFromName($nom_dump);
+    if (substr($nom_dump, -3) === '.gz' && $sql !== false) {
+        $sql = @gzdecode($sql);
+    }
+    if ($sql === false || $sql === null || trim($sql) === '') {
+        $zip->close();
+        return ['ok' => false, 'message' => "Dump illisible dans l'archive.", 'backup' => null, 'tables' => 0, 'fichiers' => 0];
+    }
+
+    $res = ecole_importer_sql($db, $sql);
+    if (!$res['ok']) {
+        $zip->close();
+        return $res + ['fichiers' => 0];
+    }
+
+    $racine = realpath(__DIR__ . '/../../assets/uploads') ?: (__DIR__ . '/../../assets/uploads');
+    $racine = str_replace('\\', '/', $racine);
+    $slug   = ecole_maint_slug_upload($e['code']);
+    $nb_fichiers = 0;
+    if ($slug !== '') {
+        foreach (["$racine/etab/$slug", "$racine/dossiers_eleves/etab/$slug"] as $d) {
+            ecole_maint_rmdir_recursif($d);
+        }
+        for ($i = 0; $i < $zip->numFiles; $i++) {
+            $nom = $zip->getNameIndex($i);
+            if (strpos($nom, 'uploads/') !== 0 || substr($nom, -1) === '/') continue;
+            $cible = str_replace('\\', '/', $racine . '/' . substr($nom, strlen('uploads/')));
+            // Garde-fou : rester sous assets/uploads/…/etab/<slug>/.
+            if (strpos($cible, $racine . '/') !== 0 || strpos($cible, '/etab/' . $slug . '/') === false
+                || strpos($cible, '/..') !== false) {
+                continue;
+            }
+            @mkdir(dirname($cible), 0775, true);
+            $data = $zip->getFromIndex($i);
+            if ($data !== false && @file_put_contents($cible, $data) !== false) $nb_fichiers++;
+        }
+    }
+    $zip->close();
+
+    return [
+        'ok'       => true,
+        'backup'   => $res['backup'],
+        'tables'   => $res['tables'],
+        'fichiers' => $nb_fichiers,
+        'message'  => "Restauration complète de « {$e['nom']} » : {$res['tables']} tables + $nb_fichiers fichier(s). "
+                    . "Backup de l'état précédent : " . basename((string) $res['backup']),
+    ];
+}
+
+// Suppression récursive d'un dossier (best-effort).
+function ecole_maint_rmdir_recursif(string $dir): void {
+    if (!is_dir($dir)) return;
+    $it = new \RecursiveIteratorIterator(
+        new \RecursiveDirectoryIterator($dir, \FilesystemIterator::SKIP_DOTS),
+        \RecursiveIteratorIterator::CHILD_FIRST
+    );
+    foreach ($it as $item) {
+        $item->isDir() ? @rmdir($item->getPathname()) : @unlink($item->getPathname());
+    }
+    @rmdir($dir);
+}
+
+// ── Sauvegarde manuelle « à la demande » depuis l'interface ────────
+//  Écrit dans bd/sauvegardes/manuel_<horo>/<code>_<db>.(zip|sql.gz) — donc
+//  visible par assoc_derniere_sauvegarde() (glob « */* » du cockpit).
+//  $avec_fichiers = true → archive .zip complète ; false → dump .sql.gz seul.
+//  Retour : ['ok'=>bool, 'message'=>string, 'fichier'=>?string, 'octets'=>int]
+function ecole_sauvegarder(int $id_etab, bool $avec_fichiers = true): array {
+    if (!annuaire_dispo()) {
+        return ['ok' => false, 'message' => 'Annuaire absent.', 'fichier' => null, 'octets' => 0];
+    }
+    $e = assoc_one("SELECT * FROM etablissement WHERE id=?", [$id_etab]);
+    if (!$e) return ['ok' => false, 'message' => 'Établissement introuvable.', 'fichier' => null, 'octets' => 0];
+    $db = $e['db_name'];
+    try { ecole_maint_garde_base($db); }
+    catch (\Throwable $ex) { return ['ok' => false, 'message' => $ex->getMessage(), 'fichier' => null, 'octets' => 0]; }
+
+    $dir = ecole_maint_dir_backup() . '/manuel_' . date('Ymd_His');
+    if (!is_dir($dir) && !@mkdir($dir, 0775, true)) {
+        return ['ok' => false, 'message' => "Impossible de créer $dir.", 'fichier' => null, 'octets' => 0];
+    }
+    $prefixe = strtolower(preg_replace('/[^a-z0-9]/i', '', $e['code'])) . '_' . $db;
+
+    try {
+        if ($avec_fichiers) {
+            $fichier = $dir . '/' . $prefixe . '.zip';
+            $r = ecole_export_zip($id_etab, $fichier);
+            if (!$r['ok']) return ['ok' => false, 'message' => $r['message'], 'fichier' => null, 'octets' => 0];
+        } else {
+            $fichier = $dir . '/' . $prefixe . '.sql' . (function_exists('gzopen') ? '.gz' : '');
+            ecole_dump_vers_fichier($db, $fichier);
+        }
+    } catch (\Throwable $ex) {
+        return ['ok' => false, 'message' => "Sauvegarde interrompue : " . $ex->getMessage(), 'fichier' => null, 'octets' => 0];
+    }
+
+    return ['ok' => true, 'fichier' => $fichier, 'octets' => (int) @filesize($fichier),
+            'message' => "Sauvegarde écrite : " . basename(dirname($fichier)) . '/' . basename($fichier)];
+}
+
+// ── Rétention : purge des sauvegardes de sécurité anciennes ────────
+//  Ne touche QUE les fichiers avant_*_ (import/vidage/migration/suppression)
+//  à la racine de bd/sauvegardes/ ; laisse les dossiers horodatés intacts.
+//  Retour : nombre de fichiers supprimés.
+function ecole_maint_purger_backups(int $jours = 45): int {
+    $racine = ECOLE_MAINT_DIR_BACKUP;
+    if (!is_dir($racine)) return 0;
+    $limite = time() - $jours * 86400;
+    $n = 0;
+    foreach (glob($racine . '/avant_*.{sql,sql.gz}', GLOB_BRACE) ?: [] as $f) {
+        if (is_file($f) && @filemtime($f) < $limite && @unlink($f)) $n++;
+    }
+    return $n;
+}
+
+// Liste les sauvegardes disponibles pour une école (dossiers horodatés de
+// bd/sauvegardes/ + backups de sécurité avant_*), plus récentes d'abord.
+//  Retour : [['chemin','nom','type','date','octets'], …]
+function ecole_maint_sauvegardes(string $code, string $db): array {
+    $racine = ECOLE_MAINT_DIR_BACKUP;
+    if (!is_dir($racine)) return [];
+    $slug = strtolower(preg_replace('/[^a-z0-9]/i', '', $code));
+    $out  = [];
+
+    foreach (glob($racine . '/*/*') ?: [] as $f) {
+        if (!is_file($f)) continue;
+        $bn = basename($f);
+        if (strpos($bn, $db) === false && ($slug === '' || strpos($bn, $slug . '_') !== 0)) continue;
+        $dossier = basename(dirname($f));
+        $out[] = [
+            'chemin' => $f, 'nom' => $dossier . '/' . $bn,
+            'type'   => strpos($dossier, 'manuel_') === 0 ? 'manuelle' : 'quotidienne',
+            'date'   => (int) @filemtime($f), 'octets' => (int) @filesize($f),
+        ];
+    }
+    foreach (glob($racine . '/avant_*') ?: [] as $f) {
+        if (!is_file($f) || strpos(basename($f), $db) === false) continue;
+        $motif = preg_match('/^avant_([a-z]+)_/', basename($f), $m) ? $m[1] : 'sécurité';
+        $out[] = [
+            'chemin' => $f, 'nom' => basename($f),
+            'type'   => 'sécurité (' . $motif . ')',
+            'date'   => (int) @filemtime($f), 'octets' => (int) @filesize($f),
+        ];
+    }
+    usort($out, fn($a, $b) => $b['date'] <=> $a['date']);
+    return $out;
 }

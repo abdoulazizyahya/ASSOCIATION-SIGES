@@ -200,6 +200,17 @@ function exiger_membre_association(): void {
         header('Location: ' . APP_URL . '/association/login.php');
         exit;
     }
+    // 2FA obligatoire pour les superadmins : tant qu'elle n'est pas activée,
+    // toutes les pages association renvoient vers securite.php (le drapeau est
+    // posé à la connexion — association/login.php). logout et securite.php
+    // eux-mêmes restent accessibles pour éviter tout enfermement.
+    if (!empty($_SESSION['forcer_2fa'])) {
+        $script = basename($_SERVER['SCRIPT_NAME'] ?? '');
+        if (!in_array($script, ['securite.php', 'logout.php'], true)) {
+            header('Location: ' . APP_URL . '/association/securite.php');
+            exit;
+        }
+    }
 }
 
 /** Journalise une action d'un membre (traçabilité des visites/écritures). */

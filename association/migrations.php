@@ -52,7 +52,7 @@ $csrf = csrf_generer();
 
 <div class="asso-card p-0 mb-3">
   <div class="table-responsive">
-  <table class="table table-dark table-sm mb-0 align-middle" style="font-size:.85rem">
+  <table class="table table-sm mb-0 align-middle" style="font-size:.85rem">
     <thead><tr class="text-muted2"><th>École</th><th>Schéma</th><th>À appliquer</th><th></th></tr></thead>
     <tbody>
       <?php foreach ($etat['ecoles'] as $e): ?>

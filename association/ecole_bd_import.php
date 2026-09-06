@@ -34,32 +34,43 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $err = "Aucun fichier reçu (ou upload trop volumineux — " . round(IMPORT_TAILLE_MAX / 1048576) . " Mo max).";
     } elseif ($_FILES['dump']['size'] > IMPORT_TAILLE_MAX) {
         $err = "Fichier trop volumineux (" . round(IMPORT_TAILLE_MAX / 1048576) . " Mo max).";
-    } elseif (!preg_match('/\.sql(\.gz)?$/i', $_FILES['dump']['name'])) {
-        $err = "Le fichier doit être un .sql ou un .sql.gz (export produit par SIGES ou mysqldump).";
+    } elseif (!preg_match('/\.(sql(\.gz)?|zip)$/i', $_FILES['dump']['name'])) {
+        $err = "Le fichier doit être un .sql, un .sql.gz ou une archive .zip (export produit par SIGES ou mysqldump).";
     } else {
-        $nom_up = $_FILES['dump']['name'];
-        $est_gz = (bool) preg_match('/\.gz$/i', $nom_up);
-        $sql    = $est_gz
-            ? ecole_maint_lire_gz($_FILES['dump']['tmp_name'])
-            : @file_get_contents($_FILES['dump']['tmp_name']);
+        $nom_up  = $_FILES['dump']['name'];
+        $est_zip = (bool) preg_match('/\.zip$/i', $nom_up);
 
-        if ($sql === false || $sql === null) {
-            $err = $est_gz
-                ? "Impossible de décompresser le .gz (extension zlib absente ?)."
-                : "Fichier illisible.";
+        if ($est_zip) {
+            // Archive complète : SQL + fichiers uploadés (logos, dossiers…).
+            $tmp_zip = tempnam(sys_get_temp_dir(), 'siges_impzip_') . '.zip';
+            move_uploaded_file($_FILES['dump']['tmp_name'], $tmp_zip);
+            $res = ecole_importer_zip($id, $tmp_zip);
+            @unlink($tmp_zip);
         } else {
-            $res = ecole_importer_sql($e['db_name'], $sql);
-            if ($res['ok']) {
-                journaliser_action('ecole_bd_import', $id,
-                    $e['code'] . ' — ' . $e['db_name'] . ' ← ' . $nom_up
-                    . ' (' . (int) $res['tables'] . ' tables)');
-                $ok = true;
+            $est_gz = (bool) preg_match('/\.gz$/i', $nom_up);
+            $sql    = $est_gz
+                ? ecole_maint_lire_gz($_FILES['dump']['tmp_name'])
+                : @file_get_contents($_FILES['dump']['tmp_name']);
+            if ($sql === false || $sql === null) {
+                $res = ['ok' => false, 'backup' => null, 'message' => $est_gz
+                    ? "Impossible de décompresser le .gz (extension zlib absente ?)."
+                    : "Fichier illisible."];
             } else {
-                $err = $res['message'];
-                if (!empty($res['backup'])) {
-                    journaliser_action('ecole_bd_import_echec', $id,
-                        $e['code'] . ' — backup ' . basename($res['backup']));
-                }
+                $res = ecole_importer_sql($e['db_name'], $sql);
+            }
+        }
+
+        if ($res['ok']) {
+            journaliser_action('ecole_bd_import', $id,
+                $e['code'] . ' — ' . $e['db_name'] . ' ← ' . $nom_up
+                . ' (' . (int) ($res['tables'] ?? 0) . ' tables'
+                . (isset($res['fichiers']) ? ', ' . (int) $res['fichiers'] . ' fichiers' : '') . ')');
+            $ok = true;
+        } else {
+            $err = $res['message'];
+            if (!empty($res['backup'])) {
+                journaliser_action('ecole_bd_import_echec', $id,
+                    $e['code'] . ' — backup ' . basename($res['backup']));
             }
         }
     }
@@ -88,7 +99,7 @@ asso_haut('Importer une base — ' . $e['nom']);
   <?php endif; ?>
 <?php endif; ?>
 
-<div class="asso-card mt-2" style="max-width:660px;border-color:#7f1d1d">
+<div class="asso-card mt-2" style="max-width:660px">
   <div class="d-flex align-items-center gap-2 mb-2">
     <i class="bi bi-exclamation-octagon-fill text-danger fs-4"></i>
     <strong>Remplacement complet de la base — action destructrice</strong>
@@ -107,7 +118,7 @@ asso_haut('Importer une base — ' . $e['nom']);
   <ul class="small text-muted2">
     <li>Toutes les tables actuelles de la base sont <strong>supprimées</strong>, puis remplacées par le contenu du fichier.</li>
     <li>Un <strong>backup de sécurité</strong> de l'état courant est écrit dans <span class="font-monospace">bd/sauvegardes/</span> avant destruction.</li>
-    <li>Le fichier doit être un export d'une base école SIGES (<span class="font-monospace">.sql</span> ou <span class="font-monospace">.sql.gz</span>).</li>
+    <li>Fichier accepté : export d'une base école SIGES — <span class="font-monospace">.sql</span>, <span class="font-monospace">.sql.gz</span>, ou archive <span class="font-monospace">.zip</span> (base + fichiers : logos, signatures, pièces de dossier).</li>
     <li>L'annuaire association (code, sous-domaine, NIU, personnel) n'est pas modifié.</li>
   </ul>
 
@@ -122,8 +133,8 @@ asso_haut('Importer une base — ' . $e['nom']);
       <input type="hidden" name="csrf" value="<?= h(csrf_generer()) ?>">
 
       <div class="col-12">
-        <label class="form-label small fw-bold">Fichier de dump (.sql ou .sql.gz)</label>
-        <input type="file" name="dump" accept=".sql,.gz,application/sql,application/gzip" required
+        <label class="form-label small fw-bold">Fichier de dump (.sql, .sql.gz ou .zip)</label>
+        <input type="file" name="dump" accept=".sql,.gz,.zip,application/sql,application/gzip,application/zip" required
                class="form-control form-control-sm">
       </div>
 

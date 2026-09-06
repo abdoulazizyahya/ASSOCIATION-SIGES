@@ -173,62 +173,74 @@ asso_haut('Fiche — ' . $e['nom']);
 <?php endif; ?>
 
 <?php if (est_superadmin_association()): ?>
-<div class="asso-card p-0 mb-3" style="border-color:#3a2b12">
-  <div class="px-3 py-2 small text-muted2 border-bottom d-flex align-items-center gap-2" style="border-color:#23304d!important">
+<div class="asso-card p-0 mb-3" style="border-color:var(--border)">
+  <div class="px-3 py-2 small text-muted2 border-bottom d-flex align-items-center gap-2" style="border-color:var(--border)">
     <i class="bi bi-database-gear"></i>Base de données
     <span class="font-monospace text-muted2"><?= h($e['db_name']) ?></span>
   </div>
-  <div class="p-3 d-flex flex-wrap gap-2">
+  <?php $eid = (int) $e['id']; $csrf = h(csrf_generer()); ?>
+  <div class="p-3">
     <?php if ($base_absente): ?>
-      <a href="<?= APP_URL ?>/association/ecole_bd_creer.php?id=<?= (int) $e['id'] ?>"
-         class="btn btn-primary btn-sm">
-        <i class="bi bi-database-add me-1"></i><?= $base_etat['existe'] ? 'Initialiser la base' : 'Créer la base' ?>
-      </a>
-      <?php if ($base_etat['existe']): ?>
-        <a href="<?= APP_URL ?>/association/ecole_bd_import.php?id=<?= (int) $e['id'] ?>"
-           class="btn btn-outline-warning btn-sm">
-          <i class="bi bi-database-down me-1"></i>Importer un dump
+      <div class="d-flex flex-wrap gap-2">
+        <a href="<?= APP_URL ?>/association/ecole_bd_creer.php?id=<?= $eid ?>" class="btn btn-primary btn-sm">
+          <i class="bi bi-database-add me-1"></i><?= $base_etat['existe'] ? 'Initialiser la base' : 'Créer la base' ?>
         </a>
-      <?php endif; ?>
+        <?php if ($base_etat['existe']): ?>
+          <a href="<?= APP_URL ?>/association/ecole_bd_import.php?id=<?= $eid ?>" class="btn btn-outline-warning btn-sm">
+            <i class="bi bi-database-down me-1"></i>Importer un dump
+          </a>
+        <?php endif; ?>
+      </div>
     <?php else: ?>
-      <a href="<?= APP_URL ?>/association/ecole_bd_export.php?id=<?= (int) $e['id'] ?>&csrf=<?= h(csrf_generer()) ?>"
-         class="btn btn-outline-light btn-sm">
-        <i class="bi bi-download me-1"></i>Exporter (.sql)
-      </a>
-      <a href="<?= APP_URL ?>/association/ecole_bd_export.php?id=<?= (int) $e['id'] ?>&gzip=1&csrf=<?= h(csrf_generer()) ?>"
-         class="btn btn-outline-light btn-sm">
-        <i class="bi bi-file-zip me-1"></i>Exporter (.sql.gz)
-      </a>
-      <a href="<?= APP_URL ?>/association/ecole_bd_import.php?id=<?= (int) $e['id'] ?>"
-         class="btn btn-outline-warning btn-sm">
-        <i class="bi bi-database-down me-1"></i>Importer un dump
-      </a>
-      <a href="<?= APP_URL ?>/association/ecole_bd_vider.php?id=<?= (int) $e['id'] ?>"
-         class="btn btn-outline-danger btn-sm">
-        <i class="bi bi-eraser me-1"></i>Vider la base
-      </a>
+      <div class="mb-2">
+        <div class="small text-muted2 mb-1"><i class="bi bi-shield-check me-1"></i>Sauvegarde</div>
+        <div class="d-flex flex-wrap gap-2">
+          <a href="<?= APP_URL ?>/association/ecole_bd_sauvegarder.php?id=<?= $eid ?>" class="btn btn-primary btn-sm">
+            <i class="bi bi-clock me-1"></i>Sauvegarder maintenant
+          </a>
+          <a href="<?= APP_URL ?>/association/ecole_bd_export.php?id=<?= $eid ?>&format=zip&csrf=<?= $csrf ?>" class="btn btn-outline-light btn-sm">
+            <i class="bi bi-file-earmark-zip me-1"></i>Exporter complet (.zip)
+          </a>
+          <a href="<?= APP_URL ?>/association/ecole_bd_export.php?id=<?= $eid ?>&gzip=1&csrf=<?= $csrf ?>" class="btn btn-outline-light btn-sm">
+            <i class="bi bi-download me-1"></i>Base seule (.sql.gz)
+          </a>
+        </div>
+      </div>
+      <div>
+        <div class="small text-muted2 mb-1"><i class="bi bi-arrow-counterclockwise me-1"></i>Restauration &amp; réinitialisation</div>
+        <div class="d-flex flex-wrap gap-2">
+          <a href="<?= APP_URL ?>/association/ecole_bd_restaurer.php?id=<?= $eid ?>" class="btn btn-outline-warning btn-sm">
+            <i class="bi bi-clock-history me-1"></i>Restaurer une sauvegarde
+          </a>
+          <a href="<?= APP_URL ?>/association/ecole_bd_import.php?id=<?= $eid ?>" class="btn btn-outline-warning btn-sm">
+            <i class="bi bi-database-down me-1"></i>Importer un fichier
+          </a>
+          <a href="<?= APP_URL ?>/association/ecole_bd_vider.php?id=<?= $eid ?>" class="btn btn-outline-danger btn-sm">
+            <i class="bi bi-eraser me-1"></i>Vider la base
+          </a>
+          <?php if (!$e['actif']): ?>
+            <a href="<?= APP_URL ?>/association/etablissement_supprimer.php?id=<?= $eid ?>" class="btn btn-outline-danger btn-sm">
+              <i class="bi bi-trash3 me-1"></i>Supprimer l'établissement
+            </a>
+          <?php endif; ?>
+        </div>
+      </div>
     <?php endif; ?>
-    <?php if (!$e['actif']): ?>
-      <a href="<?= APP_URL ?>/association/etablissement_supprimer.php?id=<?= (int) $e['id'] ?>"
-         class="btn btn-outline-danger btn-sm">
-        <i class="bi bi-trash3 me-1"></i>Supprimer l'établissement
-      </a>
+    <?php if ($e['actif'] && !$base_absente): ?>
+      <div class="small text-muted2 mt-2">
+        <i class="bi bi-info-circle me-1"></i>Restaurer, Importer et Vider exigent un établissement <strong>inactif</strong>
+        (Modifier → décocher « actif »).
+      </div>
     <?php endif; ?>
   </div>
-  <?php if ($e['actif'] && !$base_absente): ?>
-    <div class="px-3 pb-3 small text-muted2">
-      <i class="bi bi-info-circle me-1"></i>Importer et Vider exigent un établissement <strong>inactif</strong>
-      (Modifier → décocher « actif »).
-    </div>
-  <?php endif; ?>
 </div>
 <?php endif; ?>
 
 <div class="asso-card p-0">
-  <div class="px-3 py-2 small text-muted2 border-bottom" style="border-color:#23304d!important">
+  <div class="px-3 py-2 small text-muted2 border-bottom" style="border-color:var(--border)">
     Personnel affecté par l'association
   </div>
-  <table class="table table-dark table-sm mb-0 align-middle" style="font-size:.83rem">
+  <table class="table table-sm mb-0 align-middle" style="font-size:.83rem">
     <tbody>
       <?php foreach ($affectations as $a): ?>
         <tr>

@@ -63,7 +63,7 @@ asso_haut('Vider la base — ' . $e['nom']);
   <?php endif; ?>
 <?php endif; ?>
 
-<div class="asso-card mt-2" style="max-width:640px;border-color:#7f1d1d">
+<div class="asso-card mt-2" style="max-width:640px">
   <div class="d-flex align-items-center gap-2 mb-2">
     <i class="bi bi-exclamation-octagon-fill text-danger fs-4"></i>
     <strong>Effacement de toutes les données — action irréversible</strong>

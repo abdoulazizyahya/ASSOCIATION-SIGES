@@ -32,13 +32,25 @@ if (!empty($_SESSION['membre_2fa_pending'])
 
 function _membre_connecter(array $m): void {
     unset($_SESSION['user'], $_SESSION['user_id'], $_SESSION['ecole'], $_SESSION['visite_asso'],
-          $_SESSION['membre_2fa_pending']);
+          $_SESSION['membre_2fa_pending'], $_SESSION['forcer_2fa']);
     $_SESSION['membre'] = [
         'id' => (int) $m['id'], 'login' => $m['login'],
         'nom' => $m['nom'], 'prenom' => $m['prenom'],
     ];
     session_regenerate_id(true);
     journaliser_action('connexion_membre');
+
+    // 2FA obligatoire pour les superadmins : si elle n'est pas encore active,
+    // on force la configuration (exiger_membre_association() redirige vers
+    // securite.php tant que ce drapeau est là). Désactivable via
+    // define('ASSOC_2FA_SUPERADMIN_OBLIGATOIRE', false) dans config.local.php.
+    $oblig = !defined('ASSOC_2FA_SUPERADMIN_OBLIGATOIRE') || ASSOC_2FA_SUPERADMIN_OBLIGATOIRE;
+    if ($oblig && assoc_2fa_disponible() && (int) ($m['totp_actif'] ?? 0) !== 1 && est_superadmin_association()) {
+        $_SESSION['forcer_2fa'] = 1;
+        header('Location: ' . APP_URL . '/association/securite.php');
+        exit;
+    }
+
     header('Location: ' . APP_URL . '/association/index.php');
     exit;
 }

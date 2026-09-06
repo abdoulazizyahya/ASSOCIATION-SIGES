@@ -25,9 +25,43 @@ UPDATE promeducam_assoc.membre_acces SET plein_acces = 1 WHERE id_etablissement 
 Interface : `/association/` → **Nouvel établissement** (superadmin uniquement).
 CLI équivalente : `php bd/assoc/creer_ecole.php`.
 
-Crée la base `promeducam_<slug du nom>` à partir de `bd/assoc/schema_ref_ecole.sql`, l'inscrit
-dans l'annuaire, cale sa version de schéma. **Ensuite** : le superadmin affecte 1 `FONDATEUR`
-et 1 `DIRECTEUR` via `/association/personnel/affecter.php`.
+Crée la base `promeducam_<slug du nom>` à partir de `bd/assoc/schema_ref_ecole.sql`, y charge les
+**données de référence** `bd/assoc/seed_ref_ecole.sql`, l'inscrit dans l'annuaire, cale sa version
+de schéma. **Ensuite** : le superadmin affecte 1 `FONDATEUR` et 1 `DIRECTEUR` via
+`/association/personnel/affecter.php`.
+
+### Données de référence (`seed_ref_ecole.sql`)
+
+Chargées automatiquement à la **création**, au **vidage** et à la **création de base** d'une
+école (`charger_schema_ecole()` → `charger_seed_ref_ecole()`). Communes à toutes les écoles,
+elles n'ont pas à être ressaisies :
+
+- **niveaux** (M, I, II, III + LEVEL 1-3) ;
+- **groupes de compétences / compétences** (jeux `Fr` et `An`) et leur **affectation aux niveaux**
+  (`groupe_competence_niveau`) ;
+- **matières / disciplines arabes** (`matiere_arabe`, `groupe_matiere_arabe`, `matiere_niveau_arabe`,
+  `discipline_arabe`), critères de conseil ;
+- **géographie** Cameroun (`pays`, `region`, `departement`, `arrondissement`) ;
+- grades enseignants, questions secrètes, couleurs PDF, catégories de dépense ;
+- **`bareme_reference`** — gabarit du barème APC (points oral/écrit/pratique/savoir-être par
+  compétence et par niveau).
+
+Le **barème de travail** reste dans `discipline` (par classe et par année). Il est dérivé du
+gabarit automatiquement : à la **création d'une classe** (`pages/classes/form.php`) et à
+l'ouverture de la **première année scolaire** d'une école neuve (`pages/parametres/index.php`,
+quand `reporter_bareme_annee()` n'a rien à reporter) — via `appliquer_bareme_reference()`
+(`fonctions.php`), non destructif.
+
+Créer une année scolaire provisionne toujours **3 trimestres + 6 évaluations (UA1-UA6)** —
+comportement existant, désormais fiable sur une école neuve puisque la référence est en place.
+
+**Réappliquer la référence à une école existante** (ex. écoles créées avant cette version) :
+```
+php bd/assoc/reseeder_ecole.php <CODE|--tout> [--bareme]
+```
+`--bareme` remplit aussi les lignes `discipline` manquantes de l'année active. Sauvegarde de
+sécurité écrite avant (sauf `--sans-backup`). ⚠ écrase les niveaux/compétences personnalisés
+par l'école, le cas échéant.
 
 ## 2 bis. Supprimer une école
 

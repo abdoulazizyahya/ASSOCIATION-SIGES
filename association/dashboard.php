@@ -52,7 +52,7 @@ asso_haut('Tableau de bord');
 
 <div class="asso-card p-0">
   <div class="table-responsive">
-  <table class="table table-dark table-sm mb-0 align-middle" style="font-size:.83rem">
+  <table class="table table-sm mb-0 align-middle" style="font-size:.83rem">
     <thead>
       <tr class="text-muted2">
         <th>École</th>
@@ -92,7 +92,9 @@ asso_haut('Tableau de bord');
             <?php endif; ?>
           </td>
           <td class="<?= ($r['sauvegarde'] !== null && $r['sauvegarde'] > time() - 172800) ? 'text-muted2' : 'text-warning' ?>">
-            <?= h(_il_y_a($r['sauvegarde'])) ?>
+            <a href="<?= APP_URL ?>/association/ecole_bd_sauvegarder.php?id=<?= (int) $e['id'] ?>"
+               class="text-decoration-none" title="Sauvegarder maintenant"
+               style="color:inherit"><?= h(_il_y_a($r['sauvegarde'])) ?> <i class="bi bi-clock" style="font-size:.7rem;opacity:.6"></i></a>
           </td>
           <td class="text-muted2"><?= $r['db_mo'] > 0 ? h((string) $r['db_mo']) . ' Mo' : '—' ?></td>
           <td>

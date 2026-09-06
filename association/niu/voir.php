@@ -66,7 +66,7 @@ $csrf = csrf_generer();
         <span class="font-monospace fs-5"><?= h($n['niu']) ?></span>
         <span class="badge badge-soft"><?= h($n['statut']) ?></span>
       </div>
-      <table class="table table-dark table-sm mb-0" style="font-size:.85rem">
+      <table class="table table-sm mb-0" style="font-size:.85rem">
         <tbody>
           <tr><td class="text-muted2">Nom</td><td><?= h(trim($n['nom'] . ' ' . $n['prenom'])) ?: '—' ?></td></tr>
           <tr><td class="text-muted2">Naissance</td><td><?= h($n['date_naissance'] ?: '—') ?> <?= h($n['lieu_naissance'] ? '· ' . $n['lieu_naissance'] : '') ?></td></tr>
@@ -140,8 +140,8 @@ $csrf = csrf_generer();
     <?php endif; ?>
 
     <div class="asso-card p-0">
-      <div class="px-3 py-2 small text-muted2 border-bottom" style="border-color:#23304d!important">Historique</div>
-      <table class="table table-dark table-sm mb-0 align-middle" style="font-size:.82rem">
+      <div class="px-3 py-2 small text-muted2 border-bottom" style="border-color:var(--border)">Historique</div>
+      <table class="table table-sm mb-0 align-middle" style="font-size:.82rem">
         <tbody>
           <?php foreach ($n['mouvements'] as $mv): ?>
             <tr>

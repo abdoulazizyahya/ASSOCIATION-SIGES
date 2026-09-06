@@ -151,7 +151,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 // Report automatique du barème par compétence (demande explicite
                 // du 18/08/2026) — voir reporter_bareme_annee().
                 $nb_bareme = reporter_bareme_annee($annee_precedente, $lib);
-                $msg_bareme = $nb_bareme > 0 ? " Barème de $nb_bareme compétence(s) reporté automatiquement." : '';
+                // École neuve / première année : aucun barème à reporter → on
+                // dérive le barème de travail du gabarit de référence livré
+                // avec l'application (bareme_reference, seed_ref_ecole.sql).
+                if ($nb_bareme === 0) {
+                    $nb_bareme = appliquer_bareme_reference($lib);
+                }
+                $msg_bareme = $nb_bareme > 0 ? " Barème de $nb_bareme compétence(s) provisionné automatiquement." : '';
                 flash_set('succes', "Année $lib créée avec sa structure standard (3 trimestres, 6 évaluations UA1-UA6).$msg_promo$msg_bareme");
             } else {
                 flash_set('info', "Année $lib existait déjà (structure conservée telle quelle).");

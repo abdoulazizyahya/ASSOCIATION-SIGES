@@ -57,6 +57,12 @@ define('BACKUP_TOKEN', 'METTRE_UN_JETON_ALEATOIRE_LONG');
 // define('BACKUP_OFFSITE_DIR', 'Z:/sauvegardes-siges');
 // define('BACKUP_OFFSITE_CMD', 'C:/rclone/rclone.exe copy');
 
+// ── Sécurité du portail association ───────────────────────────────
+// Double authentification (TOTP) EXIGÉE des superadministrateurs : à la
+// connexion, tant qu'elle n'est pas activée, le portail renvoie vers
+// /association/securite.php. Mettre à false pour la rendre facultative.
+// define('ASSOC_2FA_SUPERADMIN_OBLIGATOIRE', false);
+
 // ── Clé ECDSA de signature offline des bulletins ──────────────────
 // ⚠ IMPORTANT : garder EXACTEMENT la même clé que celle de config.php en
 // LAN. En changer invaliderait la vérification hors-ligne de tous les

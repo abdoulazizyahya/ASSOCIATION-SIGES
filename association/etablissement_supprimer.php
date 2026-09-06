@@ -55,10 +55,18 @@ asso_haut('Supprimer — ' . $e['nom']);
 
 <?php if ($err): ?><div class="alert alert-danger py-2 small mt-2"><?= h($err) ?></div><?php endif; ?>
 
-<div class="asso-card mt-2" style="max-width:640px;border-color:#7f1d1d">
+<div class="asso-card mt-2" style="max-width:640px">
   <div class="d-flex align-items-center gap-2 mb-2">
     <i class="bi bi-exclamation-octagon-fill text-danger fs-4"></i>
     <strong>Suppression définitive — action irréversible</strong>
+  </div>
+
+  <div class="alert alert-secondary py-2 small">
+    <i class="bi bi-shield-check me-1"></i>
+    Une <strong>sauvegarde complète</strong> (base + fichiers : logos, signatures, pièces de dossier)
+    est écrite dans <span class="font-monospace">bd/sauvegardes/avant_suppression_…</span>
+    <em>avant</em> la suppression. Elle permet de restaurer l'école plus tard si besoin
+    (<span class="font-monospace">bd/assoc/restaurer_ecole.php</span>).
   </div>
 
   <div class="small text-muted2 mb-3">
@@ -71,9 +79,9 @@ asso_haut('Supprimer — ' . $e['nom']);
     <?php endif; ?>
   </div>
 
-  <div class="asso-card p-0 mb-3" style="background:#0f1830">
-    <div class="px-3 py-2 small text-muted2 border-bottom" style="border-color:#23304d!important">Ce qui sera supprimé</div>
-    <table class="table table-dark table-sm mb-0 align-middle" style="font-size:.83rem">
+  <div class="asso-card p-0 mb-3">
+    <div class="px-3 py-2 small text-muted2 border-bottom" style="border-color:var(--border)">Ce qui sera supprimé</div>
+    <table class="table table-sm mb-0 align-middle" style="font-size:.83rem">
       <tbody>
         <tr>
           <td>Base de données <span class="font-monospace"><?= h($imp['db_name']) ?></span></td>

@@ -54,8 +54,8 @@ asso_haut('Créer la base — ' . $e['nom']);
     base <span class="font-monospace"><?= h($e['db_name']) ?></span>
   </div>
 
-  <div class="asso-card p-0 mb-3" style="background:#0f1830">
-    <table class="table table-dark table-sm mb-0 align-middle" style="font-size:.83rem">
+  <div class="asso-card p-0 mb-3">
+    <table class="table table-sm mb-0 align-middle" style="font-size:.83rem">
       <tbody>
         <tr>
           <td>Base <span class="font-monospace"><?= h($e['db_name']) ?></span> sur le serveur</td>

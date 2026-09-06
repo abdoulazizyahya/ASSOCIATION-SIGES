@@ -43,7 +43,7 @@ asso_haut('Agent — ' . trim($p['nom'] . ' ' . $p['prenom']));
 
 <h2 class="h6 fw-bold">Affectations</h2>
 <div class="asso-card p-0">
-  <table class="table table-dark table-sm mb-0 align-middle" style="font-size:.83rem">
+  <table class="table table-sm mb-0 align-middle" style="font-size:.83rem">
     <thead><tr><th>École</th><th>Fonction</th><th>Depuis</th><th>Jusqu'au</th><th>État</th><th></th></tr></thead>
     <tbody>
       <?php foreach ($affs as $a): ?>

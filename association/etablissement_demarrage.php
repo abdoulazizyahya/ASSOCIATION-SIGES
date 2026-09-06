@@ -36,7 +36,7 @@ asso_haut('Démarrage — ' . $e['nom']);
 
   <ul class="list-unstyled mb-0">
     <?php foreach ($items as $i): ?>
-      <li class="d-flex align-items-center gap-2 py-2 border-bottom" style="border-color:#23304d!important">
+      <li class="d-flex align-items-center gap-2 py-2 border-bottom" style="border-color:var(--border)">
         <?php if ($i['fait'] === true): ?>
           <i class="bi bi-check-circle-fill text-success"></i>
         <?php elseif ($i['fait'] === null): ?>

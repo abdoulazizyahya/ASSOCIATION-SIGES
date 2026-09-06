@@ -28,7 +28,7 @@ asso_haut('Personnel de l\'association');
 </form>
 
 <div class="asso-card p-0">
-  <table class="table table-dark table-sm mb-0 align-middle" style="font-size:.83rem">
+  <table class="table table-sm mb-0 align-middle" style="font-size:.83rem">
     <thead><tr><th>Matricule</th><th>Nom</th><th>Statut</th><th>Affectations</th><th></th></tr></thead>
     <tbody>
       <?php foreach ($gens as $p): ?>

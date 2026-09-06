@@ -31,8 +31,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $r = ($secret !== '')
             ? assoc_membre_2fa_activer($moi, $secret, trim($_POST['code'] ?? ''))
             : ['ok' => false, 'message' => 'Secret manquant, recommencez.'];
-        if ($r['ok']) { unset($_SESSION['secu_secret']); $msg = $r['message']; }
-        else          { $err = $r['message']; }
+        if ($r['ok']) {
+            unset($_SESSION['secu_secret'], $_SESSION['forcer_2fa']);
+            $msg = $r['message'];
+        } else {
+            $err = $r['message'];
+        }
         $m = assoc_one("SELECT * FROM membre WHERE id=?", [$moi]);
 
     } elseif ($op === 'desactiver') {
@@ -63,6 +67,13 @@ asso_haut('Sécurité — double authentification');
 $csrf = csrf_generer();
 ?>
 <div class="asso-card" style="max-width:560px">
+  <?php if (!empty($_SESSION['forcer_2fa'])): ?>
+    <div class="alert alert-warning py-2 small">
+      <i class="bi bi-shield-exclamation me-1"></i>
+      La double authentification est <strong>obligatoire</strong> pour les superadministrateurs.
+      Configurez-la ci-dessous pour accéder au portail.
+    </div>
+  <?php endif; ?>
   <?php if ($msg): ?><div class="alert alert-success py-2 small"><?= h($msg) ?></div><?php endif; ?>
   <?php if ($err): ?><div class="alert alert-warning py-2 small"><?= h($err) ?></div><?php endif; ?>
 

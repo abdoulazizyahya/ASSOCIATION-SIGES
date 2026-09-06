@@ -671,6 +671,50 @@ function reporter_bareme_annee(string $annee_precedente, string $nouvelle_annee)
     return count($rows);
 }
 
+// ── Barème de référence (gabarit APC standard livré avec l'application) ──
+// `bareme_reference` (code_niveau, id_comp, points…) est chargée par
+// bd/assoc/seed_ref_ecole.sql à la création / au vidage d'une école. Elle
+// sert de GABARIT DE DÉPART : quand une classe est créée, ou quand la
+// première année scolaire d'une école neuve est ouverte, on en dérive les
+// lignes `discipline` (barème de travail, par classe et par année) qui
+// n'existent pas encore. Jamais destructif — un barème déjà saisi n'est
+// pas touché. No-op si `bareme_reference` est absente (ancienne install).
+function bareme_reference_dispo(): bool {
+    static $ok = null;
+    if ($ok === null) {
+        $ok = (bool) db_val(
+            "SELECT COUNT(*) FROM information_schema.tables
+             WHERE table_schema = DATABASE() AND table_name = 'bareme_reference'"
+        );
+    }
+    return $ok;
+}
+
+// Crée les lignes `discipline` manquantes pour $val_annee à partir de
+// `bareme_reference`, éventuellement limité à certaines classes.
+// Retourne le nombre de lignes créées.
+function appliquer_bareme_reference(string $val_annee, ?array $ids_classes = null): int {
+    if ($val_annee === '' || !bareme_reference_dispo()) return 0;
+
+    $filtre = '';
+    if ($ids_classes !== null) {
+        $ids = array_filter(array_map('intval', $ids_classes));
+        if (!$ids) return 0;
+        $filtre = ' AND c.IDClasses IN (' . implode(',', $ids) . ')';
+    }
+    return db_exec(
+        "INSERT INTO discipline (IDClasses, id_comp, annee_scol, orale, ecrite, pratique, savoir_etre, total_points, actif)
+         SELECT c.IDClasses, b.id_comp, ?, b.orale, b.ecrite, b.pratique, b.savoir_etre, b.total_points, b.actif
+         FROM bareme_reference b
+         JOIN classe c ON c.Niveau = b.code_niveau
+         WHERE NOT EXISTS (
+             SELECT 1 FROM discipline d
+             WHERE d.IDClasses = c.IDClasses AND d.id_comp = b.id_comp AND d.annee_scol = ?
+         )" . $filtre,
+        [$val_annee, $val_annee]
+    );
+}
+
 // ── Section (Fr/An) d'une classe ou d'un niveau — bascule d'affichage ───
 // Un niveau anglophone (niveau.Section='An') n'affecte QUE l'affichage des
 // libellés de compétences/groupes (le jeu langue='An', simple jumeau

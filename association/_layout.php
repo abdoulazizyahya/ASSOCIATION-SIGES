@@ -1,8 +1,8 @@
 <?php
 // ── Shell de l'interface association (portail multi-établissement) ──
-//  Même langage de design que l'app école (sidebar fixe + topbar
-//  collante + contenu en cartes), palette indigo/nuit propre à
-//  l'association — voir assets/css/association.css.
+//  MÊME système de design que l'app école (assets/css/style.css) :
+//  thème clair, marine + or, sidebar fixe + topbar collante + contenu
+//  en cartes, titres Georgia — voir assets/css/association.css.
 //
 //  API inchangée :
 //    asso_haut(string $titre, bool $avec_nav = true)  — ouvre la page

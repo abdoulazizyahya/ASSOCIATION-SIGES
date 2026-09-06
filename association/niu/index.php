@@ -65,7 +65,7 @@ asso_haut('Registre NIU');
 <?php endif; ?>
 
 <div class="asso-card p-0">
-  <table class="table table-dark table-sm mb-0 align-middle" style="font-size:.83rem">
+  <table class="table table-sm mb-0 align-middle" style="font-size:.83rem">
     <thead><tr>
       <th>NIU</th><th>Nom</th><th>Naissance</th><th>Statut</th><th>Origine</th><th>École actuelle</th>
     </tr></thead>
