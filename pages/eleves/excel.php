@@ -22,6 +22,21 @@ $etab      = get_etablissement();
 $where  = ["i.val_annee = ?", "e.statut='actif'"];
 $params = [$val_annee];
 if ($id_classe) { $where[] = "i.IDClasses=?"; $params[] = $id_classe; }
+
+// Cloisonnement enseignant : export limité à ses classes (FR ∪ AR).
+$ids_classes_vis = classes_ids_visibles($val_annee, 'union');
+if ($ids_classes_vis !== null) {
+    if ($id_classe && !in_array($id_classe, $ids_classes_vis, true)) {
+        http_response_code(403);
+        exit('Accès refusé : cette classe ne fait pas partie de vos affectations.');
+    }
+    if (!$ids_classes_vis) {
+        $where[] = '1=0';
+    } elseif (!$id_classe) {
+        $where[] = 'i.IDClasses IN (' . implode(',', array_fill(0, count($ids_classes_vis), '?')) . ')';
+        $params  = array_merge($params, $ids_classes_vis);
+    }
+}
 $sql_where = 'WHERE ' . implode(' AND ', $where);
 
 $eleves = db_all(

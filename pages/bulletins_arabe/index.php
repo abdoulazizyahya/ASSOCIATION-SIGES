@@ -25,19 +25,22 @@ $trim_actif = (int) ($seq_active['id_trim'] ?? 0);
 // LEFT JOIN (pas INNER) — une classe sans élève inscrit reste visible dans
 // le select (grisée, non sélectionnable) plutôt que silencieusement absente
 // (confusion signalée le 21/08/2026).
-$classes = db_all(
+// Enseignant restreint : seulement ses classes de piste ARABE.
+$classes = filtrer_classes_visibles(db_all(
     "SELECT c.IDClasses, c.DesignationClasses, n.OrdreNiveau, COUNT(i.id_eleve) AS nb_eleves
      FROM classe c LEFT JOIN niveau n ON n.LibelleNiveau = c.Niveau
      LEFT JOIN inscrire i ON i.IDClasses = c.IDClasses AND i.val_annee = ?
      GROUP BY c.IDClasses, c.DesignationClasses, n.OrdreNiveau
      ORDER BY n.OrdreNiveau, c.DesignationClasses",
     [$val_annee]
-);
+), $val_annee, 'ar');
 
 // ── Paramètres GET ─────────────────────────────────────────────────
 $id_classe = (int) ($_GET['classe'] ?? 0);
+exiger_acces_classe($id_classe, $val_annee, 'ar');
 $vue       = in_array($_GET['vue'] ?? '', ['trim', 'annee'], true) ? $_GET['vue'] : 'trim';
 $id_eleve  = (int) ($_GET['eleve'] ?? 0);
+exiger_acces_eleve($id_eleve, 'ar');
 $ordre     = in_array($_GET['ordre'] ?? '', ['alpha', 'merite'], true) ? $_GET['ordre'] : 'alpha';
 $chiffres_ar = ($_GET['chiffres_ar'] ?? '') === '1'; // ٠١٢٣... plutôt que 0123... dans le PDF — choix explicite de l'utilisateur, pas la valeur par défaut.
 $qs_chiffres = $chiffres_ar ? '&chiffres_ar=1' : '';

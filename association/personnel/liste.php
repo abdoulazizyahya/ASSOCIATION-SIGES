@@ -49,8 +49,10 @@ asso_haut('Personnel de l\'association');
   </table>
 </div>
 <p class="small text-muted2 mt-2">
+  <?php if (est_superadmin_association()): ?>
   <a href="<?= APP_URL ?>/association/personnel/affecter.php" class="btn btn-primary btn-sm">
     <i class="bi bi-arrow-left-right me-1"></i>Affecter un agent à une école
   </a>
+  <?php endif; ?>
 </p>
 <?php asso_bas();

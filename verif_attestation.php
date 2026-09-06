@@ -6,6 +6,7 @@ require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/connexion.php';
 require_once __DIR__ . '/fonctions.php';
 require_once __DIR__ . '/pdf/verif_attestation_lib.php';
+verif_exiger_ecole_publique();  // multi-école : URL sans &ec= -> page neutre
 
 $type_recu = (string)($_GET['t'] ?? '');
 $type      = in_array($type_recu, ['attestation', 'prise', 'reprise'], true) ? $type_recu : '';
@@ -34,7 +35,9 @@ $pdf_urls = [
     'prise'       => '/pages/enseignants/pdf_prise_service.php?type=prise&id=' . urlencode($mat) . '&vh=' . urlencode($h_recu),
     'reprise'     => '/pages/enseignants/pdf_prise_service.php?type=reprise&id=' . urlencode($mat) . '&vh=' . urlencode($h_recu),
 ];
-$pdf_url = $authentique ? APP_URL . $pdf_urls[$type] : '';
+// verif_ajout_ec() : en multi-établissement, propage &ec=CODE — sinon le
+// générateur (accès public par « vh ») reste pointé sur l'annuaire.
+$pdf_url = $authentique ? verif_ajout_ec(APP_URL . $pdf_urls[$type]) : '';
 ?>
 <!DOCTYPE html>
 <html lang="fr">

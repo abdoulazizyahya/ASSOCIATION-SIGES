@@ -63,6 +63,11 @@ if ($acces) {
     }
 }
 
+// État de la base MySQL de l'école (pour proposer sa création si absente).
+require_once __DIR__ . '/../bd/lib/ecole_maintenance.php';
+$base_etat = ecole_base_etat($e['db_name']);
+$base_absente = !$base_etat['existe'] || $base_etat['tables'] === 0;
+
 // Affectations centrales (personnel de l'association affecté à cette école)
 $affectations = assoc_all(
     "SELECT a.fonction, a.actif, p.nom, p.prenom, p.matricule
@@ -75,6 +80,16 @@ $affectations = assoc_all(
 asso_haut('Fiche — ' . $e['nom']);
 ?>
 <a href="<?= APP_URL ?>/association/index.php" class="small text-decoration-none">← Établissements</a>
+<a href="<?= APP_URL ?>/association/etablissement_demarrage.php?id=<?= (int) $e['id'] ?>"
+   class="btn btn-outline-light btn-sm ms-2"><i class="bi bi-list-check me-1"></i>Démarrage</a>
+<?php if (est_superadmin_association()): ?>
+  <a href="<?= APP_URL ?>/association/etablissement_modifier.php?id=<?= (int) $e['id'] ?>"
+     class="btn btn-outline-light btn-sm ms-2"><i class="bi bi-pencil me-1"></i>Modifier</a>
+  <?php if (!$e['actif']): ?>
+    <a href="<?= APP_URL ?>/association/etablissement_supprimer.php?id=<?= (int) $e['id'] ?>"
+       class="btn btn-outline-danger btn-sm ms-2"><i class="bi bi-trash3 me-1"></i>Supprimer</a>
+  <?php endif; ?>
+<?php endif; ?>
 
 <div class="d-flex flex-wrap align-items-center gap-2 mt-2 mb-3">
   <span class="badge badge-soft"><?= h($e['code']) ?></span>
@@ -92,18 +107,42 @@ asso_haut('Fiche — ' . $e['nom']);
   </div>
 <?php else: ?>
 
+  <?php
+    // Écriture dans l'école : superadmin association, ou membre disposant
+    // de membre_acces.plein_acces=1 sur cette école ($acces calculé plus haut).
+    $peut_ecrire_ecole = est_superadmin_association() || !empty($acces['plein_acces']);
+  ?>
   <?php if ($e['actif']): ?>
   <div class="d-flex flex-wrap gap-2 mb-3">
     <a href="<?= APP_URL ?>/association/entrer_ecole.php?id=<?= (int) $e['id'] ?>" class="btn btn-primary btn-sm">
       <i class="bi bi-box-arrow-in-right me-1"></i>Ouvrir en lecture seule
     </a>
+    <?php if ($peut_ecrire_ecole): ?>
+    <a href="<?= APP_URL ?>/association/entrer_ecole.php?id=<?= (int) $e['id'] ?>&mode=ecriture"
+       class="btn btn-warning btn-sm"
+       onclick="return confirm('Ouvrir « <?= h(addslashes($e['nom'])) ?> » en LECTURE / ÉCRITURE ?\n\nToute modification sera enregistrée dans la base de cette école.');">
+      <i class="bi bi-pencil-square me-1"></i>Ouvrir en écriture
+    </a>
+    <?php endif; ?>
     <a href="<?= APP_URL ?>/association/niu/index.php?etab=<?= (int) $e['id'] ?>" class="btn btn-outline-light btn-sm">
       <i class="bi bi-person-vcard me-1"></i>NIU de l'école
     </a>
   </div>
   <?php endif; ?>
 
-  <?php if ($stats_err): ?>
+  <?php if ($base_absente && est_superadmin_association()): ?>
+    <div class="alert alert-warning d-flex flex-wrap align-items-center gap-2 py-2 small">
+      <span>
+        <i class="bi bi-database-exclamation me-1"></i>
+        La base <span class="font-monospace"><?= h($e['db_name']) ?></span>
+        <?= $base_etat['existe'] ? 'existe mais est vide' : "n'existe pas encore sur le serveur" ?> —
+        l'école n'est pas utilisable.
+      </span>
+      <a href="<?= APP_URL ?>/association/ecole_bd_creer.php?id=<?= (int) $e['id'] ?>" class="btn btn-primary btn-sm">
+        <i class="bi bi-database-add me-1"></i>Créer la base
+      </a>
+    </div>
+  <?php elseif ($stats_err): ?>
     <div class="alert alert-warning py-2 small">Base école injoignable : <?= h($stats_err) ?></div>
   <?php elseif ($stats): ?>
     <div class="row g-3 mb-3">
@@ -131,6 +170,58 @@ asso_haut('Fiche — ' . $e['nom']);
     <?php endif; ?>
   <?php endif; ?>
 
+<?php endif; ?>
+
+<?php if (est_superadmin_association()): ?>
+<div class="asso-card p-0 mb-3" style="border-color:#3a2b12">
+  <div class="px-3 py-2 small text-muted2 border-bottom d-flex align-items-center gap-2" style="border-color:#23304d!important">
+    <i class="bi bi-database-gear"></i>Base de données
+    <span class="font-monospace text-muted2"><?= h($e['db_name']) ?></span>
+  </div>
+  <div class="p-3 d-flex flex-wrap gap-2">
+    <?php if ($base_absente): ?>
+      <a href="<?= APP_URL ?>/association/ecole_bd_creer.php?id=<?= (int) $e['id'] ?>"
+         class="btn btn-primary btn-sm">
+        <i class="bi bi-database-add me-1"></i><?= $base_etat['existe'] ? 'Initialiser la base' : 'Créer la base' ?>
+      </a>
+      <?php if ($base_etat['existe']): ?>
+        <a href="<?= APP_URL ?>/association/ecole_bd_import.php?id=<?= (int) $e['id'] ?>"
+           class="btn btn-outline-warning btn-sm">
+          <i class="bi bi-database-down me-1"></i>Importer un dump
+        </a>
+      <?php endif; ?>
+    <?php else: ?>
+      <a href="<?= APP_URL ?>/association/ecole_bd_export.php?id=<?= (int) $e['id'] ?>&csrf=<?= h(csrf_generer()) ?>"
+         class="btn btn-outline-light btn-sm">
+        <i class="bi bi-download me-1"></i>Exporter (.sql)
+      </a>
+      <a href="<?= APP_URL ?>/association/ecole_bd_export.php?id=<?= (int) $e['id'] ?>&gzip=1&csrf=<?= h(csrf_generer()) ?>"
+         class="btn btn-outline-light btn-sm">
+        <i class="bi bi-file-zip me-1"></i>Exporter (.sql.gz)
+      </a>
+      <a href="<?= APP_URL ?>/association/ecole_bd_import.php?id=<?= (int) $e['id'] ?>"
+         class="btn btn-outline-warning btn-sm">
+        <i class="bi bi-database-down me-1"></i>Importer un dump
+      </a>
+      <a href="<?= APP_URL ?>/association/ecole_bd_vider.php?id=<?= (int) $e['id'] ?>"
+         class="btn btn-outline-danger btn-sm">
+        <i class="bi bi-eraser me-1"></i>Vider la base
+      </a>
+    <?php endif; ?>
+    <?php if (!$e['actif']): ?>
+      <a href="<?= APP_URL ?>/association/etablissement_supprimer.php?id=<?= (int) $e['id'] ?>"
+         class="btn btn-outline-danger btn-sm">
+        <i class="bi bi-trash3 me-1"></i>Supprimer l'établissement
+      </a>
+    <?php endif; ?>
+  </div>
+  <?php if ($e['actif'] && !$base_absente): ?>
+    <div class="px-3 pb-3 small text-muted2">
+      <i class="bi bi-info-circle me-1"></i>Importer et Vider exigent un établissement <strong>inactif</strong>
+      (Modifier → décocher « actif »).
+    </div>
+  <?php endif; ?>
+</div>
 <?php endif; ?>
 
 <div class="asso-card p-0">

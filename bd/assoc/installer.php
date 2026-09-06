@@ -1,7 +1,8 @@
 <?php
 // =====================================================================
-//  jaynitaare — bd/assoc/installer.php
-//  Met en place la base centrale « jaynitaare_assoc » :
+//  bd/assoc/installer.php
+//  Met en place la base centrale « annuaire » (DB_NAME_ASSOC, défaut
+//  promeducam_assoc) :
 //    1. crée la base + les tables (bd/assoc/schema_assoc.sql) ;
 //    2. enregistre l'école n°1 (EC1) à partir de la ligne `etablissement`
 //       de la base actuelle (DB_NAME) ;
@@ -29,7 +30,7 @@ $pwd_admin = $est_cli
     ? ($argv[1] ?? 'association')
     : ($_GET['pwd'] ?? 'association');
 
-out("=== Installation de la base centrale jaynitaare_assoc ===\n");
+out("=== Installation de la base centrale « annuaire » (DB_NAME_ASSOC) ===\n");
 
 // ── 1. Schéma ──────────────────────────────────────────────────────
 $srv = mysqli_connect(DB_HOST, DB_USER, DB_PASS);
@@ -37,6 +38,9 @@ mysqli_set_charset($srv, 'utf8mb4');
 
 $sql = file_get_contents(__DIR__ . '/schema_assoc.sql');
 if ($sql === false) { out('ERREUR : schema_assoc.sql introuvable.'); exit(1); }
+// La base annuaire suit la constante DB_NAME_ASSOC (le SQL porte un
+// marqueur {{DB_NAME_ASSOC}} pour rester indépendant du nom).
+$sql = str_replace('{{DB_NAME_ASSOC}}', DB_NAME_ASSOC, $sql);
 
 if (mysqli_multi_query($srv, $sql)) {
     do { /* consommer tous les jeux de résultats */ } while (mysqli_next_result($srv));
@@ -95,9 +99,12 @@ if ($nb_membres === 0) {
     mysqli_stmt_execute($stmt);
     $id_membre = mysqli_stmt_insert_id($stmt);
     mysqli_stmt_close($stmt);
+    // plein_acces=1 + id_etablissement NULL : ce 1er compte est le
+    // SUPERADMIN de l'association (crée les écoles, affecte les agents,
+    // frappe les NIU — cf. ecole_contexte.php::est_superadmin_association()).
     mysqli_query($assoc,
         "INSERT INTO membre_acces (id_membre, id_etablissement, plein_acces, actif)
-         VALUES ($id_membre, NULL, 0, 1)");
+         VALUES ($id_membre, NULL, 1, 1)");
     out("OK  Compte membre créé : login « admin » / mot de passe « $pwd_admin »");
     out("    ⚠  Changez ce mot de passe après la première connexion.");
 } else {

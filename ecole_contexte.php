@@ -46,15 +46,64 @@ function est_visite_association(): bool {
     return !empty($_SESSION['visite_asso']);
 }
 
-// En visite association, toute écriture est interdite (lecture seule).
+// Rôle « FONDATEUR » : consulte toute son école en lecture seule, ne peut
+// qu'enregistrer/remplacer le compte DIRECTEUR (pages/fondateur/directeur.php).
+function est_fondateur(): bool {
+    ecole_session_demarrer();
+    return ($_SESSION['user']['role'] ?? '') === 'FONDATEUR';
+}
+
+// Scripts où le FONDATEUR est exceptionnellement autorisé à écrire :
+//  - directeur.php          : créer / remplacer / désactiver le directeur
+//  - configurer_securite.php: ses 2 questions secrètes à la 1re connexion
+//  - profil.php             : son propre login / mot de passe
+function fondateur_ecriture_permise(): bool {
+    return in_array(
+        basename($_SERVER['SCRIPT_NAME'] ?? ''),
+        ['directeur.php', 'configurer_securite.php', 'profil.php'],
+        true
+    );
+}
+
+// Écritures interdites (lecture seule) : visite association SANS droit
+// d'écriture, OU FONDATEUR hors de ses pages autorisées.
 function est_lecture_seule(): bool {
-    return est_visite_association() && empty($_SESSION['visite_asso_ecriture']);
+    if (est_visite_association() && empty($_SESSION['visite_asso_ecriture'])) return true;
+    if (est_fondateur() && !fondateur_ecriture_permise()) return true;
+    return false;
+}
+
+// Superadmin de l'association : membre disposant d'un accès GLOBAL en
+// écriture (membre_acces : id_etablissement NULL + plein_acces=1). Seul
+// habilité à créer une école, affecter un agent à une école, frapper un NIU.
+function est_superadmin_association(): bool {
+    if (!annuaire_dispo() || !est_membre_association()) return false;
+    $m = membre_connecte();
+    return (bool) assoc_val(
+        "SELECT COUNT(*) FROM membre_acces
+         WHERE id_membre=? AND actif=1 AND id_etablissement IS NULL AND plein_acces=1",
+        [$m['id'] ?? 0]
+    );
+}
+
+// Garde des pages d'écriture de l'interface association (création d'école,
+// affectation d'un agent, registre NIU).
+function exiger_superadmin_association(): void {
+    exiger_membre_association();
+    if (!est_superadmin_association()) {
+        http_response_code(403);
+        die('<div style="font-family:sans-serif;padding:2rem;color:#b45309">
+             Action réservée au superadministrateur de l\'association.</div>');
+    }
 }
 
 // Sous-domaine de la requête (« ecole1 » pour ecole1.assoc.cm), ou ''.
 function _sous_domaine_requete(): string {
     $host = strtolower(explode(':', $_SERVER['HTTP_HOST'] ?? '')[0]);
     if ($host === '' || filter_var($host, FILTER_VALIDATE_IP)) return '';
+    // Hôte canonique unique de l'app (déploiement 1 sous-domaine) : aucune
+    // résolution par sous-domaine, l'école est choisie au login / via ?ec=.
+    if (defined('APP_HOTE') && APP_HOTE !== '' && $host === strtolower(APP_HOTE)) return '';
     $parts = explode('.', $host);
     if (count($parts) < 2) return '';                       // « localhost »
     $sub = $parts[0];
@@ -86,10 +135,22 @@ function resoudre_etablissement(): ?array {
         if ($e) return $e;
     }
 
-    // 4. Repli : école n°1 (installation mono-école, ou login direct avant
-    //    choix d'école quand une seule école existe)
+    // 4. Repli : école n°1 — UNIQUEMENT en installation mono-école (une
+    //    seule école active). Dès qu'il y a plusieurs établissements, aucune
+    //    école par défaut : la page d'accueil / de connexion reste NEUTRE
+    //    (pas de logo ni de nom d'école) tant que l'utilisateur n'en a pas
+    //    choisi une (login.php), et les pages publiques exigent ?ec=.
+    $nb_actives = (int) assoc_val("SELECT COUNT(*) FROM etablissement WHERE actif=1");
+    if ($nb_actives > 1) return null;
+
     return assoc_one("SELECT * FROM etablissement WHERE code='EC1' AND actif=1")
         ?? assoc_one("SELECT * FROM etablissement WHERE actif=1 ORDER BY id LIMIT 1");
+}
+
+/** Contexte « neutre » : annuaire présent, plusieurs écoles, aucune choisie. */
+function est_contexte_neutre(): bool {
+    global $ETAB_COURANT;
+    return annuaire_dispo() && !est_contexte_association() && $ETAB_COURANT === null;
 }
 
 /** Ligne annuaire de l'école courante (null en contexte association). */
@@ -197,7 +258,7 @@ function niu_enregistrer_inscription(string $niu, array $ident): void {
 //  $ident : ['nom','prenom','sexe','date_naiss','tel','email']
 function affecter_agent(string $matricule, int $id_etab_cible, string $fonction, array $ident): array {
     if (!annuaire_dispo()) return [false, 'Annuaire indisponible.', null, null];
-    $fonction = in_array($fonction, ['DIRECTEUR', 'ENSEIGNANT', 'SECRETAIRE', 'COMPTABLE'], true) ? $fonction : 'ENSEIGNANT';
+    $fonction = in_array($fonction, ['DIRECTEUR', 'FONDATEUR', 'ENSEIGNANT', 'SECRETAIRE', 'COMPTABLE'], true) ? $fonction : 'ENSEIGNANT';
 
     // 1. personnel central (créé si absent)
     if (!assoc_val("SELECT COUNT(*) FROM personnel WHERE matricule=?", [$matricule])) {

@@ -1,7 +1,7 @@
 <?php
 // verif_carte.php — page publique (pas de exiger_connexion) : quiconque
 // scanne le QR d'une carte scolaire arrive ici pour vérifier son
-// authenticité. Même pattern que verif_paiement.php/verif_recu.php.
+// authenticité. Même pattern que verif_recu.php.
 //
 // Corrigé le 15/08/2026 : ce fichier utilisait encore les noms de table/
 // colonnes d'ABZ_MBE (eleve.id, inscription, classe.designation, id_annee
@@ -15,6 +15,7 @@ require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/connexion.php';
 require_once __DIR__ . '/fonctions.php';
 require_once __DIR__ . '/pdf/verif_carte_lib.php';
+verif_exiger_ecole_publique();  // multi-école : URL sans &ec= -> page neutre
 
 $id_eleve  = (int) ($_GET['e'] ?? 0);
 $val_annee = (string) ($_GET['a'] ?? '');
@@ -30,8 +31,10 @@ $insc        = $authentique
 // bouton "Ouvrir la carte" (jamais automatiquement). Le jeton "vh" (= le
 // hash déjà vérifié ci-dessus) permet à pdf/cartes.php de servir cette
 // carte précise, pour ce seul élève, sans exiger de connexion.
+// verif_ajout_ec() : en multi-établissement, propage &ec=CODE — sinon
+// pdf/cartes.php (accès public par « vh ») reste pointé sur l'annuaire.
 $pdf_url = $authentique
-    ? APP_URL . '/pdf/cartes.php?eleve=' . $id_eleve . '&annee=' . urlencode($val_annee) . '&vh=' . urlencode($h_recu)
+    ? verif_ajout_ec(APP_URL . '/pdf/cartes.php?eleve=' . $id_eleve . '&annee=' . urlencode($val_annee) . '&vh=' . urlencode($h_recu))
     : '';
 ?>
 <!DOCTYPE html>

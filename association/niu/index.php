@@ -35,9 +35,11 @@ $doublons = assoc_all(
 asso_haut('Registre NIU');
 ?>
 <div class="d-flex flex-wrap gap-2 mb-3 align-items-center">
+  <?php if (est_superadmin_association()): ?>
   <a href="<?= APP_URL ?>/association/niu/creer.php" class="btn btn-primary btn-sm">
     <i class="bi bi-plus-lg me-1"></i>Nouveau NIU
   </a>
+  <?php endif; ?>
   <form method="get" class="d-flex gap-2 ms-auto" style="max-width:340px">
     <input type="text" name="q" value="<?= h($q) ?>" class="form-control form-control-sm"
            placeholder="NIU, nom, prénom…" data-filtre>
@@ -50,9 +52,15 @@ asso_haut('Registre NIU');
   <div class="fw-bold text-warning mb-2"><i class="bi bi-exclamation-triangle me-1"></i>Doublons potentiels (<?= count($doublons) ?>)</div>
   <ul class="small mb-0">
     <?php foreach ($doublons as $d): ?>
-      <li><?= h(trim($d['nom'] . ' ' . $d['prenom'])) ?> (<?= h($d['date_naissance'] ?: '?') ?>) → <?= h($d['nius']) ?></li>
+      <li>
+        <?= h(trim($d['nom'] . ' ' . $d['prenom'])) ?> (<?= h($d['date_naissance'] ?: '?') ?>) →
+        <?php foreach (array_map('trim', explode(',', $d['nius'])) as $nn): ?>
+          <a href="<?= APP_URL ?>/association/niu/voir.php?niu=<?= urlencode($nn) ?>" class="font-monospace"><?= h($nn) ?></a>
+        <?php endforeach; ?>
+      </li>
     <?php endforeach; ?>
   </ul>
+  <div class="small text-muted2 mt-2">Ouvrir un NIU puis « fusionner » pour consolider deux fiches identiques.</div>
 </div>
 <?php endif; ?>
 
@@ -64,7 +72,9 @@ asso_haut('Registre NIU');
     <tbody>
       <?php foreach ($lignes as $r): ?>
         <tr>
-          <td class="font-monospace"><?= h($r['niu']) ?></td>
+          <td class="font-monospace">
+            <a href="<?= APP_URL ?>/association/niu/voir.php?niu=<?= urlencode($r['niu']) ?>" class="text-decoration-none"><?= h($r['niu']) ?></a>
+          </td>
           <td><?= h(trim($r['nom'] . ' ' . $r['prenom'])) ?: '<span class="text-muted2">(non renseigné)</span>' ?></td>
           <td><?= h($r['date_naissance'] ?: '—') ?></td>
           <td><span class="badge badge-soft"><?= h($r['statut']) ?></span></td>

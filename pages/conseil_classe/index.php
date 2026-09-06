@@ -36,6 +36,10 @@ $val_annee = $annee_act['val_annee'] ?? '';
 // silencieusement absente (confusion signalée le 21/08/2026). En revanche
 // l'accès effectif (voir $ids_classes_ok plus bas) reste réservé aux
 // classes AVEC élèves — rien à traiter pour un conseil de classe vide.
+// DIRECTEUR/SECRETAIRE voient tout ; un ENSEIGNANT ne voit que ses classes
+// affectées (voir filtrer_classes_visibles(), demande explicite du 29/08/2026)
+// — clé 'id' ici (pas 'IDClasses'), d'où le array_map plutôt qu'un appel
+// direct à filtrer_classes_visibles().
 $classes_access = db_all(
     "SELECT c.IDClasses AS id, c.DesignationClasses AS designation, c.Niveau, n.OrdreNiveau,
             COUNT(i.id_eleve) AS nb_eleves
@@ -45,6 +49,14 @@ $classes_access = db_all(
      ORDER BY n.OrdreNiveau, c.DesignationClasses",
     [$val_annee]
 );
+$ids_visibles = classes_ids_visibles($val_annee, 'fr');
+if ($ids_visibles !== null) {
+    $classes_access = array_values(array_filter($classes_access, fn($c) => in_array((int) $c['id'], $ids_visibles, true)));
+    if (!$classes_access) {
+        flash_set('erreur', "Vous n'êtes affecté(e) à aucune classe de la piste française cette année.");
+        rediriger('dashboard.php');
+    }
+}
 if (!array_filter($classes_access, fn($c) => (int) $c['nb_eleves'] > 0)) {
     flash_set('erreur', 'Aucun élève inscrit cette année — impossible d\'utiliser le Conseil de classe.');
     rediriger('dashboard.php');

@@ -39,6 +39,10 @@ if (!$id && !$id_classe) die('Paramètre id (ou classe) manquant.');
 
 $annee     = get_annee_active();
 $val_annee = $annee['val_annee'] ?? '';
+if (!$acces_public) {                       // cloisonnement enseignant (piste FR)
+    exiger_acces_classe($id_classe, $val_annee, 'fr');
+    exiger_acces_eleve($id, 'fr');
+}
 // 🐛 CORRIGÉ : `annee_scolaire` n'a pas de colonne `id` (juste `val_annee`
 // en clé primaire, voir fonctions.php::get_annee_active()) — cette
 // affectation valait donc TOUJOURS 0 (via le repli `?? 0`), ce qui cassait

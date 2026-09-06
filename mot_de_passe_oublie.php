@@ -18,13 +18,30 @@ const MAX_TENTATIVES = 5;
 $etape  = $_SESSION['reset_etape'] ?? 'login';
 $erreur = '';
 
+// Multi-établissement : choix de l'école à la 1re étape (comme login.php).
+// Une fois choisie, basculer_base_ecole() pose $_SESSION['ecole'] et
+// connexion.php résout automatiquement la bonne base aux étapes suivantes.
+$ecoles = annuaire_dispo()
+    ? assoc_all("SELECT id, code, nom FROM etablissement WHERE actif=1 ORDER BY nom")
+    : [];
+$choix_ecole = count($ecoles) > 1;
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     csrf_verifier();
     $action = post('action');
 
     if ($action === 'chercher') {
         $login = post('login');
-        $u = db_one("SELECT id_user FROM user WHERE login_user = ?", [$login]);
+        if ($choix_ecole) {
+            $ec = assoc_one("SELECT * FROM etablissement WHERE code=? AND actif=1", [post('ecole')]);
+            if (!$ec) {
+                $erreur = 'Veuillez sélectionner votre établissement.';
+                $etape  = 'login';
+            } else {
+                basculer_base_ecole($ec);
+            }
+        }
+        $u = $erreur === '' ? db_one("SELECT id_user FROM user WHERE login_user = ?", [$login]) : null;
         $questions = $u ? db_all(
             "SELECT q.id, q.libelle FROM user_question_secrete uqs
              JOIN question_secrete q ON q.id = uqs.id_question
@@ -38,8 +55,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $_SESSION['reset_etape'] = 'questions';
             header('Location: ' . APP_URL . '/mot_de_passe_oublie.php'); exit;
         }
-        $erreur = "Compte introuvable ou récupération indisponible pour ce compte. Contactez le Directeur.";
-        $etape  = 'login';
+        if ($erreur === '') {
+            $erreur = "Compte introuvable ou récupération indisponible pour ce compte. Contactez le Directeur.";
+        }
+        $etape = 'login';
     }
 
     if ($action === 'verifier' && $etape === 'questions') {
@@ -109,7 +128,7 @@ $etab = get_etablissement();
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Mot de passe oublié — <?= h($etab['Initial_Etab'] ?: 'Jaynitaare') ?></title>
+  <title>Mot de passe oublié — <?= h(($etab['Initial_Etab'] ?? '') ?: 'Jaynitaare') ?></title>
   <?php if (!empty($etab['logo']) && is_file(__DIR__ . '/assets/uploads/' . $etab['logo'])): ?>
     <link rel="icon" href="<?= APP_URL ?>/assets/uploads/<?= h($etab['logo']) ?>">
   <?php endif; ?>
@@ -145,6 +164,19 @@ $etab = get_etablissement();
     <form method="post" autocomplete="off">
       <?= csrf_champ() ?>
       <input type="hidden" name="action" value="chercher">
+      <?php if ($choix_ecole): ?>
+      <div class="mb-3">
+        <label class="form-label">Établissement</label>
+        <select name="ecole" class="form-select" required>
+          <option value="">— Choisir —</option>
+          <?php foreach ($ecoles as $ec): ?>
+            <option value="<?= h($ec['code']) ?>" <?= post('ecole') === $ec['code'] ? 'selected' : '' ?>>
+              <?= h($ec['nom']) ?>
+            </option>
+          <?php endforeach; ?>
+        </select>
+      </div>
+      <?php endif; ?>
       <div class="mb-3">
         <label class="form-label">Identifiant</label>
         <input type="text" name="login" class="form-control" required autofocus placeholder="Votre identifiant">

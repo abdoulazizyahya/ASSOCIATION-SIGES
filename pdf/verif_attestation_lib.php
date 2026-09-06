@@ -26,6 +26,7 @@ function attestation_verif_hash_ok(string $type, string $matricule, string $recu
 }
 
 function attestation_verif_base_url(): string {
+    if (function_exists('verif_base_url_ecole') && ($u = verif_base_url_ecole()) !== '') return $u;
     if (defined('BULLETIN_VERIF_BASE_URL') && BULLETIN_VERIF_BASE_URL !== '') {
         return rtrim(BULLETIN_VERIF_BASE_URL, '/');
     }

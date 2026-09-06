@@ -59,7 +59,9 @@ if ($periode_detail !== 'trim' && !in_array((int) $periode_detail, array_column(
 $mode_eval   = $periode_detail === 'trim' ? 'trim' : 'seq';
 $id_seq_stat = $mode_eval === 'seq' ? (int) $periode_detail : 0;
 
-$classes = db_all(
+// DIRECTEUR/SECRETAIRE voient tout ; un ENSEIGNANT ne voit que ses classes
+// affectées (voir filtrer_classes_visibles(), demande explicite du 29/08/2026).
+$classes = filtrer_classes_visibles(db_all(
     "SELECT c.IDClasses, c.DesignationClasses, c.Niveau, n.OrdreNiveau
      FROM classe c
      LEFT JOIN niveau n ON n.LibelleNiveau = c.Niveau
@@ -67,7 +69,8 @@ $classes = db_all(
      GROUP BY c.IDClasses, c.DesignationClasses, c.Niveau, n.OrdreNiveau
      ORDER BY n.OrdreNiveau, c.DesignationClasses",
     [$val_annee]
-);
+), $val_annee, 'fr');
+if ($id_classe && !in_array($id_classe, array_column($classes, 'IDClasses'), true)) $id_classe = 0;
 // $classes est déjà trié par OrdreNiveau -> array_unique() sur cette colonne
 // préserve l'ordre des niveaux, pas besoin de retrier (demande du 18/08/2026,
 // sélecteur Classe/Niveau unifié — voir render_select_classe_niveau() plus bas).

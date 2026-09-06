@@ -13,6 +13,7 @@ require_once __DIR__ . '/fpdf.php';
 require_once __DIR__ . '/header_pdf.php';
 
 $id_classe = (int) ($_GET['classe'] ?? 0);
+exiger_acces_classe($id_classe, get_annee_active()['val_annee'] ?? '', 'fr');   // cloisonnement enseignant
 $id_trim   = (int) ($_GET['trim'] ?? 0);
 $ordre     = ($_GET['ordre'] ?? 'merite') === 'alpha' ? 'alpha' : 'merite';
 $dl        = ($_GET['dl'] ?? '0') === '1';

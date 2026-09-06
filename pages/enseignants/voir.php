@@ -56,6 +56,19 @@ require_once __DIR__ . '/../../layout/header.php';
     <a href="<?= APP_URL ?>/pages/enseignants/form.php?mat=<?= $mat ?>" class="btn btn-primary btn-sm">
       <i class="bi bi-pencil-square me-1"></i>Modifier
     </a>
+    <div class="dropdown">
+      <button class="btn btn-outline-primary btn-sm dropdown-toggle" data-bs-toggle="dropdown">
+        <i class="bi bi-file-earmark-text me-1"></i>Documents
+      </button>
+      <ul class="dropdown-menu dropdown-menu-end" style="font-size:.82rem">
+        <li><a class="dropdown-item" target="_blank" href="<?= APP_URL ?>/pages/enseignants/pdf_attestation.php?id=<?= $mat ?>">
+          <i class="bi bi-file-earmark-check me-2"></i>Attestation de présence effective</a></li>
+        <li><a class="dropdown-item" target="_blank" href="<?= APP_URL ?>/pages/enseignants/pdf_prise_service.php?type=prise&id=<?= $mat ?>">
+          <i class="bi bi-file-earmark-check me-2"></i>Certificat de prise de service</a></li>
+        <li><a class="dropdown-item" target="_blank" href="<?= APP_URL ?>/pages/enseignants/pdf_prise_service.php?type=reprise&id=<?= $mat ?>">
+          <i class="bi bi-file-earmark-check me-2"></i>Certificat de reprise de service</a></li>
+      </ul>
+    </div>
     <a href="<?= APP_URL ?>/pages/enseignants/liste.php" class="btn btn-outline-secondary btn-sm">
       <i class="bi bi-arrow-left me-1"></i>Retour
     </a>

@@ -29,6 +29,14 @@ $is_admin            = $peut_voir_finances; // alias conservé : encore utilisé
 
 $annee     = get_annee_active();
 $val_annee = $annee['val_annee'] ?? '';
+
+// Cloisonnement enseignant : un(e) ENSEIGNANT restreint(e) à ses classes ne
+// voit PAS les synthèses établissement du tableau de bord (moyennes,
+// meilleure classe, meilleurs élèves de toutes les classes) — il/elle
+// travaille via le menu Pédagogie, déjà filtré sur ses classes.
+if (classes_ids_visibles($val_annee) !== null) {
+    $peut_voir_pedagogie = false;
+}
 $seq_act   = get_sequence_active();
 
 // ── Scolarité ─────────────────────────────────────────────────────

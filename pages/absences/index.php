@@ -42,11 +42,27 @@ $seq_active = get_sequence_active();
 $id_classe = (int) ($_GET['classe'] ?? 0);
 $id_trim   = (int) ($_GET['trim'] ?? ($seq_active['id_trim'] ?? 0));
 
+// DIRECTEUR/SECRETAIRE voient tout ; un ENSEIGNANT ne voit que ses classes
+// affectées (voir filtrer_classes_visibles(), demande explicite du 29/08/2026)
+// — calculé avant le bloc Enregistrement ci-dessous pour aussi valider
+// l'écriture POST (pas seulement le <select> affiché plus bas).
+$classes = filtrer_classes_visibles(db_all(
+    "SELECT c.IDClasses, c.DesignationClasses, n.OrdreNiveau
+     FROM classe c LEFT JOIN niveau n ON n.LibelleNiveau = c.Niveau
+     ORDER BY n.OrdreNiveau, c.DesignationClasses"
+), $val_annee);
+$ids_classes_vis = array_column($classes, 'IDClasses');
+if ($id_classe && !in_array($id_classe, $ids_classes_vis, true)) $id_classe = 0;
+
 // ── Enregistrement ────────────────────────────────────────────────
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && post('action') === 'enregistrer') {
     csrf_verifier();
     $p_classe = (int) post('id_classe');
     $p_trim   = (int) post('id_trim');
+    if (!in_array($p_classe, $ids_classes_vis, true)) {
+        flash_set('erreur', "Vous n'êtes pas affecté(e) à cette classe.");
+        rediriger('pages/absences/index.php');
+    }
 
     $touches = 0;
     foreach ($_POST['jours'] ?? [] as $id_eleve => $vals) {
@@ -66,11 +82,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && post('action') === 'enregistrer') {
 }
 
 // ── Données pour l'affichage ────────────────────────────────────
-$classes = db_all(
-    "SELECT c.IDClasses, c.DesignationClasses, n.OrdreNiveau
-     FROM classe c LEFT JOIN niveau n ON n.LibelleNiveau = c.Niveau
-     ORDER BY n.OrdreNiveau, c.DesignationClasses"
-);
+// $classes déjà chargée (filtrée) plus haut, avant le bloc Enregistrement.
 $trimestres = db_all("SELECT id_trim, libelle_trim FROM trimestre WHERE id_annee=? ORDER BY id_trim", [$val_annee]);
 
 $eleves = [];

@@ -4,7 +4,7 @@ require_once __DIR__ . '/../../config.php';
 require_once __DIR__ . '/../../connexion.php';
 require_once __DIR__ . '/../../fonctions.php';
 require_once __DIR__ . '/../_layout.php';
-exiger_membre_association();
+exiger_superadmin_association();
 
 $ecoles = assoc_all("SELECT id, code, sigle, nom FROM etablissement WHERE actif=1 ORDER BY nom");
 

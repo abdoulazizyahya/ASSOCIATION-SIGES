@@ -21,7 +21,7 @@
  *     selDepartement:    document.getElementById('sel_departement'),
  *     selArrondissement: document.getElementById('sel_arrondissement'),
  *     inputLibre:        document.getElementById('inp_lieu_libre'),
- *     appUrl:            '/jaynitaare_v2',
+ *     appUrl:            '<?= APP_URL ?>',   // ex. '/SIGES'
  *     valeurs: {                        // optionnel — pré-remplissage (édition)
  *       id_region:         2,
  *       id_departement:    7,

@@ -17,6 +17,7 @@ function u(string $s): string {
 }
 
 $id  = (int)($_GET['id'] ?? 0);
+exiger_acces_eleve($id, 'union');   // cloisonnement enseignant
 $dl  = ($_GET['dl'] ?? '0') === '1';
 if (!$id) die('Paramètre id manquant.');
 

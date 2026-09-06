@@ -36,14 +36,17 @@ if (!empty($seq_active_brut['id_seq'])) {
 // LEFT JOIN (pas INNER) — une classe sans élève inscrit reste visible dans
 // les selects ci-dessous (grisée, non sélectionnable) plutôt que
 // silencieusement absente (confusion signalée le 21/08/2026).
-$classes = db_all(
+// DIRECTEUR/SECRETAIRE/FONDATEUR voient tout ; un ENSEIGNANT ne voit que
+// ses classes affectées EN PISTE ARABE (enseignat_classe_arabe) — les
+// enseignant(e)s FR et AR sont des personnes distinctes.
+$classes = filtrer_classes_visibles(db_all(
     "SELECT c.IDClasses, c.DesignationClasses, n.OrdreNiveau, COUNT(i.id_eleve) AS nb_eleves
      FROM classe c LEFT JOIN niveau n ON n.LibelleNiveau = c.Niveau
      LEFT JOIN inscrire i ON i.IDClasses = c.IDClasses AND i.val_annee = ?
      GROUP BY c.IDClasses, c.DesignationClasses, n.OrdreNiveau
      ORDER BY n.OrdreNiveau, c.DesignationClasses",
     [$val_annee]
-);
+), $val_annee, 'ar');
 
 $seqs = db_all(
     "SELECT s.id_seq, s.libelle_seq, t.libelle_trim
@@ -85,6 +88,7 @@ function cote_abz20(?float $note): array {
 //  ONGLET 1 — Saisie par classe (une matière, toute la classe)
 // ══════════════════════════════════════════════════════════════
 $id_cl_c  = (int) ($_GET['classe_c'] ?? 0);
+exiger_acces_classe($id_cl_c, $val_annee, 'ar');
 $id_mat_c = (int) ($_GET['mat_c'] ?? 0);
 // La saisie de notes porte toujours sur l'évaluation active — pas de
 // sélecteur pour en choisir une autre (même règle que pages/notes/index.php).
@@ -112,6 +116,7 @@ if ($onglet === 'classe') {
     if ($_SERVER['REQUEST_METHOD'] === 'POST' && post('action') === 'save_classe') {
         csrf_verifier();
         $p_classe = (int) post('id_cl');
+        exiger_acces_classe($p_classe, $val_annee, 'ar');
         $p_seq    = (int) post('id_seq');
         $p_mat    = (int) post('id_mat');
 
@@ -170,7 +175,9 @@ if ($onglet === 'classe') {
 //  ONGLET 2 — Saisie par élève (toutes les matières, un élève)
 // ══════════════════════════════════════════════════════════════
 $id_cl_e  = (int) ($_GET['classe_e'] ?? 0);
+exiger_acces_classe($id_cl_e, $val_annee, 'ar');
 $id_eleve = (int) ($_GET['eleve_e'] ?? 0);
+exiger_acces_eleve($id_eleve, 'ar');
 $id_seq_e = (int) ($seq_active['id_seq'] ?? 0); // idem — toujours l'évaluation active
 $eleves_e = [];
 $mats_e   = [];
@@ -211,6 +218,7 @@ if ($onglet === 'eleve') {
         csrf_verifier();
         $p_seq    = (int) post('id_seq');
         $p_classe = (int) post('id_cl');
+        exiger_acces_classe($p_classe, $val_annee, 'ar');
         $p_eleve  = (int) post('id_eleve');
         $id_trim_p = (int) db_val("SELECT id_trim FROM sequence WHERE id_seq=?", [$p_seq]);
 
@@ -254,6 +262,7 @@ if ($onglet === 'eleve') {
 //  ONGLET 3 — Copie de notes (d'une séquence vers une autre)
 // ══════════════════════════════════════════════════════════════
 $id_cl_cop  = (int) ($_GET['classe_cop'] ?? 0);
+exiger_acces_classe($id_cl_cop, $val_annee, 'ar');
 $id_seq_src = (int) ($_GET['seq_src'] ?? 0);
 $id_seq_dst = (int) ($_GET['seq_dst'] ?? 0);
 $id_mat_cop = (int) ($_GET['mat_cop'] ?? 0);
@@ -288,6 +297,7 @@ if ($onglet === 'copie') {
     if ($_SERVER['REQUEST_METHOD'] === 'POST' && post('action') === 'exec_copie') {
         csrf_verifier();
         $p_classe = (int) post('id_cl');
+        exiger_acces_classe($p_classe, $val_annee, 'ar');
         $p_src    = (int) post('id_seq_src');
         $p_dst    = (int) post('id_seq_dst');
         $p_mat    = (int) post('id_mat');
@@ -342,6 +352,7 @@ if ($onglet === 'copie') {
 //  ONGLET 4 — Matières non saisies (séquence active)
 // ══════════════════════════════════════════════════════════════
 $id_cl_ns   = (int) ($_GET['classe_ns'] ?? 0);
+exiger_acces_classe($id_cl_ns, $val_annee, 'ar');
 $non_saisis = [];
 
 if ($onglet === 'non_saisis' && $seq_active) {

@@ -77,19 +77,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-$classes = db_all(
+// DIRECTEUR/SECRETAIRE voient tout ; un ENSEIGNANT ne voit que ses classes
+// affectées (voir filtrer_classes_visibles(), demande explicite du 29/08/2026)
+// — n'affecte que les onglets Classe/Provisoire (ENSEIGNANT) ; Établissement/
+// Validation sont déjà réservés à $is_admin plus bas.
+$classes = filtrer_classes_visibles(db_all(
     "SELECT c.IDClasses, c.DesignationClasses, n.OrdreNiveau
      FROM classe c LEFT JOIN niveau n ON n.LibelleNiveau = c.Niveau
      JOIN inscrire i ON i.IDClasses = c.IDClasses AND i.val_annee = ?
      GROUP BY c.IDClasses, c.DesignationClasses, n.OrdreNiveau
      ORDER BY n.OrdreNiveau, c.DesignationClasses",
     [$val_annee]
-);
+), $val_annee, 'fr');
 
 $onglet = in_array($_GET['onglet'] ?? '', ['classe', 'etablissement', 'provisoire', 'validation'], true) ? $_GET['onglet'] : 'classe';
 if (($onglet === 'etablissement' || $onglet === 'validation') && !$is_admin) $onglet = 'classe';
 
 $id_classe = (int) ($_GET['classe'] ?? 0);
+if ($id_classe && !in_array($id_classe, array_column($classes, 'IDClasses'), true)) $id_classe = 0;
 $filtre    = in_array($_GET['filtre'] ?? '', ['admis', 'redoublants', 'exclus', 'tous'], true) ? $_GET['filtre'] : 'tous';
 $limite    = max(0, (int) ($_GET['limite'] ?? 10));
 $ordre     = ($_GET['ordre'] ?? 'merite') === 'alpha' ? 'alpha' : 'merite';

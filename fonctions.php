@@ -237,24 +237,74 @@ function agent_est_aussi_enseignant(): bool {
 // été affecté (enseignat_classe) pour l'année en cours. Ne concerne QUE
 // pages/notes(_arabe)/… non — piste arabe hors scope, voir enseignat_classe
 // vs enseignat_classe_arabe.
-function classes_ids_visibles(string $val_annee): ?array {
+// $piste : 'fr' -> enseignat_classe ; 'ar' -> enseignat_classe_arabe ;
+// 'union' (défaut) -> les deux. Les enseignant(e)s FR et AR sont des
+// personnes distinctes, affectées séparément (pages/enseignants/liste.php,
+// onglet Affectation) : une page de la piste française ne doit filtrer que
+// sur enseignat_classe, une page arabe que sur enseignat_classe_arabe.
+// DIRECTEUR / SECRETAIRE / FONDATEUR ne sont jamais restreints (null).
+function classes_ids_visibles(string $val_annee, string $piste = 'union'): ?array {
     if (in_array(role_connecte(), ['DIRECTEUR', 'SECRETAIRE'], true)) return null;
+    if (function_exists('est_fondateur') && est_fondateur()) return null;
     $mat = matricule_ens_courant();
     if (!$mat) return [];
-    return array_map('intval', array_column(
-        db_all("SELECT IDClasses FROM enseignat_classe WHERE matricule_ens=? AND val_annee=?", [$mat, $val_annee]),
-        'IDClasses'
-    ));
+    $tables = match ($piste) {
+        'fr'    => ['enseignat_classe'],
+        'ar'    => ['enseignat_classe_arabe'],
+        default => ['enseignat_classe', 'enseignat_classe_arabe'],
+    };
+    $ids = [];
+    foreach ($tables as $t) {
+        foreach (db_all("SELECT IDClasses FROM $t WHERE matricule_ens=? AND val_annee=?", [$mat, $val_annee]) as $r) {
+            $ids[(int) $r['IDClasses']] = true;
+        }
+    }
+    return array_map('intval', array_keys($ids));
 }
 
 // Filtre une liste de classes déjà chargée (tableaux avec clé 'IDClasses')
 // selon classes_ids_visibles() — à appeler juste après le db_all() qui
-// construit le <select>/la liste de classes d'une page Pédagogie/Discipline
-// piste française, jamais sur des requêtes Finances/RH (non concernées).
-function filtrer_classes_visibles(array $classes, string $val_annee): array {
-    $ids = classes_ids_visibles($val_annee);
+// construit le <select>/la liste de classes d'une page Pédagogie/Discipline,
+// jamais sur des requêtes Finances/RH (non concernées).
+function filtrer_classes_visibles(array $classes, string $val_annee, string $piste = 'union'): array {
+    $ids = classes_ids_visibles($val_annee, $piste);
     if ($ids === null) return $classes;
     return array_values(array_filter($classes, fn(array $c): bool => in_array((int) $c['IDClasses'], $ids, true)));
+}
+
+// Garde SERVEUR : refuse net (403) l'accès d'un(e) enseignant(e) à une
+// classe hors de son périmètre — à appeler dès qu'une page reçoit un
+// identifiant de classe en paramètre (?classe=, IDClasses…), APRÈS les
+// gardes de rôle. $id_classe 0/vide = pas de classe encore choisie (laissé
+// passer : les listes sont déjà filtrées par filtrer_classes_visibles()).
+function exiger_acces_classe(int $id_classe, string $val_annee, string $piste = 'union'): void {
+    if ($id_classe <= 0) return;
+    $ids = classes_ids_visibles($val_annee, $piste);
+    if ($ids === null) return;                       // rôle non restreint
+    if (!in_array($id_classe, $ids, true)) {
+        http_response_code(403);
+        die('<div style="font-family:sans-serif;padding:2rem;color:#b91c1c">
+             Accès refusé : cette classe ne fait pas partie de vos affectations.</div>');
+    }
+}
+
+// Idem, à partir d'un élève : résout sa classe pour l'année active via
+// `inscrire` puis délègue à exiger_acces_classe(). Un élève non inscrit
+// cette année est invisible pour un(e) enseignant(e) restreint(e).
+function exiger_acces_eleve(int $id_eleve, string $piste = 'union'): void {
+    $val_annee = get_annee_active()['val_annee'] ?? '';
+    $ids = classes_ids_visibles($val_annee, $piste);
+    if ($ids === null) return;                       // rôle non restreint
+    if ($id_eleve <= 0) return;
+    $classes_eleve = array_map('intval', array_column(
+        db_all("SELECT IDClasses FROM inscrire WHERE id_eleve=? AND val_annee=?", [$id_eleve, $val_annee]),
+        'IDClasses'
+    ));
+    if (!array_intersect($classes_eleve, $ids)) {
+        http_response_code(403);
+        die('<div style="font-family:sans-serif;padding:2rem;color:#b91c1c">
+             Accès refusé : cet élève ne fait pas partie de vos classes.</div>');
+    }
 }
 
 // ── Questions secrètes (récupération de mot de passe — migration_v45) ────
@@ -274,6 +324,12 @@ function exiger_role(array $roles): void {
     // (« visiter toutes les infos »). Les écritures restent bloquées par
     // csrf_verifier() / db_exec() (est_lecture_seule()).
     if (function_exists('est_visite_association') && est_visite_association()) {
+        return;
+    }
+    // FONDATEUR : accès en LECTURE à toutes les pages de son école (mêmes
+    // écritures bloquées en aval). Sa seule page d'écriture — directeur.php —
+    // pose sa propre garde exiger_role(['FONDATEUR']) qui passe par ici aussi.
+    if (function_exists('est_fondateur') && est_fondateur() && !in_array('FONDATEUR', $roles, true)) {
         return;
     }
     if (!in_array(role_connecte(), $roles, true)) {
@@ -296,6 +352,7 @@ function exiger_role(array $roles): void {
 function exiger_acces_pedagogie(): void {
     exiger_connexion();
     if (function_exists('est_visite_association') && est_visite_association()) return;
+    if (function_exists('est_fondateur') && est_fondateur()) return;
     if (in_array(role_connecte(), ['DIRECTEUR', 'ENSEIGNANT', 'SECRETAIRE'], true)) return;
     if (agent_est_aussi_enseignant()) return;
     die('<div style="font-family:sans-serif;padding:2rem;color:red">
@@ -452,7 +509,33 @@ function get_annee_active(): array {
 }
 
 function get_etablissement(): array {
+    // Contexte neutre (multi-école, aucune choisie) : aucune identité d'école
+    // — la page appelante doit afficher un habillage générique (login.php).
+    if (function_exists('est_contexte_neutre') && est_contexte_neutre()) return [];
     return db_one("SELECT * FROM etablissement LIMIT 1") ?? [];
+}
+
+// ── Isolation des fichiers uploadés par école (multi-établissement) ──────
+// Les logos / signatures / documents étaient écrits sous des noms FIXES
+// (assets/uploads/logo_etab.jpg…) → en multi-école, l'upload d'une école
+// ÉCRASAIT celui d'une autre. On préfixe désormais par un sous-dossier
+// dédié à l'école courante : assets/uploads/etab/<code>/… . En mono-école
+// (annuaire absent) le préfixe est vide → comportement historique inchangé.
+// Le chemin relatif retourné est stocké TEL QUEL dans etablissement.logo /
+// etablissement.signature : tous les lecteurs existants (« assets/uploads/ »
+// . $etab['logo']) continuent de fonctionner sans modification.
+function upload_prefixe_etab(): string {
+    $e = function_exists('ecole_courante') ? ecole_courante() : null;
+    $code = $e['code'] ?? '';
+    return $code !== '' ? 'etab/' . strtolower(preg_replace('/[^a-z0-9]/i', '', $code)) . '/' : '';
+}
+
+// Crée si besoin le sous-dossier d'upload de l'école courante et retourne
+// son chemin absolu (avec / final). $base = racine assets/uploads.
+function upload_dir_etab(string $base): string {
+    $dir = rtrim($base, '/\\') . '/' . upload_prefixe_etab();
+    if (!is_dir($dir)) @mkdir($dir, 0775, true);
+    return $dir;
 }
 
 // ── Couleurs personnalisables du bulletin PDF (table pdf_couleur) ───
@@ -960,6 +1043,7 @@ function pagination_html(int $page, int $total_pages, string $url_base): string 
 function libelle_role(string $role): string {
     return match ($role) {
         'DIRECTEUR'  => 'Directeur/Directrice',
+        'FONDATEUR'  => 'Fondateur/Fondatrice',
         'ENSEIGNANT' => 'Enseignant(e)',
         'SECRETAIRE' => 'Secrétaire',
         'COMPTABLE'  => 'Agent financier / Comptable',
@@ -1328,11 +1412,15 @@ function sauver_document_dossier(string $champ_fichier): ?string {
     if (!isset($ext_ok[$ext]) || $ext_ok[$ext] !== $mime || $_FILES[$champ_fichier]['size'] > 750 * 1024) {
         return null;
     }
-    $nom = 'doc_' . bin2hex(random_bytes(10)) . '.' . $ext;
-    $dir = __DIR__ . '/assets/uploads/dossiers_eleves/';
-    if (!is_dir($dir)) mkdir($dir, 0775, true);
-    move_uploaded_file($_FILES[$champ_fichier]['tmp_name'], $dir . $nom);
-    return $nom;
+    // Nom aléatoire + sous-dossier par école (multi-établissement) : le
+    // chemin relatif « <code>/doc_xxx.ext » est stocké dans dossier_eleve.fichier,
+    // les lecteurs (dossier_fichier.php / dossier_supprimer.php) le concatènent
+    // tel quel à assets/uploads/dossiers_eleves/.
+    $base = __DIR__ . '/assets/uploads/dossiers_eleves';
+    $dir  = upload_dir_etab($base);
+    $fichier = bin2hex(random_bytes(10)) . '.' . $ext;
+    move_uploaded_file($_FILES[$champ_fichier]['tmp_name'], $dir . 'doc_' . $fichier);
+    return upload_prefixe_etab() . 'doc_' . $fichier;
 }
 
 // Vérifie qu'un BLOB est réellement une image décodable — nécessaire car le

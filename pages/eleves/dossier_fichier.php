@@ -10,6 +10,7 @@ exiger_connexion();
 $id  = (int)($_GET['id'] ?? 0);
 $doc = db_one("SELECT * FROM dossier_eleve WHERE id=?", [$id]);
 if (!$doc) { http_response_code(404); exit; }
+exiger_acces_eleve((int) $doc['id_eleve'], 'union');   // enseignant restreint : pièce d'un élève hors de ses classes -> refus
 
 $chemin = __DIR__ . '/../../assets/uploads/dossiers_eleves/' . $doc['fichier'];
 if (!is_file($chemin)) { http_response_code(404); exit; }

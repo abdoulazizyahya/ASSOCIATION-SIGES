@@ -31,6 +31,7 @@ if (($_GET['vh'] ?? '') !== '' && (int) ($_GET['eleve'] ?? 0) > 0) {
 if (!$acces_public) exiger_acces_pedagogie();
 
 $id_classe       = (int) ($_GET['classe'] ?? 0);
+if (!$acces_public) exiger_acces_classe($id_classe, get_annee_active()['val_annee'] ?? '', 'ar');   // cloisonnement enseignant
 $vue             = (($_GET['vue'] ?? '') === 'annee') ? 'annee' : 'trim';
 $id_trim         = (int) ($_GET['trim'] ?? 0);
 $id_eleve_filtre = (int) ($_GET['eleve'] ?? 0);

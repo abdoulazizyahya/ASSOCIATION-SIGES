@@ -15,6 +15,7 @@ require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/connexion.php';
 require_once __DIR__ . '/fonctions.php';
 require_once __DIR__ . '/pdf/verif_lib.php';
+verif_exiger_ecole_publique();  // multi-école : URL sans &ec= -> page neutre
 
 $id_eleve   = (int) ($_GET['e'] ?? 0);
 $vue_recue  = (string) ($_GET['v'] ?? '');
@@ -61,10 +62,13 @@ if ($authentique && $piste === 'fr') {
 $pdf_url = '';
 if ($authentique) {
     $fichier = 'bulletin_' . ($vue === 'annee' ? 'annuel' : 'trimestriel') . ($piste === 'ar' ? '_arabe' : ($anglais ? '_anglais' : ''));
-    $pdf_url = APP_URL . '/pdf/' . $fichier . '.php?id=' . $id_eleve
+    // verif_ajout_ec() : en multi-établissement, propage &ec=CODE — sans lui
+    // le générateur de bulletin (accès public par « vh ») reste pointé sur
+    // l'annuaire et échoue (« table … n'existe pas »).
+    $pdf_url = verif_ajout_ec(APP_URL . '/pdf/' . $fichier . '.php?id=' . $id_eleve
              . ($vue === 'trim' ? '&trim=' . $id_periode : '')
              . '&vh=' . urlencode($h_recu)
-             . ($chiffres_ar ? '&chiffres_ar=1' : '');
+             . ($chiffres_ar ? '&chiffres_ar=1' : ''));
 }
 ?>
 <!DOCTYPE html>

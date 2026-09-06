@@ -19,6 +19,20 @@
 # pas seulement le schéma — les migrations elles-mêmes (migration_v*.sql)
 # restent versionnées, ce sont les backup_*.sql à écarter) ────────────
 /bd/backup_*.sql
+/bd/sauvegardes/
+
+# ── Uploads par école (logos/signatures/pièces de dossier) — voir
+# fonctions.php::upload_prefixe_etab(). Le logo par défaut (logo_etab.jpg
+# à la racine) reste versionné ; les sous-dossiers par école, non. ─────
+/assets/uploads/etab/
 
 # ── Config locale Claude Code (spécifique à ce poste) ──────────────────
 /.claude/settings.local.json
+
+# ── Surcharge de config par environnement (identifiants BD prod, APP_URL,
+# domaine, jeton de sauvegarde…) — jamais en dépôt. Modèle versionné :
+# config.local.php.example ────────────────────────────────────────────
+/config.local.php
+
+# Fichiers verrouillage Office (~$...) — jamais versionnés
+~$*

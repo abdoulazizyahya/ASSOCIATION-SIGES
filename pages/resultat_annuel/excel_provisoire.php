@@ -23,6 +23,7 @@ if (!$id_classe) die('Classe manquante.');
 
 $annee_act = get_annee_active();
 $val_annee = $annee_act['val_annee'] ?? '';
+exiger_acces_classe($id_classe, $val_annee, 'fr');   // cloisonnement enseignant
 $etab_brut = get_etablissement();
 $etab      = etab_pour_pdf($etab_brut);
 $classe = db_one("SELECT DesignationClasses FROM classe WHERE IDClasses=?", [$id_classe]);

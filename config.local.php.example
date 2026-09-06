@@ -1,0 +1,70 @@
+<?php
+// =====================================================================
+//  config.local.php.example — modèle de surcharge de config PAR ENVIRONNEMENT
+//
+//  1. Copier ce fichier en  config.local.php  À LA RACINE de l'application.
+//  2. Renseigner les valeurs de l'hébergement (Camoo / cPanel).
+//  3. NE PAS versionner config.local.php (déjà gitignoré).
+//
+//  config.php charge ce fichier EN PREMIER : chaque define() ci-dessous
+//  l'emporte sur la valeur par défaut de config.php. Tout ce qui n'est pas
+//  redéfini ici garde la valeur de config.php.
+//
+//  En LAN / WAMP : ne PAS créer config.local.php → comportement historique.
+// =====================================================================
+
+// ── Base de données (cPanel : 1 seul utilisateur ajouté à TOUTES les bases) ──
+define('DB_HOST', 'localhost');
+define('DB_USER', 'promeduca_app');
+define('DB_PASS', 'CHANGER_MOI');
+
+// Base « repli mono-école » (utilisée seulement si l'annuaire est absent
+// ou s'il n'y a qu'une école active) : pointer sur la base de l'école n°1.
+define('DB_NAME', 'promeduca_ec1');
+
+// Base centrale annuaire (écoles, NIU, personnel, comptes membres).
+define('DB_NAME_ASSOC', 'promeduca_assoc');
+
+// ── Multi-établissement : un seul sous-domaine ──────────────────────
+// Pas de résolution par sous-domaine : l'école est choisie au login.
+define('ASSOC_DOMAINE', '');
+// Hôte canonique de l'app : court-circuite la résolution par sous-domaine.
+define('APP_HOTE', 'promeducam.beero.cm');
+// Création d'école = consommer une base vide d'un pool pré-créé au cPanel
+// (le compte MySQL mutualisé ne peut pas faire CREATE DATABASE).
+define('ECOLE_POOL_ACTIF', true);
+
+// ── URL / chemins ──────────────────────────────────────────────────
+// App servie à la racine du sous-domaine → préfixe vide.
+define('APP_URL', '');
+define('UPLOAD_DIR', __DIR__ . '/assets/uploads/eleves/');
+define('UPLOAD_URL', '/assets/uploads/eleves/');
+
+// URL publique complète pour les QR de vérification (schéma + hôte).
+define('BULLETIN_VERIF_BASE_URL', 'https://promeducam.beero.cm');
+
+// ── Sauvegardes (bd/assoc/sauvegarder_php.php) ─────────────────────
+// Jeton exigé en paramètre ?token= pour lancer une sauvegarde.
+define('BACKUP_TOKEN', 'METTRE_UN_JETON_ALEATOIRE_LONG');
+
+// ── Copie hors-site des sauvegardes (bd/assoc/sauvegarder_toutes_ecoles.php) ──
+// Optionnel. Après le dump quotidien de l'annuaire + chaque école, le
+// dossier horodaté est aussi :
+//   - recopié dans BACKUP_OFFSITE_DIR (partage réseau, disque monté,
+//     dossier synchronisé Google Drive / Dropbox / OneDrive…) ;
+//   - et/ou passé à BACKUP_OFFSITE_CMD, appelée avec « <dossier> <horodatage> »
+//     (ex. rclone/rsync/scp/aws s3). Code retour non nul = échec signalé.
+// define('BACKUP_OFFSITE_DIR', 'Z:/sauvegardes-siges');
+// define('BACKUP_OFFSITE_CMD', 'C:/rclone/rclone.exe copy');
+
+// ── Clé ECDSA de signature offline des bulletins ──────────────────
+// ⚠ IMPORTANT : garder EXACTEMENT la même clé que celle de config.php en
+// LAN. En changer invaliderait la vérification hors-ligne de tous les
+// bulletins déjà imprimés. Ne décommenter que si vous savez ce que vous
+// faites (ex. isoler la clé hors du dépôt).
+// define('BULLETIN_VERIF_PRIVATE_KEY_PEM', <<<'PEM'
+// -----BEGIN PRIVATE KEY-----
+// ...
+// -----END PRIVATE KEY-----
+// PEM
+// );

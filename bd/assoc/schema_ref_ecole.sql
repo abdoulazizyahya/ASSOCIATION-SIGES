@@ -682,6 +682,10 @@ CREATE TABLE `fonction` (
   PRIMARY KEY (`id_fonction`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
+-- Socle des rôles (cf. bd/migration_v51.sql) — alimente le <select> de rôle
+-- de pages/utilisateurs/liste.php. Une nouvelle école part de ce schéma.
+INSERT IGNORE INTO `fonction` (`id_fonction`) VALUES
+  ('DIRECTEUR'),('FONDATEUR'),('ENSEIGNANT'),('SECRETAIRE'),('COMPTABLE');
 DROP TABLE IF EXISTS `grade_enseignant`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;

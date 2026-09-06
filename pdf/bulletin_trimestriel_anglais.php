@@ -54,6 +54,10 @@ if (!$id_trim || (!$id && !$id_classe)) die('Paramètres id (ou classe) / trim m
 
 $annee     = get_annee_active();
 $val_annee = $annee['val_annee'] ?? '';
+if (!$acces_public) {                       // cloisonnement enseignant (piste FR)
+    exiger_acces_classe($id_classe, $val_annee, 'fr');
+    exiger_acces_eleve($id, 'fr');
+}
 $trimestre = db_one("SELECT * FROM trimestre WHERE id_trim=?", [$id_trim]);
 if (!$trimestre) die('Trimestre introuvable.');
 

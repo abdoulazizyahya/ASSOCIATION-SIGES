@@ -16,7 +16,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && post('action') === 'changer_role') 
     csrf_verifier();
     $id_user   = (int) post('id_user');
     $nouveau   = post('role');
-    $roles_ok  = array_column(db_all("SELECT id_fonction FROM fonction"), 'id_fonction');
+    // FONDATEUR est attribué uniquement par le superadmin association
+    // (association/personnel/affecter.php) — jamais depuis cet écran école.
+    $roles_ok  = array_values(array_diff(
+        array_column(db_all("SELECT id_fonction FROM fonction"), 'id_fonction'),
+        ['FONDATEUR']
+    ));
     if ($id_user && in_array($nouveau, $roles_ok, true)) {
         $mat = db_val("SELECT matricule_ens FROM user WHERE id_user=?", [$id_user]);
         if ($mat) {
@@ -29,7 +34,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && post('action') === 'changer_role') 
     rediriger('pages/utilisateurs/liste.php');
 }
 
-$roles_disponibles = array_column(db_all("SELECT id_fonction FROM fonction ORDER BY id_fonction"), 'id_fonction');
+$roles_disponibles = array_values(array_diff(
+    array_column(db_all("SELECT id_fonction FROM fonction ORDER BY id_fonction"), 'id_fonction'),
+    ['FONDATEUR']
+));
 
 $utilisateurs = db_all(
     "SELECT u.id_user, u.login_user, u.matricule_ens, e.nom_ens, e.prenom_ens, e.id_fonction

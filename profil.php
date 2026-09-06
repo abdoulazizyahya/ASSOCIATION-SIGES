@@ -14,12 +14,14 @@ require_once __DIR__ . '/fonctions.php';
 exiger_connexion();
 
 $user_id = (int) $_SESSION['user_id'];
-$user    = db_one(
+// $compte (pas $user) : layout/header.php écrase $user avec la session
+// ($_SESSION['user'] : clés nom/prenom/role, PAS nom_ens/id_fonction…).
+$compte  = db_one(
     "SELECT u.id_user, u.login_user, u.matricule_ens, e.nom_ens, e.prenom_ens, e.id_fonction
      FROM user u JOIN enseignant e ON e.matricule_ens = u.matricule_ens
      WHERE u.id_user = ?", [$user_id]
 );
-if (!$user) { flash_set('erreur', 'Compte introuvable.'); rediriger('dashboard.php'); }
+if (!$compte) { flash_set('erreur', 'Compte introuvable.'); rediriger('dashboard.php'); }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     csrf_verifier();
@@ -47,14 +49,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 $titre_page = 'Mon compte';
 require_once __DIR__ . '/layout/header.php';
 
-$initiales = mb_strtoupper(mb_substr($user['nom_ens'] ?? '?', 0, 1)) . mb_strtoupper(mb_substr($user['prenom_ens'] ?? '', 0, 1));
+$initiales = mb_strtoupper(mb_substr($compte['nom_ens'] ?? '?', 0, 1)) . mb_strtoupper(mb_substr($compte['prenom_ens'] ?? '', 0, 1));
 $role_colors = [
     'DIRECTEUR'  => ['bg' => '#fee2e2', 'txt' => '#991b1b'],
+    'FONDATEUR'  => ['bg' => '#fef9c3', 'txt' => '#854d0e'],
     'ENSEIGNANT' => ['bg' => '#fdf4ff', 'txt' => '#6b21a8'],
     'SECRETAIRE' => ['bg' => '#f0fdf4', 'txt' => '#166534'],
     'COMPTABLE'  => ['bg' => '#dbeafe', 'txt' => '#1e40af'],
 ];
-$rc = $role_colors[$user['id_fonction']] ?? ['bg' => '#f3f4f6', 'txt' => '#374151'];
+$rc = $role_colors[$compte['id_fonction'] ?? ''] ?? ['bg' => '#f3f4f6', 'txt' => '#374151'];
 ?>
 
 <div class="page-titre d-flex align-items-center justify-content-between">
@@ -78,13 +81,13 @@ $rc = $role_colors[$user['id_fonction']] ?? ['bg' => '#f3f4f6', 'txt' => '#37415
           </div>
         </div>
         <div class="fw-bold" style="font-size:1rem;color:#1e2a3a">
-          <?= h($user['nom_ens']) ?> <?= h($user['prenom_ens'] ?? '') ?>
+          <?= h($compte['nom_ens']) ?> <?= h($compte['prenom_ens'] ?? '') ?>
         </div>
         <div class="text-muted mb-2" style="font-size:.78rem">
-          <i class="bi bi-at"></i><?= h($user['login_user']) ?>
+          <i class="bi bi-at"></i><?= h($compte['login_user']) ?>
         </div>
         <span style="background:<?= $rc['bg'] ?>;color:<?= $rc['txt'] ?>;padding:2px 9px;border-radius:10px;font-size:.68rem;font-weight:700">
-          <?= h($user['id_fonction']) ?>
+          <?= h(libelle_role($compte['id_fonction'] ?? '')) ?>
         </span>
 
         <!-- Questions de sécurité -->
@@ -103,7 +106,7 @@ $rc = $role_colors[$user['id_fonction']] ?? ['bg' => '#f3f4f6', 'txt' => '#37415
         </div>
 
         <div class="mt-2 pt-2 border-top" style="font-size:.75rem;color:#6b7280">
-          <i class="bi bi-person-badge me-1"></i>Fiche liée : matricule <?= h((string) $user['matricule_ens']) ?>
+          <i class="bi bi-person-badge me-1"></i>Fiche liée : matricule <?= h((string) $compte['matricule_ens']) ?>
           <a href="<?= APP_URL ?>/pages/enseignants/mon_profil.php" class="d-block mt-1" style="font-size:.72rem">
             <i class="bi bi-pencil-square me-1"></i>Modifier mes informations
           </a>
@@ -127,7 +130,7 @@ $rc = $role_colors[$user['id_fonction']] ?? ['bg' => '#f3f4f6', 'txt' => '#37415
             <label class="form-label">Nom d'utilisateur (login) <span class="text-danger">*</span></label>
             <div class="input-group input-group-sm">
               <span class="input-group-text" style="background:#f3f4f6"><i class="bi bi-at"></i></span>
-              <input type="text" name="login" class="form-control" required value="<?= h($user['login_user']) ?>">
+              <input type="text" name="login" class="form-control" required value="<?= h($compte['login_user']) ?>">
             </div>
           </div>
 

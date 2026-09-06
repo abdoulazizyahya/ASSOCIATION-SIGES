@@ -14,6 +14,7 @@ require_once __DIR__ . '/fpdf.php';
 require_once __DIR__ . '/header_pdf.php';
 
 $id_classe = (int) ($_GET['classe'] ?? 0);
+exiger_acces_classe($id_classe, get_annee_active()['val_annee'] ?? '', 'ar');   // cloisonnement enseignant
 $type      = in_array($_GET['type'] ?? '', ['trimestre', 'annee'], true) ? $_GET['type'] : 'trimestre';
 $id_trim   = (int) ($_GET['trim'] ?? 0);
 $ordre     = in_array($_GET['ordre'] ?? '', ['alpha', 'merite'], true) ? $_GET['ordre'] : 'alpha';

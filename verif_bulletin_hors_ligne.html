@@ -100,11 +100,21 @@
 // Clé publique ECDSA P-256 (générée une fois via bd/generer_cles_verif_offline.php)
 // — publique par nature, aucun risque à la diffuser : elle permet de
 // VÉRIFIER une signature, jamais d'en fabriquer une nouvelle.
-const CLE_PUBLIQUE_JWK = {
-  kty: 'EC', crv: 'P-256', ext: true, key_ops: ['verify'],
-  x: 'hPC5CrHa4YngnX8t-CbNGcUMATIGJ1DsUNb7u7k_04c',
-  y: 'n9UQ58tKtuzwvHyY9HCXaUghMwKU84qbg0R9s7_SCeQ'
+// Multi-établissement : une clé publique PAR ÉCOLE (le QR porte &ec=CODE).
+// Générer/mettre à jour ce bloc avec :
+//   php bd/assoc/generer_cles_verif_ecoles.php
+// La clé '' est celle de config.php — repli pour les QR émis AVANT qu'une
+// école ait sa propre clé. NE PAS la retirer.
+const CLES_PUBLIQUES = {
+  'EC1': { x: 'd4m0cTolK82BamcNIXmTbC-fYIPdvo-CHkbrhyBXTFQ', y: 'bQchrJuutS_H3G-18xMyZfDzenDzo71-o5Fgzor_ffw' },
+  'EC2': { x: 'w__dPNNM7Xv3gjrgZAuAm85pBqjC67Bg6z4gXMybp24', y: '2No2mV2F3Y3wU27HSfwfPZ9DdNfGcspMRFUGl9mkgK8' },
+  'MH':  { x: 'PpAcoDlclov0DB_yey0pAVDE9jDtA_EYBiAgfEK7rZY', y: 'Y2YCCNw0zOvC9LNrk8VspKwA_Jn-gvoMIVkdXKaa-pc' },
+  '': { x: 'hPC5CrHa4YngnX8t-CbNGcUMATIGJ1DsUNb7u7k_04c', y: 'n9UQ58tKtuzwvHyY9HCXaUghMwKU84qbg0R9s7_SCeQ' }
 };
+
+function jwkDe(xy) {
+  return { kty: 'EC', crv: 'P-256', ext: true, key_ops: ['verify'], x: xy.x, y: xy.y };
+}
 
 function b64urlToBytes(s) {
   s = s.replace(/-/g, '+').replace(/_/g, '/');
@@ -127,7 +137,10 @@ function extraireCharge(texte) {
   if (!d) throw new Error("Aucun paramètre de vérification hors ligne (« d= ») trouvé dans le texte collé — ce QR n'a peut-être pas été généré avec la signature offline, ou le texte est incomplet.");
   const parts = d.split('.');
   if (parts.length !== 2) throw new Error('Format de signature invalide.');
-  return { donnees: b64urlToBytes(parts[0]), signature: b64urlToBytes(parts[1]) };
+  // Code établissement (&ec=) pour choisir la bonne clé publique.
+  let ec = '';
+  try { ec = new URL(texte).searchParams.get('ec') || ''; } catch (e) {}
+  return { donnees: b64urlToBytes(parts[0]), signature: b64urlToBytes(parts[1]), ec };
 }
 
 let champsVerifies = null;
@@ -146,14 +159,24 @@ async function verifier() {
 
   try {
     const texte = document.getElementById('entree').value;
-    const { donnees, signature } = extraireCharge(texte);
+    const { donnees, signature, ec } = extraireCharge(texte);
 
-    const clePub = await crypto.subtle.importKey(
-      'jwk', CLE_PUBLIQUE_JWK, { name: 'ECDSA', namedCurve: 'P-256' }, false, ['verify']
-    );
-    const valide = await crypto.subtle.verify(
-      { name: 'ECDSA', hash: 'SHA-256' }, clePub, signature, donnees
-    );
+    // Essaie la clé de l'école (ec=CODE), puis la clé globale de repli :
+    // un QR émis avant que l'école ait sa propre clé est signé avec ''.
+    const candidats = [];
+    if (ec && CLES_PUBLIQUES[ec]) candidats.push(CLES_PUBLIQUES[ec]);
+    if (CLES_PUBLIQUES['']) candidats.push(CLES_PUBLIQUES['']);
+    if (!candidats.length) throw new Error("Établissement inconnu (ec=" + ec + ") — clé publique absente de cette page.");
+
+    let valide = false;
+    for (const xy of candidats) {
+      const clePub = await crypto.subtle.importKey(
+        'jwk', jwkDe(xy), { name: 'ECDSA', namedCurve: 'P-256' }, false, ['verify']
+      );
+      if (await crypto.subtle.verify({ name: 'ECDSA', hash: 'SHA-256' }, clePub, signature, donnees)) {
+        valide = true; break;
+      }
+    }
 
     const texteDonnees = new TextDecoder('utf-8').decode(donnees);
     const [matricule, niu, nom, naissance, periode, moyUa1, moyUa2, moyenne, rang, matieresStr] = texteDonnees.split('|');

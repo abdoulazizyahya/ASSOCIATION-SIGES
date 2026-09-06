@@ -18,7 +18,7 @@ require_once __DIR__ . '/../../fonctions.php';
 exiger_connexion();
 
 $role = role_connecte();
-if (!in_array($role, ['ADMIN','PROVISEUR','CENSEUR'])) die('Accès refusé.');
+if (!in_array($role, ['DIRECTEUR', 'FONDATEUR', 'SECRETAIRE'], true)) die('Accès refusé.');
 
 $q      = trim($_GET['q'] ?? '');
 $region = trim($_GET['region'] ?? '');

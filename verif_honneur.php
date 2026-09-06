@@ -10,6 +10,7 @@ require_once __DIR__ . '/connexion.php';
 require_once __DIR__ . '/fonctions.php';
 require_once __DIR__ . '/pdf/verif_lib.php';
 require_once __DIR__ . '/pdf/verif_honneur_lib.php';
+verif_exiger_ecole_publique();  // multi-école : URL sans &ec= -> page neutre
 
 $id_eleve   = (int) ($_GET['e'] ?? 0);
 $vue_recue  = (string) ($_GET['v'] ?? '');
@@ -34,10 +35,12 @@ if ($authentique) {
     );
     if ($insc) {
         $fichier = 'certificat_tableau_honneur' . ($piste === 'ar' ? '_arabe' : '');
-        $pdf_url = APP_URL . '/pdf/' . $fichier . '.php?classe=' . (int) $insc['IDClasses']
+        // verif_ajout_ec() : en multi-établissement, propage &ec=CODE — sinon
+        // le générateur (accès public par « vh ») reste pointé sur l'annuaire.
+        $pdf_url = verif_ajout_ec(APP_URL . '/pdf/' . $fichier . '.php?classe=' . (int) $insc['IDClasses']
                  . '&eleve=' . $id_eleve . '&modele=2'
                  . ($vue === 'trim' ? '&trim=' . $id_periode : '&vue=annee')
-                 . '&vh=' . urlencode($h_recu);
+                 . '&vh=' . urlencode($h_recu));
     } else {
         $authentique = false; // élève plus inscrit cette année — rien à ouvrir
     }

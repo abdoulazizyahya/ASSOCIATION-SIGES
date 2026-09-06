@@ -23,6 +23,17 @@ $id_classe = (int) ($_GET['classe'] ?? 0);
 $annee     = get_annee_active();
 $val_annee = $annee['val_annee'] ?? '';
 
+// Cloisonnement enseignant : une classe hors de ses affectations renvoie
+// une liste vide (réponse JSON — jamais une page d'erreur HTML qui casserait
+// le parsing côté navigateur).
+$ids_vis = classes_ids_visibles($val_annee, 'union');
+if ($ids_vis !== null && !in_array($id_classe, $ids_vis, true)) {
+    ob_end_clean();
+    header('Content-Type: application/json; charset=utf-8');
+    echo json_encode([]);
+    exit;
+}
+
 $eleves = ($id_classe && $val_annee)
     ? db_all(
         "SELECT e.id_eleve, e.Nom_elv, e.Prenom_elv, e.Mat_elv FROM eleve e

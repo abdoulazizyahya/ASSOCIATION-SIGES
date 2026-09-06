@@ -29,15 +29,17 @@ $vue     = in_array($_GET['vue'] ?? '', ['trim', 'annee'], true) ? $_GET['vue'] 
 $id_trim = (int) ($seq_act['id_trim'] ?? 0);
 $trim_lib = $id_trim ? (string) db_val("SELECT libelle_trim FROM trimestre WHERE id_trim=?", [$id_trim]) : '';
 $id_classe = (int) ($_GET['classe'] ?? 0);
+exiger_acces_classe($id_classe, $val_annee, 'ar');
 
-$classes = db_all(
+// Enseignant restreint : seulement ses classes de piste ARABE.
+$classes = filtrer_classes_visibles(db_all(
     "SELECT c.IDClasses, c.DesignationClasses, c.Niveau, n.OrdreNiveau
      FROM classe c LEFT JOIN niveau n ON n.LibelleNiveau = c.Niveau
      JOIN inscrire i ON i.IDClasses = c.IDClasses AND i.val_annee = ?
      GROUP BY c.IDClasses, c.DesignationClasses, c.Niveau, n.OrdreNiveau
      ORDER BY n.OrdreNiveau, c.DesignationClasses",
     [$val_annee]
-);
+), $val_annee, 'ar');
 
 $periode_ok = ($vue === 'annee') || ($id_trim > 0);
 $fmt = fn(?float $v): string => $v === null ? '—' : rtrim(rtrim(number_format($v, 2, '.', ''), '0'), '.');

@@ -54,8 +54,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $mime   = finfo_file($fi, $_FILES['logo']['tmp_name']);
             finfo_close($fi);
             if (isset($ext_ok[$ext]) && $ext_ok[$ext] === $mime && $_FILES['logo']['size'] <= 2 * 1024 * 1024) {
-                $logo = 'logo_etab.' . $ext;
-                move_uploaded_file($_FILES['logo']['tmp_name'], __DIR__ . '/../../assets/uploads/' . $logo);
+                // Préfixe par école (multi-établissement) : sinon l'upload
+                // d'une école écrase le logo d'une autre — voir upload_prefixe_etab().
+                $logo = upload_prefixe_etab() . 'logo_etab.' . $ext;
+                move_uploaded_file($_FILES['logo']['tmp_name'],
+                    upload_dir_etab(__DIR__ . '/../../assets/uploads') . 'logo_etab.' . $ext);
             }
         }
 
@@ -67,8 +70,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $mime   = finfo_file($fi, $_FILES['signature']['tmp_name']);
             finfo_close($fi);
             if (isset($ext_ok[$ext]) && $ext_ok[$ext] === $mime && $_FILES['signature']['size'] <= 2 * 1024 * 1024) {
-                $signature = 'signature_directeur.' . $ext;
-                move_uploaded_file($_FILES['signature']['tmp_name'], __DIR__ . '/../../assets/uploads/' . $signature);
+                $signature = upload_prefixe_etab() . 'signature_directeur.' . $ext;
+                move_uploaded_file($_FILES['signature']['tmp_name'],
+                    upload_dir_etab(__DIR__ . '/../../assets/uploads') . 'signature_directeur.' . $ext);
             }
         }
 

@@ -6,7 +6,7 @@ require_once __DIR__ . '/../../config.php';
 require_once __DIR__ . '/../../connexion.php';
 require_once __DIR__ . '/../../fonctions.php';
 require_once __DIR__ . '/../_layout.php';
-exiger_membre_association();
+exiger_superadmin_association();
 
 $ecoles = assoc_all("SELECT id, code, nom FROM etablissement WHERE actif=1 ORDER BY nom");
 $mat_pre = (string) ($_GET['m'] ?? '');
@@ -100,7 +100,7 @@ asso_haut('Affecter un agent');
     <div class="col-6">
       <label class="form-label small">Fonction</label>
       <select name="fonction" class="form-select form-select-sm">
-        <?php foreach (['ENSEIGNANT', 'DIRECTEUR', 'SECRETAIRE', 'COMPTABLE'] as $f): ?>
+        <?php foreach (['ENSEIGNANT', 'DIRECTEUR', 'FONDATEUR', 'SECRETAIRE', 'COMPTABLE'] as $f): ?>
           <option><?= $f ?></option>
         <?php endforeach; ?>
       </select>

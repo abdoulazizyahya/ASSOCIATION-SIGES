@@ -44,6 +44,7 @@ $id_seq = (int) ($seq_active['id_seq'] ?? 0);
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     csrf_verifier();
     $id_classe_p = (int) post('id_classe');
+    exiger_acces_classe($id_classe_p, $val_annee, 'ar');
     $id_mat_p    = (int) post('id_mat');
     $id_seq_p    = (int) post('id_seq');
     $agent       = utilisateur_connecte()['id'] ?? null;
@@ -99,16 +100,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 // LEFT JOIN (pas INNER) — une classe sans élève inscrit reste visible dans
 // le select (grisée, non sélectionnable) plutôt que silencieusement absente
 // (confusion signalée le 21/08/2026).
-$classes = db_all(
+// Enseignant restreint : seulement ses classes de piste ARABE.
+$classes = filtrer_classes_visibles(db_all(
     "SELECT c.IDClasses, c.DesignationClasses, n.OrdreNiveau, COUNT(i.id_eleve) AS nb_eleves
      FROM classe c LEFT JOIN niveau n ON n.LibelleNiveau = c.Niveau
      LEFT JOIN inscrire i ON i.IDClasses = c.IDClasses AND i.val_annee = ?
      GROUP BY c.IDClasses, c.DesignationClasses, n.OrdreNiveau
      ORDER BY n.OrdreNiveau, c.DesignationClasses",
     [$val_annee]
-);
+), $val_annee, 'ar');
 
 $id_classe_sel = (int) ($_GET['classe'] ?? 0);
+exiger_acces_classe($id_classe_sel, $val_annee, 'ar');
 $id_mat_sel    = (int) ($_GET['mat'] ?? 0);
 
 $matieres = $id_classe_sel ? matieres_classe_arabe($id_classe_sel) : [];

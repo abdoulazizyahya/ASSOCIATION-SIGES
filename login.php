@@ -66,14 +66,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
+// Contexte neutre (annuaire présent, plusieurs écoles, aucune choisie) :
+// get_etablissement() renvoie [] -> habillage GÉNÉRIQUE (aucun logo ni nom
+// d'école). L'identité d'un établissement n'apparaît qu'après sélection dans
+// la liste (fetch ajax/ecole_identite.php) ou après un POST avec école
+// valide (basculer_base_ecole() déjà appelé plus haut).
 $etab = get_etablissement();
+$neutre = function_exists('est_contexte_neutre') && est_contexte_neutre() && empty($etab);
 ?>
 <!DOCTYPE html>
 <html lang="fr">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Connexion — <?= h($etab['Initial_Etab'] ?: 'Jaynitaare') ?></title>
+  <title>Connexion — <?= h(($etab['Initial_Etab'] ?? '') ?: 'Jaynitaare') ?></title>
   <?php if (!empty($etab['logo']) && is_file(__DIR__ . '/assets/uploads/' . $etab['logo'])): ?>
     <link rel="icon" href="<?= APP_URL ?>/assets/uploads/<?= h($etab['logo']) ?>">
   <?php endif; ?>
@@ -96,15 +102,15 @@ $etab = get_etablissement();
 </head>
 <body>
 <div class="login-box">
-  <div class="login-logo">
+  <div class="login-logo" id="loginLogo">
     <?php if (!empty($etab['logo']) && is_file(__DIR__ . '/assets/uploads/' . $etab['logo'])): ?>
-      <img src="<?= APP_URL ?>/assets/uploads/<?= h($etab['logo']) ?>" alt="<?= h($etab['Initial_Etab'] ?: 'Logo') ?>">
+      <img src="<?= APP_URL ?>/assets/uploads/<?= h($etab['logo']) ?>" alt="<?= h(($etab['Initial_Etab'] ?? '') ?: 'Logo') ?>">
     <?php else: ?>
-      <?= h($etab['Initial_Etab'] ?: 'JN') ?>
+      <?= h(($etab['Initial_Etab'] ?? '') ?: 'JN') ?>
     <?php endif; ?>
   </div>
   <div class="login-etab">
-    <strong><?= h($etab['Nom_Etab_Fr'] ?? 'Système de Gestion Scolaire') ?></strong>
+    <strong id="loginEtabNom"><?= h($etab['Nom_Etab_Fr'] ?? 'Système de Gestion Scolaire') ?></strong>
     Espace de connexion
   </div>
 
@@ -162,5 +168,35 @@ $etab = get_etablissement();
   <?php endif; ?>
 </div>
 <script src="<?= APP_URL ?>/assets/vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
+<?php if ($choix_ecole): ?>
+<script>
+// Multi-établissement : afficher le logo + le nom de l'école dès qu'elle est
+// choisie dans la liste (accueil neutre tant qu'aucune n'est sélectionnée).
+(function () {
+  var sel  = document.querySelector('select[name="ecole"]');
+  var logo = document.getElementById('loginLogo');
+  var nom  = document.getElementById('loginEtabNom');
+  if (!sel) return;
+  var nomDefaut = nom.textContent;
+  function appliquer(code) {
+    if (!code) { logo.textContent = 'JN'; nom.textContent = nomDefaut; return; }
+    fetch('<?= APP_URL ?>/ajax/ecole_identite.php?code=' + encodeURIComponent(code))
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        if (!d) { logo.textContent = 'JN'; nom.textContent = nomDefaut; return; }
+        nom.textContent = d.nom || nomDefaut;
+        if (d.logo) {
+          logo.innerHTML = '<img src="' + d.logo + '" alt="' + (d.sigle || 'Logo') + '">';
+        } else {
+          logo.textContent = d.sigle || 'JN';
+        }
+      })
+      .catch(function () {});
+  }
+  sel.addEventListener('change', function () { appliquer(this.value); });
+  if (sel.value) appliquer(sel.value);   // rechargement après erreur d'auth
+})();
+</script>
+<?php endif; ?>
 </body>
 </html>

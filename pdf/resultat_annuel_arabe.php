@@ -15,6 +15,7 @@ require_once __DIR__ . '/header_pdf.php';
 
 $scope     = in_array($_GET['scope'] ?? '', ['classe', 'etablissement'], true) ? $_GET['scope'] : 'classe';
 $id_classe = (int) ($_GET['classe'] ?? 0);
+exiger_acces_classe($id_classe, get_annee_active()['val_annee'] ?? '', 'ar');   // cloisonnement enseignant
 $filtre    = in_array($_GET['filtre'] ?? '', ['admis', 'redoublants', 'exclus', 'tous'], true) ? $_GET['filtre'] : 'tous';
 $limite    = max(0, (int) ($_GET['limite'] ?? 10));
 $ordre     = ($_GET['ordre'] ?? 'merite') === 'alpha' ? 'alpha' : 'merite';

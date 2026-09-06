@@ -22,6 +22,21 @@ $offset    = ($page - 1) * $pp;
 $where  = ["e.statut = ?"];
 $params = [$statut];
 
+// Cloisonnement enseignant : un(e) ENSEIGNANT ne voit que les élèves
+// inscrit(e)s cette année dans SES classes (piste FR ∪ AR). DIRECTEUR /
+// SECRETAIRE / FONDATEUR : aucune restriction (classes_ids_visibles = null).
+$ids_classes_vis = classes_ids_visibles($val_annee, 'union');
+if ($ids_classes_vis !== null) {
+    if (!$ids_classes_vis) {
+        $where[] = '1=0';                       // aucune classe affectée -> aucune ligne
+    } else {
+        $ph = implode(',', array_fill(0, count($ids_classes_vis), '?'));
+        $where[] = "i.IDClasses IN ($ph)";
+        $params  = array_merge($params, $ids_classes_vis);
+    }
+    if ($id_classe && !in_array($id_classe, $ids_classes_vis, true)) $id_classe = 0;
+}
+
 // Recherche : nom, prénom, matricule, NIU ou téléphone. L'élève n'a pas de
 // champ téléphone dédié dans le schéma jaynitaare — recherché dans
 // l'adresse des parents, seul endroit où un numéro est parfois saisi
@@ -95,6 +110,10 @@ $classes = db_all(
             (SELECT COUNT(*) FROM inscrire i2 WHERE i2.IDClasses=c.IDClasses AND i2.val_annee=?) AS nb
      FROM classe c LEFT JOIN niveau n ON n.LibelleNiveau=c.Niveau
      ORDER BY n.OrdreNiveau, c.DesignationClasses", [$val_annee]);
+// Enseignant restreint : le filtre « Classe » ne propose que ses classes.
+if ($ids_classes_vis !== null) {
+    $classes = array_values(array_filter($classes, fn($c) => in_array((int) $c['IDClasses'], $ids_classes_vis, true)));
+}
 $classe_nom_choisie = $id_classe ? (db_one("SELECT DesignationClasses FROM classe WHERE IDClasses=?", [$id_classe])['DesignationClasses'] ?? '') : '';
 
 $titre_page = 'Élèves';

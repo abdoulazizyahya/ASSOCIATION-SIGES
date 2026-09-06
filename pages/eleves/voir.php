@@ -5,6 +5,7 @@ require_once __DIR__ . '/../../fonctions.php';
 exiger_connexion();
 
 $id    = (int)($_GET['id'] ?? 0);
+exiger_acces_eleve($id, 'union');   // enseignant restreint : élève hors de ses classes -> refus
 $eleve = db_one("SELECT * FROM eleve WHERE id_eleve=?", [$id]);
 if (!$eleve) { flash_set('erreur', 'Élève introuvable.'); rediriger('pages/eleves/liste.php'); }
 

@@ -10,6 +10,7 @@ require_once __DIR__ . '/fpdf.php';
 require_once __DIR__ . '/header_pdf.php';
 
 $id    = (int)($_GET['id'] ?? 0);
+exiger_acces_eleve($id, 'union');   // cloisonnement enseignant
 $dl    = ($_GET['dl'] ?? '0') === '1';
 $eleve = db_one("SELECT * FROM eleve WHERE id_eleve=?", [$id]);
 if (!$eleve) die('Élève introuvable.');

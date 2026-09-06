@@ -1,0 +1,52 @@
+# =====================================================================
+#  Modèle de .htaccess pour la PRODUCTION (Camoo / cPanel, Apache).
+#  À copier tel quel en  .htaccess  À LA RACINE du sous-domaine
+#  (promeducam.beero.cm). Ne PAS l'utiliser en LAN / WAMP.
+# =====================================================================
+
+DirectoryIndex index.php
+
+# ── Forcer HTTPS ────────────────────────────────────────────────────
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteCond %{HTTPS} off
+    RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+</IfModule>
+
+# ── PHP : pas d'affichage d'erreurs, journalisation active ──────────
+#  (si le serveur utilise PHP-FPM, régler plutôt via cPanel → MultiPHP INI Editor)
+<IfModule mod_php.c>
+    php_flag display_errors Off
+    php_flag log_errors On
+</IfModule>
+<IfModule mod_php7.c>
+    php_flag display_errors Off
+    php_flag log_errors On
+</IfModule>
+
+# ── Fichiers sensibles : accès direct interdit ─────────────────────
+<FilesMatch "(^\.|\.(sql|md|log|example|dist|lock|json|ya?ml|sh|bat)$|^config(\.local)?\.php$)">
+    Require all denied
+</FilesMatch>
+
+# ── Dossiers internes : accès web interdit ─────────────────────────
+#  bd/ contient les runners (installer, migrations, sauvegardes, pool).
+#  Les débloquer ponctuellement (par IP) le temps d'une opération d'admin,
+#  puis re-commenter.
+RedirectMatch 403 ^/(bd|\.git|deploy)(/|$)
+
+# Exemple : autoriser les runners bd/ depuis une IP d'admin seulement
+# <If "%{REQUEST_URI} =~ m#^/bd/#">
+#     Require ip 41.202.0.0/16
+# </If>
+
+# ── Cache statique léger ──────────────────────────────────────────
+<IfModule mod_expires.c>
+    ExpiresActive On
+    ExpiresByType image/png            "access plus 30 days"
+    ExpiresByType image/jpeg           "access plus 30 days"
+    ExpiresByType image/svg+xml        "access plus 30 days"
+    ExpiresByType text/css             "access plus 7 days"
+    ExpiresByType application/javascript "access plus 7 days"
+    ExpiresByType font/woff2           "access plus 30 days"
+</IfModule>

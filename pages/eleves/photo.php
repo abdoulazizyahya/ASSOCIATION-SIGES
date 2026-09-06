@@ -7,6 +7,7 @@ require_once __DIR__ . '/../../fonctions.php';
 exiger_connexion();
 
 $id   = (int)($_GET['id'] ?? 0);
+exiger_acces_eleve($id, 'union');   // enseignant restreint
 $sexe = db_val("SELECT Sexe_elv FROM eleve WHERE id_eleve=?", [$id]);
 $blob = db_val("SELECT Photo_elv FROM eleve WHERE id_eleve=?", [$id]);
 

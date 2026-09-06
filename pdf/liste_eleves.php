@@ -17,9 +17,22 @@ $avec_sig  = ($_GET['signature'] ?? '0') === '1';
 $annee     = get_annee_active();
 $val_annee = $annee['val_annee'] ?? '';
 
+// Cloisonnement enseignant : liste PDF limitée à ses classes (FR ∪ AR).
+$ids_classes_vis = classes_ids_visibles($val_annee, 'union');
+if ($ids_classes_vis !== null && $id_classe && !in_array($id_classe, $ids_classes_vis, true)) {
+    http_response_code(403);
+    exit('Accès refusé : cette classe ne fait pas partie de vos affectations.');
+}
+
 $where  = ["i.val_annee = ?"];
 $params = [$val_annee];
 if ($id_classe) { $where[] = "i.IDClasses=?"; $params[] = $id_classe; }
+elseif ($ids_classes_vis !== null) {
+    $where[] = $ids_classes_vis
+        ? "i.IDClasses IN (" . implode(',', array_fill(0, count($ids_classes_vis), '?')) . ")"
+        : '1=0';
+    $params = array_merge($params, $ids_classes_vis);
+}
 $sql_where = 'WHERE ' . implode(' AND ', $where);
 
 $eleves = db_all(

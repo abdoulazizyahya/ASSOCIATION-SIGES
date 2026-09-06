@@ -44,6 +44,10 @@ if (!$id_trim || (!$id && !$id_classe)) die('Paramètres id (ou classe) / trim m
 
 $annee     = get_annee_active();
 $val_annee = $annee['val_annee'] ?? '';
+if (!$acces_public) {                       // cloisonnement enseignant (piste arabe)
+    exiger_acces_classe($id_classe, $val_annee, 'ar');
+    exiger_acces_eleve($id, 'ar');
+}
 $trimestre = db_one("SELECT * FROM trimestre WHERE id_trim=?", [$id_trim]);
 if (!$trimestre) die('Trimestre introuvable.');
 
@@ -469,7 +473,16 @@ function dessiner_bulletin_trimestriel_arabe(
     }
 
     $y = $y0 + $h_entete;
-    $h_row = 6.5;
+    // 8.3 -> 7.8 (demande explicite du 29/08/2026, en même temps que l'arabe
+    // 10 -> 14pt ci-dessous) : à ce point l'arabe (14pt, ~6.36mm de ligne)
+    // occupe déjà la quasi-totalité de $h_row=7.8 à lui seul — le français
+    // n'a mécaniquement plus qu'environ 1mm restant (~2.5-3pt, voir calcul
+    // de $taille_item_fr plus bas) pour que le bloc tienne SANS agrandir
+    // $h_row, comme demandé. Le français devient donc à peine lisible dans
+    // le pire cas (nom de matière court, non rétréci) — c'est la conséquence
+    // arithmétique directe des deux contraintes posées (14pt fixe + 7.8mm),
+    // signalé explicitement plutôt que silencieusement subi.
+    $h_row = 7.8;
     $T_bareme = 0.0; $T_points = 0.0;
     $T_bareme_seq1 = 0.0; $T_points_seq1 = 0.0;
     $T_bareme_seq2 = 0.0; $T_points_seq2 = 0.0;
@@ -512,19 +525,51 @@ function dessiner_bulletin_trimestriel_arabe(
             if ($pts1 !== null) { $T_bareme_seq1 += $bareme_pts; $T_points_seq1 += $pts1; }
             if ($pts2 !== null) { $T_bareme_seq2 += $bareme_pts; $T_points_seq2 += $pts2; }
 
-            // Nom de matière sur une seule ligne, centré verticalement —
-            // taille 14 par défaut, rétrécie si besoin pour tenir dans
-            // $w_item (Cell() ne retourne jamais à la ligne).
+            // Nom de matière sur 2 lignes empilées — arabe en haut, français
+            // en bas (demande explicite du 29/08/2026) — plutôt que la seule
+            // ligne "FR / AR (Pts)" concaténée d'avant : certains intitulés
+            // (ex. "Avoir une foi pure et authentique et mettre en
+            // application l'unicité d'Allah", 76 caractères) débordaient de
+            // $w_item même réduits au plancher (6pt), le français à lui seul
+            // ayant déjà besoin de toute la largeur de la cellule. AR à 14pt
+            // FIXE (demande explicite — même taille que l'arabe de l'en-tête
+            // COMPETENCES/الكفايات avait été portée à 10pt, puis 14pt ici)
+            // SANS agrandir $h_row (doit rester 7.8) : à 14pt l'arabe occupe
+            // déjà ~6.36mm de ligne à lui seul, il ne reste donc plus qu'une
+            // fraction de mm pour le français — $taille_item_fr est dérivée
+            // de l'espace VERTICAL restant (pas seulement de la largeur comme
+            // avant), avec un plancher dur à 3pt pour ne jamais aller à 0.
             $pdf->Rect($TX0, $y, $w_item, $h_row, 'D');
-            $texte_item = ' ' . $m['matiere_fr'] . ' / ' . $m['matiere_ar'] . ' (' . (int) $bareme_pts . 'Pts)';
-            $taille_item = 10;
-            $pdf->SetFont('amirib', 'B', $taille_item);
-            while ($pdf->GetStringWidth($texte_item) > $w_item - 2 && $taille_item > 6) {
-                $taille_item -= 0.5;
-                $pdf->SetFontSize($taille_item);
+            $texte_item_ar = ' ' . $m['matiere_ar'];
+            $texte_item_fr = ' ' . $m['matiere_fr'] . ' (' . (int) $bareme_pts . 'Pts)';
+            $gap_item = 0.2;
+            $taille_item_ar = 14;
+            $pdf->SetFont('amirib', 'B', $taille_item_ar);
+            while ($pdf->GetStringWidth($texte_item_ar) > $w_item - 2 && $taille_item_ar > 10) {
+                $taille_item_ar -= 0.5;
+                $pdf->SetFontSize($taille_item_ar);
             }
-            $pdf->SetXY($TX0, $y + ($h_row - $taille_item / 2.6) / 2);
-            $pdf->Cell($w_item, $taille_item / 2.2, $texte_item, 0, 0, 'L');
+            $lh_item_ar = $taille_item_ar / 2.2;
+            // Espace restant sous l'arabe, converti en taille de police
+            // (inverse de lh = taille/2.2) — plafonné à 7 (jamais plus gros
+            // que sans la contrainte de hauteur), plancher dur 3.
+            $taille_item_fr = max(3, min(7, ($h_row - $lh_item_ar - $gap_item) * 2.2));
+            $pdf->SetFont('helvetica', 'B', $taille_item_fr);
+            while ($pdf->GetStringWidth($texte_item_fr) > $w_item - 2 && $taille_item_fr > 3) {
+                $taille_item_fr -= 0.5;
+                $pdf->SetFontSize($taille_item_fr);
+            }
+            $lh_item_fr = $taille_item_fr / 2.2;
+            $y_item_ar = $y + max(0, ($h_row - ($lh_item_ar + $gap_item + $lh_item_fr)) / 2);
+            $y_item_fr = $y_item_ar + $lh_item_ar + $gap_item;
+            $pdf->SetFont('amirib', 'B', $taille_item_ar);
+            $pdf->SetRTL(true, false);
+            $pdf->SetXY($TX0 + $w_item, $y_item_ar, true);
+            $pdf->Cell($w_item, $lh_item_ar, $texte_item_ar, 0, 0, 'L');
+            $pdf->SetRTL(false, false);
+            $pdf->SetFont('helvetica', 'B', $taille_item_fr);
+            $pdf->SetXY($TX0, $y_item_fr);
+            $pdf->Cell($w_item, $lh_item_fr, $texte_item_fr, 0, 0, 'L');
 
             // Note en rouge si < la moitié de son barème (ex: barème 40 →
             // rouge sous 20) — sous-notes contre le barème de leur propre

@@ -37,6 +37,10 @@ if (!$id && !$id_classe) die('Paramètre id (ou classe) manquant.');
 
 $annee     = get_annee_active();
 $val_annee = $annee['val_annee'] ?? '';
+if (!$acces_public) {                       // cloisonnement enseignant (piste arabe)
+    exiger_acces_classe($id_classe, $val_annee, 'ar');
+    exiger_acces_eleve($id, 'ar');
+}
 // 🐛 `annee_scolaire` n'a pas de colonne `id` — ne pas y chercher un id_annee.
 $id_annee  = (int) substr($val_annee, 0, 4);
 $etab_brut = get_etablissement();

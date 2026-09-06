@@ -35,6 +35,10 @@ $id_format = (int)($_GET['format'] ?? 1);
 // jamais à une classe entière (id_classe ignoré ci-dessous dans ce cas).
 $id_classe = $acces_public ? 0 : (int)($_GET['classe'] ?? 0);
 $id_seul   = $acces_public ? (int) $_GET['eleve'] : (int)($_GET['id'] ?? 0);
+if (!$acces_public) {                       // cloisonnement enseignant
+    exiger_acces_classe($id_classe, get_annee_active()['val_annee'] ?? '', 'union');
+    exiger_acces_eleve($id_seul, 'union');
+}
 $dl        = ($_GET['dl'] ?? '0') === '1';
 $verso     = ($_GET['verso'] ?? '0') === '1';
 $flip      = ($_GET['flip'] ?? 'long') === 'short' ? 'short' : 'long';

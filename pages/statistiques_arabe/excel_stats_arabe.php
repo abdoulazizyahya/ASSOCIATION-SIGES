@@ -32,9 +32,10 @@ $onglet    = in_array($_GET['onglet'] ?? '', ['niveau', 'matiere', 'eleves'], tr
 $vue       = in_array($_GET['vue'] ?? '', ['trim', 'annee'], true) ? $_GET['vue'] : 'trim';
 $id_trim   = (int) ($_GET['trim'] ?? 0);
 $id_classe = (int) ($_GET['classe'] ?? 0);
+exiger_acces_classe($id_classe, $val_annee, 'ar');   // cloisonnement enseignant
 if ($vue === 'trim' && !$id_trim) die('Aucun trimestre sélectionné.');
 
-$classes = db_all(
+$classes = filtrer_classes_visibles(db_all(
     "SELECT c.IDClasses, c.DesignationClasses, c.Niveau, n.OrdreNiveau
      FROM classe c
      LEFT JOIN niveau n ON n.LibelleNiveau = c.Niveau
@@ -42,7 +43,7 @@ $classes = db_all(
      GROUP BY c.IDClasses, c.DesignationClasses, c.Niveau, n.OrdreNiveau
      ORDER BY n.OrdreNiveau, c.DesignationClasses",
     [$val_annee]
-);
+), $val_annee, 'ar');
 if ($id_classe) $classes = array_values(array_filter($classes, fn($c) => (int) $c['IDClasses'] === $id_classe));
 
 $titres = ['niveau' => 'Bilan par niveau (arabe)', 'matiere' => 'Bilan par matière (école, arabe)', 'eleves' => 'Résultats par classe (arabe)'];

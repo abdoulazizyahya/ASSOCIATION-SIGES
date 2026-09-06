@@ -30,7 +30,10 @@ if ($role !== 'ENSEIGNANT' && agent_est_aussi_enseignant()) {
 // quel que soit leur liste de rôles ; les écritures restent bloquées
 // (est_lecture_seule() : csrf_verifier / db_exec).
 $visite_asso   = function_exists('est_visite_association') && est_visite_association();
-$menu_voit_tout = $visite_asso;
+$est_fondateur = function_exists('est_fondateur') && est_fondateur();
+// FONDATEUR : voit tout le menu de son école (comme une visite association),
+// en lecture seule — sa seule action est la page « Directeur ».
+$menu_voit_tout = $visite_asso || $est_fondateur;
 $lecture_seule = function_exists('est_lecture_seule') && est_lecture_seule();
 
 // Année RÉELLEMENT active (Etat_annee_scolaire=1), pas juste le repli de
@@ -158,6 +161,7 @@ $menu = [
     // comptes d'autrui).
     'Paramètres' => [
         ['Mon compte',        'profil.php',                    'key', []],
+        ['Directeur',         'pages/fondateur/directeur.php', 'person-badge', ['FONDATEUR']],
         ['Configurations',    'pages/parametres/index.php',    'gear',        ['DIRECTEUR']],
         ['Utilisateurs',      'pages/utilisateurs/liste.php',  'person-gear', ['DIRECTEUR']],
     ],
@@ -309,17 +313,22 @@ function lien_actif(string $url): string {
     <!-- Bandeau : visite d'un membre de l'association -->
     <?php $ecoles_asso = assoc_all("SELECT id, code, nom FROM etablissement WHERE actif=1 ORDER BY nom"); ?>
     <div class="d-flex flex-wrap align-items-center gap-2 px-3 py-1"
-         style="background:#fff8e6;border-bottom:1px solid #f0dca0;font-size:.8rem;color:#7a5b00">
-      <span><i class="bi bi-eye me-1"></i><strong>Visite association</strong>
-        <?= $lecture_seule ? '— lecture seule' : '— écriture autorisée' ?></span>
+         style="<?= $lecture_seule
+             ? 'background:#fff8e6;border-bottom:1px solid #f0dca0;color:#7a5b00'
+             : 'background:#fde8e8;border-bottom:1px solid #f5b5b5;color:#8a1c1c' ?>;font-size:.8rem">
+      <span>
+        <i class="bi bi-<?= $lecture_seule ? 'eye' : 'pencil-square' ?> me-1"></i>
+        <strong>Visite association</strong>
+        <?= $lecture_seule ? '— lecture seule' : '— LECTURE / ÉCRITURE (modifications enregistrées)' ?></span>
       <?php if (count($ecoles_asso) > 1): ?>
       <div class="dropdown">
         <button class="btn btn-sm btn-light border py-0 px-2 dropdown-toggle" data-bs-toggle="dropdown" style="font-size:.78rem">
           <?= h($etab['Nom_Etab_Fr'] ?? '') ?>
         </button>
         <ul class="dropdown-menu" style="font-size:.82rem">
+          <?php $mode_actuel = $lecture_seule ? '' : '&mode=ecriture'; ?>
           <?php foreach ($ecoles_asso as $ea): ?>
-            <li><a class="dropdown-item" href="<?= APP_URL ?>/association/entrer_ecole.php?id=<?= (int) $ea['id'] ?>">
+            <li><a class="dropdown-item" href="<?= APP_URL ?>/association/entrer_ecole.php?id=<?= (int) $ea['id'] ?><?= $mode_actuel ?>">
               <?= h($ea['nom']) ?>
             </a></li>
           <?php endforeach; ?>
@@ -328,6 +337,15 @@ function lien_actif(string $url): string {
       <?php endif; ?>
       <a href="<?= APP_URL ?>/association/sortir_ecole.php" class="ms-auto btn btn-sm btn-outline-secondary py-0 px-2" style="font-size:.78rem">
         <i class="bi bi-arrow-left me-1"></i>Retour association
+      </a>
+    </div>
+    <?php elseif ($est_fondateur): ?>
+    <!-- Bandeau : fondateur (consultation seule, hors gestion du directeur) -->
+    <div class="d-flex flex-wrap align-items-center gap-2 px-3 py-1"
+         style="background:#fff8e6;border-bottom:1px solid #f0dca0;font-size:.8rem;color:#7a5b00">
+      <span><i class="bi bi-eye me-1"></i><strong>Espace fondateur</strong> — consultation seule</span>
+      <a href="<?= APP_URL ?>/pages/fondateur/directeur.php" class="ms-auto btn btn-sm btn-outline-secondary py-0 px-2" style="font-size:.78rem">
+        <i class="bi bi-person-badge me-1"></i>Gérer le directeur
       </a>
     </div>
     <?php endif; ?>

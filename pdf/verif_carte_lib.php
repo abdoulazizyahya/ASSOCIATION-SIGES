@@ -1,7 +1,7 @@
 <?php
 // pdf/verif_carte_lib.php — signature et vérification d'authenticité des
 // cartes scolaires. Même principe que pdf/verif_lib.php (bulletins) et
-// pdf/verif_paiement_lib.php (reçus), gardé dans un fichier séparé pour ne
+// pdf/verif_recu_lib.php (reçus), gardé dans un fichier séparé pour ne
 // jamais risquer de désynchroniser les différents usages.
 // Inclus par pdf/cartes.php (accès public via jeton) et verif_carte.php
 // (vérification lors du scan) — pas de QR imprimé sur la carte physique

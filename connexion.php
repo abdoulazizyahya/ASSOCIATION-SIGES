@@ -32,8 +32,11 @@ $ETAB_COURANT = annuaire_dispo() ? resoudre_etablissement() : null;
 
 if ($ETAB_COURANT) {
     $bd_active = $ETAB_COURANT['db_name'];
-} elseif (annuaire_dispo() && est_contexte_association()) {
-    $bd_active = DB_NAME_ASSOC;           // l'interface association travaille dans l'annuaire
+} elseif (annuaire_dispo() && (est_contexte_association() || est_contexte_neutre())) {
+    // Interface association OU contexte neutre (multi-école, aucune choisie —
+    // page de connexion / pages publiques sans ?ec=) : on pointe la base
+    // annuaire. Aucune requête « école » n'est émise avant basculer_base_ecole().
+    $bd_active = DB_NAME_ASSOC;
 } else {
     $bd_active = DB_NAME;                 // repli mono-école
 }

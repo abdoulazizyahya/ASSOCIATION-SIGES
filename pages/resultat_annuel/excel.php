@@ -32,6 +32,7 @@ $etab      = etab_pour_pdf($etab_brut);
 $avec_classe = $scope === 'etablissement';
 if ($scope === 'classe') {
     if (!$id_classe) die('Classe manquante.');
+    exiger_acces_classe($id_classe, $val_annee, 'fr');   // cloisonnement enseignant
     $classe = db_one("SELECT DesignationClasses FROM classe WHERE IDClasses=?", [$id_classe]);
     $lignes = resultat_annuel_filtrer(resultat_annuel_lignes_classe($id_classe, $val_annee, $ordre), $filtre);
     $sous_titre = mb_strtoupper($classe['DesignationClasses'] ?? '') . ' — ' . ucfirst($filtre === 'tous' ? 'toute la classe' : $filtre);

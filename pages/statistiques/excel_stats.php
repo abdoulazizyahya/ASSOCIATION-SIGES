@@ -33,6 +33,7 @@ $onglet    = in_array($_GET['onglet'] ?? '', ['niveau', 'non_evalue', 'competenc
 $vue       = in_array($_GET['vue'] ?? '', ['trim', 'annee'], true) ? $_GET['vue'] : 'trim';
 $id_trim   = (int) ($_GET['trim'] ?? 0);
 $id_classe = (int) ($_GET['classe'] ?? 0);
+exiger_acces_classe($id_classe, $val_annee, 'fr');   // cloisonnement enseignant
 if ($vue === 'trim' && !$id_trim) die('Aucun trimestre sélectionné.');
 // Onglets « Par classe/Résultats » et « Par compétence / Évaluation ».
 // $seq_stat (demande du 18/08/2026) : id_seq précis choisi sur la page web —
@@ -42,7 +43,7 @@ $mode_eval = in_array($_GET['mode'] ?? '', ['seq', 'trim'], true) ? $_GET['mode'
 $seq_act_xls_top = get_sequence_active();
 $id_seq_stat = (int) ($_GET['seq_stat'] ?? ($seq_act_xls_top['id_seq'] ?? 0));
 
-$classes = db_all(
+$classes = filtrer_classes_visibles(db_all(
     "SELECT c.IDClasses, c.DesignationClasses, c.Niveau, n.OrdreNiveau
      FROM classe c
      LEFT JOIN niveau n ON n.LibelleNiveau = c.Niveau
@@ -50,7 +51,7 @@ $classes = db_all(
      GROUP BY c.IDClasses, c.DesignationClasses, c.Niveau, n.OrdreNiveau
      ORDER BY n.OrdreNiveau, c.DesignationClasses",
     [$val_annee]
-);
+), $val_annee, 'fr');
 if ($id_classe)           $classes = array_values(array_filter($classes, fn($c) => (int) $c['IDClasses'] === $id_classe));
 elseif ($niveau_f !== '') $classes = array_values(array_filter($classes, fn($c) => $c['Niveau'] === $niveau_f));
 

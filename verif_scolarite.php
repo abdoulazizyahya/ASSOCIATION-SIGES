@@ -6,11 +6,15 @@ require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/connexion.php';
 require_once __DIR__ . '/fonctions.php';
 require_once __DIR__ . '/pdf/verif_scolarite_lib.php';
+verif_exiger_ecole_publique();  // multi-école : URL sans &ec= -> page neutre
 
 $id_eleve = (int)($_GET['e'] ?? 0);
 $h_recu   = (string)($_GET['h'] ?? '');
 
-$eleve = $id_eleve ? db_one("SELECT * FROM eleve WHERE id=?", [$id_eleve]) : null;
+// Schéma jaynitaare_v2 : eleve.id_eleve, table `inscrire` (val_annee texte,
+// pas d'id numérique), classe.DesignationClasses — voir verif_carte.php,
+// corrigé de la même façon le 15/08/2026.
+$eleve = $id_eleve ? db_one("SELECT * FROM eleve WHERE id_eleve=?", [$id_eleve]) : null;
 
 $authentique = false;
 if ($eleve && $h_recu !== '') {
@@ -18,18 +22,20 @@ if ($eleve && $h_recu !== '') {
 }
 
 $classe = $authentique ? db_one(
-    "SELECT c.designation, a.libelle AS annee FROM inscription i
-     JOIN classe c ON c.id=i.id_classe
-     JOIN annee_scolaire a ON a.id=i.id_annee
-     WHERE i.id_eleve=? ORDER BY i.id DESC LIMIT 1", [$id_eleve]
+    "SELECT c.DesignationClasses AS designation, i.val_annee AS annee
+     FROM inscrire i JOIN classe c ON c.IDClasses = i.IDClasses
+     WHERE i.id_eleve=? ORDER BY i.val_annee DESC LIMIT 1", [$id_eleve]
 ) : null;
 
 // URL du certificat réel, ouverte uniquement si l'utilisateur clique sur le
 // bouton "Ouvrir le certificat" (jamais automatiquement). Le jeton "vh" (=
 // le hash déjà vérifié ci-dessus) permet à pdf/certificat_scolarite.php de
 // servir ce certificat précis sans exiger de connexion.
+// verif_ajout_ec() : en multi-établissement, propage &ec=CODE — sinon
+// pdf/certificat_scolarite.php (accès public par « vh ») reste pointé sur
+// l'annuaire.
 $pdf_url = $authentique
-    ? APP_URL . '/pdf/certificat_scolarite.php?id=' . $id_eleve . '&vh=' . urlencode($h_recu)
+    ? verif_ajout_ec(APP_URL . '/pdf/certificat_scolarite.php?id=' . $id_eleve . '&vh=' . urlencode($h_recu))
     : '';
 ?>
 <!DOCTYPE html>
@@ -52,7 +58,7 @@ $pdf_url = $authentique
       <div class="verif-icon text-success"><i class="bi bi-patch-check-fill"></i></div>
       <h4 class="mt-2 mb-1 text-success">Certificat de scolarité authentique</h4>
       <p class="text-muted mb-0">
-        <strong><?= h(strtoupper($eleve['nom']) . ' ' . ($eleve['prenom'] ?? '')) ?></strong><br>
+        <strong><?= h(mb_strtoupper($eleve['Nom_elv']) . ' ' . ($eleve['Prenom_elv'] ?? '')) ?></strong><br>
         NIU : <?= h(id_affichage_eleve($eleve)) ?><br>
         <?php if ($classe): ?>
           Classe : <?= h($classe['designation']) ?><br>

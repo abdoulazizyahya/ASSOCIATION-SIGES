@@ -7,20 +7,17 @@ require_once __DIR__ . '/_layout.php';
 exiger_membre_association();
 
 $ecoles = assoc_all("SELECT * FROM etablissement ORDER BY actif DESC, nom");
+$superadmin = est_superadmin_association();
 
 asso_haut('Établissements de l\'association');
 ?>
+<?php if ($superadmin): ?>
 <div class="d-flex flex-wrap gap-2 mb-3">
   <a href="<?= APP_URL ?>/association/etablissement_nouveau.php" class="btn btn-primary btn-sm">
     <i class="bi bi-plus-lg me-1"></i>Nouvel établissement
   </a>
-  <a href="<?= APP_URL ?>/association/niu/index.php" class="btn btn-outline-light btn-sm">
-    <i class="bi bi-person-vcard me-1"></i>Registre NIU
-  </a>
-  <a href="<?= APP_URL ?>/association/personnel/liste.php" class="btn btn-outline-light btn-sm">
-    <i class="bi bi-people me-1"></i>Personnel
-  </a>
 </div>
+<?php endif; ?>
 
 <div class="row g-3">
   <?php foreach ($ecoles as $e): ?>

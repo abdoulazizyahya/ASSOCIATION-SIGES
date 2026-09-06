@@ -6,6 +6,7 @@ require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/connexion.php';
 require_once __DIR__ . '/fonctions.php';
 require_once __DIR__ . '/pdf/verif_recu_lib.php';
+verif_exiger_ecole_publique();  // multi-école : URL sans &ec= -> page neutre
 
 $id_eleve  = (int) ($_GET['e'] ?? 0);
 $val_annee = (string) ($_GET['a'] ?? '');
@@ -21,7 +22,11 @@ $authentique = $eleve !== null;
 $pdf_url = '';
 if ($authentique) {
     $id_classe = (int) db_val("SELECT IDClasses FROM inscrire WHERE id_eleve=? AND val_annee=? LIMIT 1", [$id_eleve, $val_annee]);
-    $pdf_url = APP_URL . '/pages/finances/recu.php?eleve=' . $id_eleve . '&classe=' . $id_classe . '&vh=' . urlencode($h_recu);
+    // verif_ajout_ec() : en multi-établissement, propage &ec=CODE — sans lui
+    // pages/finances/recu.php (accès public) ne sait pas dans quelle base
+    // chercher et connexion.php reste pointé sur l'annuaire (erreur SQL
+    // « table annee_scolaire n'existe pas »).
+    $pdf_url = verif_ajout_ec(APP_URL . '/pages/finances/recu.php?eleve=' . $id_eleve . '&classe=' . $id_classe . '&vh=' . urlencode($h_recu));
 }
 ?>
 <!DOCTYPE html>

@@ -93,6 +93,7 @@ function bulletin_verif_signature_offline(array $champs): string {
  * sinon déduit automatiquement de la requête en cours.
  */
 function bulletin_verif_base_url(): string {
+    if (function_exists('verif_base_url_ecole') && ($u = verif_base_url_ecole()) !== '') return $u;
     if (defined('BULLETIN_VERIF_BASE_URL') && BULLETIN_VERIF_BASE_URL !== '') {
         return rtrim(BULLETIN_VERIF_BASE_URL, '/');
     }

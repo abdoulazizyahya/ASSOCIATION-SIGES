@@ -13,8 +13,9 @@
 //  Exemple :
 //    php bd/assoc/creer_ecole.php EC2 "Ecole Al Nour" ecole2 ALN Ngaoundere
 //
-//  La base s'appelle jaynitaare_ecole_<code minuscule>. Refuse d'ecraser
-//  une base existante ou un code deja pris.
+//  La base s'appelle promeducam_<slug du nom de l'etablissement>
+//  (ex. "GSBI Minhadjoul Mouslim" -> promeducam_minhadjoul_mouslim).
+//  Refuse d'ecraser une base existante ou un code deja pris.
 // =====================================================================
 
 require_once __DIR__ . '/../../config.php';

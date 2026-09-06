@@ -25,6 +25,7 @@ function recu_verif_hash(int $id_eleve, string $val_annee, string $numero, ?stri
 }
 
 function recu_verif_base_url(): string {
+    if (function_exists('verif_base_url_ecole') && ($u = verif_base_url_ecole()) !== '') return $u;
     if (defined('RECU_VERIF_BASE_URL') && RECU_VERIF_BASE_URL !== '') {
         return rtrim(RECU_VERIF_BASE_URL, '/');
     }

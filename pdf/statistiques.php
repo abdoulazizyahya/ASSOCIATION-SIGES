@@ -19,6 +19,7 @@ $onglet    = $_GET['onglet'] ?? 'eleves';
 $vue       = in_array($_GET['vue'] ?? '', ['trim', 'annee'], true) ? $_GET['vue'] : 'trim';
 $id_trim   = (int) ($_GET['trim'] ?? 0);
 $id_classe = (int) ($_GET['classe'] ?? 0);
+exiger_acces_classe($id_classe, get_annee_active()['val_annee'] ?? '', 'fr');   // cloisonnement enseignant
 $dl        = ($_GET['dl'] ?? '0') === '1';
 $avec_sig  = ($_GET['signature'] ?? '0') === '1';
 // Onglets « Par classe/Résultats » et « Par compétence / Évaluation »

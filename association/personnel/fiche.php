@@ -13,6 +13,7 @@ if (!$p) { asso_haut('Agent'); echo '<div class="asso-card">Agent introuvable.</
 $msg = '';
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'cloturer') {
     csrf_verifier();
+    exiger_superadmin_association();
     cloturer_affectation((int) $_POST['id_affectation']);
     journaliser_action('affectation_cloturee', null, $mat);
     $msg = 'Affectation clôturée.';

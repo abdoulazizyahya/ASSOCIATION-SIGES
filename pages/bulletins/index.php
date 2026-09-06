@@ -29,19 +29,23 @@ $trim_actif = (int) ($seq_active['id_trim'] ?? 0);
 // doit rester VISIBLE dans le select (grisée, non sélectionnable) plutôt que
 // silencieusement absente, source de confusion signalée le 21/08/2026
 // (« la classe/le niveau que je viens de créer n'apparaît nulle part »).
-$classes = db_all(
+// DIRECTEUR/SECRETAIRE voient tout ; un ENSEIGNANT ne voit que ses classes
+// affectées (voir filtrer_classes_visibles(), demande explicite du 29/08/2026).
+$classes = filtrer_classes_visibles(db_all(
     "SELECT c.IDClasses, c.DesignationClasses, n.OrdreNiveau, COUNT(i.id_eleve) AS nb_eleves
      FROM classe c LEFT JOIN niveau n ON n.LibelleNiveau = c.Niveau
      LEFT JOIN inscrire i ON i.IDClasses = c.IDClasses AND i.val_annee = ?
      GROUP BY c.IDClasses, c.DesignationClasses, n.OrdreNiveau
      ORDER BY n.OrdreNiveau, c.DesignationClasses",
     [$val_annee]
-);
+), $val_annee, 'fr');
 
 // ── Paramètres GET ─────────────────────────────────────────────────
 $id_classe = (int) ($_GET['classe'] ?? 0);
+if ($id_classe && !in_array($id_classe, array_column($classes, 'IDClasses'), true)) $id_classe = 0;
 $vue       = in_array($_GET['vue'] ?? '', ['trim', 'annee'], true) ? $_GET['vue'] : 'trim';
 $id_eleve  = (int) ($_GET['eleve'] ?? 0);
+exiger_acces_eleve($id_eleve, 'fr');   // enseignant restreint : élève hors de ses classes -> refus
 $ordre     = in_array($_GET['ordre'] ?? '', ['alpha', 'merite'], true) ? $_GET['ordre'] : 'alpha';
 $voir_tous = isset($_GET['voir_tous']);
 // Trimestre choisissable (contrairement à ABZ_MBE qui impose la séquence

@@ -5,7 +5,7 @@ require_once __DIR__ . '/../config.php';
 require_once __DIR__ . '/../connexion.php';
 require_once __DIR__ . '/../fonctions.php';
 require_once __DIR__ . '/_layout.php';
-exiger_membre_association();
+exiger_superadmin_association();
 
 $msg = ''; $err = ''; $ok = false;
 $val = ['code' => '', 'nom' => '', 'nom_en' => '', 'sigle' => '', 'ville' => '', 'sous_domaine' => ''];
@@ -39,9 +39,15 @@ asso_haut('Nouvel établissement');
 <?php endif; ?>
 
 <div class="asso-card mt-2" style="max-width:560px">
+  <?php $pool_mode = defined('ECOLE_POOL_ACTIF') && ECOLE_POOL_ACTIF; ?>
   <p class="text-muted2 small mb-3">
-    Crée une base de données dédiée <span class="font-monospace">jaynitaare_ecole_&lt;code&gt;</span>,
-    y installe le schéma de référence à jour, puis inscrit l'école à l'annuaire.
+    <?php if ($pool_mode): ?>
+      Consomme une base vide du <strong>pool</strong> pré-créé (hébergement mutualisé),
+      y installe le schéma de référence à jour, puis inscrit l'école à l'annuaire.
+    <?php else: ?>
+      Crée une base de données dédiée <span class="font-monospace">promeducam_&lt;nom simplifié&gt;</span>,
+      y installe le schéma de référence à jour, puis inscrit l'école à l'annuaire.
+    <?php endif; ?>
     Ensuite : créer un compte <strong>DIRECTEUR</strong> via
     <a href="<?= APP_URL ?>/association/personnel/affecter.php">Personnel → Affecter</a>.
   </p>
@@ -77,6 +83,7 @@ asso_haut('Nouvel établissement');
       <input name="ville" class="form-control form-control-sm" value="<?= h($val['ville']) ?>"
              maxlength="100">
     </div>
+    <?php if (!$pool_mode): ?>
     <div class="col-6">
       <label class="form-label small">Sous-domaine</label>
       <input name="sous_domaine" class="form-control form-control-sm text-lowercase"
@@ -84,6 +91,7 @@ asso_haut('Nouvel établissement');
              placeholder="ecole3">
       <div class="form-text small text-muted2">production uniquement · optionnel</div>
     </div>
+    <?php endif; ?>
 
     <div class="col-12 mt-3">
       <button class="btn btn-primary btn-sm"><i class="bi bi-plus-lg me-1"></i>Créer l'établissement</button>

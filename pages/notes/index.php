@@ -51,18 +51,21 @@ if (!empty($seq_active_brut['id_seq'])) {
     );
 }
 
-// ── Classes disponibles (les 3 rôles voient tout, voir en-tête) ──
+// ── Classes disponibles ────────────────────────────────────────
 // LEFT JOIN (pas INNER) — une classe sans élève inscrit reste visible dans
 // les selects ci-dessous (grisée, non sélectionnable) plutôt que
 // silencieusement absente (confusion signalée le 21/08/2026).
-$classes = db_all(
+// DIRECTEUR/SECRETAIRE voient tout ; un ENSEIGNANT ne voit que ses classes
+// affectées (pages/enseignants/liste.php, onglet Affectation des classes —
+// demande explicite du 29/08/2026, voir filtrer_classes_visibles()).
+$classes = filtrer_classes_visibles(db_all(
     "SELECT c.IDClasses, c.DesignationClasses, n.OrdreNiveau, COUNT(i.id_eleve) AS nb_eleves
      FROM classe c LEFT JOIN niveau n ON n.LibelleNiveau = c.Niveau
      LEFT JOIN inscrire i ON i.IDClasses = c.IDClasses AND i.val_annee = ?
      GROUP BY c.IDClasses, c.DesignationClasses, n.OrdreNiveau
      ORDER BY n.OrdreNiveau, c.DesignationClasses",
     [$val_annee]
-);
+), $val_annee, 'fr');
 
 // Toutes les séquences de l'année (choix libre pour les 3 rôles — jaynitaare
 // n'a pas de distinction ADMIN vs ENSEIGNANT pour ça, voir Classement).
@@ -109,6 +112,7 @@ function jn_libelle_groupe_comp(array $c, bool $section_en): string {
 //  ONGLET 1 — Saisie par classe (une compétence, toute la classe)
 // ══════════════════════════════════════════════════════════════
 $id_cl_c   = (int) ($_GET['classe_c'] ?? 0);
+exiger_acces_classe($id_cl_c, $val_annee, 'fr');   // enseignant restreint : refuse une classe hors périmètre
 $id_comp_c = (int) ($_GET['comp_c'] ?? 0);
 // Demande explicite du 17/08/2026 : la saisie peut porter sur n'importe
 // quelle évaluation (séquence) du TRIMESTRE ACTIF — pas seulement LA
@@ -143,6 +147,7 @@ if ($onglet === 'classe') {
     if ($_SERVER['REQUEST_METHOD'] === 'POST' && post('action') === 'save_classe') {
         csrf_verifier();
         $p_classe = (int) post('id_cl');
+        exiger_acces_classe($p_classe, $val_annee, 'fr');
         $p_seq    = (int) post('id_seq');
         $p_comp   = (int) post('id_comp');
 
@@ -200,7 +205,9 @@ if ($onglet === 'classe') {
 //  ONGLET 2 — Saisie par élève (toutes les compétences, un élève)
 // ══════════════════════════════════════════════════════════════
 $id_cl_e  = (int) ($_GET['classe_e'] ?? 0);
+exiger_acces_classe($id_cl_e, $val_annee, 'fr');
 $id_eleve = (int) ($_GET['eleve_e'] ?? 0);
+exiger_acces_eleve($id_eleve, 'fr');
 // Demande explicite du 17/08/2026 : même règle que l'onglet 1 — n'importe
 // quelle évaluation du trimestre actif, pas seulement la séquence active.
 $seqs_trim_actif_e = sequences_trimestre_actif();
@@ -244,6 +251,7 @@ if ($onglet === 'eleve') {
         csrf_verifier();
         $p_seq    = (int) post('id_seq');
         $p_classe = (int) post('id_cl');
+        exiger_acces_classe($p_classe, $val_annee, 'fr');
         $p_eleve  = (int) post('id_eleve');
 
         // Défense en profondeur : même contrôle que l'onglet 1.
@@ -296,6 +304,7 @@ if ($onglet === 'eleve') {
 //  ONGLET 3 — Copie de notes (d'une séquence vers une autre)
 // ══════════════════════════════════════════════════════════════
 $id_cl_cop   = (int) ($_GET['classe_cop'] ?? 0);
+exiger_acces_classe($id_cl_cop, $val_annee, 'fr');
 $id_seq_src  = (int) ($_GET['seq_src'] ?? 0);
 $id_seq_dst  = (int) ($_GET['seq_dst'] ?? 0);
 $id_comp_cop = (int) ($_GET['comp_cop'] ?? 0);
@@ -328,6 +337,7 @@ if ($onglet === 'copie') {
     if ($_SERVER['REQUEST_METHOD'] === 'POST' && post('action') === 'exec_copie') {
         csrf_verifier();
         $p_classe = (int) post('id_cl');
+        exiger_acces_classe($p_classe, $val_annee, 'fr');
         $p_src    = (int) post('id_seq_src');
         $p_dst    = (int) post('id_seq_dst');
         $p_comp   = (int) post('id_comp');
@@ -383,6 +393,7 @@ if ($onglet === 'copie') {
 //  ONGLET 4 — Compétences non saisies (évaluation choisie du trimestre actif)
 // ══════════════════════════════════════════════════════════════
 $id_cl_ns   = (int) ($_GET['classe_ns'] ?? 0);
+exiger_acces_classe($id_cl_ns, $val_annee, 'fr');
 $non_saisis = [];
 // Demande explicite du 17/08/2026 : même règle que les onglets 1 et 2.
 $seqs_trim_actif_ns = sequences_trimestre_actif();

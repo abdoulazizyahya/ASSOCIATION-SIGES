@@ -11,6 +11,7 @@ require_once __DIR__ . '/fpdf.php';
 require_once __DIR__ . '/header_pdf.php';
 
 $id_classe = (int) ($_GET['classe'] ?? 0);
+exiger_acces_classe($id_classe, get_annee_active()['val_annee'] ?? '', 'ar');   // cloisonnement enseignant
 $id_trim   = (int) ($_GET['trim'] ?? 0);
 $dl        = ($_GET['dl'] ?? '0') === '1';
 if (!$id_classe || !$id_trim) die('Paramètres classe/trim manquants.');

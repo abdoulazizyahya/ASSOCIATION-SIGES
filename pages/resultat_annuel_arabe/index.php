@@ -23,19 +23,21 @@ $is_admin  = $role === 'DIRECTEUR'; // Meilleurs élèves réservé DIRECTEUR (c
 $annee_act = get_annee_active();
 $val_annee = $annee_act['val_annee'] ?? '';
 
-$classes = db_all(
+// Enseignant restreint : seulement ses classes de piste ARABE.
+$classes = filtrer_classes_visibles(db_all(
     "SELECT c.IDClasses, c.DesignationClasses, n.OrdreNiveau
      FROM classe c LEFT JOIN niveau n ON n.LibelleNiveau = c.Niveau
      JOIN inscrire i ON i.IDClasses = c.IDClasses AND i.val_annee = ?
      GROUP BY c.IDClasses, c.DesignationClasses, n.OrdreNiveau
      ORDER BY n.OrdreNiveau, c.DesignationClasses",
     [$val_annee]
-);
+), $val_annee, 'ar');
 
 $onglet = in_array($_GET['onglet'] ?? '', ['classe', 'etablissement', 'provisoire'], true) ? $_GET['onglet'] : 'classe';
 if ($onglet === 'etablissement' && !$is_admin) $onglet = 'classe';
 
 $id_classe = (int) ($_GET['classe'] ?? 0);
+exiger_acces_classe($id_classe, $val_annee, 'ar');
 $filtre    = in_array($_GET['filtre'] ?? '', ['admis', 'redoublants', 'exclus', 'tous'], true) ? $_GET['filtre'] : 'tous';
 $limite    = max(0, (int) ($_GET['limite'] ?? 10));
 $ordre     = ($_GET['ordre'] ?? 'merite') === 'alpha' ? 'alpha' : 'merite';

@@ -23,11 +23,10 @@ if ($acces_public) {
 } else {
     exiger_connexion();
     $role = role_connecte();
-    if (in_array($role, ['ADMIN','PROVISEUR','CENSEUR'])) {
-        $mat = $_GET['id'] ?? '';
+    if (in_array($role, ['DIRECTEUR', 'FONDATEUR', 'SECRETAIRE'], true)) {
+        $mat = $_GET['id'] ?? '';           // RH : document pour n'importe quel agent
     } elseif ($role === 'ENSEIGNANT') {
-        $mat = matricule_ens_courant() ?? '';
-        if (!$mat || !demande_validee_existe($mat, $type)) die('Accès refusé : aucune demande validée pour ce document.');
+        $mat = matricule_ens_courant() ?? '';   // libre-service : son propre document
     } else {
         die('Accès refusé.');
     }
