@@ -14,9 +14,15 @@
 //  Idempotent (le fichier fait DELETE puis INSERT sur ces tables).
 //  N'affecte NI les élèves, NI les classes, NI les notes, NI les années.
 //
-//  Optionnel : --bareme applique aussi le gabarit `bareme_reference` à la
-//  table de travail `discipline` de l'année scolaire active (lignes
-//  manquantes seulement — un barème déjà saisi n'est pas touché).
+//  Options :
+//   --bareme   applique le gabarit `bareme_reference` à la table de travail
+//              `discipline` de l'année active (lignes manquantes seulement).
+//   --classes  PROVISIONNE l'école comme une école neuve : 8 classes
+//              standard + année scolaire courante active (3 trimestres,
+//              UA1-UA6) + barème de travail dérivé. Idempotent : ne crée
+//              rien si des classes / cette année existent déjà. Utile pour
+//              une école inscrite mais jamais configurée.
+//   --sans-backup  saute la sauvegarde de sécurité.
 //
 //  Une sauvegarde de sécurité de chaque base est écrite dans bd/sauvegardes/
 //  avant l'opération (désactivable avec --sans-backup).
@@ -27,7 +33,7 @@
 //  le jeu de référence.
 //
 //  Usage :
-//    php bd/assoc/reseeder_ecole.php <CODE|--tout> [--bareme] [--sans-backup]
+//    php bd/assoc/reseeder_ecole.php <CODE|--tout> [--bareme] [--classes] [--sans-backup]
 // =====================================================================
 
 require_once __DIR__ . '/../../config.php';
@@ -40,6 +46,7 @@ if (!annuaire_dispo()) { fwrite(STDERR, "Annuaire absent.\n"); exit(1); }
 $a          = $argv ?? [];
 $cible      = $a[1] ?? '';
 $bareme     = in_array('--bareme', $a, true);
+$classes    = in_array('--classes', $a, true);
 $sans_bkp   = in_array('--sans-backup', $a, true);
 
 if ($cible === '') {
@@ -95,6 +102,13 @@ foreach ($ecoles as $e) {
         $stats[] = "$t=" . ($r ? mysqli_fetch_row($r)[0] : '?');
     }
     echo "  référence OK — " . implode(', ', $stats) . "\n";
+
+    if ($classes) {
+        $p = provisionner_ecole_neuve($l);
+        echo "  provisionnement : {$p['classes']} classe(s), "
+           . ($p['sequences'] ? "année {$p['annee']} active (+6 UA), " : "année déjà présente, ")
+           . "{$p['bareme']} ligne(s) barème\n";
+    }
 
     if ($bareme) {
         $va = mysqli_fetch_row(mysqli_query($l,

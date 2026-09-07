@@ -196,6 +196,17 @@ function charger_schema_ecole(mysqli $l, array $seed): int {
     mysqli_stmt_bind_param($st, 'ssss', $seed['nom'], $seed['nom_en'], $seed['sigle'], $seed['ville']);
     mysqli_stmt_execute($st);
     mysqli_stmt_close($st);
+
+    // Provisionnement « école neuve » : classes standard + année scolaire
+    // active + barème de travail dérivé du gabarit. Best-effort — un échec
+    // ici ne doit pas empêcher la création de l'école (rattrapable via
+    // bd/assoc/reseeder_ecole.php --classes).
+    try {
+        provisionner_ecole_neuve($l);
+    } catch (\Throwable $ex) {
+        error_log('provisionner_ecole_neuve: ' . $ex->getMessage());
+    }
+
     return $nbTables;
 }
 
@@ -224,11 +235,83 @@ function charger_seed_ref_ecole(mysqli $l): int {
     return $n;
 }
 
-// NB : l'application du gabarit `bareme_reference` vers la table de travail
-// `discipline` se fait côté « école » (à la création d'une classe et à
-// l'ouverture de la 1re année) — voir appliquer_bareme_reference() dans
-// fonctions.php. Rien à faire ici : charger_seed_ref_ecole() a suffi à
-// installer la table et son contenu de référence.
+// ── Provisionnement d'une école neuve ──────────────────────────────
+//  Amène une base fraîchement créée / vidée à l'état « prête à l'emploi » :
+//   1. les 8 classes standard (progression M → CM1 + CLASS 1 anglophone),
+//      chaînées par `classe_suivante` (passage automatique en classe sup.) ;
+//   2. l'année scolaire courante, ACTIVE, avec 3 trimestres et 6 évaluations
+//      (UA1-UA6) ;
+//   3. le barème de travail (`discipline`) de cette année, dérivé du gabarit
+//      `bareme_reference` (une ligne par classe × compétence du niveau).
+//  Chaque étape est idempotente (ne fait rien si déjà présente). $l : mysqli
+//  avec la base école sélectionnée. Retour : compteurs.
+function provisionner_ecole_neuve(mysqli $l, ?string $val_annee = null): array {
+    if ($val_annee === null) {
+        // Année de la rentrée en cours (la nouvelle année commence en août).
+        $y = (int) date('Y') - ((int) date('n') < 8 ? 1 : 0);
+        $val_annee = $y . '/' . ($y + 1);
+    }
+    $va  = mysqli_real_escape_string($l, $val_annee);
+    $out = ['classes' => 0, 'annee' => $val_annee, 'sequences' => 0, 'bareme' => 0];
+
+    // 1. Classes standard (uniquement si la base n'en a aucune).
+    if ((int) mysqli_fetch_row(mysqli_query($l, "SELECT COUNT(*) FROM classe"))[0] === 0) {
+        $standard = [
+            ['1ère Année', 'M'],   ['2ème Année', 'M'],
+            ['SIL', 'I'],          ['CP', 'I'],
+            ['CE1', 'II'],         ['CE2', 'II'],
+            ['CM1', 'III'],        ['CLASS 1', 'LEVEL 1'],
+        ];
+        $st = mysqli_prepare($l, "INSERT INTO classe (DesignationClasses, Niveau) VALUES (?, ?)");
+        $ids = [];
+        foreach ($standard as [$des, $niv]) {
+            mysqli_stmt_bind_param($st, 'ss', $des, $niv);
+            mysqli_stmt_execute($st);
+            $ids[] = mysqli_insert_id($l);
+        }
+        mysqli_stmt_close($st);
+        // Progression 1ère → 2ème → SIL → CP → CE1 → CE2 → CM1 (indices 0..6).
+        // CM1 (6) et CLASS 1 (7) : pas de suivante.
+        for ($i = 0; $i < 6; $i++) {
+            mysqli_query($l, "UPDATE classe SET classe_suivante = {$ids[$i + 1]} WHERE IDClasses = {$ids[$i]}");
+        }
+        $out['classes'] = count($ids);
+    }
+
+    // 2. Année scolaire active + trimestres + évaluations (si cette année absente).
+    if ((int) mysqli_fetch_row(mysqli_query($l,
+            "SELECT COUNT(*) FROM annee_scolaire WHERE val_annee = '$va'"))[0] === 0) {
+        mysqli_query($l, "UPDATE annee_scolaire SET Etat_annee_scolaire = 0");
+        mysqli_query($l, "INSERT INTO annee_scolaire (val_annee, Etat_annee_scolaire) VALUES ('$va', 1)");
+        $trims = [];
+        foreach (['1er Trimestre', '2eme Trimestre', '3eme Trimestre'] as $lt) {
+            mysqli_query($l, "INSERT INTO trimestre (libelle_trim, id_annee) VALUES ('$lt', '$va')");
+            $trims[] = mysqli_insert_id($l);
+        }
+        foreach ([[0,'UA1'],[0,'UA2'],[1,'UA3'],[1,'UA4'],[2,'UA5'],[2,'UA6']] as [$ti, $ls]) {
+            mysqli_query($l, "INSERT INTO sequence (libelle_seq, etat, id_trim) VALUES ('$ls', 0, {$trims[$ti]})");
+        }
+        $out['sequences'] = 6;
+    }
+
+    // 3. Barème de travail dérivé du gabarit bareme_reference (lignes manquantes).
+    $chk = mysqli_query($l, "SELECT COUNT(*) FROM information_schema.tables
+                             WHERE table_schema = DATABASE() AND table_name = 'bareme_reference'");
+    if ($chk && (int) mysqli_fetch_row($chk)[0] > 0) {
+        mysqli_query($l,
+            "INSERT INTO discipline (IDClasses, id_comp, annee_scol, orale, ecrite, pratique, savoir_etre, total_points, actif)
+             SELECT c.IDClasses, b.id_comp, '$va', b.orale, b.ecrite, b.pratique, b.savoir_etre, b.total_points, b.actif
+             FROM bareme_reference b
+             JOIN classe c ON c.Niveau = b.code_niveau
+             WHERE NOT EXISTS (
+                 SELECT 1 FROM discipline d
+                 WHERE d.IDClasses = c.IDClasses AND d.id_comp = b.id_comp AND d.annee_scol = '$va'
+             )");
+        $out['bareme'] = mysqli_affected_rows($l);
+    }
+
+    return $out;
+}
 
 // Best-effort : vide toutes les tables d'une base (restaure une base du
 // pool à l'état « vide » après un chargement de schéma échoué).

@@ -54,16 +54,27 @@ l'ouverture de la **première année scolaire** d'une école neuve (`pages/param
 quand `reporter_bareme_annee()` n'a rien à reporter) — via `appliquer_bareme_reference()`
 (`fonctions.php`), non destructif.
 
-Créer une année scolaire provisionne toujours **3 trimestres + 6 évaluations (UA1-UA6)** —
-comportement existant, désormais fiable sur une école neuve puisque la référence est en place.
+### École neuve « prête à l'emploi » (`provisionner_ecole_neuve()`)
 
-**Réappliquer la référence à une école existante** (ex. écoles créées avant cette version) :
+À la création d'un établissement — et au **vidage** / à la **création de base** — la base est
+amenée à un état directement utilisable (`charger_schema_ecole()` appelle
+`provisionner_ecole_neuve()`) :
+
+1. **8 classes standard** — 1ère Année, 2ème Année (niveau M), SIL, CP (I), CE1, CE2 (II),
+   CM1 (III), CLASS 1 (LEVEL 1) — chaînées par `classe_suivante` (passage automatique).
+2. **Année scolaire courante, ACTIVE** (rentrée = août), avec 3 trimestres + 6 évaluations UA1-UA6.
+3. **Barème de travail** (`discipline`) de cette année dérivé du gabarit `bareme_reference`.
+
+Chaque étape est idempotente (ne fait rien si des classes / cette année existent déjà).
+
+**Réappliquer à une école existante** (créée avant cette version, ou jamais configurée) :
 ```
-php bd/assoc/reseeder_ecole.php <CODE|--tout> [--bareme]
+php bd/assoc/reseeder_ecole.php <CODE|--tout> [--classes] [--bareme] [--sans-backup]
 ```
-`--bareme` remplit aussi les lignes `discipline` manquantes de l'année active. Sauvegarde de
-sécurité écrite avant (sauf `--sans-backup`). ⚠ écrase les niveaux/compétences personnalisés
-par l'école, le cas échéant.
+- `--classes` : provisionne classes + année active + barème (comme une école neuve).
+- `--bareme` : remplit seulement les lignes `discipline` manquantes de l'année active.
+- Sauvegarde de sécurité écrite avant (sauf `--sans-backup`).
+- ⚠ le rechargement du seed écrase les niveaux/compétences personnalisés par l'école, le cas échéant.
 
 ## 2 bis. Supprimer une école
 
