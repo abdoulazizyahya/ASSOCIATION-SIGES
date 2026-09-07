@@ -682,12 +682,15 @@ function supprimer_etablissement(int $id, array $opts = []): array {
 
 /** Liste des membres + résumé de leurs droits. */
 function assoc_membres_liste(): array {
-    $cols = assoc_2fa_disponible()
-        ? "id, login, nom, prenom, email, actif, totp_actif, cree_le"
-        : "id, login, nom, prenom, email, actif, cree_le";
-    $membres = assoc_all("SELECT $cols FROM membre ORDER BY actif DESC, login");
+    $cols = ['id', 'login', 'nom', 'prenom', 'email', 'actif', 'cree_le'];
+    $prop = assoc_proprietaire_dispo();
+    if (assoc_2fa_disponible()) $cols[] = 'totp_actif';
+    if ($prop)                  $cols[] = 'proprietaire';
+    $ordre = ($prop ? 'proprietaire DESC, ' : '') . 'actif DESC, login';
+    $membres = assoc_all("SELECT " . implode(', ', $cols) . " FROM membre ORDER BY $ordre");
     foreach ($membres as &$m) {
-        $m['superadmin'] = (bool) assoc_val(
+        $m['proprietaire'] = !empty($m['proprietaire']);
+        $m['superadmin'] = $m['proprietaire'] || (bool) assoc_val(
             "SELECT COUNT(*) FROM membre_acces WHERE id_membre=? AND actif=1 AND id_etablissement IS NULL AND plein_acces=1",
             [$m['id']]
         );
@@ -708,6 +711,11 @@ function assoc_membres_liste(): array {
 function assoc_membre_detail(int $id): ?array {
     $m = assoc_one("SELECT * FROM membre WHERE id=?", [$id]);
     if (!$m) return null;
+    $m['proprietaire'] = !empty($m['proprietaire']);
+    $m['superadmin_effectif'] = $m['proprietaire'] || (bool) assoc_val(
+        "SELECT COUNT(*) FROM membre_acces WHERE id_membre=? AND actif=1 AND id_etablissement IS NULL AND plein_acces=1",
+        [$id]
+    );
     $m['acces'] = assoc_all(
         "SELECT a.id, a.id_etablissement, a.plein_acces, a.actif, e.code, e.nom
          FROM membre_acces a
@@ -769,7 +777,11 @@ function assoc_membre_mot_de_passe(int $id, string $pwd): array {
 //  $portee : 'global' (toutes les écoles) ou un id d'établissement.
 //  $niveau : 'aucun' (retire l'accès), 'lecture' (visite lecture seule) ou
 //            'ecriture' (plein_acces=1). 'global'+'ecriture' = superadmin.
-function assoc_acces_definir(int $id_membre, string $portee, string $niveau): array {
+//  $par_proprietaire : true si l'opération est faite par le propriétaire de
+//            l'association. Requis pour toucher le TIER SUPERADMIN (accorder
+//            OU retirer l'accès global en écriture) — un superadmin « simple »
+//            ne peut gérer que les accès par école et l'accès global lecture.
+function assoc_acces_definir(int $id_membre, string $portee, string $niveau, bool $par_proprietaire = false): array {
     if (!assoc_val("SELECT COUNT(*) FROM membre WHERE id=?", [$id_membre])) {
         return ['ok' => false, 'message' => "Membre introuvable."];
     }
@@ -779,6 +791,17 @@ function assoc_acces_definir(int $id_membre, string $portee, string $niveau): ar
     }
     if (!in_array($niveau, ['aucun', 'lecture', 'ecriture'], true)) {
         return ['ok' => false, 'message' => "Niveau d'accès invalide."];
+    }
+
+    // Garde du tier superadmin.
+    if ($id_etab === null && !$par_proprietaire) {
+        $deja_superadmin = (bool) assoc_val(
+            "SELECT COUNT(*) FROM membre_acces
+             WHERE id_membre=? AND actif=1 AND id_etablissement IS NULL AND plein_acces=1", [$id_membre]);
+        if ($niveau === 'ecriture' || $deja_superadmin) {
+            return ['ok' => false, 'message' =>
+                "Seul le propriétaire de l'association peut accorder ou retirer le niveau superadmin."];
+        }
     }
 
     $where = $id_etab === null ? "id_etablissement IS NULL" : "id_etablissement=" . (int) $id_etab;
@@ -1298,6 +1321,20 @@ function assoc_2fa_disponible(): bool {
             $ok = (bool) assoc_val(
                 "SELECT COUNT(*) FROM information_schema.columns
                  WHERE table_schema = DATABASE() AND table_name = 'membre' AND column_name = 'totp_actif'"
+            );
+        } catch (\Throwable $e) { $ok = false; }
+    }
+    return $ok;
+}
+
+/** La colonne membre.proprietaire existe-t-elle (bd/assoc/maj_assoc.php passé) ? */
+function assoc_proprietaire_dispo(): bool {
+    static $ok = null;
+    if ($ok === null) {
+        try {
+            $ok = (bool) assoc_val(
+                "SELECT COUNT(*) FROM information_schema.columns
+                 WHERE table_schema = DATABASE() AND table_name = 'membre' AND column_name = 'proprietaire'"
             );
         } catch (\Throwable $e) { $ok = false; }
     }

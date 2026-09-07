@@ -51,6 +51,7 @@ CREATE TABLE IF NOT EXISTS `membre` (
   `prenom`       varchar(100) DEFAULT NULL,
   `email`        varchar(150) DEFAULT NULL,
   `actif`        tinyint(1)   NOT NULL DEFAULT 1,
+  `proprietaire` tinyint(1)   NOT NULL DEFAULT 0,    -- compte fondateur : seul habilité à créer/retirer d'autres superadmins
   `totp_secret`  varchar(64)  DEFAULT NULL,          -- secret Base32 de la double authentification
   `totp_actif`   tinyint(1)   NOT NULL DEFAULT 0,    -- 2FA exigée à la connexion
   `cree_le`      datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP,

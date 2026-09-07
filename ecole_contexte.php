@@ -73,11 +73,28 @@ function est_lecture_seule(): bool {
     return false;
 }
 
+// Propriétaire de l'association : compte fondateur (membre.proprietaire=1).
+// Au-dessus du superadmin — SEUL habilité à accorder ou retirer le niveau
+// superadmin à un autre membre (association/membres/voir.php). Colonne
+// ajoutée par bd/assoc/maj_assoc.php : son absence est tolérée (false).
+function est_proprietaire_association(): bool {
+    if (!annuaire_dispo() || !est_membre_association()) return false;
+    $m = membre_connecte();
+    try {
+        return (bool) assoc_val("SELECT proprietaire FROM membre WHERE id=?", [$m['id'] ?? 0]);
+    } catch (\Throwable $e) {
+        return false;   // colonne pas encore présente
+    }
+}
+
 // Superadmin de l'association : membre disposant d'un accès GLOBAL en
-// écriture (membre_acces : id_etablissement NULL + plein_acces=1). Seul
-// habilité à créer une école, affecter un agent à une école, frapper un NIU.
+// écriture (membre_acces : id_etablissement NULL + plein_acces=1), ou le
+// propriétaire (qui l'est toujours, même si sa ligne d'accès a été retirée
+// par erreur — anti-verrouillage). Seul habilité à créer une école,
+// affecter un agent à une école, frapper un NIU.
 function est_superadmin_association(): bool {
     if (!annuaire_dispo() || !est_membre_association()) return false;
+    if (est_proprietaire_association()) return true;
     $m = membre_connecte();
     return (bool) assoc_val(
         "SELECT COUNT(*) FROM membre_acces

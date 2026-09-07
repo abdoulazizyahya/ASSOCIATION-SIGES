@@ -92,14 +92,17 @@ out("OK  schema_version_etab(EC1) = $vmax.");
 $nb_membres = (int) mysqli_fetch_row(mysqli_query($assoc, "SELECT COUNT(*) FROM membre"))[0];
 if ($nb_membres === 0) {
     $hash = password_hash($pwd_admin, PASSWORD_DEFAULT);
+    // proprietaire=1 : ce 1er compte est le PROPRIÉTAIRE de l'association —
+    // seul habilité à accorder/retirer le niveau superadmin à d'autres
+    // membres (cf. ecole_contexte.php::est_proprietaire_association()).
     $stmt = mysqli_prepare($assoc,
-        "INSERT INTO membre (login, pwd_hash, nom, prenom, actif)
-         VALUES ('admin', ?, 'Administrateur', 'Association', 1)");
+        "INSERT INTO membre (login, pwd_hash, nom, prenom, actif, proprietaire)
+         VALUES ('admin', ?, 'Administrateur', 'Association', 1, 1)");
     mysqli_stmt_bind_param($stmt, 's', $hash);
     mysqli_stmt_execute($stmt);
     $id_membre = mysqli_stmt_insert_id($stmt);
     mysqli_stmt_close($stmt);
-    // plein_acces=1 + id_etablissement NULL : ce 1er compte est le
+    // plein_acces=1 + id_etablissement NULL : ce 1er compte est aussi le
     // SUPERADMIN de l'association (crée les écoles, affecte les agents,
     // frappe les NIU — cf. ecole_contexte.php::est_superadmin_association()).
     mysqli_query($assoc,

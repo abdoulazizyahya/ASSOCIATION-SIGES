@@ -49,6 +49,29 @@ if (!col_existe('membre', 'totp_actif')) {
     $fait[] = "membre.totp_actif ajoutée";
 }
 
+// ── Hiérarchie : membre.proprietaire ─────────────────────────────
+//  Le « propriétaire » (compte fondateur) est le seul habilité à accorder
+//  ou retirer le niveau superadmin à un autre membre. Sur une base
+//  existante, on désigne le plus ancien superadmin (ou, à défaut, le plus
+//  ancien membre actif).
+if (!col_existe('membre', 'proprietaire')) {
+    mysqli_query($link_assoc, "ALTER TABLE `membre` ADD COLUMN `proprietaire` tinyint(1) NOT NULL DEFAULT 0 AFTER `actif`");
+    $fait[] = "membre.proprietaire ajoutée";
+}
+if (!(int) assoc_val("SELECT COUNT(*) FROM membre WHERE proprietaire=1")) {
+    $cible = (int) (assoc_val(
+        "SELECT m.id FROM membre m
+         JOIN membre_acces a ON a.id_membre = m.id
+         WHERE a.actif=1 AND a.id_etablissement IS NULL AND a.plein_acces=1 AND m.actif=1
+         ORDER BY m.id LIMIT 1"
+    ) ?? assoc_val("SELECT id FROM membre WHERE actif=1 ORDER BY id LIMIT 1") ?? 0);
+    if ($cible) {
+        assoc_exec("UPDATE membre SET proprietaire=1 WHERE id=?", [$cible]);
+        $log = assoc_val("SELECT login FROM membre WHERE id=?", [$cible]);
+        $fait[] = "propriétaire désigné : « $log » (#$cible)";
+    }
+}
+
 // ── Limitation des connexions : table login_echec ─────────────────
 if (!table_existe('login_echec')) {
     mysqli_query($link_assoc,

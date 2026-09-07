@@ -45,7 +45,9 @@ asso_haut('Membres de l\'association');
               <?php if ($m['email']): ?><div class="small text-muted2"><?= h($m['email']) ?></div><?php endif; ?>
           </td>
           <td>
-            <?php if ($m['superadmin']): ?>
+            <?php if (!empty($m['proprietaire'])): ?>
+              <span class="badge bg-warning text-dark"><i class="bi bi-key-fill me-1"></i>Propriétaire</span>
+            <?php elseif ($m['superadmin']): ?>
               <span class="badge bg-primary">Superadmin</span>
             <?php elseif ($m['global_lecture']): ?>
               <span class="badge badge-soft">Toutes écoles · lecture</span>
@@ -101,7 +103,12 @@ asso_haut('Membres de l\'association');
     </div>
     <div class="col-12 mt-2">
       <button class="btn btn-primary btn-sm"><i class="bi bi-plus-lg me-1"></i>Créer le membre</button>
-      <span class="small text-muted2 ms-2">Les accès aux écoles se règlent ensuite via « Gérer ».</span>
+      <span class="small text-muted2 ms-2">
+        Le membre est créé sans accès. Réglez ensuite ses droits par école via « Gérer ».
+        <?php if (!est_proprietaire_association()): ?>
+          Le niveau <strong>superadmin</strong> ne peut être accordé que par le propriétaire de l'association.
+        <?php endif; ?>
+      </span>
     </div>
   </form>
 </div>

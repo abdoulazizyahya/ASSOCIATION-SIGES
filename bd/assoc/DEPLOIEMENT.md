@@ -103,6 +103,18 @@ La barre de navigation `/association/` expose, pour un superadmin :
 |---|---|
 | **Tableau de bord** (`dashboard.php`) | Effectifs consolidés (élèves G/F, classes, enseignants) + état de santé par école : base joignable, version de schéma vs dernière migration, année scolaire active, directeur affecté, fraîcheur de la dernière sauvegarde, taille de la base. Chaque anomalie remonte en badge dans la colonne « État ». |
 | **Membres** (`membres/index.php`, `membres/voir.php`) | Créer / désactiver un membre, réinitialiser un mot de passe, et régler ses **accès** : globaux (toutes écoles, lecture ou écriture) ou par école. « Écriture globale » = superadmin. Garde-fous : on ne peut ni se désactiver soi-même ni retirer le dernier accès superadmin. Remplace l'édition SQL directe de `membre_acces`. |
+
+**Hiérarchie des comptes** — 3 niveaux :
+
+| Niveau | `membre` | Peut |
+|---|---|---|
+| **Propriétaire** | `proprietaire=1` (compte fondateur, 1 seul) | tout, **+ accorder / retirer le niveau superadmin** à un autre membre, **+ transférer la propriété** |
+| **Superadmin** | `membre_acces` global écriture | créer des écoles, gérer les membres et leurs accès **par école**, frapper les NIU — mais **pas** promouvoir / rétrograder un superadmin, ni modifier le compte du propriétaire |
+| Membre | `membre_acces` par école (lecture / écriture) ou global lecture | visiter / gérer les écoles autorisées |
+
+Le propriétaire initial = le 1er compte (`installer.php`). Sur une base existante, `maj_assoc.php`
+le désigne (plus ancien superadmin). Le propriétaire est toujours superadmin (anti-verrouillage)
+et son compte ne peut être ni désactivé ni modifié par un tiers.
 | **Journal** (`journal.php`) | Journal d'audit filtrable (membre / école / action / période) : connexions, visites d'écoles, créations-modifications-suppressions d'établissements, export/import/vidage de bases, transferts NIU, migrations. Bouton de purge des entrées > 12 mois. |
 | **Migrations** (`migrations.php`) | Version de schéma de chaque école vs la dernière `bd/migration_v*.sql`, et bouton **Migrer** (par école ou toutes les écoles en retard). Une **sauvegarde de sécurité** est écrite avant application ; arrêt à la première migration en échec. Équivalent UI de `migrer_toutes_ecoles.php`. |
 | **Démarrage** (`etablissement_demarrage.php?id=N`) | Checklist « école opérationnelle » : base créée, schéma à jour, fondateur/directeur affectés, année ouverte, classes, logo — avec les liens d'action pour chaque point manquant. Accessible depuis la fiche et le cockpit. |
