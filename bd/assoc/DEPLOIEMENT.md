@@ -43,8 +43,10 @@ elles n'ont pas à être ressaisies :
   `discipline_arabe`), critères de conseil ;
 - **géographie** Cameroun (`pays`, `region`, `departement`, `arrondissement`) ;
 - grades enseignants, questions secrètes, couleurs PDF, catégories de dépense ;
-- **`bareme_reference`** — gabarit du barème APC (points oral/écrit/pratique/savoir-être par
-  compétence et par niveau).
+- **`bareme_reference`** — gabarit du barème APC : points oral/écrit/pratique/savoir-être pour
+  **les 7 niveaux** (M, I, II, III, LEVEL 1-3) × **13 compétences** (les 11 générales + Arabe /
+  Éducation islamique, ces 2 dernières `actif=0` par défaut, activées si l'école ouvre une
+  section arabe).
 
 Le **barème de travail** reste dans `discipline` (par classe et par année). Il est dérivé du
 gabarit automatiquement : à la **création d'une classe** (`pages/classes/form.php`) et à
