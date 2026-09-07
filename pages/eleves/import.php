@@ -52,7 +52,7 @@ $CHAMPS = [
                          'syn' => ['adresse','address','domicile','residence','quartier']],
     'niu'            => ['label' => 'NIU',              'requis' => false, 'aide' => '',
                          'syn' => ['niu','identifiantunique','numeroidentifiantunique','numeroidentifiant']],
-    'classe'         => ['label' => 'Classe',           'requis' => false, 'aide' => 'Doit correspondre à une classe existante',
+    'classe'         => ['label' => 'Classe',           'requis' => false, 'aide' => 'Classe existante, ou créée automatiquement si ≥ 5 élèves',
                          'syn' => ['classe','class','classeeleve']],
     'statut'         => ['label' => 'Statut',           'requis' => false, 'aide' => 'Nouveau / Redoublant',
                          'syn' => ['statut','status','situation','statutinscription','statutinsc']],
@@ -76,6 +76,28 @@ function import_gc_temp(string $prefix): void {
     foreach (glob(sys_get_temp_dir() . '/' . $prefix . '*.xlsx') ?: [] as $f) {
         if (is_file($f) && filemtime($f) < time() - 3600) @unlink($f);
     }
+}
+
+// Devine le code niveau d'un libellé de classe (heuristique système scolaire
+// camerounais). Renvoie '' si indéterminé (la classe n'est alors PAS créée
+// automatiquement — l'utilisateur la crée à la main). $niveaux_valides =
+// liste des LibelleNiveau réellement présents dans la table `niveau`.
+function import_deviner_niveau(string $libelle, array $niveaux_valides): string {
+    $s = mb_strtolower(trim($libelle), 'UTF-8');
+    $s = strtr($s, ['è'=>'e','é'=>'e','ê'=>'e','ë'=>'e','à'=>'a','â'=>'a','î'=>'i','ï'=>'i','ô'=>'o','ù'=>'u','û'=>'u','ç'=>'c']);
+    $cand = '';
+    if (preg_match('~(maternelle|prematernelle|pre[ -]?maternelle|petite\s+section|moyenne\s+section|grande\s+section|1\s*(ere|re|e)?\s*ann?ee|2\s*(eme|e)?\s*ann?ee|nursery|kindergarten|kg|\bps\b|\bms\b|\bgs\b)~u', $s)) {
+        $cand = 'M';
+    } elseif (preg_match('~\b(sil|c\.?\s*i\.?|cours\s+d.?initiation)\b~u', $s) || preg_match('~\bcp\b|cours\s+preparatoire~u', $s)) {
+        $cand = 'I';
+    } elseif (preg_match('~\bce\s*1\b|cours\s+elementaire\s*1~u', $s) || preg_match('~\bce\s*2\b|cours\s+elementaire\s*2~u', $s)) {
+        $cand = 'II';
+    } elseif (preg_match('~\bcm\s*1\b|cours\s+moyen\s*1~u', $s) || preg_match('~\bcm\s*2\b|cours\s+moyen\s*2~u', $s)) {
+        $cand = 'III';
+    } elseif (preg_match('~\b(class|level|grade|primary|standard|std)\s*([1-6])\b~u', $s, $m)) {
+        $cand = 'LEVEL ' . min(3, max(1, (int) $m[2]));
+    }
+    return ($cand !== '' && in_array($cand, $niveaux_valides, true)) ? $cand : '';
 }
 
 $vue         = 'formulaire';   // formulaire | correspondance
@@ -232,6 +254,43 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             };
 
             $ok = 0; $erreurs = []; $total = 0; $matricules_utilises = [];
+
+            // ── Pré-passe : création automatique des classes absentes ──────
+            // Une classe présente dans le fichier mais absente de la base est
+            // créée si elle concerne AU MOINS 5 élèves (et si la case est
+            // cochée), avec un niveau déduit du nom et le barème par défaut —
+            // les élèves sont alors importés directement dans cette classe.
+            $creer_classes = !empty($_POST['creer_classes_absentes']);
+            $SEUIL_CLASSE  = 5;
+            $niveaux_valides = array_column(db_all("SELECT LibelleNiveau FROM niveau"), 'LibelleNiveau');
+
+            $compte_classe_absente = [];
+            foreach ($lignes as $i => $ligne) {
+                $n = $i + 1;
+                if ($n === 1 || ($ignorer_1ere && $n === 2)) continue;
+                $lbl = $val($ligne, 'classe');
+                if ($lbl === '' || $val($ligne, 'nom') === '') continue;
+                if (!isset($classes_idx[mb_strtolower($lbl)])) {
+                    $compte_classe_absente[$lbl] = ($compte_classe_absente[$lbl] ?? 0) + 1;
+                }
+            }
+
+            foreach ($compte_classe_absente as $lbl => $nb) {
+                if (!$creer_classes || $nb < $SEUIL_CLASSE) continue;
+                $niv = import_deviner_niveau($lbl, $niveaux_valides);
+                if ($niv === '') {
+                    $erreurs[] = ['ligne' => 0, 'msg' => "Classe « $lbl » : $nb élève(s), mais impossible de déduire le niveau du nom — créez-la dans le menu Classes puis relancez l'import."];
+                    continue;
+                }
+                db_exec("INSERT INTO classe (DesignationClasses, Niveau) VALUES (?, ?)", [trim($lbl), $niv]);
+                $new_id = (int) db_last_id();
+                if ($val_annee !== '') appliquer_bareme_reference($val_annee, [$new_id]);
+                synchroniser_bareme_niveau_arabe($niv, [$new_id]);
+                $classes_idx[mb_strtolower($lbl)] = ['IDClasses' => $new_id, 'DesignationClasses' => trim($lbl), 'Niveau' => $niv];
+                $erreurs[] = ['ligne' => 0, 'msg' => "Classe « $lbl » créée automatiquement — niveau « $niv », $nb élève(s), barème par défaut appliqué (vérifiez le niveau dans le menu Classes si besoin)."];
+            }
+            $classe_absente_signalee = [];
+
             foreach ($lignes as $i => $ligne) {
                 $num_ligne = $i + 1;
                 if ($num_ligne === 1) continue;                        // en-têtes
@@ -302,8 +361,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
 
                 $classe_trouvee = $classe_lbl !== '' ? ($classes_idx[mb_strtolower($classe_lbl)] ?? null) : null;
-                if ($classe_lbl !== '' && $classe_trouvee === null) {
-                    $erreurs[] = ['ligne' => $num_ligne, 'msg' => "Classe « $classe_lbl » introuvable — élève importé sans classe."];
+                if ($classe_lbl !== '' && $classe_trouvee === null && !isset($classe_absente_signalee[mb_strtolower($classe_lbl)])) {
+                    $classe_absente_signalee[mb_strtolower($classe_lbl)] = true;
+                    $nb_c = $compte_classe_absente[$classe_lbl] ?? 0;
+                    $raison = ($creer_classes && $nb_c > 0 && $nb_c < $SEUIL_CLASSE)
+                        ? " (moins de $SEUIL_CLASSE élèves — non créée automatiquement)" : '';
+                    $erreurs[] = ['ligne' => 0, 'msg' => "Classe « $classe_lbl » introuvable$raison — les élèves concernés sont importés sans classe."];
                 }
 
                 $statut_norm = normaliser_statut_insc($statut_insc);
@@ -397,7 +460,7 @@ function import_option_colonne(int $idx, string $lbl): string {
           <thead><tr><th style="width:80px">Ligne</th><th>Détail</th></tr></thead>
           <tbody>
             <?php foreach ($rapport['erreurs'] as $e): ?>
-              <tr><td><?= (int)$e['ligne'] ?></td><td><?= h($e['msg']) ?></td></tr>
+              <tr><td><?= (int)$e['ligne'] > 0 ? (int)$e['ligne'] : '<span class="text-muted">—</span>' ?></td><td><?= h($e['msg']) ?></td></tr>
             <?php endforeach; ?>
           </tbody>
         </table>
@@ -452,6 +515,14 @@ function import_option_colonne(int $idx, string $lbl): string {
           <input class="form-check-input" type="checkbox" id="ignorer_premiere_ligne" name="ignorer_premiere_ligne" value="1"<?= $ignorer_1ere ? ' checked' : '' ?>>
           <label class="form-check-label" for="ignorer_premiere_ligne" style="font-size:.8rem">
             Ignorer la première ligne de données (ligne d'exemple / de commentaire)
+          </label>
+        </div>
+
+        <div class="form-check mt-1">
+          <input class="form-check-input" type="checkbox" id="creer_classes_absentes" name="creer_classes_absentes" value="1"<?= empty($_POST) || !empty($_POST['creer_classes_absentes']) ? ' checked' : '' ?>>
+          <label class="form-check-label" for="creer_classes_absentes" style="font-size:.8rem">
+            Créer automatiquement une classe absente si le fichier contient au moins
+            <strong>5&nbsp;élèves</strong> pour cette classe (niveau déduit du nom, barème par défaut appliqué)
           </label>
         </div>
 
