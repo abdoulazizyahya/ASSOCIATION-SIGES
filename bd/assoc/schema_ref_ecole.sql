@@ -517,7 +517,7 @@ DROP TABLE IF EXISTS `eleve`;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `eleve` (
   `id_eleve` int unsigned NOT NULL AUTO_INCREMENT,
-  `Mat_elv` varchar(10) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `Mat_elv` varchar(30) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `Nom_elv` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL,
   `Nom_arabe_elv` varchar(250) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `Prenom_elv` varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
@@ -536,6 +536,21 @@ CREATE TABLE `eleve` (
   CONSTRAINT `fk_eleve_arrondissement` FOREIGN KEY (`id_arrondissement`) REFERENCES `arrondissement` (`code_arrond`) ON DELETE SET NULL ON UPDATE CASCADE
 ) ENGINE=InnoDB AUTO_INCREMENT=245 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
+
+-- Configuration du format de matricule (migration v52) — ligne unique id=1.
+DROP TABLE IF EXISTS `matricule_config`;
+CREATE TABLE `matricule_config` (
+  `id` tinyint(1) NOT NULL DEFAULT '1',
+  `mode` enum('auto','manuel') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'auto',
+  `format` varchar(60) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '{AA}{NIV}{SEQ}',
+  `longueur_seq` tinyint(2) NOT NULL DEFAULT '3',
+  `sequence_par` enum('annee_niveau','annee','globale') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'annee_niveau',
+  `maj_le` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+INSERT INTO `matricule_config` (`id`, `mode`, `format`, `longueur_seq`, `sequence_par`) VALUES
+(1, 'auto', '{AA}{NIV}{SEQ}', 3, 'annee_niveau');
+
 DROP TABLE IF EXISTS `enseignant`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;

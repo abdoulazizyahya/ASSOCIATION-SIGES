@@ -1267,19 +1267,89 @@ function finances_du_par_eleve(string $val_annee, ?int $id_classe = null, ?strin
 // même après une ou plusieurs suppressions. Repli sur un nombre aléatoire à
 // 3 chiffres si malgré tout ce matricule existe déjà (ex. deux
 // enregistrements simultanés), même filet de sécurité qu'avant.
+// ── Configuration du matricule (par école, migration v52) ────────────
+//  Table `matricule_config` à ligne unique (id=1). Renvoie des valeurs par
+//  défaut si la table/la ligne est absente (base pas encore migrée) : le
+//  défaut '{AA}{NIV}{SEQ}' / longueur_seq=3 reproduit EXACTEMENT l'ancien
+//  gen_matricule() (« 25P001 »).
+function matricule_config(): array {
+    static $c = null;
+    if ($c === null) {
+        $def = ['mode' => 'auto', 'format' => '{AA}{NIV}{SEQ}', 'longueur_seq' => 3, 'sequence_par' => 'annee_niveau'];
+        try {
+            $row = db_one("SELECT mode, format, longueur_seq, sequence_par FROM matricule_config WHERE id=1");
+        } catch (\Throwable $e) { $row = null; }
+        $c = $row ? array_merge($def, array_filter($row, fn($v) => $v !== null && $v !== '')) : $def;
+        $c['mode']         = $c['mode'] === 'manuel' ? 'manuel' : 'auto';
+        $c['longueur_seq'] = max(1, min(8, (int) $c['longueur_seq']));
+        // {SEQ} obligatoire en mode auto (sinon numéro impossible à placer).
+        if (strpos($c['format'], '{SEQ}') === false) $c['format'] = '{AA}{NIV}{SEQ}';
+    }
+    return $c;
+}
+
+/** Le matricule est-il saisi à la main (et éventuellement laissé vide) ? */
+function matricule_manuel(): bool {
+    return matricule_config()['mode'] === 'manuel';
+}
+
+/** Aperçu lisible d'un format de matricule (écran de configuration). */
+function matricule_exemple(string $format, int $lseq, string $val_annee = '2025/2026'): string {
+    $an = explode('/', $val_annee)[0] ?: $val_annee;
+    return strtr($format, [
+        '{AAAA}' => $an, '{AA}' => substr($an, -2), '{NIV}' => 'P',
+        '{SEQ}'  => str_pad('1', max(1, $lseq), '0', STR_PAD_LEFT),
+    ]);
+}
+
+// ── Génération de matricule ─────────────────────────────────
+//  Piloté par matricule_config() : le format est une suite de littéraux et
+//  de jetons {AA} {AAAA} {NIV} {SEQ}. Le préfixe (tout avant {SEQ}, jetons
+//  résolus) a une longueur fixe -> {SEQ} est extrait par SUBSTRING pour
+//  calculer le MAX (jamais un COUNT : se décalerait à chaque suppression et
+//  pourrait recréer un matricule déjà attribué). `sequence_par` élargit le
+//  périmètre du compteur : par (année, niveau) [défaut, historique], par
+//  année seule, ou global. Repli aléatoire en cas de collision (2
+//  enregistrements simultanés). Mode 'manuel' -> chaîne vide (le matricule
+//  est alors saisi, ou laissé vide, dans le formulaire).
 function gen_matricule(string $val_annee, string $niveau): string {
-    $code_an  = substr(explode('/', $val_annee)[0] ?: $val_annee, 2, 2);
-    $code_niv = (trim($niveau) === 'M') ? 'M' : 'P';
-    $base     = $code_an . $code_niv;
+    $cfg = matricule_config();
+    if ($cfg['mode'] === 'manuel') return '';
+
+    $an   = explode('/', $val_annee)[0] ?: $val_annee;
+    $aa   = substr($an, -2);
+    $niv  = (trim($niveau) === 'M') ? 'M' : 'P';
+    $lseq = (int) $cfg['longueur_seq'];
+
+    [$avant, $apres] = array_pad(explode('{SEQ}', $cfg['format'], 2), 2, '');
+    $resoudre = fn(string $s) => strtr($s, ['{AAAA}' => $an, '{AA}' => $aa, '{NIV}' => $niv]);
+    $prefixe = $resoudre($avant);
+    $suffixe = $resoudre($apres);
+
+    // Regex REGEXP : jetons -> classes selon le périmètre de séquence.
+    $an_wild  = $cfg['sequence_par'] === 'globale';
+    $niv_wild = in_array($cfg['sequence_par'], ['annee', 'globale'], true);
+    $regex = '^';
+    foreach (preg_split('/(\{AAAA\}|\{AA\}|\{NIV\}|\{SEQ\})/', $cfg['format'], -1, PREG_SPLIT_DELIM_CAPTURE) as $p) {
+        $regex .= match ($p) {
+            '{AAAA}' => $an_wild ? '[0-9]{4}' : preg_quote($an),
+            '{AA}'   => $an_wild ? '[0-9]{2}' : preg_quote($aa),
+            '{NIV}'  => $niv_wild ? '[MP]' : $niv,
+            '{SEQ}'  => '[0-9]{' . $lseq . '}',
+            default  => preg_quote($p),
+        };
+    }
+    $regex .= '$';
 
     $max = (int) db_val(
-        "SELECT MAX(CAST(SUBSTRING(Mat_elv, ?) AS UNSIGNED)) FROM eleve WHERE Mat_elv REGEXP ?",
-        [strlen($base) + 1, '^' . preg_quote($base) . '[0-9]{3}$']
+        "SELECT MAX(CAST(SUBSTRING(Mat_elv, ?, ?) AS UNSIGNED)) FROM eleve WHERE Mat_elv REGEXP ?",
+        [strlen($prefixe) + 1, $lseq, $regex]
     );
-    $matricule = $base . str_pad((string)($max + 1), 3, '0', STR_PAD_LEFT);
+    $matricule = $prefixe . str_pad((string) ($max + 1), $lseq, '0', STR_PAD_LEFT) . $suffixe;
 
     if (db_val("SELECT COUNT(*) FROM eleve WHERE Mat_elv=?", [$matricule])) {
-        $matricule = $base . random_int(100, 999);
+        $alea = random_int(1, (10 ** $lseq) - 1);
+        $matricule = $prefixe . str_pad((string) $alea, $lseq, '0', STR_PAD_LEFT) . $suffixe;
     }
     return $matricule;
 }

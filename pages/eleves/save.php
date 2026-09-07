@@ -44,9 +44,23 @@ $niu          = post('niu') ?: null;
 $id_classe    = (int) post('id_classe');
 $statut_insc  = normaliser_statut_insc(post('statut_insc'));
 
+// Matricule saisi à la main (matricule_config mode 'manuel') : champ libre,
+// normalisé en MAJUSCULES, éventuellement vide -> NULL. En mode 'auto' ce
+// champ n'existe pas dans le formulaire (généré côté serveur plus bas).
+$mat_manuel = matricule_manuel();
+$mat_saisi  = $mat_manuel ? (mb_strtoupper(trim(post('matricule'))) ?: null) : null;
+
 if ($nom === '') {
     flash_set('erreur', 'Le nom est obligatoire.');
     rediriger('pages/eleves/form.php' . ($id_existant ? '?id=' . $id_existant : ''));
+}
+
+if ($mat_manuel && $mat_saisi !== null) {
+    $collision = db_val("SELECT COUNT(*) FROM eleve WHERE Mat_elv=? AND id_eleve<>?", [$mat_saisi, $id_existant]);
+    if ($collision) {
+        flash_set('erreur', "Le matricule « $mat_saisi » est déjà attribué à un autre élève.");
+        rediriger('pages/eleves/form.php' . ($id_existant ? '?id=' . $id_existant : ''));
+    }
 }
 
 $annee     = get_annee_active();
@@ -64,17 +78,24 @@ if ($id_existant) {
     if (!$eleve) { flash_set('erreur', 'Élève introuvable.'); rediriger('pages/eleves/liste.php'); }
     $id = $id_existant;
 
+    // Matricule : modifiable seulement en mode 'manuel' (sinon jamais touché
+    // après création — il sert de référence stable).
+    $set_mat = $mat_manuel ? ', Mat_elv=?' : '';
     if ($photo_bin !== null) {
+        $p = [$nom, $nom_arabe, $prenom, $sexe, $date_naiss, $lieu_naiss, $id_arrondissement, $arrondissement, $adresse, $niu];
+        if ($mat_manuel) $p[] = $mat_saisi;
+        $p[] = $photo_bin; $p[] = $id;
         db_exec(
             "UPDATE eleve SET Nom_elv=?, Nom_arabe_elv=?, Prenom_elv=?, Sexe_elv=?, Date_naiss_elv=?, Lieu_naiss_elv=?,
-                    id_arrondissement=?, arrondissement_elv=?, Adresse_elv=?, niu=?, Photo_elv=? WHERE id_eleve=?",
-            [$nom, $nom_arabe, $prenom, $sexe, $date_naiss, $lieu_naiss, $id_arrondissement, $arrondissement, $adresse, $niu, $photo_bin, $id]
+                    id_arrondissement=?, arrondissement_elv=?, Adresse_elv=?, niu=?$set_mat, Photo_elv=? WHERE id_eleve=?", $p
         );
     } else {
+        $p = [$nom, $nom_arabe, $prenom, $sexe, $date_naiss, $lieu_naiss, $id_arrondissement, $arrondissement, $adresse, $niu];
+        if ($mat_manuel) $p[] = $mat_saisi;
+        $p[] = $id;
         db_exec(
             "UPDATE eleve SET Nom_elv=?, Nom_arabe_elv=?, Prenom_elv=?, Sexe_elv=?, Date_naiss_elv=?, Lieu_naiss_elv=?,
-                    id_arrondissement=?, arrondissement_elv=?, Adresse_elv=?, niu=? WHERE id_eleve=?",
-            [$nom, $nom_arabe, $prenom, $sexe, $date_naiss, $lieu_naiss, $id_arrondissement, $arrondissement, $adresse, $niu, $id]
+                    id_arrondissement=?, arrondissement_elv=?, Adresse_elv=?, niu=?$set_mat WHERE id_eleve=?", $p
         );
     }
     // Registre NIU central (multi-établissement) : identité tenue à jour
@@ -90,7 +111,9 @@ if ($id_existant) {
     // stable de l'élève, indépendant des deux. Voir fonctions.php::gen_matricule()
     // pour le matricule.
     $niveau = $id_classe ? (string) db_val("SELECT Niveau FROM classe WHERE IDClasses=?", [$id_classe]) : '';
-    $mat = gen_matricule($val_annee, $niveau ?: 'P');
+    // Mode 'manuel' : le matricule vient du formulaire (peut être NULL).
+    // Mode 'auto' : généré d'après matricule_config()::format.
+    $mat = $mat_manuel ? $mat_saisi : gen_matricule($val_annee, $niveau ?: 'P');
     $niu = gen_niu($etab['Initial_Etab'] ?? '');
 
     db_exec(
@@ -104,7 +127,7 @@ if ($id_existant) {
     // « actif », renseigne l'identité et l'école courante, trace le mouvement.
     niu_enregistrer_inscription($niu, ['nom' => $nom, 'prenom' => $prenom,
         'date_naiss' => $date_naiss, 'sexe' => $sexe, 'lieu_naiss' => $lieu_naiss]);
-    $msg = 'Élève créé — matricule ' . $mat . '.';
+    $msg = $mat ? 'Élève créé — matricule ' . $mat . '.' : 'Élève créé (sans matricule).';
 }
 
 // Inscription pour l'année active (upsert)

@@ -308,7 +308,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                 $statut_norm = normaliser_statut_insc($statut_insc);
 
-                // Matricule : fourni (migration de données existantes) ou généré si absent.
+                // Matricule : fourni dans le fichier (migration de données
+                // existantes) ; sinon généré — sauf si l'école est en mode
+                // « matricule manuel » (matricule_config) : dans ce cas un
+                // matricule absent reste NULL.
                 $niveau_pour_matricule = $classe_trouvee['Niveau'] ?? 'P';
                 if ($mat_col !== '') {
                     $mat = mb_strtoupper($mat_col);
@@ -317,9 +320,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         continue;
                     }
                 } else {
-                    $mat = gen_matricule($val_annee, $niveau_pour_matricule);
+                    $mat = matricule_manuel() ? null : gen_matricule($val_annee, $niveau_pour_matricule);
                 }
-                $matricules_utilises[$mat] = true;
+                if ($mat !== null) $matricules_utilises[$mat] = true;
 
                 db_exec(
                     "INSERT INTO eleve (Mat_elv, Nom_elv, Nom_arabe_elv, Prenom_elv, Sexe_elv, Date_naiss_elv, Lieu_naiss_elv,

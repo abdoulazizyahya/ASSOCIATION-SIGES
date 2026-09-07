@@ -12,7 +12,24 @@ $val_annee = $annee['val_annee'] ?? '';
 // ── Paramètres de filtre / tri / pagination ──────────────
 $q         = trim($_GET['q'] ?? '');
 $id_classe = (int)($_GET['classe'] ?? 0);
-$statut    = ($_GET['statut'] ?? 'actif') === 'desactive' ? 'desactive' : 'actif';
+// Écriture autorisée par l'association (superadmin entré en mode écriture) :
+// couvre toutes les actions élève, y compris import / config matricule
+// (import.php & matricule_config.php ont un exiger_role() qui laisse passer
+// la visite association — voir fonctions.php::exiger_role()).
+$asso_ecriture = function_exists('est_visite_association') && est_visite_association()
+              && function_exists('est_lecture_seule') && !est_lecture_seule();
+
+$peut_gerer    = $asso_ecriture || in_array(role_connecte(), ['DIRECTEUR','SECRETAIRE','COMPTABLE'], true);
+// L'import en masse + la config des matricules restent hors périmètre
+// COMPTABLE (demande du 22/08/2026) — pages/eleves/import.php et
+// matricule_config.php restent ['DIRECTEUR','SECRETAIRE'] (+ visite écriture).
+$peut_importer = $asso_ecriture || in_array(role_connecte(), ['DIRECTEUR','SECRETAIRE'], true);
+
+// « outils » = onglet Import & matricules (pas une liste d'élèves) — réservé
+// aux rôles qui peuvent importer / configurer.
+$statut = in_array($_GET['statut'] ?? '', ['actif','desactive','outils'], true) ? $_GET['statut'] : 'actif';
+if ($statut === 'outils' && !$peut_importer) $statut = 'actif';
+$vue_outils = ($statut === 'outils');
 $tri       = in_array($_GET['tri'] ?? '', ['nom','mat','sexe','classe']) ? $_GET['tri'] : 'nom';
 $ordre     = ($_GET['ordre'] ?? 'asc') === 'desc' ? 'DESC' : 'ASC';
 $page      = max(1, (int)($_GET['page'] ?? 1));
@@ -64,22 +81,26 @@ $order_sql = ($order_map[$tri] ?? 'e.Nom_elv') . ' ' . $ordre;
 $join_insc = "LEFT JOIN inscrire i ON i.id_eleve=e.id_eleve AND i.val_annee=?";
 $params_join = array_merge([$val_annee], $params);
 
-$total = (int) db_val(
-    "SELECT COUNT(*) FROM eleve e
-     $join_insc
-     LEFT JOIN classe c ON c.IDClasses = i.IDClasses
-     $sql_where", $params_join);
+$total  = 0;
+$eleves = [];
+if (!$vue_outils) {
+    $total = (int) db_val(
+        "SELECT COUNT(*) FROM eleve e
+         $join_insc
+         LEFT JOIN classe c ON c.IDClasses = i.IDClasses
+         $sql_where", $params_join);
 
-$eleves = db_all(
-    "SELECT e.id_eleve, e.Mat_elv, e.Nom_elv, e.Prenom_elv, e.Sexe_elv, e.Date_naiss_elv, e.Lieu_naiss_elv, e.niu, e.statut,
-            (e.Photo_elv IS NOT NULL) AS a_photo,
-            c.DesignationClasses, c.IDClasses
-     FROM eleve e
-     $join_insc
-     LEFT JOIN classe c ON c.IDClasses = i.IDClasses
-     $sql_where
-     ORDER BY $order_sql
-     LIMIT $pp OFFSET $offset", $params_join);
+    $eleves = db_all(
+        "SELECT e.id_eleve, e.Mat_elv, e.Nom_elv, e.Prenom_elv, e.Sexe_elv, e.Date_naiss_elv, e.Lieu_naiss_elv, e.niu, e.statut,
+                (e.Photo_elv IS NOT NULL) AS a_photo,
+                c.DesignationClasses, c.IDClasses
+         FROM eleve e
+         $join_insc
+         LEFT JOIN classe c ON c.IDClasses = i.IDClasses
+         $sql_where
+         ORDER BY $order_sql
+         LIMIT $pp OFFSET $offset", $params_join);
+}
 
 function th_tri(string $col, string $label, string $tri_actuel, string $ordre_actuel): string {
     $o    = ($tri_actuel === $col && $ordre_actuel === 'ASC') ? 'desc' : 'asc';
@@ -90,12 +111,6 @@ function th_tri(string $col, string $label, string $tri_actuel, string $ordre_ac
     return '<a href="#" onclick="triListe(\'' . $col . '\',\'' . $o . '\');return false" class="text-white text-decoration-none">' . $label . $icon . '</a>';
 }
 
-$peut_gerer  = in_array(role_connecte(), ['DIRECTEUR','SECRETAIRE','COMPTABLE'], true);
-// L'import en masse reste hors du périmètre COMPTABLE (demande du 22/08/2026
-// : ajouter/modifier/activer/désactiver UN élève à la fois, pas d'import) —
-// distinct de $peut_gerer pour ne pas afficher un lien menant à un
-// "Accès refusé" (pages/eleves/import.php reste ['DIRECTEUR','SECRETAIRE']).
-$peut_importer = in_array(role_connecte(), ['DIRECTEUR','SECRETAIRE'], true);
 
 // ═══ Réponse AJAX (partiel=1) : uniquement onglets + tableau + pagination,
 // jamais la barre de recherche/filtres (qui reste stable côté client pour
@@ -127,11 +142,8 @@ require_once __DIR__ . '/../../layout/header.php';
   </div>
   <?php if ($peut_gerer): ?>
   <div class="d-flex gap-2 flex-wrap">
-    <?php if ($peut_importer): ?>
-    <a href="<?= APP_URL ?>/pages/eleves/import.php" class="btn btn-outline-primary btn-sm">
-      <i class="bi bi-upload me-1"></i>Importer
-    </a>
-    <?php endif; ?>
+    <?php /* « Importer » a été déplacé dans l'onglet « Import & matricules »
+             (voir _liste_resultats.php), avec la configuration des matricules. */ ?>
     <a href="<?= APP_URL ?>/pages/eleves/form.php" class="btn btn-primary btn-sm">
       <i class="bi bi-plus-lg me-1"></i> Nouvel élève
     </a>

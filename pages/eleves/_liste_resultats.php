@@ -17,7 +17,18 @@ $nb_pages = max(1, (int)ceil($total / $pp));
       <i class="bi bi-slash-circle me-1"></i>Désactivés
     </a>
   </li>
+  <?php if (!empty($peut_importer)): ?>
+  <li class="nav-item">
+    <a class="nav-link <?= $statut === 'outils' ? 'active' : '' ?>" href="#" onclick="changerStatutListe('outils');return false">
+      <i class="bi bi-upc-scan me-1"></i>Import &amp; matricules
+    </a>
+  </li>
+  <?php endif; ?>
 </ul>
+
+<?php if (($statut ?? '') === 'outils'): ?>
+  <?php require __DIR__ . '/_eleves_outils.php'; ?>
+<?php else: ?>
 
 <div class="text-muted mb-1" style="font-size:.78rem"><?= $total ?> élève(s) <?= $statut === 'actif' ? 'actif(s)' : 'désactivé(s)' ?><?= $q !== '' ? ' — recherche « ' . h($q) . ' »' : '' ?></div>
 
@@ -119,3 +130,5 @@ $nb_pages = max(1, (int)ceil($total / $pp));
     </ul></nav>
   </div>
 <?php endif; ?>
+
+<?php endif; // fin onglet liste vs. onglet « outils » ?>

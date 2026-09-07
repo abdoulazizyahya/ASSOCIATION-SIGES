@@ -39,6 +39,10 @@ if ($eleve && $eleve['id_arrondissement']) {
 
 $ve = fn(string $k) => $eleve[$k] ?? '';
 
+// Matricule : saisie manuelle (champ libre, éventuellement vide) ou
+// génération automatique à l'enregistrement — voir matricule_config().
+$mat_manuel = matricule_manuel();
+
 // NIU proposé automatiquement pour un NOUVEL élève seulement (voir
 // fonctions.php::gen_niu()) — champ texte normal, reste modifiable/
 // effaçable si le vrai NIU officiel est déjà connu ou à saisir plus tard.
@@ -65,7 +69,9 @@ if (!$es_partiel) {
   </a>
   <div>
     <h4 class="mb-0" style="font-size:1.05rem;font-weight:700"><?= h($titre_page) ?></h4>
-    <div class="sub"><?= $eleve ? h($eleve['Mat_elv']) : 'Le matricule sera généré automatiquement' ?></div>
+    <div class="sub"><?= $eleve
+        ? h($eleve['Mat_elv'] ?: '— sans matricule —')
+        : ($mat_manuel ? 'Matricule saisi manuellement (peut rester vide)' : 'Le matricule sera généré automatiquement') ?></div>
   </div>
 </div>
 
@@ -147,9 +153,16 @@ if (!$es_partiel) {
                             background:var(--purple-bg);color:var(--purple);border:1.5px solid var(--purple);cursor:not-allowed">
             </div>
             <div class="col-md-6">
-              <label class="form-label">Matricule interne</label>
-              <input type="text" class="form-control" disabled
-                     value="<?= $eleve ? h($eleve['Mat_elv']) : 'Généré automatiquement' ?>">
+              <label class="form-label">Matricule<?= $mat_manuel ? '' : ' interne' ?></label>
+              <?php if ($mat_manuel): ?>
+                <input type="text" name="matricule" class="form-control" maxlength="30"
+                       value="<?= h($ve('Mat_elv')) ?>" placeholder="Laisser vide si non attribué"
+                       style="font-family:var(--font-mono);letter-spacing:.04em">
+                <div class="form-text" style="font-size:.68rem">Saisie manuelle (Configuration → onglet « Import &amp; matricules »).</div>
+              <?php else: ?>
+                <input type="text" class="form-control" disabled
+                       value="<?= $eleve ? h($eleve['Mat_elv'] ?: '—') : 'Généré automatiquement' ?>">
+              <?php endif; ?>
             </div>
             <div class="col-md-12">
               <label class="form-label">Adresse</label>
