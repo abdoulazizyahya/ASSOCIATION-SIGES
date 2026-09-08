@@ -102,8 +102,13 @@ function import_deviner_niveau(string $libelle, array $niveaux_valides): string 
     } elseif (preg_match('~\bcm\s*1(?![0-9])|cours\s+moyen\s*1~u', $s)
            || preg_match('~\bcm\s*2(?![0-9])|cours\s+moyen\s*2~u', $s)) {
         $cand = 'III';
-    } elseif (preg_match('~\b(?:class|level|grade|primary|standard|std)\s*([1-6])(?![0-9])~u', $s, $m)) {
+    } elseif (preg_match('~\blevel\s*([1-9])(?![0-9])~u', $s, $m)) {
+        // « LEVEL 2 » (ou « LEVEL 2 A ») = niveau LEVEL 2 directement.
         $cand = 'LEVEL ' . min(3, max(1, (int) $m[1]));
+    } elseif (preg_match('~\b(?:class|grade|primary|standard|std)\s*([1-9])(?![0-9])~u', $s, $m)) {
+        // Piste anglophone : LEVEL 1 = CLASS 1-2, LEVEL 2 = CLASS 3-4,
+        // LEVEL 3 = CLASS 5-6 (2 classes par niveau).
+        $cand = 'LEVEL ' . min(3, max(1, (int) ceil((int) $m[1] / 2)));
     }
     return ($cand !== '' && in_array($cand, $niveaux_valides, true)) ? $cand : '';
 }
