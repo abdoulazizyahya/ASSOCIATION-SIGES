@@ -1,19 +1,36 @@
 # Déploiement multi-établissement
 
-L'application fonctionne en **mono-école** sans rien faire (base `DB_NAME` de `config.php`,
-défaut `promeducam_jaynitaare`).
-Le **multi-établissement** s'active dès que la base annuaire `DB_NAME_ASSOC`
-(défaut `promeducam_assoc`) existe.
+## 0. Installation neuve (à partir de zéro)
 
-## 1. Première installation de l'annuaire
+Une seule commande met tout en place :
+```
+php bd/assoc/installer.php [mot_de_passe_admin]
+```
+Elle :
 
-```
-php bd/assoc/installer.php
-```
-Crée la base annuaire (`DB_NAME_ASSOC`), y inscrit l'école n°1 (`EC1` = base `DB_NAME`) et le
-**compte superadmin** (`admin` / mot de passe affiché). Ce compte a `membre_acces.plein_acces = 1`
-sur *toutes* les écoles (`id_etablissement IS NULL`) — c'est ce qui le rend superadmin
-(`ecole_contexte.php::est_superadmin_association()`).
+1. **crée la base de l'école n°1** (`DB_NAME`, défaut `promeducam_jaynitaare`) si elle est
+   absente ou vide : schéma de référence + données de référence (niveaux, compétences,
+   géographie, barème…) + 8 classes standard + première année scolaire active + barème de
+   travail, et un **compte DIRECTEUR `admin`** (mot de passe = celui passé en argument, défaut
+   `association`) pour se connecter à `/login.php` ;
+2. **crée la base annuaire** (`DB_NAME_ASSOC`, défaut `promeducam_assoc`) + ses tables ;
+3. y **inscrit l'école n°1** (`EC1`) et cale sa version de schéma ;
+4. crée le **compte membre `admin`** de l'espace association (propriétaire + superadmin ;
+   même mot de passe).
+
+Idempotent : relançable sans risque. Tant que l'installation n'est pas faite, l'application
+affiche une page « Installation à finaliser » (au lieu d'une erreur SQL).
+
+> **Mono-école sans annuaire** : si le multi-établissement n'est pas voulu, il suffit d'avoir
+> la base `DB_NAME` garnie (schéma école + une ligne `etablissement`) — l'annuaire est
+> facultatif. `installer.php` sans annuaire préexistant fait quand même l'étape 1.
+
+## 1. (rappel) rôle du compte superadmin
+
+Le compte `admin` de l'annuaire a `membre_acces.plein_acces = 1` sur *toutes* les écoles
+(`id_etablissement IS NULL`) — c'est ce qui le rend superadmin
+(`ecole_contexte.php::est_superadmin_association()`), et `membre.proprietaire = 1` (voir
+« Hiérarchie des comptes »).
 
 Si l'annuaire existait déjà avant ce correctif, promouvoir le compte :
 ```sql

@@ -1,22 +1,25 @@
 <?php
 // =====================================================================
 //  bd/assoc/installer.php
-//  Met en place la base centrale « annuaire » (DB_NAME_ASSOC, défaut
-//  promeducam_assoc) :
-//    1. crée la base + les tables (bd/assoc/schema_assoc.sql) ;
-//    2. enregistre l'école n°1 (EC1) à partir de la ligne `etablissement`
-//       de la base actuelle (DB_NAME) ;
+//  Installe / répare une application SIGES :
+//    0. crée la BASE DE L'ÉCOLE N°1 (DB_NAME) si elle est absente ou vide :
+//       schéma de référence + données de référence + classes standard +
+//       première année scolaire + barème + un compte DIRECTEUR pour se
+//       connecter ;
+//    1. crée la base centrale « annuaire » (DB_NAME_ASSOC) + ses tables ;
+//    2. y enregistre l'école n°1 (EC1) ;
 //    3. cale schema_version_etab(EC1) sur la dernière migration connue ;
-//    4. crée un compte membre « admin » si aucun membre n'existe.
+//    4. crée un compte membre « admin » (propriétaire) si aucun n'existe.
 //
-//  Idempotent : relançable sans risque (INSERT ... ON DUPLICATE / IGNORE,
-//  CREATE TABLE IF NOT EXISTS).
+//  Idempotent : relançable sans risque.
 //
 //  Usage :  php bd/assoc/installer.php [mot_de_passe_admin]
-//  (défaut du mot de passe : « association » — À CHANGER ensuite)
+//  (défaut du mot de passe : « association » — À CHANGER ensuite ;
+//   le même mot de passe sert au 1er compte DIRECTEUR « admin » de l'école)
 // =====================================================================
 
 require_once __DIR__ . '/../../config.php';
+require_once __DIR__ . '/../../connexion_assoc.php';   // charger_schema_ecole()
 
 $est_cli = (PHP_SAPI === 'cli');
 if (!$est_cli) header('Content-Type: text/plain; charset=utf-8');
@@ -30,11 +33,69 @@ $pwd_admin = $est_cli
     ? ($argv[1] ?? 'association')
     : ($_GET['pwd'] ?? 'association');
 
-out("=== Installation de la base centrale « annuaire » (DB_NAME_ASSOC) ===\n");
+out("=== Installation SIGES ===\n");
 
-// ── 1. Schéma ──────────────────────────────────────────────────────
 $srv = mysqli_connect(DB_HOST, DB_USER, DB_PASS);
 mysqli_set_charset($srv, 'utf8mb4');
+
+// ── 0. Base de l'école n°1 (DB_NAME) ───────────────────────────────
+//  Créée si absente, ou peuplée si présente mais vide. Sur une base déjà
+//  garnie (colonne `etablissement` existante), on ne touche à rien.
+$db_ecole   = DB_NAME;
+$db_ecole_e = mysqli_real_escape_string($srv, $db_ecole);
+$existe = (int) mysqli_fetch_row(mysqli_query($srv,
+    "SELECT COUNT(*) FROM information_schema.schemata WHERE schema_name='$db_ecole_e'"))[0];
+$a_etab = 0;
+if ($existe) {
+    $a_etab = (int) mysqli_fetch_row(mysqli_query($srv,
+        "SELECT COUNT(*) FROM information_schema.tables
+         WHERE table_schema='$db_ecole_e' AND table_name='etablissement'"))[0];
+}
+
+if (!$a_etab) {
+    if (!$existe) {
+        mysqli_query($srv, "CREATE DATABASE `" . str_replace('`', '', $db_ecole)
+                         . "` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci");
+        out("OK  Base école « $db_ecole » créée.");
+    }
+    $le = mysqli_connect(DB_HOST, DB_USER, DB_PASS, $db_ecole);
+    mysqli_set_charset($le, 'utf8mb4');
+
+    // Schéma de référence + données de référence + classes standard + 1re
+    // année + barème (charger_schema_ecole -> charger_seed_ref_ecole ->
+    // provisionner_ecole_neuve).
+    $nb_tables = charger_schema_ecole($le, [
+        'nom'    => 'École n°1',
+        'nom_en' => null,
+        'sigle'  => null,
+        'ville'  => null,
+    ]);
+    out("OK  École n°1 initialisée ($nb_tables tables : schéma + référence + classes + année + barème).");
+
+    // Compte DIRECTEUR « admin » pour se connecter à l'école (login.php
+    // joint `user` -> `enseignant`).
+    if (!(int) mysqli_fetch_row(mysqli_query($le, "SELECT COUNT(*) FROM user"))[0]) {
+        mysqli_query($le,
+            "INSERT INTO enseignant (nom_ens, prenom_ens, id_fonction, statut_ens)
+             VALUES ('Directeur', 'Général', 'DIRECTEUR', 'actif')");
+        $mat = (int) mysqli_insert_id($le);
+        $st  = mysqli_prepare($le,
+            "INSERT INTO user (login_user, pwd_user, matricule_ens) VALUES ('admin', ?, ?)");
+        $hash_dir = password_hash($pwd_admin, PASSWORD_DEFAULT);
+        mysqli_stmt_bind_param($st, 'si', $hash_dir, $mat);
+        mysqli_stmt_execute($st);
+        mysqli_stmt_close($st);
+        out("OK  Compte DIRECTEUR école créé : login « admin » / mot de passe « $pwd_admin »");
+    }
+    mysqli_close($le);
+} else {
+    out("--  Base école « $db_ecole » déjà garnie — étape 0 ignorée.");
+}
+
+out("");
+out("=== Base centrale « annuaire » (DB_NAME_ASSOC) ===\n");
+
+// ── 1. Schéma ──────────────────────────────────────────────────────
 
 $sql = file_get_contents(__DIR__ . '/schema_assoc.sql');
 if ($sql === false) { out('ERREUR : schema_assoc.sql introuvable.'); exit(1); }

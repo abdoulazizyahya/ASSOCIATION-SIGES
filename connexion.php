@@ -30,17 +30,56 @@ require_once __DIR__ . '/ecole_contexte.php';
 /** @var array|null $ETAB_COURANT  Ligne annuaire de l'école active (null = contexte association ou annuaire absent). */
 $ETAB_COURANT = annuaire_dispo() ? resoudre_etablissement() : null;
 
+// Nombre d'écoles actives dans l'annuaire (0 sur une installation neuve où
+// l'annuaire existe mais aucune école n'a encore été créée).
+$_nb_ecoles = annuaire_dispo()
+    ? (int) assoc_val("SELECT COUNT(*) FROM etablissement WHERE actif=1")
+    : 0;
+
 if ($ETAB_COURANT) {
     $bd_active = $ETAB_COURANT['db_name'];
-} elseif (annuaire_dispo() && (est_contexte_association() || est_contexte_neutre())) {
-    // Interface association OU contexte neutre (multi-école, aucune choisie —
-    // page de connexion / pages publiques sans ?ec=) : on pointe la base
-    // annuaire. Aucune requête « école » n'est émise avant basculer_base_ecole().
+} elseif (annuaire_dispo() && est_contexte_association()) {
+    $bd_active = DB_NAME_ASSOC;           // interface /association/ : on travaille dans l'annuaire
+} elseif (annuaire_dispo() && est_contexte_neutre() && $_nb_ecoles > 0) {
+    // Contexte neutre AVEC au moins une école : page de connexion / pages
+    // publiques sans ?ec=. On pointe l'annuaire (login.php liste les écoles).
+    // Aucune requête « école » n'est émise avant basculer_base_ecole().
     $bd_active = DB_NAME_ASSOC;
 } else {
-    $bd_active = DB_NAME;                 // repli mono-école
+    $bd_active = DB_NAME;                 // repli mono-école (ou annuaire sans école)
 }
-mysqli_select_db($link, $bd_active);
+
+// La base cible peut ne pas exister sur une installation incomplète
+// (annuaire présent mais aucune école, base école n°1 jamais créée…).
+// On affiche alors des instructions claires au lieu d'un « Fatal error ».
+$_db_ok = true;
+try {
+    mysqli_select_db($link, $bd_active);
+} catch (\Throwable $e) {
+    $_db_ok = false;
+}
+if (!$_db_ok) {
+    $_annu = annuaire_dispo();
+    http_response_code(503);
+    header('Content-Type: text/html; charset=utf-8');
+    echo '<!doctype html><meta charset="utf-8"><title>Installation à finaliser</title>'
+       . '<div style="max-width:640px;margin:12vh auto;font:15px/1.6 Segoe UI,system-ui,sans-serif;color:#1e2a3a">'
+       . '<h1 style="font:600 22px Georgia,serif;color:#1a2744">Installation à finaliser</h1>'
+       . '<p>La base de données <code style="background:#f2f0e8;padding:1px 5px;border-radius:4px">'
+       . htmlspecialchars($bd_active) . '</code> est introuvable — l\'application n\'a pas encore d\'école configurée.</p>';
+    if ($_annu && $_nb_ecoles === 0) {
+        echo '<p>L\'annuaire association est en place mais <b>aucune école</b> n\'y est enregistrée.</p>'
+           . '<p><b>Pour créer la première école :</b></p>'
+           . '<pre style="background:#f2f0e8;padding:12px;border-radius:6px;overflow:auto">php bd/assoc/installer.php [mot_de_passe_admin]</pre>'
+           . '<p>ou, si l\'annuaire est déjà installé, ouvrez <a href="' . htmlspecialchars(APP_URL) . '/association/">l\'Espace association</a> &rarr; <i>Nouvel établissement</i>.</p>';
+    } else {
+        echo '<p><b>Pour installer l\'application :</b></p>'
+           . '<pre style="background:#f2f0e8;padding:12px;border-radius:6px;overflow:auto">php bd/assoc/installer.php [mot_de_passe_admin]</pre>'
+           . '<p>Ce script crée la base de l\'école n°1 (schéma + données de référence + classes standard + première année) et un compte <b>DIRECTEUR</b> pour la connexion.</p>';
+    }
+    echo '<p style="color:#6b7280;font-size:13px">Détail des étapes : <code>bd/assoc/DEPLOIEMENT.md</code>.</p></div>';
+    exit;
+}
 
 // ── Helper interne : prépare, lie les paramètres, exécute ────────────
 //  Tous les paramètres sont liés en type « s » (chaîne) : MySQL applique
