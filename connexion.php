@@ -59,6 +59,15 @@ try {
     $_db_ok = false;
 }
 if (!$_db_ok) {
+    // Aucune config d'environnement (config.local.php) : rien n'a jamais été
+    // installé -> assistant de première installation (choix du nom
+    // d'association, création des bases). La page 503 ci-dessous ne sert que
+    // pour une install PARTIELLEMENT cassée (config présente, base disparue).
+    $_script = basename($_SERVER['SCRIPT_NAME'] ?? '');
+    if (!is_file(__DIR__ . '/config.local.php') && $_script !== 'install.php') {
+        header('Location: ' . APP_URL . '/install.php');
+        exit;
+    }
     $_annu = annuaire_dispo();
     http_response_code(503);
     header('Content-Type: text/html; charset=utf-8');
