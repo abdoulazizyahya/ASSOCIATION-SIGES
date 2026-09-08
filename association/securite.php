@@ -59,8 +59,12 @@ $actif = (int) $m['totp_actif'] === 1;
 if (!$actif) {
     if (empty($_SESSION['secu_secret'])) $_SESSION['secu_secret'] = totp_secret_nouveau();
     $secret = $_SESSION['secu_secret'];
-    $issuer = 'SIGES Association';
+    $issuer = (defined('ASSOC_NOM') && ASSOC_NOM !== '') ? ASSOC_NOM
+            : (defined('APP_NOM') ? APP_NOM : 'SIGES');
     $uri    = totp_uri($secret, $m['login'], $issuer);
+    // QR : générateur PNG maison (pdf/qrcode.php), déjà utilisé par les
+    // bulletins — pas de dépendance externe.
+    $qr_src = APP_URL . '/pdf/qrcode.php?s=6&e=M&d=' . urlencode($uri);
 }
 
 asso_haut('Sécurité — double authentification');
@@ -95,30 +99,49 @@ $csrf = csrf_generer();
     </form>
 
   <?php else: ?>
-    <div class="fw-bold mb-2"><i class="bi bi-shield-lock me-1"></i>Activer la double authentification</div>
-    <ol class="small text-muted2">
-      <li>Installez une application d'authentification (Google Authenticator, Authy, FreeOTP…).</li>
-      <li>Ajoutez un compte en scannant un QR code <em>ou</em> en saisissant la clé ci-dessous.</li>
-      <li>Entrez le code à 6 chiffres affiché par l'application pour confirmer.</li>
-    </ol>
+    <div class="fw-bold mb-3"><i class="bi bi-shield-lock me-1"></i>Activer la double authentification</div>
 
-    <div class="mb-2">
-      <div class="small text-muted2">Clé de configuration (saisie manuelle)</div>
-      <div class="font-monospace fs-6" style="letter-spacing:.15em;word-break:break-all"><?= h(chunk_split($secret, 4, ' ')) ?></div>
-    </div>
+    <!-- Étape 1 -->
     <div class="mb-3">
-      <div class="small text-muted2">Ou lien <span class="font-monospace">otpauth://</span> (copier dans l'app si elle l'accepte)</div>
-      <div class="font-monospace small text-break"><?= h($uri) ?></div>
+      <div class="fw-bold small mb-1"><span class="badge bg-secondary me-1">1</span>Installez une application d'authentification</div>
+      <div class="small text-muted2">Google&nbsp;Authenticator, Microsoft&nbsp;Authenticator, Authy, FreeOTP… sur votre téléphone.</div>
     </div>
 
-    <form method="post" class="d-flex gap-2 align-items-center">
-      <input type="hidden" name="csrf" value="<?= h($csrf) ?>">
-      <input type="hidden" name="op" value="activer">
-      <input type="hidden" name="secret" value="<?= h($secret) ?>">
-      <input name="code" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" required autofocus
-             class="form-control form-control-sm font-monospace" style="max-width:130px" placeholder="Code à 6 chiffres">
-      <button class="btn btn-primary btn-sm">Activer</button>
-    </form>
+    <!-- Étape 2 : QR + clé -->
+    <div class="mb-3">
+      <div class="fw-bold small mb-2"><span class="badge bg-secondary me-1">2</span>Ajoutez le compte dans l'application</div>
+      <div class="d-flex flex-wrap gap-3 align-items-start">
+        <div style="flex:0 0 auto">
+          <img src="<?= h($qr_src) ?>" alt="QR code de configuration" width="180" height="180"
+               style="border:1px solid var(--border);border-radius:8px;background:#fff;padding:6px;display:block">
+          <div class="text-center small text-muted2 mt-1">Scannez ce QR&nbsp;code</div>
+        </div>
+        <div style="flex:1 1 220px;min-width:220px">
+          <div class="small text-muted2">…ou saisissez la clé à la main :</div>
+          <div class="font-monospace fs-6 mb-2" style="letter-spacing:.12em;word-break:break-all"><?= h(chunk_split($secret, 4, ' ')) ?></div>
+          <div class="small text-muted2">Compte : <span class="font-monospace"><?= h($m['login']) ?></span> · Émetteur : <span class="font-monospace"><?= h($issuer) ?></span> · SHA1 · 6&nbsp;chiffres · 30&nbsp;s</div>
+          <details class="mt-2">
+            <summary class="small text-muted2" style="cursor:pointer">Lien <span class="font-monospace">otpauth://</span></summary>
+            <div class="font-monospace small text-break mt-1"><?= h($uri) ?></div>
+          </details>
+        </div>
+      </div>
+    </div>
+
+    <!-- Étape 3 : confirmation -->
+    <div class="mb-1">
+      <label class="fw-bold small mb-1" for="secu_code"><span class="badge bg-secondary me-1">3</span>Entrez le code affiché par l'application</label>
+      <form method="post" class="d-flex gap-2 align-items-center mt-1">
+        <input type="hidden" name="csrf" value="<?= h($csrf) ?>">
+        <input type="hidden" name="op" value="activer">
+        <input type="hidden" name="secret" value="<?= h($secret) ?>">
+        <input id="secu_code" name="code" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" required autofocus
+               autocomplete="one-time-code"
+               class="form-control font-monospace" style="max-width:160px;letter-spacing:.35em;font-size:1.1rem"
+               placeholder="000000">
+        <button class="btn btn-primary"><i class="bi bi-shield-check me-1"></i>Activer</button>
+      </form>
+    </div>
   <?php endif; ?>
 </div>
 <?php asso_bas();
