@@ -82,20 +82,28 @@ function import_gc_temp(string $prefix): void {
 // camerounais). Renvoie '' si indéterminé (la classe n'est alors PAS créée
 // automatiquement — l'utilisateur la crée à la main). $niveaux_valides =
 // liste des LibelleNiveau réellement présents dans la table `niveau`.
+//
+// Les classes parallèles / sections sont ramenées au même niveau que la
+// classe de base : « CM1 A », « CM1B », « CM1-C », « CE2 B », « SIL 2 »…
+// (le suffixe de section n'empêche pas la reconnaissance — d'où (?![0-9])
+// plutôt qu'un \b final : seule une AUTRE chiffre invalide « CM1 »).
 function import_deviner_niveau(string $libelle, array $niveaux_valides): string {
     $s = mb_strtolower(trim($libelle), 'UTF-8');
     $s = strtr($s, ['è'=>'e','é'=>'e','ê'=>'e','ë'=>'e','à'=>'a','â'=>'a','î'=>'i','ï'=>'i','ô'=>'o','ù'=>'u','û'=>'u','ç'=>'c']);
     $cand = '';
-    if (preg_match('~(maternelle|prematernelle|pre[ -]?maternelle|petite\s+section|moyenne\s+section|grande\s+section|1\s*(ere|re|e)?\s*ann?ee|2\s*(eme|e)?\s*ann?ee|nursery|kindergarten|kg|\bps\b|\bms\b|\bgs\b)~u', $s)) {
+    if (preg_match('~(maternelle|prematernelle|pre[ -]?maternelle|petite\s+section|moyenne\s+section|grande\s+section|1\s*(ere|re|e)?\s*ann?ee|2\s*(eme|e)?\s*ann?ee|nursery|kindergarten|\bkg\b|\bps\b|\bms\b|\bgs\b)~u', $s)) {
         $cand = 'M';
-    } elseif (preg_match('~\b(sil|c\.?\s*i\.?|cours\s+d.?initiation)\b~u', $s) || preg_match('~\bcp\b|cours\s+preparatoire~u', $s)) {
+    } elseif (preg_match('~\b(?:sil|c\.?\s*i\.?|cours\s+d.?initiation)\b~u', $s)
+           || preg_match('~\bcp(?![a-z0-9])|cours\s+preparatoire~u', $s)) {
         $cand = 'I';
-    } elseif (preg_match('~\bce\s*1\b|cours\s+elementaire\s*1~u', $s) || preg_match('~\bce\s*2\b|cours\s+elementaire\s*2~u', $s)) {
+    } elseif (preg_match('~\bce\s*1(?![0-9])|cours\s+elementaire\s*1~u', $s)
+           || preg_match('~\bce\s*2(?![0-9])|cours\s+elementaire\s*2~u', $s)) {
         $cand = 'II';
-    } elseif (preg_match('~\bcm\s*1\b|cours\s+moyen\s*1~u', $s) || preg_match('~\bcm\s*2\b|cours\s+moyen\s*2~u', $s)) {
+    } elseif (preg_match('~\bcm\s*1(?![0-9])|cours\s+moyen\s*1~u', $s)
+           || preg_match('~\bcm\s*2(?![0-9])|cours\s+moyen\s*2~u', $s)) {
         $cand = 'III';
-    } elseif (preg_match('~\b(class|level|grade|primary|standard|std)\s*([1-6])\b~u', $s, $m)) {
-        $cand = 'LEVEL ' . min(3, max(1, (int) $m[2]));
+    } elseif (preg_match('~\b(?:class|level|grade|primary|standard|std)\s*([1-6])(?![0-9])~u', $s, $m)) {
+        $cand = 'LEVEL ' . min(3, max(1, (int) $m[1]));
     }
     return ($cand !== '' && in_array($cand, $niveaux_valides, true)) ? $cand : '';
 }
