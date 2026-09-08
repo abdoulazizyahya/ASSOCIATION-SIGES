@@ -163,7 +163,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 . "define('DB_PREFIXE_ECOLE', " . var_export($pref, true) . ");\n"
                 . "define('DB_NAME',          " . var_export($db_ec1, true) . ");\n"
                 . "define('ASSOC_NOM',        " . var_export($val['nom_association'], true) . ");\n"
-                . "define('APP_NOM',          " . var_export($val['nom_association'] . ' · Gestion scolaire', true) . ");\n";
+                . "define('APP_NOM',          " . var_export($val['nom_association'] . ' · Gestion scolaire', true) . ");\n"
+                . "\n"
+                . "// Double authentification (TOTP) NON imposée aux superadministrateurs :\n"
+                . "// chacun peut l'activer depuis « Sécurité ». Mettre true pour la rendre obligatoire.\n"
+                . "define('ASSOC_2FA_SUPERADMIN_OBLIGATOIRE', false);\n";
             if (@file_put_contents(__DIR__ . '/config.local.php', $conf) === false) {
                 $conf_manuel = $conf;
                 throw new RuntimeException("Bases créées, mais impossible d'écrire config.local.php (droits). Créez-le manuellement avec le contenu ci-dessous, puis ouvrez l'Espace association.");
