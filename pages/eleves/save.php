@@ -34,9 +34,12 @@ if (ctype_digit($id_arrondissement_brut) && (int) $id_arrondissement_brut > 0) {
 }
 $arrondissement = $id_arrondissement ? null : ($lieu_libre ?: null);
 // Champ verrouillé (readonly) côté formulaire, jamais saisi/modifié à la
-// main — repris tel quel en modification (ne change pas le NIU déjà
-// attribué), mais RE-généré côté serveur à la création (voir plus bas,
-// même principe que Mat_elv/gen_matricule() juste en dessous) plutôt que
+// main. En modification, la valeur postée est purement IGNORÉE et on
+// reprend le NIU en base (voir plus bas) — un compte école
+// (directeur/secrétaire/…) ne peut jamais attribuer ni changer un NIU,
+// c'est le rôle du registre central (association/niu/), seule une visite
+// association en écriture y touche. À la création, RE-généré côté serveur
+// (même principe que Mat_elv/gen_matricule() juste en dessous) plutôt que
 // de faire confiance à la valeur postée : deux créations simultanées
 // verraient sinon le même NIU proposé côté formulaire et l'enverraient
 // tel quel, provoquant une collision malgré gen_niu().
@@ -74,9 +77,16 @@ $photo_bin = decoder_photo_b64($_POST['photo_b64'] ?? null);
 
 if ($id_existant) {
     // ── Modification ──────────────────────────────────────
-    $eleve = db_one("SELECT id_eleve FROM eleve WHERE id_eleve=?", [$id_existant]);
+    $eleve = db_one("SELECT id_eleve, niu FROM eleve WHERE id_eleve=?", [$id_existant]);
     if (!$eleve) { flash_set('erreur', 'Élève introuvable.'); rediriger('pages/eleves/liste.php'); }
     $id = $id_existant;
+
+    // Garde-fou NIU : une modification côté école ne peut ni changer un NIU
+    // déjà posé, ni en attribuer un. On ignore la valeur postée et on garde
+    // celle en base — sauf visite association en écriture (admin/superadmin).
+    if (!(function_exists('est_visite_association') && est_visite_association())) {
+        $niu = $eleve['niu'] ?: null;
+    }
 
     // Matricule : modifiable seulement en mode 'manuel' (sinon jamais touché
     // après création — il sert de référence stable).
