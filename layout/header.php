@@ -233,7 +233,10 @@ function lien_actif(string $url): string {
         <button class="btn btn-sm btn-light border py-0 px-2 dropdown-toggle" data-bs-toggle="dropdown" style="font-size:.78rem">
           <?= h($etab['Nom_Etab_Fr'] ?? '') ?>
         </button>
-        <ul class="dropdown-menu" style="font-size:.82rem">
+        <!-- z-index > .abz-topbar (1030, sticky) : sinon les écoles listées
+             sous le bandeau passent DERRIÈRE la topbar et sont invisibles.
+             max-height + scroll : la liste peut être longue (réseau). -->
+        <ul class="dropdown-menu" style="font-size:.82rem;z-index:1040;max-height:min(70vh,420px);overflow-y:auto">
           <?php $mode_actuel = $lecture_seule ? '&mode=lecture' : ''; // '' = écriture par défaut (superadmin/plein_acces) ?>
           <?php foreach ($ecoles_asso as $ea): ?>
             <li><a class="dropdown-item" href="<?= APP_URL ?>/association/entrer_ecole.php?id=<?= (int) $ea['id'] ?><?= $mode_actuel ?>">
