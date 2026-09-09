@@ -7,7 +7,7 @@ require_once __DIR__ . '/../config.php';
 require_once __DIR__ . '/../connexion.php';
 require_once __DIR__ . '/../fonctions.php';
 require_once __DIR__ . '/_layout.php';
-exiger_superadmin_association();
+exiger_proprietaire_association();   // suppression = DROP DATABASE : propriétaire seul
 
 $id = (int) ($_GET['id'] ?? 0);
 $e  = $id ? assoc_one("SELECT * FROM etablissement WHERE id=?", [$id]) : null;

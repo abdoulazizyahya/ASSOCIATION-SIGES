@@ -7,7 +7,7 @@ require_once __DIR__ . '/../config.php';
 require_once __DIR__ . '/../connexion.php';
 require_once __DIR__ . '/../fonctions.php';
 require_once __DIR__ . '/_layout.php';
-exiger_superadmin_association();
+exiger_proprietaire_association();   // migrations de schéma (modifie les bases) : propriétaire seul
 
 $msg = ''; $err = ''; $detail = '';
 

@@ -575,6 +575,12 @@ function supprimer_etablissement(int $id, array $opts = []): array {
     if (!annuaire_dispo()) {
         return ['ok' => false, 'message' => "Annuaire association absent.", 'db_name' => null];
     }
+    // Défense en profondeur : hors CLI, seul le propriétaire peut supprimer
+    // (la page etablissement_supprimer.php pose déjà exiger_proprietaire_association()).
+    if (PHP_SAPI !== 'cli' && function_exists('est_proprietaire_association') && !est_proprietaire_association()) {
+        return ['ok' => false, 'db_name' => null,
+                'message' => "Suppression réservée au propriétaire de l'association."];
+    }
     $e = assoc_one("SELECT * FROM etablissement WHERE id=?", [$id]);
     if (!$e) {
         return ['ok' => false, 'message' => "Établissement introuvable.", 'db_name' => null];

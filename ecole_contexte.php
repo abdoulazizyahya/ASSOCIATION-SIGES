@@ -114,6 +114,22 @@ function exiger_superadmin_association(): void {
     }
 }
 
+// Garde des OPÉRATIONS SENSIBLES SUR LES BASES : restauration, import,
+// vidage, réinitialisation, création/suppression de base, suppression
+// d'établissement. Réservées au PROPRIÉTAIRE (compte fondateur). Un
+// administrateur « simple » (superadmin sans être propriétaire) ne peut
+// que consulter et SAUVEGARDER — jamais remplacer ni détruire des données.
+function exiger_proprietaire_association(): void {
+    exiger_membre_association();
+    if (!est_proprietaire_association()) {
+        http_response_code(403);
+        die('<div style="font-family:sans-serif;padding:2rem;color:#b45309">
+             Opération réservée au <b>propriétaire</b> de l\'association
+             (restauration / import / vidage / suppression de base).<br>
+             Un administrateur peut uniquement <b>sauvegarder</b> une base.</div>');
+    }
+}
+
 // Sous-domaine de la requête (« ecole1 » pour ecole1.assoc.cm), ou ''.
 function _sous_domaine_requete(): string {
     $host = strtolower(explode(':', $_SERVER['HTTP_HOST'] ?? '')[0]);
