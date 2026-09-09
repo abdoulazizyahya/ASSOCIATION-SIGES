@@ -9,6 +9,14 @@ require_once __DIR__ . '/../../config.php';
 require_once __DIR__ . '/../../connexion.php';
 require_once __DIR__ . '/../../fonctions.php';
 exiger_role(['DIRECTEUR']);
+// Gestion des privilèges = DIRECTEUR local ou superadmin association en
+// visite écriture UNIQUEMENT (jamais le FONDATEUR, qui passe pourtant
+// exiger_role via son accès lecture global — il enregistre les personnes,
+// pas les droits d'accès).
+if (function_exists('est_fondateur') && est_fondateur()) {
+    http_response_code(403);
+    die('<div style="font-family:system-ui,sans-serif;max-width:520px;margin:3rem auto;padding:1.5rem;border:1px solid #f0dca0;background:#fff8e6;border-radius:10px;color:#7a5b00"><strong>Réservé au directeur.</strong><br>La gestion des privilèges d\'accès n\'est pas ouverte à l\'espace fondateur.</div>');
+}
 
 $id = (int) ($_GET['id'] ?? 0);
 $u  = $id ? db_one(
