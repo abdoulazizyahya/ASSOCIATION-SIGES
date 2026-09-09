@@ -12,12 +12,13 @@ $val_annee = $annee['val_annee'] ?? '';
 // ── Paramètres de filtre / tri / pagination ──────────────
 $q         = trim($_GET['q'] ?? '');
 $id_classe = (int)($_GET['classe'] ?? 0);
-// Écriture autorisée par l'association (superadmin entré en mode écriture) :
-// couvre toutes les actions élève, y compris import / config matricule
-// (import.php & matricule_config.php ont un exiger_role() qui laisse passer
-// la visite association — voir fonctions.php::exiger_role()).
-$asso_ecriture = function_exists('est_visite_association') && est_visite_association()
-              && function_exists('est_lecture_seule') && !est_lecture_seule();
+// Écriture déléguée : superadmin association entré en mode écriture, OU
+// FONDATEUR (il enregistre les élèves — pas de restriction « argent/notes »
+// ici, on est sur la fiche élève). Couvre toutes les actions élève, y
+// compris import / config matricule (import.php & matricule_config.php ont
+// un exiger_role() qui laisse passer visite asso ET fondateur — voir
+// fonctions.php::exiger_role()).
+$asso_ecriture = est_ecriture_deleguee();
 
 $peut_gerer    = $asso_ecriture || in_array(role_connecte(), ['DIRECTEUR','SECRETAIRE','COMPTABLE'], true);
 // L'import en masse + la config des matricules restent hors périmètre

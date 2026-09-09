@@ -9,7 +9,10 @@ exiger_acces_eleve($id, 'union');   // enseignant restreint : élève hors de se
 $eleve = db_one("SELECT * FROM eleve WHERE id_eleve=?", [$id]);
 if (!$eleve) { flash_set('erreur', 'Élève introuvable.'); rediriger('pages/eleves/liste.php'); }
 
-$peut_gerer = in_array(role_connecte(), ['DIRECTEUR','SECRETAIRE','COMPTABLE'], true);
+// Écriture déléguée : superadmin association entré en écriture, ou FONDATEUR
+// (il gère les élèves — voir ecole_contexte.php::fondateur_ecriture_permise).
+$ecriture_deleguee = est_ecriture_deleguee();
+$peut_gerer = $ecriture_deleguee || in_array(role_connecte(), ['DIRECTEUR','SECRETAIRE','COMPTABLE'], true);
 // Fiche PDF / Certificat de scolarité / Carte scolaire : jamais pour le
 // profil COMPTABLE (Agent financier) — demande explicite du 22/08/2026, voir
 // interdire_role() dans pdf/fiche_eleve.php, certificat_scolarite.php,
@@ -123,7 +126,7 @@ if (!$es_partiel) {
         <i class="bi bi-toggle-off me-1"></i>Réactiver
       </a>
     <?php endif; ?>
-    <?php if (role_connecte() === 'DIRECTEUR'): ?>
+    <?php if (role_connecte() === 'DIRECTEUR' || $ecriture_deleguee): ?>
       <a href="<?= APP_URL ?>/pages/eleves/supprimer.php?id=<?= $id ?>&csrf=<?= csrf_generer() ?>"
          class="btn btn-outline-danger btn-sm"
          onclick="return confirm('Supprimer définitivement <?= h(addslashes(mb_strtoupper($eleve['Nom_elv']))) ?> ? Cette action est irréversible (fiche, parents, informations complémentaires, pièces jointes).')">

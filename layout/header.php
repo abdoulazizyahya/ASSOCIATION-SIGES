@@ -266,10 +266,18 @@ function lien_actif(string $url): string {
       </a>
     </div>
     <?php elseif ($est_fondateur): ?>
-    <!-- Bandeau : fondateur (consultation seule, hors gestion du directeur) -->
+    <!-- Bandeau : fondateur. Il enregistre les personnes / la structure ;
+         notes et finances restent en lecture seule ($lecture_seule reflète
+         la page courante — voir ecole_contexte.php::fondateur_ecriture_permise). -->
     <div class="d-flex flex-wrap align-items-center gap-2 px-3 py-1"
          style="background:#fff8e6;border-bottom:1px solid #f0dca0;font-size:.8rem;color:#7a5b00">
-      <span><i class="bi bi-eye me-1"></i><strong>Espace fondateur</strong> — consultation seule</span>
+      <span>
+        <i class="bi bi-<?= $lecture_seule ? 'eye' : 'pencil-square' ?> me-1"></i>
+        <strong>Espace fondateur</strong>
+        <?= $lecture_seule
+            ? '— consultation seule (notes &amp; finances)'
+            : '— enregistrement autorisé · notes et finances en lecture seule' ?>
+      </span>
       <a href="<?= APP_URL ?>/pages/fondateur/directeur.php" class="ms-auto btn btn-sm btn-outline-secondary py-0 px-2" style="font-size:.78rem">
         <i class="bi bi-person-badge me-1"></i>Gérer le directeur
       </a>

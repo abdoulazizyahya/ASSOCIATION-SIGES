@@ -46,23 +46,46 @@ function est_visite_association(): bool {
     return !empty($_SESSION['visite_asso']);
 }
 
-// Rôle « FONDATEUR » : consulte toute son école en lecture seule, ne peut
-// qu'enregistrer/remplacer le compte DIRECTEUR (pages/fondateur/directeur.php).
+// Rôle « FONDATEUR » : consulte toute son école. Il peut ENREGISTRER les
+// personnes et la structure (élèves, personnel, directeur, comptes,
+// classes, niveaux…) mais PAS l'argent ni les notes : paiements, dépenses,
+// paie, saisie de notes, bulletins, conseils, statistiques et résultats
+// restent en LECTURE SEULE pour lui (demande explicite du 10/09/2026).
 function est_fondateur(): bool {
     ecole_session_demarrer();
     return ($_SESSION['user']['role'] ?? '') === 'FONDATEUR';
 }
 
-// Scripts où le FONDATEUR est exceptionnellement autorisé à écrire :
-//  - directeur.php          : créer / remplacer / désactiver le directeur
-//  - configurer_securite.php: ses 2 questions secrètes à la 1re connexion
-//  - profil.php             : son propre login / mot de passe
+// Le FONDATEUR peut-il écrire sur la page courante ?
+//  - toujours : directeur.php (gérer le directeur), configurer_securite.php
+//    (ses questions secrètes), profil.php (son compte) ;
+//  - jamais : modules « argent » (finances / dépenses / paie) et
+//    « pédagogie » (notes, bulletins, conseils, statistiques, résultats,
+//    compétences, matières arabe, absences) — consultation seule ;
+//  - sinon (élèves, personnel, comptes, classes, niveaux, paramètres,
+//    dossiers…) : écriture autorisée.
 function fondateur_ecriture_permise(): bool {
-    return in_array(
-        basename($_SERVER['SCRIPT_NAME'] ?? ''),
-        ['directeur.php', 'configurer_securite.php', 'profil.php'],
-        true
-    );
+    $script = str_replace('\\', '/', $_SERVER['SCRIPT_NAME'] ?? '');
+    $base   = basename($script);
+
+    if (in_array($base, ['directeur.php', 'configurer_securite.php', 'profil.php'], true)) {
+        return true;
+    }
+
+    $modules_lecture_seule = [
+        '/pages/finances/', '/pages/depenses/', '/pages/paie/',
+        '/pages/notes/', '/pages/notes_arabe/',
+        '/pages/bulletins/', '/pages/bulletins_arabe/',
+        '/pages/conseil_classe/', '/pages/conseil_classe_arabe/',
+        '/pages/statistiques/', '/pages/statistiques_arabe/',
+        '/pages/resultat_annuel/', '/pages/resultat_annuel_arabe/',
+        '/pages/competences/', '/pages/matieres_arabe/',
+        '/pages/absences/',
+    ];
+    foreach ($modules_lecture_seule as $frag) {
+        if (strpos($script, $frag) !== false) return false;
+    }
+    return true;
 }
 
 // Écritures interdites (lecture seule) : visite association SANS droit
@@ -71,6 +94,17 @@ function est_lecture_seule(): bool {
     if (est_visite_association() && empty($_SESSION['visite_asso_ecriture'])) return true;
     if (est_fondateur() && !fondateur_ecriture_permise()) return true;
     return false;
+}
+
+// « Écriture déléguée » : l'utilisateur n'a pas de rôle école classique
+// (DIRECTEUR/SECRETAIRE/…) mais est un membre association entré en mode
+// écriture OU un FONDATEUR, ET la page courante lui autorise l'écriture
+// (est_lecture_seule() = false). Les gabarits s'en servent pour AFFICHER
+// les boutons d'action qui seraient sinon réservés à un rôle local — le
+// blocage réel des écritures reste csrf_verifier() / db_exec().
+function est_ecriture_deleguee(): bool {
+    if (est_lecture_seule()) return false;
+    return est_visite_association() || est_fondateur();
 }
 
 // Propriétaire de l'association : compte fondateur (membre.proprietaire=1).

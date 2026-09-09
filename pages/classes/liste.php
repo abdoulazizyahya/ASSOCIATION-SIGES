@@ -14,7 +14,11 @@ require_once __DIR__ . '/../../fonctions.php';
 exiger_connexion();
 
 $role          = role_connecte();
-$peut_modifier = ($role === 'DIRECTEUR');
+// DIRECTEUR, ou écriture déléguée : superadmin association entré en écriture,
+// ou FONDATEUR (la structure — classes / niveaux — fait partie de ce qu'il
+// enregistre ; seuls notes et finances lui restent en lecture seule, voir
+// ecole_contexte.php::fondateur_ecriture_permise).
+$peut_modifier = ($role === 'DIRECTEUR') || est_ecriture_deleguee();
 $annee         = get_annee_active();
 $val_annee     = $annee['val_annee'] ?? '';
 

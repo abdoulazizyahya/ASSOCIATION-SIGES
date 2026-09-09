@@ -586,9 +586,11 @@ function csrf_verifier(): void {
     // (POST) est refusé — point de contrôle unique, tous les enregistrements
     // de l'application passent par ici. Filet complémentaire : db_exec().
     if (function_exists('est_lecture_seule') && est_lecture_seule()) {
-        die('<div style="font-family:sans-serif;padding:2rem;color:#b45309">
-             Visite association — consultation en lecture seule.
-             Aucune modification n\'est possible depuis ce mode.</div>');
+        $motif = (function_exists('est_fondateur') && est_fondateur())
+            ? "Espace fondateur — cette rubrique (notes / finances) est en consultation seule."
+            : "Visite association — consultation en lecture seule.";
+        die('<div style="font-family:sans-serif;padding:2rem;color:#b45309">'
+          . h($motif) . ' Aucune modification n\'est possible ici.</div>');
     }
     $token = $_POST['csrf'] ?? $_GET['csrf'] ?? '';
     if (!hash_equals($_SESSION['csrf'] ?? '', $token)) {
