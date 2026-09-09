@@ -103,54 +103,56 @@ $csrf = csrf_generer();
 
 <?php if ($onglet === 'eleves'): ?>
 <?php
-  $f = [
-    'etab' => (int) ($_GET['etab'] ?? 0) ?: null,
-    'q'    => trim($_GET['q'] ?? ''),
-    'niu'  => in_array($_GET['niu'] ?? '', ['avec', 'sans'], true) ? $_GET['niu'] : null,
-  ];
-  $page = max(1, (int) ($_GET['page'] ?? 1));
-  $data = assoc_eleves_systeme($f, $page, 40);
-  $qs = fn(array $x) => http_build_query(array_filter(array_merge(
-        ['onglet' => 'eleves', 'etab' => $f['etab'], 'q' => $f['q'], 'niu' => $f['niu']], $x),
-        fn($v) => $v !== null && $v !== '' && $v !== 0));
+  // Réseau entier chargé une seule fois : école / NIU / texte se filtrent
+  // ensuite côté navigateur, au fur et à mesure, sans rechargement.
+  $data     = assoc_eleves_systeme([], 1, 100000);
+  $CAP      = 4000;
+  $lignes   = array_slice($data['lignes'], 0, $CAP);
+  $tronque  = count($data['lignes']) > $CAP;
+  $strip = fn($s) => strtr(mb_strtolower((string) $s),
+      ['à'=>'a','â'=>'a','ä'=>'a','é'=>'e','è'=>'e','ê'=>'e','ë'=>'e','î'=>'i','ï'=>'i',
+       'ô'=>'o','ö'=>'o','û'=>'u','ù'=>'u','ü'=>'u','ç'=>'c']);
 ?>
 
-<form method="get" class="asso-card mb-3">
-  <input type="hidden" name="onglet" value="eleves">
+<div class="asso-card mb-3">
   <div class="row g-2 align-items-end">
-    <div class="col-12 col-md-4">
+    <div class="col-12 col-md-5">
       <label class="form-label small">Recherche</label>
-      <input type="text" name="q" value="<?= h($f['q']) ?>" class="form-control form-control-sm"
+      <input type="text" id="niu-q" class="form-control form-control-sm" autocomplete="off"
              placeholder="nom, NIU, matricule interne, parent…">
     </div>
-    <div class="col-6 col-md-4">
+    <div class="col-6 col-md-5">
       <label class="form-label small">École</label>
-      <select name="etab" class="form-select form-select-sm">
+      <select id="niu-etab" class="form-select form-select-sm">
         <option value="">— toutes —</option>
         <?php foreach ($ecoles as $e): ?>
-          <option value="<?= (int) $e['id'] ?>" <?= $f['etab'] == $e['id'] ? 'selected' : '' ?>><?= h($e['code'] . ' — ' . $e['nom']) ?></option>
+          <option value="<?= (int) $e['id'] ?>" <?= (int) ($_GET['etab'] ?? 0) === (int) $e['id'] ? 'selected' : '' ?>><?= h($e['code'] . ' — ' . $e['nom']) ?></option>
         <?php endforeach; ?>
       </select>
     </div>
     <div class="col-6 col-md-2">
       <label class="form-label small">NIU</label>
-      <select name="niu" class="form-select form-select-sm">
+      <select id="niu-filtre" class="form-select form-select-sm">
         <option value="">— tous —</option>
-        <option value="avec" <?= $f['niu'] === 'avec' ? 'selected' : '' ?>>avec NIU</option>
-        <option value="sans" <?= $f['niu'] === 'sans' ? 'selected' : '' ?>>sans NIU</option>
+        <option value="avec">avec NIU</option>
+        <option value="sans">sans NIU</option>
       </select>
-    </div>
-    <div class="col-12 col-md-2">
-      <button class="btn btn-primary btn-sm w-100"><i class="bi bi-funnel me-1"></i>Filtrer</button>
     </div>
   </div>
   <div class="small text-muted2 mt-2">
-    <?= (int) $data['total'] ?> élève(s) · <?= (int) $data['sans_niu'] ?> sans NIU
-    <?php if ($f['q'] !== '' || $f['etab'] || $f['niu']): ?>
-      · <a href="<?= APP_URL ?>/association/niu/index.php?onglet=eleves">réinitialiser</a>
-    <?php endif; ?>
+    <span id="niu-compte"><?= count($lignes) ?></span> affiché(s) · <?= (int) $data['sans_niu'] ?> sans NIU
+    <?php if ($tronque): ?> · <span class="text-warning">liste limitée à <?= $CAP ?> — affinez la recherche</span><?php endif; ?>
   </div>
+</div>
+
+<?php if ($superadmin): ?>
+<form method="post" id="niu-gen-form" class="d-none">
+  <input type="hidden" name="csrf" value="<?= h($csrf) ?>">
+  <input type="hidden" name="op" value="generer_un">
+  <input type="hidden" name="ecole_id" id="gen-ecole">
+  <input type="hidden" name="id_eleve" id="gen-eleve">
 </form>
+<?php endif; ?>
 
 <div class="asso-card p-0">
   <div class="table-responsive">
@@ -158,9 +160,11 @@ $csrf = csrf_generer();
     <thead><tr class="text-muted2">
       <th>École</th><th>Élève</th><th>Naissance</th><th>Matricule</th><th>NIU</th><th></th>
     </tr></thead>
-    <tbody>
-      <?php foreach ($data['lignes'] as $r): ?>
-        <tr>
+    <tbody id="niu-tbody">
+      <?php foreach ($lignes as $r): ?>
+        <tr data-ecole="<?= (int) $r['ecole_id'] ?>"
+            data-niu="<?= $r['niu'] !== '' ? 'avec' : 'sans' ?>"
+            data-txt="<?= h($strip($r['nom'] . ' ' . $r['niu'] . ' ' . $r['mat'] . ' ' . ($r['parents'] ?? ''))) ?>">
           <td><span class="badge badge-soft"><?= h($r['ecole_code']) ?></span></td>
           <td><?= h($r['nom']) ?>
             <?php if ($r['parents']): ?><div class="small text-muted2"><?= h($r['parents']) ?></div><?php endif; ?>
@@ -176,32 +180,57 @@ $csrf = csrf_generer();
           </td>
           <td class="text-end">
             <?php if ($r['niu'] === '' && $superadmin): ?>
-            <form method="post" class="d-inline">
-              <input type="hidden" name="csrf" value="<?= h($csrf) ?>">
-              <input type="hidden" name="op" value="generer_un">
-              <input type="hidden" name="ecole_id" value="<?= (int) $r['ecole_id'] ?>">
-              <input type="hidden" name="id_eleve" value="<?= (int) $r['id_eleve'] ?>">
-              <button class="btn btn-outline-primary btn-sm py-0"><i class="bi bi-magic"></i> Générer</button>
-            </form>
+              <button type="button" class="btn btn-outline-primary btn-sm py-0"
+                      onclick="niuGenerer(<?= (int) $r['ecole_id'] ?>,<?= (int) $r['id_eleve'] ?>)">
+                <i class="bi bi-magic"></i> Générer
+              </button>
             <?php endif; ?>
           </td>
         </tr>
       <?php endforeach; ?>
-      <?php if (!$data['lignes']): ?>
-        <tr><td colspan="6" class="text-center text-muted2 py-3">Aucun élève pour ces critères.</td></tr>
-      <?php endif; ?>
     </tbody>
   </table>
   </div>
+  <div id="niu-vide" class="text-center text-muted2 py-3 d-none">Aucun élève pour ces critères.</div>
 </div>
 
-<?php if ($data['pages'] > 1): ?>
-  <div class="d-flex gap-2 mt-2 align-items-center small">
-    <?php if ($data['page'] > 1): ?><a class="btn btn-outline-light btn-sm" href="?<?= h($qs(['page' => $data['page'] - 1])) ?>">← Précédent</a><?php endif; ?>
-    <span class="text-muted2">Page <?= (int) $data['page'] ?> / <?= (int) $data['pages'] ?></span>
-    <?php if ($data['page'] < $data['pages']): ?><a class="btn btn-outline-light btn-sm" href="?<?= h($qs(['page' => $data['page'] + 1])) ?>">Suivant →</a><?php endif; ?>
-  </div>
-<?php endif; ?>
+<script>
+(function () {
+  var q = document.getElementById('niu-q'),
+      selEtab = document.getElementById('niu-etab'),
+      selNiu = document.getElementById('niu-filtre'),
+      rows = Array.prototype.slice.call(document.querySelectorAll('#niu-tbody tr')),
+      compte = document.getElementById('niu-compte'),
+      vide = document.getElementById('niu-vide'),
+      t;
+  function norm(s){ return s.toLowerCase()
+      .replace(/[àâä]/g,'a').replace(/[éèêë]/g,'e').replace(/[îï]/g,'i')
+      .replace(/[ôö]/g,'o').replace(/[ûùü]/g,'u').replace(/ç/g,'c'); }
+  function filtrer(){
+    var texte = norm(q.value.trim()), ec = selEtab.value, nf = selNiu.value, n = 0;
+    rows.forEach(function (tr) {
+      var ok = (!texte || tr.dataset.txt.indexOf(texte) !== -1)
+            && (!ec || tr.dataset.ecole === ec)
+            && (!nf || tr.dataset.niu === nf);
+      tr.hidden = !ok;
+      if (ok) n++;
+    });
+    compte.textContent = n;
+    vide.classList.toggle('d-none', n !== 0);
+  }
+  q.addEventListener('input', function () { clearTimeout(t); t = setTimeout(filtrer, 120); });
+  selEtab.addEventListener('change', filtrer);
+  selNiu.addEventListener('change', filtrer);
+  filtrer();
+})();
+function niuGenerer(idEcole, idEleve) {
+  var f = document.getElementById('niu-gen-form');
+  if (!f) return;
+  document.getElementById('gen-ecole').value = idEcole;
+  document.getElementById('gen-eleve').value = idEleve;
+  f.submit();
+}
+</script>
 
 <?php else: /* ── Onglet Générer ─────────────────────────────────── */ ?>
 
