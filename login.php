@@ -79,7 +79,7 @@ $neutre = function_exists('est_contexte_neutre') && est_contexte_neutre() && emp
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Connexion — <?= h(($etab['Initial_Etab'] ?? '') ?: 'Jaynitaare') ?></title>
+  <title>Connexion — <?= h(($etab['Initial_Etab'] ?? '') ?: (defined('ASSOC_NOM') && ASSOC_NOM !== '' ? ASSOC_NOM : 'SIGES')) ?></title>
   <?php if (!empty($etab['logo']) && is_file(__DIR__ . '/assets/uploads/' . $etab['logo'])): ?>
     <link rel="icon" href="<?= APP_URL ?>/assets/uploads/<?= h($etab['logo']) ?>">
   <?php endif; ?>

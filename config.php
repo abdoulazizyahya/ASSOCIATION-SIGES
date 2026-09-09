@@ -37,7 +37,7 @@ defined('APP_HOTE') || define('APP_HOTE', '');
 // direct (LAN / serveur dédié).
 defined('ECOLE_POOL_ACTIF') || define('ECOLE_POOL_ACTIF', false);
 
-defined('APP_NOM') || define('APP_NOM', 'Jaynitaare · Gestion Scolaire');
+defined('APP_NOM') || define('APP_NOM', 'SIGES · Gestion scolaire');
 
 // ── Chemin de l'application depuis la racine web (APP_URL) ───────────
 // Déduit AUTOMATIQUEMENT de l'emplacement du dossier : si vous renommez

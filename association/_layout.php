@@ -43,13 +43,17 @@ function asso_haut(string $titre, bool $avec_nav = true): void {
 
     $courant = _asso_chemin_courant();
     $css_ver = @filemtime(__DIR__ . '/../assets/css/association.css') ?: time();
+    // Nom de l'association (défini dans config.local.php par l'assistant
+    // d'installation) — sinon libellé générique.
+    $asso_nom  = (defined('ASSOC_NOM') && ASSOC_NOM !== '') ? ASSOC_NOM : 'Association';
+    $asso_marq = mb_strtoupper($asso_nom, 'UTF-8');
     ?>
 <!DOCTYPE html>
 <html lang="fr">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title><?= h($titre) ?> — Association</title>
+  <title><?= h($titre) ?> — <?= h($asso_nom) ?></title>
   <link rel="stylesheet" href="<?= APP_URL ?>/assets/vendor/bootstrap/css/bootstrap.min.css">
   <link rel="stylesheet" href="<?= APP_URL ?>/assets/vendor/bootstrap-icons/bootstrap-icons.min.css">
   <link rel="stylesheet" href="<?= APP_URL ?>/assets/vendor/inter/inter.css">
@@ -61,7 +65,7 @@ function asso_haut(string $titre, bool $avec_nav = true): void {
     <div class="auth-box">
       <div class="auth-brand">
         <span class="brand-mark"><i class="bi bi-mortarboard-fill"></i></span>
-        <span class="t">ASSOCIATION</span>
+        <span class="t"><?= h($asso_marq) ?></span>
       </div>
 <?php else: ?>
   <div class="asso-shell">
@@ -70,7 +74,7 @@ function asso_haut(string $titre, bool $avec_nav = true): void {
       <div class="asso-brand">
         <span class="brand-mark"><i class="bi bi-mortarboard-fill"></i></span>
         <div>
-          <div class="brand-name">ASSOCIATION</div>
+          <div class="brand-name"><?= h($asso_marq) ?></div>
           <div class="brand-sub">Portail multi-établissement</div>
         </div>
       </div>
