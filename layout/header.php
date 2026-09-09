@@ -311,7 +311,24 @@ function lien_actif(string $url): string {
 
     <?php if ($visite_asso): ?>
     <!-- Bandeau : visite d'un membre de l'association -->
-    <?php $ecoles_asso = assoc_all("SELECT id, code, nom FROM etablissement WHERE actif=1 ORDER BY nom"); ?>
+    <?php
+      $ecoles_asso = assoc_all("SELECT id, code, nom FROM etablissement WHERE actif=1 ORDER BY nom");
+      // École courante (id annuaire) + droit d'écriture du membre sur elle
+      // (superadmin, ou membre_acces.plein_acces) — pour le bouton bascule.
+      $ec_id = (int) (function_exists('ecole_courante') && ecole_courante() ? ecole_courante()['id'] : ($_SESSION['ecole']['id'] ?? 0));
+      $peut_ecrire_visite = false;
+      if ($ec_id && function_exists('est_superadmin_association')) {
+          if (est_superadmin_association()) {
+              $peut_ecrire_visite = true;
+          } else {
+              $_mid = membre_connecte()['id'] ?? 0;
+              $peut_ecrire_visite = $_mid && (int) assoc_val(
+                  "SELECT COALESCE(MAX(plein_acces),0) FROM membre_acces
+                   WHERE id_membre=? AND actif=1 AND (id_etablissement IS NULL OR id_etablissement=?)",
+                  [$_mid, $ec_id]);
+          }
+      }
+    ?>
     <div class="d-flex flex-wrap align-items-center gap-2 px-3 py-1"
          style="<?= $lecture_seule
              ? 'background:#fff8e6;border-bottom:1px solid #f0dca0;color:#7a5b00'
@@ -326,7 +343,7 @@ function lien_actif(string $url): string {
           <?= h($etab['Nom_Etab_Fr'] ?? '') ?>
         </button>
         <ul class="dropdown-menu" style="font-size:.82rem">
-          <?php $mode_actuel = $lecture_seule ? '' : '&mode=ecriture'; ?>
+          <?php $mode_actuel = $lecture_seule ? '&mode=lecture' : ''; // '' = écriture par défaut (superadmin/plein_acces) ?>
           <?php foreach ($ecoles_asso as $ea): ?>
             <li><a class="dropdown-item" href="<?= APP_URL ?>/association/entrer_ecole.php?id=<?= (int) $ea['id'] ?><?= $mode_actuel ?>">
               <?= h($ea['nom']) ?>
@@ -335,6 +352,21 @@ function lien_actif(string $url): string {
         </ul>
       </div>
       <?php endif; ?>
+
+      <?php if ($ec_id && !$lecture_seule): ?>
+        <a href="<?= APP_URL ?>/association/entrer_ecole.php?id=<?= $ec_id ?>&amp;mode=lecture"
+           class="btn btn-sm btn-light border py-0 px-2" style="font-size:.78rem"
+           title="Consulter sans risque de modification">
+          <i class="bi bi-eye me-1"></i>Lecture seule
+        </a>
+      <?php elseif ($ec_id && $lecture_seule && $peut_ecrire_visite): ?>
+        <a href="<?= APP_URL ?>/association/entrer_ecole.php?id=<?= $ec_id ?>"
+           class="btn btn-sm btn-warning border-0 py-0 px-2" style="font-size:.78rem"
+           onclick="return confirm('Passer en mode ÉCRITURE ? Les modifications seront enregistrées dans cette école.');">
+          <i class="bi bi-pencil-square me-1"></i>Passer en écriture
+        </a>
+      <?php endif; ?>
+
       <a href="<?= APP_URL ?>/association/sortir_ecole.php" class="ms-auto btn btn-sm btn-outline-secondary py-0 px-2" style="font-size:.78rem">
         <i class="bi bi-arrow-left me-1"></i>Retour association
       </a>
