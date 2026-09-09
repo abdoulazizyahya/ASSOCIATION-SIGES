@@ -192,6 +192,119 @@ function exiger_connexion(): void {
         header('Location: ' . APP_URL . '/configurer_securite.php');
         exit;
     }
+    // Privilèges par utilisateur : un menu / sous-menu retiré au compte
+    // (acces_utilisateur) bloque aussi l'accès direct par URL — pas
+    // seulement le masquage du menu dans layout/header.php.
+    if (!in_array($script_courant, $exemptes, true) && acces_page_bloquee()) {
+        http_response_code(403);
+        die('<div style="font-family:system-ui,sans-serif;max-width:520px;margin:3rem auto;padding:1.5rem;'
+          . 'border:1px solid #f5b5b5;background:#fde8e8;border-radius:10px;color:#8a1c1c">'
+          . '<strong>Accès restreint.</strong><br>Ce menu a été retiré de votre compte par un administrateur.'
+          . '<div style="margin-top:1rem"><a href="' . APP_URL . '/dashboard.php">← Tableau de bord</a></div></div>');
+    }
+}
+
+// ── Privilèges par utilisateur (menus / sous-menus retirés) ──────────
+//  Le Directeur — ou un superadmin association entré en écriture — peut
+//  RETIRER à un compte l'accès à un groupe de menu entier ('grp:Nom') ou à
+//  une entrée précise (son url). Deny-list : une ligne dans
+//  acces_utilisateur = une clé refusée ; aucune ligne = accès complet
+//  selon le rôle (comportement historique). Ne concerne QUE les comptes
+//  école locaux — jamais une visite association ni le FONDATEUR (qui
+//  voient déjà tout en lecture seule). UI : pages/utilisateurs/acces.php.
+
+/** Définition unique du menu latéral (layout/menu.php), avec cache statique. */
+function menu_definition(): array {
+    static $m = null;
+    if ($m === null) $m = require __DIR__ . '/layout/menu.php';
+    return $m;
+}
+
+/**
+ * Clés (grp:… ou url) refusées à un compte.
+ * [] si aucun refus, si la table n'existe pas encore (migration v53 non
+ * appliquée) ou si l'appelant n'est pas un compte école local.
+ */
+function acces_refuses_utilisateur(?int $id_user = null): array {
+    static $cache = [];
+    $id_user = $id_user ?? (int) ($_SESSION['user_id'] ?? 0);
+    if ($id_user <= 0) return [];
+    if (array_key_exists($id_user, $cache)) return $cache[$id_user];
+    $refuses = [];
+    try {
+        foreach (db_all("SELECT cle FROM acces_utilisateur WHERE id_user=?", [$id_user]) as $r) {
+            $refuses[$r['cle']] = true;
+        }
+    } catch (\Throwable $e) {
+        // table pas encore migrée — aucune restriction
+    }
+    return $cache[$id_user] = $refuses;
+}
+
+/**
+ * Le groupe / l'entrée de menu donnés sont-ils autorisés au compte connecté ?
+ * Utilisé par layout/header.php pour masquer les entrées retirées.
+ */
+function menu_acces_autorise(string $groupe, string $url): bool {
+    if (function_exists('est_visite_association') && est_visite_association()) return true;
+    if (function_exists('est_fondateur') && est_fondateur()) return true;
+    $refuses = acces_refuses_utilisateur();
+    if (!$refuses) return true;
+    if (isset($refuses['grp:' . $groupe])) return false;
+    if (isset($refuses[$url])) return false;
+    return true;
+}
+
+/** Chemin de la page courante relatif à la racine de l'app (ex. « pages/eleves/liste.php »). */
+function page_courante_relative(): string {
+    $s    = str_replace('\\', '/', $_SERVER['SCRIPT_NAME'] ?? ($_SERVER['PHP_SELF'] ?? ''));
+    $base = rtrim((string) parse_url(APP_URL, PHP_URL_PATH), '/');
+    if ($base !== '' && strpos($s, $base . '/') === 0) $s = substr($s, strlen($base) + 1);
+    return ltrim($s, '/');
+}
+
+/**
+ * La page courante appartient-elle à un menu / sous-menu retiré au compte
+ * connecté ? Bloque l'entrée de menu exacte, tout un groupe, et les pages
+ * « filles » d'un dossier de module dont TOUTES les entrées de menu sont
+ * refusées (ex. pages/eleves/voir.php si « Élèves » est retiré).
+ * 'dashboard.php', 'profil.php' et 'logout.php' ne sont jamais bloqués
+ * (anti-verrouillage — voir aussi pages/utilisateurs/acces.php).
+ */
+function acces_page_bloquee(): bool {
+    if (function_exists('est_visite_association') && est_visite_association()) return false;
+    if (function_exists('est_fondateur') && est_fondateur()) return false;
+    $refuses = acces_refuses_utilisateur();
+    if (!$refuses) return false;
+
+    $rel = page_courante_relative();
+    if ($rel === '') return false;
+    if (in_array(basename($rel), ['dashboard.php', 'profil.php', 'logout.php'], true)) return false;
+
+    $par_url = $par_dossier = [];
+    foreach (menu_definition() as $groupe => $items) {
+        foreach ($items as $it) {
+            if ($it[0] === '--') continue;
+            $u = $it[1];
+            $par_url[$u] = $groupe;
+            $d = strpos($u, '/') !== false ? basename(dirname($u)) : '';
+            if ($d !== '') $par_dossier[$d][$u] = $groupe;
+        }
+    }
+    $refusee = static function (string $u, string $g) use ($refuses): bool {
+        return isset($refuses['grp:' . $g]) || isset($refuses[$u]);
+    };
+
+    if (isset($par_url[$rel])) return $refusee($rel, $par_url[$rel]);
+
+    $d = strpos($rel, '/') !== false ? basename(dirname($rel)) : '';
+    if ($d !== '' && !empty($par_dossier[$d])) {
+        foreach ($par_dossier[$d] as $u => $g) {
+            if (!$refusee($u, $g)) return false;
+        }
+        return true;
+    }
+    return false;
 }
 
 function utilisateur_connecte(): array {

@@ -52,7 +52,7 @@ require_once __DIR__ . '/../../layout/header.php';
 <div class="page-titre d-flex justify-content-between align-items-center">
   <div>
     <h4><i class="bi bi-person-gear me-1 text-primary"></i>Comptes utilisateurs</h4>
-    <div class="sub"><?= count($utilisateurs) ?> compte(s) — identifiant, mot de passe et rôle (privilèges)</div>
+    <div class="sub"><?= count($utilisateurs) ?> compte(s) — identifiant, mot de passe, rôle et privilèges d'accès (menus)</div>
   </div>
   <a href="<?= APP_URL ?>/pages/utilisateurs/form.php" class="btn btn-primary btn-sm">
     <i class="bi bi-plus-lg me-1"></i>Nouveau compte
@@ -80,6 +80,10 @@ require_once __DIR__ . '/../../layout/header.php';
                       onclick='ouvrirRole(<?= (int) $u['id_user'] ?>, <?= json_encode($u['id_fonction']) ?>, <?= json_encode(mb_strtoupper($u['nom_ens']) . ' ' . ($u['prenom_ens'] ?? '')) ?>)'>
                 <i class="bi bi-shield-lock" style="font-size:.78rem"></i>
               </button>
+              <a href="<?= APP_URL ?>/pages/utilisateurs/acces.php?id=<?= (int)$u['id_user'] ?>"
+                 class="btn btn-sm btn-light" style="padding:3px 7px" title="Privilèges — menus et sous-menus visibles">
+                <i class="bi bi-sliders" style="font-size:.78rem"></i>
+              </a>
               <a href="<?= APP_URL ?>/pages/utilisateurs/form.php?id=<?= (int)$u['id_user'] ?>"
                  class="btn btn-sm btn-light" style="padding:3px 7px" title="Réinitialiser le mot de passe">
                 <i class="bi bi-key" style="font-size:.78rem"></i>

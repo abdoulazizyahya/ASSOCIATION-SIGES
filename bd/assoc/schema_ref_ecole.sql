@@ -551,6 +551,18 @@ CREATE TABLE `matricule_config` (
 INSERT INTO `matricule_config` (`id`, `mode`, `format`, `longueur_seq`, `sequence_par`) VALUES
 (1, 'auto', '{AA}{NIV}{SEQ}', 3, 'annee_niveau');
 
+-- Privilèges par utilisateur (migration v53) — deny-list de menus/sous-menus.
+-- cle = 'grp:<Groupe>' ou '<url de l'entrée>'. Vide par défaut (accès complet
+-- selon le rôle). Voir layout/menu.php + pages/utilisateurs/acces.php.
+DROP TABLE IF EXISTS `acces_utilisateur`;
+CREATE TABLE `acces_utilisateur` (
+  `id_user` int(11) NOT NULL,
+  `cle` varchar(120) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `refuse_le` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id_user`,`cle`),
+  KEY `idx_acces_user` (`id_user`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 DROP TABLE IF EXISTS `enseignant`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
