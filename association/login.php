@@ -129,6 +129,9 @@ asso_haut('Espace association', false);
         <i class="bi bi-box-arrow-in-right me-1"></i>Se connecter
       </button>
     </form>
+    <div class="text-center mt-2">
+      <a href="<?= APP_URL ?>/association/mot_de_passe_oublie.php" class="small text-decoration-none">Mot de passe oublié ?</a>
+    </div>
     <hr class="border-secondary my-3">
     <a href="<?= APP_URL ?>/login.php" class="small text-decoration-none">← Connexion établissement</a>
   <?php endif; ?>

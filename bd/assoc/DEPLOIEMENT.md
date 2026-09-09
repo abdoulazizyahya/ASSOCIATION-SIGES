@@ -132,6 +132,19 @@ La barre de navigation `/association/` expose, pour un superadmin :
 Le propriétaire initial = le 1er compte (`installer.php`). Sur une base existante, `maj_assoc.php`
 le désigne (plus ancien superadmin). Le propriétaire est toujours superadmin (anti-verrouillage)
 et son compte ne peut être ni désactivé ni modifié par un tiers.
+
+**Sécurité de la connexion**
+
+- **Double authentification (TOTP)** : *facultative* par défaut. Chaque membre l'active depuis
+  `/association/securite.php`. Pour l'imposer aux superadmins : `define('ASSOC_2FA_SUPERADMIN_OBLIGATOIRE', true)`
+  dans `config.local.php`. Un superadmin peut retirer la 2FA d'un membre (téléphone perdu) via `membres/voir.php`.
+- **Limitation de débit** : 8 échecs sur un même identifiant OU une même IP en 15 min → connexion
+  bloquée 15 min (`login_echec`, `assoc_login_bloque()`).
+- **Mot de passe oublié** (`/association/mot_de_passe_oublie.php`) : sans envoi d'e-mail. Le membre
+  fournit son identifiant + l'e-mail **et** le téléphone *exactement* tels qu'enregistrés dans son
+  compte (`securite.php` → « Mes coordonnées », colonne `membre.tel` ajoutée par `maj_assoc.php`).
+  Comparaison e-mail insensible à la casse, téléphone sur les 9 derniers chiffres. Rate-limité.
+  Un superadmin peut toujours réinitialiser directement le mot de passe d'un membre via `membres/voir.php`.
 | **Journal** (`journal.php`) | Journal d'audit filtrable (membre / école / action / période) : connexions, visites d'écoles, créations-modifications-suppressions d'établissements, export/import/vidage de bases, transferts NIU, migrations. Bouton de purge des entrées > 12 mois. |
 | **Migrations** (`migrations.php`) | Version de schéma de chaque école vs la dernière `bd/migration_v*.sql`, et bouton **Migrer** (par école ou toutes les écoles en retard). Une **sauvegarde de sécurité** est écrite avant application ; arrêt à la première migration en échec. Équivalent UI de `migrer_toutes_ecoles.php`. |
 | **Démarrage** (`etablissement_demarrage.php?id=N`) | Checklist « école opérationnelle » : base créée, schéma à jour, fondateur/directeur affectés, année ouverte, classes, logo — avec les liens d'action pour chaque point manquant. Accessible depuis la fiche et le cockpit. |

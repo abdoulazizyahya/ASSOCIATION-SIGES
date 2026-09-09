@@ -50,6 +50,7 @@ CREATE TABLE IF NOT EXISTS `membre` (
   `nom`          varchar(100) NOT NULL,
   `prenom`       varchar(100) DEFAULT NULL,
   `email`        varchar(150) DEFAULT NULL,
+  `tel`          varchar(30)  DEFAULT NULL,          -- téléphone (récupération de mot de passe)
   `actif`        tinyint(1)   NOT NULL DEFAULT 1,
   `proprietaire` tinyint(1)   NOT NULL DEFAULT 0,    -- compte fondateur : seul habilité à créer/retirer d'autres superadmins
   `totp_secret`  varchar(64)  DEFAULT NULL,          -- secret Base32 de la double authentification

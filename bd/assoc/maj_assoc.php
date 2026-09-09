@@ -49,6 +49,12 @@ if (!col_existe('membre', 'totp_actif')) {
     $fait[] = "membre.totp_actif ajoutée";
 }
 
+// ── Coordonnées : membre.tel (récupération de mot de passe) ──────
+if (!col_existe('membre', 'tel')) {
+    mysqli_query($link_assoc, "ALTER TABLE `membre` ADD COLUMN `tel` varchar(30) DEFAULT NULL AFTER `email`");
+    $fait[] = "membre.tel ajoutée";
+}
+
 // ── Hiérarchie : membre.proprietaire ─────────────────────────────
 //  Le « propriétaire » (compte fondateur) est le seul habilité à accorder
 //  ou retirer le niveau superadmin à un autre membre. Sur une base

@@ -1340,3 +1340,86 @@ function assoc_proprietaire_dispo(): bool {
     }
     return $ok;
 }
+
+// =====================================================================
+//  COORDONNÉES MEMBRE + RÉCUPÉRATION DE MOT DE PASSE
+//  (association/securite.php + association/mot_de_passe_oublie.php)
+//
+//  Sans SMTP : la récupération se fait par CONCORDANCE de l'e-mail ET du
+//  téléphone enregistrés sur le compte (+ limitation de débit login_echec).
+//  Léger mais suffisant pour une petite association ; le jour où un vrai
+//  serveur d'e-mail existe, on ajoutera un code à usage unique par-dessus.
+// =====================================================================
+
+/** La colonne membre.tel existe-t-elle (bd/assoc/maj_assoc.php passé) ? */
+function assoc_coordonnees_dispo(): bool {
+    static $ok = null;
+    if ($ok === null) {
+        try {
+            $ok = (bool) assoc_val(
+                "SELECT COUNT(*) FROM information_schema.columns
+                 WHERE table_schema = DATABASE() AND table_name = 'membre' AND column_name = 'tel'"
+            );
+        } catch (\Throwable $e) { $ok = false; }
+    }
+    return $ok;
+}
+
+/**
+ * Normalise un numéro de téléphone pour comparaison : on ne garde que les
+ * 9 derniers chiffres (numéro national significatif au Cameroun), ce qui
+ * rend équivalents « +237 691 22 33 44 », « 00237691223344 »,
+ * « 0691223344 » et « 691223344 ».
+ */
+function assoc_tel_normaliser(?string $tel): string {
+    $d = preg_replace('/\D+/', '', (string) $tel);
+    return strlen($d) > 9 ? substr($d, -9) : $d;
+}
+
+/** Enregistre e-mail + téléphone d'un membre. */
+function assoc_membre_coordonnees_maj(int $id, string $email, string $tel): array {
+    $email = trim($email);
+    $tel   = trim($tel);
+    if ($email !== '' && !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        return ['ok' => false, 'message' => "Adresse e-mail invalide."];
+    }
+    if ($tel !== '' && !preg_match('/^[0-9 .+()-]{6,30}$/', $tel)) {
+        return ['ok' => false, 'message' => "Numéro de téléphone invalide."];
+    }
+    $cols = assoc_coordonnees_dispo() ? "email=?, tel=?" : "email=?";
+    $params = assoc_coordonnees_dispo() ? [$email ?: null, $tel ?: null, $id] : [$email ?: null, $id];
+    assoc_exec("UPDATE membre SET $cols WHERE id=?", $params);
+    return ['ok' => true, 'message' => "Coordonnées enregistrées."];
+}
+
+/**
+ * Vérifie une demande de récupération : login + e-mail + téléphone doivent
+ * TOUS correspondre à ceux enregistrés sur un compte actif. Rate-limité.
+ * Retour : la ligne `membre` si tout concorde, null sinon.
+ */
+function assoc_recuperation_verifier(string $login, string $email, string $tel, ?string $ip): ?array {
+    if (assoc_login_bloque($login, $ip) > 0) return null;
+    if (!assoc_coordonnees_dispo()) return null;   // pas de téléphone en base : mécanisme indisponible
+
+    $m = assoc_one("SELECT * FROM membre WHERE login=? AND actif=1", [trim($login)]);
+    $ok = $m
+        && trim((string) $m['email']) !== ''
+        && trim((string) $m['tel'])   !== ''
+        && strcasecmp(trim($m['email']), trim($email)) === 0
+        && assoc_tel_normaliser($m['tel']) !== ''
+        && assoc_tel_normaliser($m['tel']) === assoc_tel_normaliser($tel);
+
+    if (!$ok) {
+        assoc_login_echec_noter($login, $ip);
+        return null;
+    }
+    return $m;
+}
+
+/** Définit un nouveau mot de passe pour un membre (après récupération vérifiée). */
+function assoc_recuperation_appliquer(int $id, string $pwd, ?string $login, ?string $ip): array {
+    if (strlen($pwd) < 8) return ['ok' => false, 'message' => "Mot de passe : 8 caractères minimum."];
+    assoc_exec("UPDATE membre SET pwd_hash=? WHERE id=?", [password_hash($pwd, PASSWORD_DEFAULT), $id]);
+    assoc_login_echec_reset($login, $ip);
+    return ['ok' => true, 'message' => "Mot de passe réinitialisé — vous pouvez vous connecter."];
+}

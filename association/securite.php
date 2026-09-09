@@ -1,8 +1,10 @@
 <?php
-// association/securite.php — le membre connecté gère sa double
-// authentification (TOTP). Personnel : chacun ne configure que son
-// propre compte. La désactivation par un tiers (perte du téléphone)
-// se fait par un superadmin depuis membres/voir.php.
+// association/securite.php — le membre connecté gère son compte :
+//   • ses coordonnées (e-mail + téléphone) — servent à récupérer un mot de
+//     passe oublié (association/mot_de_passe_oublie.php) ;
+//   • sa double authentification TOTP (facultative — activation volontaire).
+// La désactivation de la 2FA par un tiers (perte du téléphone) se fait par
+// un superadmin depuis membres/voir.php.
 require_once __DIR__ . '/../config.php';
 require_once __DIR__ . '/../connexion.php';
 require_once __DIR__ . '/../fonctions.php';
@@ -10,11 +12,8 @@ require_once __DIR__ . '/_layout.php';
 require_once __DIR__ . '/../bd/lib/totp.php';
 exiger_membre_association();
 
-if (!assoc_2fa_disponible()) {
-    asso_haut('Sécurité');
-    echo '<div class="asso-card text-muted2">Annuaire non à jour : lancez <span class="font-monospace">php bd/assoc/maj_assoc.php</span> pour activer la double authentification.</div>';
-    asso_bas(); exit;
-}
+$fa_dispo   = assoc_2fa_disponible();
+$coord_dispo = function_exists('assoc_coordonnees_dispo') && assoc_coordonnees_dispo();
 
 $moi = (int) (membre_connecte()['login'] ? assoc_val("SELECT id FROM membre WHERE login=?", [membre_connecte()['login']]) : 0);
 $m   = assoc_one("SELECT * FROM membre WHERE id=?", [$moi]);
@@ -26,7 +25,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     csrf_verifier();
     $op = $_POST['op'] ?? '';
 
-    if ($op === 'activer') {
+    if ($op === 'coordonnees') {
+        $r = assoc_membre_coordonnees_maj($moi, $_POST['email'] ?? '', $_POST['tel'] ?? '');
+        $msg = $r['ok'] ? $r['message'] : ''; $err = $r['ok'] ? '' : $r['message'];
+        if ($r['ok']) journaliser_action('membre_coordonnees', null, $m['login']);
+        $m = assoc_one("SELECT * FROM membre WHERE id=?", [$moi]);
+
+    } elseif ($op === 'activer') {
         $secret = preg_replace('/[^A-Z2-7]/', '', strtoupper($_POST['secret'] ?? ''));
         $r = ($secret !== '')
             ? assoc_membre_2fa_activer($moi, $secret, trim($_POST['code'] ?? ''))
@@ -52,11 +57,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($op === 'activer' && $msg) journaliser_action('membre_2fa_on', null, $m['login']);
 }
 
-$actif = (int) $m['totp_actif'] === 1;
+$actif = $fa_dispo && (int) ($m['totp_actif'] ?? 0) === 1;
 
 // Secret proposé (nouveau à chaque affichage du formulaire d'activation,
 // mémorisé en session tant qu'il n'est pas confirmé).
-if (!$actif) {
+if ($fa_dispo && !$actif) {
     if (empty($_SESSION['secu_secret'])) $_SESSION['secu_secret'] = totp_secret_nouveau();
     $secret = $_SESSION['secu_secret'];
     $issuer = (defined('ASSOC_NOM') && ASSOC_NOM !== '') ? ASSOC_NOM
@@ -67,9 +72,43 @@ if (!$actif) {
     $qr_src = APP_URL . '/pdf/qrcode.php?s=6&e=M&d=' . urlencode($uri);
 }
 
-asso_haut('Sécurité — double authentification');
+asso_haut('Sécurité — mon compte');
 $csrf = csrf_generer();
 ?>
+<?php if ($msg): ?><div class="alert alert-success py-2 small" style="max-width:560px"><?= h($msg) ?></div><?php endif; ?>
+<?php if ($err): ?><div class="alert alert-warning py-2 small" style="max-width:560px"><?= h($err) ?></div><?php endif; ?>
+
+<!-- ── Coordonnées ─────────────────────────────────────────────── -->
+<div class="asso-card mb-3" style="max-width:560px">
+  <div class="fw-bold mb-1"><i class="bi bi-person-vcard me-1"></i>Mes coordonnées</div>
+  <div class="small text-muted2 mb-3">
+    Servent à récupérer votre mot de passe si vous l'oubliez
+    (<a href="<?= APP_URL ?>/association/mot_de_passe_oublie.php">page « mot de passe oublié »</a>) :
+    il faudra fournir <strong>exactement</strong> l'e-mail <em>et</em> le téléphone enregistrés ici.
+    Gardez-les à jour.
+  </div>
+  <form method="post" class="row g-2">
+    <input type="hidden" name="csrf" value="<?= h($csrf) ?>">
+    <input type="hidden" name="op" value="coordonnees">
+    <div class="col-12">
+      <label class="form-label small">Adresse e-mail</label>
+      <input type="email" name="email" class="form-control form-control-sm" value="<?= h($m['email'] ?? '') ?>"
+             placeholder="vous@exemple.cm">
+    </div>
+    <div class="col-12">
+      <label class="form-label small">Téléphone</label>
+      <input type="text" name="tel" class="form-control form-control-sm" value="<?= h($m['tel'] ?? '') ?>"
+             placeholder="+237 6XX XX XX XX" <?= $coord_dispo ? '' : 'disabled' ?>>
+      <?php if (!$coord_dispo): ?>
+        <div class="form-text small text-warning">Annuaire non à jour : lancez <span class="font-monospace">php bd/assoc/maj_assoc.php</span> pour activer le champ téléphone.</div>
+      <?php endif; ?>
+    </div>
+    <div class="col-12 mt-1"><button class="btn btn-primary btn-sm"><i class="bi bi-check-lg me-1"></i>Enregistrer</button></div>
+  </form>
+</div>
+
+<?php if ($fa_dispo): ?>
+<!-- ── Double authentification (facultative) ───────────────────── -->
 <div class="asso-card" style="max-width:560px">
   <?php if (!empty($_SESSION['forcer_2fa'])): ?>
     <div class="alert alert-warning py-2 small">
@@ -78,8 +117,6 @@ $csrf = csrf_generer();
       Configurez-la ci-dessous pour accéder au portail.
     </div>
   <?php endif; ?>
-  <?php if ($msg): ?><div class="alert alert-success py-2 small"><?= h($msg) ?></div><?php endif; ?>
-  <?php if ($err): ?><div class="alert alert-warning py-2 small"><?= h($err) ?></div><?php endif; ?>
 
   <?php if ($actif): ?>
     <div class="d-flex align-items-center gap-2 mb-3">
@@ -99,7 +136,7 @@ $csrf = csrf_generer();
     </form>
 
   <?php else: ?>
-    <div class="fw-bold mb-3"><i class="bi bi-shield-lock me-1"></i>Activer la double authentification</div>
+    <div class="fw-bold mb-3"><i class="bi bi-shield-lock me-1"></i>Activer la double authentification <span class="text-muted2 small">(facultatif)</span></div>
 
     <!-- Étape 1 -->
     <div class="mb-3">
@@ -144,4 +181,5 @@ $csrf = csrf_generer();
     </div>
   <?php endif; ?>
 </div>
+<?php endif; ?>
 <?php asso_bas();
