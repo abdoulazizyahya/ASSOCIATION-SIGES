@@ -1423,3 +1423,34 @@ function assoc_recuperation_appliquer(int $id, string $pwd, ?string $login, ?str
     assoc_login_echec_reset($login, $ip);
     return ['ok' => true, 'message' => "Mot de passe réinitialisé — vous pouvez vous connecter."];
 }
+
+// =====================================================================
+//  LOGOS D'ÉCOLES (portail association)
+// =====================================================================
+
+/**
+ * URL du logo d'une école à partir de sa ligne annuaire (`etablissement.logo`,
+ * chemin relatif à assets/uploads/), ou null si absent / fichier introuvable.
+ */
+function assoc_ecole_logo_url(?string $logo): ?string {
+    $logo = trim((string) $logo);
+    if ($logo === '' || strpos($logo, '..') !== false) return null;
+    if (!is_file(__DIR__ . '/assets/uploads/' . $logo)) return null;
+    return APP_URL . '/assets/uploads/' . $logo;
+}
+
+/**
+ * Rafraîchit `etablissement.logo` (annuaire) depuis la base d'une école —
+ * best-effort, sans lever d'exception. À appeler quand on a déjà une
+ * connexion ouverte sur la base école ($l), pour garder l'annuaire à jour
+ * (le logo se règle DANS l'école, Configurations).
+ */
+function assoc_sync_logo_ecole(mysqli $l, int $id_etab): void {
+    try {
+        $r = mysqli_query($l, "SELECT logo FROM etablissement WHERE COALESCE(logo,'')<>'' LIMIT 1");
+        $logo = $r ? (mysqli_fetch_row($r)[0] ?? null) : null;
+        if ($logo !== null && $logo !== '') {
+            assoc_exec("UPDATE etablissement SET logo=? WHERE id=? AND COALESCE(logo,'')<>?", [$logo, $id_etab, $logo]);
+        }
+    } catch (\Throwable $e) { /* ignore */ }
+}

@@ -22,8 +22,9 @@ asso_haut('Établissements de l\'association');
 <div class="row g-3">
   <?php foreach ($ecoles as $e): ?>
     <div class="col-12 col-md-6">
+      <?php $logo_url = assoc_ecole_logo_url($e['logo'] ?? null); ?>
       <div class="ecole-card h-100 position-relative <?= $e['actif'] ? '' : 'opacity-50' ?>">
-        <div class="d-flex align-items-start gap-2">
+        <div class="d-flex align-items-start gap-3">
           <div class="flex-grow-1">
             <a href="<?= APP_URL ?>/association/etablissement.php?id=<?= (int) $e['id'] ?>"
                class="fw-bold text-decoration-none stretched-link">
@@ -35,6 +36,15 @@ asso_haut('Établissements de l\'association');
               <?php if (!$e['actif']): ?><span class="text-warning ms-1">(inactive)</span><?php endif; ?>
             </div>
             <div class="small text-muted2 mt-1"><i class="bi bi-database me-1"></i><?= h($e['db_name']) ?></div>
+          </div>
+          <div class="flex-shrink-0 d-flex align-items-center justify-content-center"
+               style="width:56px;height:56px;border-radius:12px;overflow:hidden;background:#fff;border:1px solid var(--border)">
+            <?php if ($logo_url): ?>
+              <img src="<?= h($logo_url) ?>" alt="Logo <?= h($e['code']) ?>"
+                   style="max-width:100%;max-height:100%;object-fit:contain">
+            <?php else: ?>
+              <span class="fw-bold text-muted2" style="font-size:.8rem"><?= h(mb_substr($e['sigle'] ?: $e['code'], 0, 4)) ?></span>
+            <?php endif; ?>
           </div>
         </div>
         <?php if ($e['actif']): ?>

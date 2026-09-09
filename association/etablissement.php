@@ -31,7 +31,9 @@ $acces = assoc_one(
 $stats = null; $stats_err = '';
 if ($acces) {
     try {
-        $stats = avec_ecole($id, function (mysqli $l) {
+        $stats = avec_ecole($id, function (mysqli $l) use ($id) {
+            // Garde le logo de l'annuaire à jour (il se règle DANS l'école).
+            assoc_sync_logo_ecole($l, $id);
             $active = ecole_one($l, "SELECT val_annee FROM annee_scolaire WHERE Etat_annee_scolaire=1 LIMIT 1");
             $annee  = $active
                   ?: ecole_one($l, "SELECT val_annee FROM annee_scolaire ORDER BY val_annee DESC LIMIT 1");
@@ -77,6 +79,9 @@ $affectations = assoc_all(
      ORDER BY a.actif DESC, a.fonction", [$id]
 );
 
+// Logo (potentiellement rafraîchi par assoc_sync_logo_ecole ci-dessus).
+$logo_url = assoc_ecole_logo_url(assoc_val("SELECT logo FROM etablissement WHERE id=?", [$id]) ?? ($e['logo'] ?? null));
+
 asso_haut('Fiche — ' . $e['nom']);
 ?>
 <a href="<?= APP_URL ?>/association/index.php" class="small text-decoration-none">← Établissements</a>
@@ -91,13 +96,21 @@ asso_haut('Fiche — ' . $e['nom']);
   <?php endif; ?>
 <?php endif; ?>
 
-<div class="d-flex flex-wrap align-items-center gap-2 mt-2 mb-3">
+<div class="d-flex align-items-start gap-3 mt-2 mb-3">
+  <?php if ($logo_url): ?>
+  <div class="flex-shrink-0 d-flex align-items-center justify-content-center"
+       style="width:64px;height:64px;border-radius:12px;overflow:hidden;background:#fff;border:1px solid var(--border)">
+    <img src="<?= h($logo_url) ?>" alt="Logo <?= h($e['code']) ?>" style="max-width:100%;max-height:100%;object-fit:contain">
+  </div>
+  <?php endif; ?>
+  <div class="d-flex flex-wrap align-items-center gap-2">
   <span class="badge badge-soft"><?= h($e['code']) ?></span>
   <?php if (!$e['actif']): ?><span class="badge bg-warning text-dark">Inactive</span><?php endif; ?>
   <?php if ($e['sigle']): ?><span class="text-muted2 small"><?= h($e['sigle']) ?></span><?php endif; ?>
   <?php if ($e['ville']): ?><span class="text-muted2 small"><i class="bi bi-geo-alt me-1"></i><?= h($e['ville']) ?></span><?php endif; ?>
   <span class="text-muted2 small"><i class="bi bi-database me-1"></i><?= h($e['db_name']) ?></span>
   <?php if ($e['sous_domaine']): ?><span class="text-muted2 small"><i class="bi bi-globe me-1"></i><?= h($e['sous_domaine']) ?></span><?php endif; ?>
+  </div>
 </div>
 
 <?php if (!$acces): ?>
