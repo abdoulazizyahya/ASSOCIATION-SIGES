@@ -33,36 +33,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                  . implode(', ', array_column($proches, 'niu'))
                  . '. Cochez « créer quand même » pour forcer.';
         } else {
-            // Préfixe : PMC + sigle école + code année scolaire courante
-            $sigle   = strtoupper(trim($ecole['sigle'] ?: $ecole['code']));
-            $annee   = (int) date('Y') - ((int) date('n') < 8 ? 1 : 0);
-            $code_an = substr((string) $annee, 2, 2);
-            $base    = 'PMC' . $sigle . $code_an;
-            for ($i = 0; $i < 6; $i++) {
-                $max = (int) assoc_val(
-                    "SELECT MAX(CAST(SUBSTRING(niu, ?) AS UNSIGNED)) FROM eleve_niu WHERE niu REGEXP ?",
-                    [strlen($base) + 1, '^' . preg_quote($base) . '[0-9]{4}$']
-                );
-                $niu = $base . str_pad((string) ($i < 3 ? $max + 1 : random_int(1, 9999)), 4, '0', STR_PAD_LEFT);
-                try {
-                    assoc_exec(
-                        "INSERT INTO eleve_niu (niu, nom, prenom, date_naissance, sexe, lieu_naissance,
-                                id_etab_origine, id_etab_courant, statut, cree_par)
-                         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'reserve', ?)",
-                        [$niu, $val['nom'], $val['prenom'], $val['date_naissance'] ?: null, $val['sexe'],
-                         $val['lieu_naissance'] ?: null, $ecole['id'], $ecole['id'],
-                         'membre:' . (membre_connecte()['login'] ?? '?')]
-                    );
-                    assoc_exec("INSERT INTO eleve_niu_mouvement (niu, id_etab_cible, type, par) VALUES (?, ?, 'creation', ?)",
-                        [$niu, $ecole['id'], 'membre:' . (membre_connecte()['login'] ?? '?')]);
-                    journaliser_action('niu_creation', (int) $ecole['id'], $niu);
-                    $niu_cree = $niu;
-                    $msg = "NIU créé : $niu — à communiquer à l'établissement pour finaliser l'inscription.";
-                    $val = ['nom' => '', 'prenom' => '', 'date_naissance' => '', 'sexe' => 'Masculin', 'lieu_naissance' => '', 'id_etab' => $val['id_etab']];
-                    break;
-                } catch (\Throwable $e) { /* collision PK → on retente */ }
+            // Format unifié (assoc_niu_generer_pour) : PMC + sigle 3 lettres
+            // de l'école + année + n° d'ordre.
+            $niu = assoc_niu_generer_pour((int) $ecole['id'], [
+                'nom'        => $val['nom'],
+                'prenom'     => $val['prenom'],
+                'date_naiss' => $val['date_naissance'] ?: null,
+                'sexe'       => $val['sexe'],
+                'lieu_naiss' => $val['lieu_naissance'] ?: null,
+            ], 'membre:' . (membre_connecte()['login'] ?? '?'));
+            if ($niu) {
+                // NIU manuel = élève pas encore inscrit → statut « reserve ».
+                assoc_exec("UPDATE eleve_niu SET statut='reserve' WHERE niu=?", [$niu]);
+                journaliser_action('niu_creation', (int) $ecole['id'], $niu);
+                $niu_cree = $niu;
+                $msg = "NIU créé : $niu — à communiquer à l'établissement pour finaliser l'inscription.";
+                $val = ['nom' => '', 'prenom' => '', 'date_naissance' => '', 'sexe' => 'Masculin', 'lieu_naissance' => '', 'id_etab' => $val['id_etab']];
+            } elseif (!$err) {
+                $err = 'Impossible de générer un NIU unique, réessayez.';
             }
-            if (!$niu_cree && !$err) $err = 'Impossible de générer un NIU unique, réessayez.';
         }
     }
 }

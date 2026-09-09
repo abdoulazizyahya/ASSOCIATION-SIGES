@@ -55,6 +55,17 @@ if (!col_existe('membre', 'tel')) {
     $fait[] = "membre.tel ajoutée";
 }
 
+// ── NIU : etablissement.niu_sigle (code 3 lettres dans le NIU) ───
+if (!col_existe('etablissement', 'niu_sigle')) {
+    mysqli_query($link_assoc, "ALTER TABLE `etablissement` ADD COLUMN `niu_sigle` varchar(3) DEFAULT NULL AFTER `sigle`");
+    // Défaut : 3 premières lettres alphanumériques du sigle (ou du code).
+    mysqli_query($link_assoc,
+        "UPDATE etablissement
+         SET niu_sigle = UPPER(LEFT(REGEXP_REPLACE(COALESCE(NULLIF(sigle,''), code), '[^A-Za-z0-9]', ''), 3))
+         WHERE niu_sigle IS NULL OR niu_sigle = ''");
+    $fait[] = "etablissement.niu_sigle ajoutée + initialisée";
+}
+
 // ── Hiérarchie : membre.proprietaire ─────────────────────────────
 //  Le « propriétaire » (compte fondateur) est le seul habilité à accorder
 //  ou retirer le niveau superadmin à un autre membre. Sur une base

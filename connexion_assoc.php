@@ -1460,3 +1460,210 @@ function assoc_sync_logo_ecole(mysqli $l, int $id_etab): void {
         }
     } catch (\Throwable $e) { /* ignore */ }
 }
+
+// =====================================================================
+//  REGISTRE NIU — génération + vue « élèves du réseau »
+//  (association/niu/index.php). Format d'un NIU :
+//    <PREFIXE><SIGLE3><AA><NNNN>
+//     PREFIXE = constante NIU_PREFIXE (défaut « PMC »)
+//     SIGLE3  = etablissement.niu_sigle (3 lettres, réglable par école)
+//     AA      = 2 derniers chiffres de l'année scolaire de l'école
+//     NNNN    = numéro d'ordre 4 chiffres, séquence par (SIGLE3, AA)
+// =====================================================================
+
+/** Le code 3 lettres d'une école dans le NIU (niu_sigle, ou défaut sigle/code). */
+function assoc_niu_sigle(array $e): string {
+    $s = strtoupper(preg_replace('/[^A-Za-z0-9]/', '', (string) ($e['niu_sigle'] ?? '')));
+    if ($s === '') {
+        $s = strtoupper(preg_replace('/[^A-Za-z0-9]/', '', (string) ($e['sigle'] ?: ($e['code'] ?? ''))));
+    }
+    return substr(str_pad($s, 3, 'X'), 0, 3);
+}
+
+/** La colonne etablissement.niu_sigle existe-t-elle (maj_assoc.php passé) ? */
+function assoc_niu_config_dispo(): bool {
+    static $ok = null;
+    if ($ok === null) {
+        try {
+            $ok = (bool) assoc_val(
+                "SELECT COUNT(*) FROM information_schema.columns
+                 WHERE table_schema = DATABASE() AND table_name = 'etablissement' AND column_name = 'niu_sigle'");
+        } catch (\Throwable $e) { $ok = false; }
+    }
+    return $ok;
+}
+
+/** Base d'un NIU pour une école + une année scolaire (« PMCJAB26 »). */
+function assoc_niu_base(array $e, ?string $val_annee): string {
+    $prefixe = (defined('NIU_PREFIXE') && NIU_PREFIXE !== '') ? NIU_PREFIXE : 'PMC';
+    $an      = substr((string) (explode('/', (string) $val_annee)[0] ?: date('Y')), -2);
+    return strtoupper($prefixe) . assoc_niu_sigle($e) . $an;
+}
+
+/**
+ * Génère (et réserve dans eleve_niu) un NIU pour une identité rattachée à
+ * l'école $id_etab. $ident : ['nom','prenom','date_naiss','sexe','lieu_naiss'].
+ * Retourne le NIU, ou null si échec.
+ */
+function assoc_niu_generer_pour(int $id_etab, array $ident, string $par, ?string $val_annee = null): ?string {
+    $e = assoc_one("SELECT * FROM etablissement WHERE id=?", [$id_etab]);
+    if (!$e) return null;
+    $base  = assoc_niu_base($e, $val_annee);
+    $regex = '^' . preg_quote($base, '/') . '[0-9]{4}$';
+
+    for ($essai = 0; $essai < 8; $essai++) {
+        $max = (int) assoc_val(
+            "SELECT MAX(CAST(SUBSTRING(niu, ?) AS UNSIGNED)) FROM eleve_niu WHERE niu REGEXP ?",
+            [strlen($base) + 1, $regex]
+        );
+        $n   = $essai < 4 ? $max + 1 : random_int(1, 9999);
+        $niu = $base . str_pad((string) $n, 4, '0', STR_PAD_LEFT);
+        try {
+            assoc_exec(
+                "INSERT INTO eleve_niu (niu, nom, prenom, date_naissance, sexe, lieu_naissance,
+                        id_etab_origine, id_etab_courant, statut, cree_par)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'actif', ?)",
+                [$niu, $ident['nom'] ?? null, $ident['prenom'] ?? null, $ident['date_naiss'] ?? null,
+                 $ident['sexe'] ?? null, $ident['lieu_naiss'] ?? null, $id_etab, $id_etab, $par]
+            );
+            assoc_exec("INSERT INTO eleve_niu_mouvement (niu, id_etab_cible, type, par) VALUES (?, ?, 'creation', ?)",
+                       [$niu, $id_etab, $par]);
+            return $niu;
+        } catch (\Throwable $ex) { /* collision PK : on retente */ }
+    }
+    return null;
+}
+
+/**
+ * Génère les NIU MANQUANTS : pour chaque élève actif sans NIU d'une école
+ * (ou de toutes si $id_etab === null), crée un NIU et l'écrit dans eleve.niu
+ * + eleve_niu. Retour :
+ *   ['ecoles' => [['code','nom','crees','deja','total','erreur'], …],
+ *    'total_crees' => int]
+ */
+function assoc_niu_generer_manquants(?int $id_etab, string $par): array {
+    $ecoles = $id_etab
+        ? assoc_all("SELECT * FROM etablissement WHERE id=? AND actif=1", [$id_etab])
+        : assoc_all("SELECT * FROM etablissement WHERE actif=1 ORDER BY nom");
+    $out = ['ecoles' => [], 'total_crees' => 0];
+
+    foreach ($ecoles as $e) {
+        $ligne = ['code' => $e['code'], 'nom' => $e['nom'], 'crees' => 0, 'deja' => 0, 'total' => 0, 'erreur' => null];
+        try {
+            $l = mysqli_connect(DB_HOST, DB_USER, DB_PASS, $e['db_name']);
+            mysqli_set_charset($l, 'utf8mb4');
+        } catch (\Throwable $ex) {
+            $ligne['erreur'] = 'base injoignable';
+            $out['ecoles'][] = $ligne;
+            continue;
+        }
+
+        $va = null;
+        $r = mysqli_query($l, "SELECT val_annee FROM annee_scolaire WHERE Etat_annee_scolaire=1 LIMIT 1");
+        if ($r && ($row = mysqli_fetch_row($r))) $va = $row[0];
+
+        $res = mysqli_query($l,
+            "SELECT id_eleve, Nom_elv, Prenom_elv, Date_naiss_elv, Sexe_elv, Lieu_naiss_elv, niu
+             FROM eleve WHERE statut='actif'");
+        $eleves = $res ? mysqli_fetch_all($res, MYSQLI_ASSOC) : [];
+        $ligne['total'] = count($eleves);
+
+        $st = mysqli_prepare($l, "UPDATE eleve SET niu=? WHERE id_eleve=?");
+        foreach ($eleves as $el) {
+            if (trim((string) $el['niu']) !== '') { $ligne['deja']++; continue; }
+            $niu = assoc_niu_generer_pour((int) $e['id'], [
+                'nom'        => $el['Nom_elv'],
+                'prenom'     => $el['Prenom_elv'],
+                'date_naiss' => $el['Date_naiss_elv'] ?: null,
+                'sexe'       => $el['Sexe_elv'] ?: null,
+                'lieu_naiss' => $el['Lieu_naiss_elv'] ?: null,
+            ], $par, $va);
+            if ($niu) {
+                mysqli_stmt_bind_param($st, 'si', $niu, $el['id_eleve']);
+                mysqli_stmt_execute($st);
+                $ligne['crees']++;
+            }
+        }
+        mysqli_stmt_close($st);
+        mysqli_close($l);
+
+        $out['total_crees'] += $ligne['crees'];
+        $out['ecoles'][] = $ligne;
+        if ($ligne['crees'] > 0) {
+            journaliser_action('niu_generation_masse', (int) $e['id'], $ligne['crees'] . ' NIU');
+        }
+    }
+    return $out;
+}
+
+/**
+ * Liste agrégée des élèves de TOUTES les écoles (ou d'une seule), paginée,
+ * avec filtres. $f : ['etab'=>?int, 'q'=>?string, 'niu'=>'avec'|'sans'|null].
+ * Coûteux (une requête par école, filtrage/tri/pagination en PHP) — OK pour
+ * un réseau de quelques milliers d'élèves.
+ */
+function assoc_eleves_systeme(array $f, int $page = 1, int $par_page = 40): array {
+    $ecoles = !empty($f['etab'])
+        ? assoc_all("SELECT * FROM etablissement WHERE id=?", [(int) $f['etab']])
+        : assoc_all("SELECT * FROM etablissement WHERE actif=1 ORDER BY nom");
+
+    $q  = trim((string) ($f['q'] ?? ''));
+    $ql = mb_strtolower($q);
+    $tous = [];
+    $sans_niu = 0;
+
+    foreach ($ecoles as $e) {
+        try {
+            $l = mysqli_connect(DB_HOST, DB_USER, DB_PASS, $e['db_name']);
+            mysqli_set_charset($l, 'utf8mb4');
+        } catch (\Throwable $ex) { continue; }
+
+        $res = mysqli_query($l,
+            "SELECT e.id_eleve, e.Mat_elv, e.Nom_elv, e.Prenom_elv, e.Date_naiss_elv,
+                    e.Sexe_elv, e.niu,
+                    (SELECT GROUP_CONCAT(CONCAT(p.nom, ' ', p.prenom) SEPARATOR ', ')
+                     FROM parent p WHERE p.id_eleve = e.id_eleve) AS parents
+             FROM eleve e WHERE e.statut = 'actif'");
+        while ($res && ($r = mysqli_fetch_assoc($res))) {
+            $niu = trim((string) $r['niu']);
+            if ($niu === '') $sans_niu++;
+
+            if (($f['niu'] ?? null) === 'avec' && $niu === '') continue;
+            if (($f['niu'] ?? null) === 'sans' && $niu !== '') continue;
+
+            if ($q !== '') {
+                $hay = mb_strtolower(
+                    $r['Nom_elv'] . ' ' . $r['Prenom_elv'] . ' ' . $niu . ' '
+                    . $r['Mat_elv'] . ' ' . ($r['parents'] ?? ''));
+                if (mb_strpos($hay, $ql) === false) continue;
+            }
+
+            $tous[] = [
+                'ecole_code' => $e['code'], 'ecole_nom' => $e['nom'], 'ecole_id' => (int) $e['id'],
+                'id_eleve'   => (int) $r['id_eleve'],
+                'mat'        => $r['Mat_elv'],
+                'nom'        => trim($r['Nom_elv'] . ' ' . $r['Prenom_elv']),
+                'naiss'      => $r['Date_naiss_elv'],
+                'sexe'       => $r['Sexe_elv'],
+                'niu'        => $niu,
+                'parents'    => $r['parents'],
+            ];
+        }
+        mysqli_close($l);
+    }
+
+    usort($tous, fn($a, $b) => [$a['ecole_nom'], $a['nom']] <=> [$b['ecole_nom'], $b['nom']]);
+
+    $total = count($tous);
+    $pages = max(1, (int) ceil($total / $par_page));
+    $page  = max(1, min($page, $pages));
+
+    return [
+        'lignes'   => array_slice($tous, ($page - 1) * $par_page, $par_page),
+        'total'    => $total,
+        'page'     => $page,
+        'pages'    => $pages,
+        'par_page' => $par_page,
+        'sans_niu' => $sans_niu,
+    ];
+}

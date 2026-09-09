@@ -29,6 +29,7 @@ CREATE TABLE IF NOT EXISTS `etablissement` (
   `db_name`              varchar(64)  NOT NULL,                 -- nom de la base MySQL de l'école
   `nom`                  varchar(150) NOT NULL,
   `sigle`                varchar(50)  DEFAULT NULL,
+  `niu_sigle`            varchar(3)   DEFAULT NULL,             -- code 3 lettres de l'école dans le NIU (défaut : 3 premières lettres du sigle)
   `ville`                varchar(100) DEFAULT NULL,
   `logo`                 varchar(255) DEFAULT NULL,             -- nom de fichier sous assets/uploads/
   `couleur`              varchar(9)   DEFAULT NULL,             -- accent visuel (#RRGGBB)
