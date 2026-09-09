@@ -110,7 +110,8 @@ $classes = db_all(
     "SELECT c.IDClasses, c.DesignationClasses, c.Niveau, n.Section, n.OrdreNiveau,
             COUNT(DISTINCT i.id_eleve) AS nb_eleves,
             SUM(e.Sexe_elv LIKE 'M%') AS nb_m,
-            SUM(e.Sexe_elv LIKE 'F%') AS nb_f
+            SUM(e.Sexe_elv LIKE 'F%') AS nb_f,
+            (SELECT COUNT(*) FROM inscrire ix WHERE ix.IDClasses = c.IDClasses) AS nb_inscrits_total
      FROM classe c
      LEFT JOIN niveau n ON n.LibelleNiveau = c.Niveau
      LEFT JOIN inscrire i ON i.IDClasses = c.IDClasses AND i.val_annee = ?
@@ -199,11 +200,18 @@ if (!$es_partiel) {
                class="btn btn-sm btn-light" style="padding:3px 7px" title="Modifier">
               <i class="bi bi-pencil" style="font-size:.78rem"></i>
             </a>
+            <?php if ((int) $c['nb_inscrits_total'] > 0): ?>
+            <span class="btn btn-sm btn-light text-muted disabled" style="padding:3px 7px;opacity:.4"
+                  title="Suppression impossible : <?= (int) $c['nb_inscrits_total'] ?> inscription(s) enregistrée(s) dans cette classe (retirez d'abord les élèves)">
+              <i class="bi bi-trash" style="font-size:.78rem"></i>
+            </span>
+            <?php else: ?>
             <a href="<?= APP_URL ?>/pages/classes/supprimer.php?id=<?= (int)$c['IDClasses'] ?>&csrf=<?= csrf_generer() ?>"
                class="btn btn-sm btn-light text-danger" style="padding:3px 7px" title="Supprimer"
-               onclick="return confirm('Supprimer cette classe ? (impossible si des élèves y sont inscrits)')">
+               onclick="return confirm('Supprimer cette classe ? (aucun élève n\'y est inscrit)')">
               <i class="bi bi-trash" style="font-size:.78rem"></i>
             </a>
+            <?php endif; ?>
             <?php endif; ?>
           </td>
         </tr>
