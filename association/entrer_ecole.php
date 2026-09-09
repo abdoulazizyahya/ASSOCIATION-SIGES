@@ -1,13 +1,12 @@
 <?php
 // association/entrer_ecole.php — un membre « ouvre » une école dans
 // l'application scolaire normale.
-//   ?id=N              → LECTURE SEULE (comportement par défaut, tous les
-//                        membres autorisés).
-//   ?id=N&mode=ecriture → LECTURE / ÉCRITURE : réservé au superadministrateur
-//                        de l'association (ou à un membre disposant de
-//                        membre_acces.plein_acces=1 sur cette école). Toute
-//                        écriture est alors permise dans la base de l'école
-//                        choisie, exactement comme un DIRECTEUR local.
+//
+//   Superadmin / membre_acces.plein_acces=1 : entre en LECTURE / ÉCRITURE
+//     PAR DÉFAUT (peut tout faire dans l'école — créer, modifier, supprimer
+//     — exactement comme un DIRECTEUR local). ?id=N&mode=lecture pour se
+//     limiter volontairement à la consultation.
+//   Membre en accès simple (lecture) : LECTURE SEULE, toujours.
 require_once __DIR__ . '/../config.php';
 require_once __DIR__ . '/../connexion.php';
 require_once __DIR__ . '/../fonctions.php';
@@ -33,12 +32,12 @@ if (!$acces) {
     die('Accès non autorisé à cet établissement.');
 }
 
-// Mode demandé : écriture seulement si explicitement réclamée ET autorisée
-// (superadmin association, ou membre_acces.plein_acces=1 sur cette école).
-// Par défaut — et pour tout membre « admin » standard — LECTURE SEULE.
-$mode_demande = ($_GET['mode'] ?? 'lecture') === 'ecriture';
-$peut_ecrire  = est_superadmin_association() || !empty($acces['plein_acces']);
-$ecriture     = $mode_demande && $peut_ecrire;
+// Un superadmin (ou un membre disposant de plein_acces sur cette école)
+// entre EN ÉCRITURE par défaut : il a le privilège de tout faire dans
+// toutes les écoles. Il peut se limiter volontairement avec ?mode=lecture.
+// Un membre en accès simple reste en LECTURE SEULE, quoi qu'il demande.
+$peut_ecrire = est_superadmin_association() || !empty($acces['plein_acces']);
+$ecriture    = $peut_ecrire && (($_GET['mode'] ?? '') !== 'lecture');
 
 // Bascule de contexte : session « visite association », rôle synthétique,
 // base école sélectionnée.
@@ -55,9 +54,17 @@ if ($ecriture) {
 // nullables). La traçabilité réelle est assurée au central par
 // journaliser_action() ci-dessous (qui membre, quelle école, quand) et par
 // le bandeau permanent « Visite association — LECTURE / ÉCRITURE ».
+//
+// En écriture : rôle « DIRECTEUR » synthétique — tous les boutons/actions
+// des pages école qui testent `role_connecte() === 'DIRECTEUR'` en dur
+// (classes, compétences/barème, matières arabes, signatures de bulletins,
+// meilleurs élèves…) deviennent disponibles. En lecture seule : rôle
+// « MEMBRE_ASSOCIATION » (les mêmes boutons restent masqués, cohérent avec
+// la consultation). `est_visite_association()` reste vrai dans les deux cas
+// (bandeau + accès à tout le menu via `$menu_voit_tout`).
 $_SESSION['user'] = [
     'id'            => null,
-    'role'          => 'MEMBRE_ASSOCIATION',
+    'role'          => $ecriture ? 'DIRECTEUR' : 'MEMBRE_ASSOCIATION',
     'nom'           => $m['nom'] ?? 'Association',
     'prenom'        => $m['prenom'] ?? '',
     'login'         => $m['login'] ?? '',

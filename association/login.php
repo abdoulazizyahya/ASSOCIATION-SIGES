@@ -25,6 +25,12 @@ if (!empty($_SESSION['membre_2fa_pending'])
     && ($_SESSION['membre_2fa_pending']['t'] ?? 0) > time() - 300) {
     $pending = assoc_one("SELECT * FROM membre WHERE id=? AND actif=1",
         [(int) $_SESSION['membre_2fa_pending']['id']]);
+    // 2FA désactivée entre-temps (par le membre lui-même ou un superadmin) :
+    // on ne laisse pas l'utilisateur coincé sur l'étape « code », on le
+    // connecte directement.
+    if ($pending && (!assoc_2fa_disponible() || (int) ($pending['totp_actif'] ?? 0) !== 1 || empty($pending['totp_secret']))) {
+        _membre_connecter($pending);   // exit
+    }
     if ($pending) $etape = '2fa';
 } else {
     unset($_SESSION['membre_2fa_pending']);
