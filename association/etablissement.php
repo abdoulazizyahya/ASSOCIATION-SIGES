@@ -90,7 +90,7 @@ asso_haut('Fiche — ' . $e['nom']);
 <?php if (est_superadmin_association()): ?>
   <a href="<?= APP_URL ?>/association/etablissement_modifier.php?id=<?= (int) $e['id'] ?>"
      class="btn btn-outline-light btn-sm ms-2"><i class="bi bi-pencil me-1"></i>Modifier</a>
-  <?php if (!$e['actif']): ?>
+  <?php if (!$e['actif'] && est_proprietaire_association()): ?>
     <a href="<?= APP_URL ?>/association/etablissement_supprimer.php?id=<?= (int) $e['id'] ?>"
        class="btn btn-outline-danger btn-sm ms-2"><i class="bi bi-trash3 me-1"></i>Supprimer</a>
   <?php endif; ?>
@@ -151,9 +151,13 @@ asso_haut('Fiche — ' . $e['nom']);
         <?= $base_etat['existe'] ? 'existe mais est vide' : "n'existe pas encore sur le serveur" ?> —
         l'école n'est pas utilisable.
       </span>
-      <a href="<?= APP_URL ?>/association/ecole_bd_creer.php?id=<?= (int) $e['id'] ?>" class="btn btn-primary btn-sm">
-        <i class="bi bi-database-add me-1"></i>Créer la base
-      </a>
+      <?php if (est_proprietaire_association()): ?>
+        <a href="<?= APP_URL ?>/association/ecole_bd_creer.php?id=<?= (int) $e['id'] ?>" class="btn btn-primary btn-sm">
+          <i class="bi bi-database-add me-1"></i>Créer la base
+        </a>
+      <?php else: ?>
+        <span class="text-muted2">Le propriétaire de l'association doit la créer.</span>
+      <?php endif; ?>
     </div>
   <?php elseif ($stats_err): ?>
     <div class="alert alert-warning py-2 small">Base école injoignable : <?= h($stats_err) ?></div>
@@ -191,9 +195,15 @@ asso_haut('Fiche — ' . $e['nom']);
     <i class="bi bi-database-gear"></i>Base de données
     <span class="font-monospace text-muted2"><?= h($e['db_name']) ?></span>
   </div>
-  <?php $eid = (int) $e['id']; $csrf = h(csrf_generer()); ?>
+  <?php $eid = (int) $e['id']; $csrf = h(csrf_generer());
+        // Propriétaire de l'association : seul habilité aux opérations
+        // lourdes (créer / vider / importer / restaurer / supprimer).
+        // Un administrateur « simple » (superadmin non propriétaire) ne
+        // peut que sauvegarder / exporter.
+        $prop = est_proprietaire_association(); ?>
   <div class="p-3">
     <?php if ($base_absente): ?>
+      <?php if ($prop): ?>
       <div class="d-flex flex-wrap gap-2">
         <a href="<?= APP_URL ?>/association/ecole_bd_creer.php?id=<?= $eid ?>" class="btn btn-primary btn-sm">
           <i class="bi bi-database-add me-1"></i><?= $base_etat['existe'] ? 'Initialiser la base' : 'Créer la base' ?>
@@ -204,6 +214,9 @@ asso_haut('Fiche — ' . $e['nom']);
           </a>
         <?php endif; ?>
       </div>
+      <?php else: ?>
+        <div class="small text-muted2"><i class="bi bi-info-circle me-1"></i>La base de cette école n'existe pas — seul le propriétaire de l'association peut la créer.</div>
+      <?php endif; ?>
     <?php else: ?>
       <div class="mb-2">
         <div class="small text-muted2 mb-1"><i class="bi bi-shield-check me-1"></i>Sauvegarde</div>
@@ -219,8 +232,9 @@ asso_haut('Fiche — ' . $e['nom']);
           </a>
         </div>
       </div>
+      <?php if ($prop): ?>
       <div>
-        <div class="small text-muted2 mb-1"><i class="bi bi-arrow-counterclockwise me-1"></i>Restauration &amp; réinitialisation</div>
+        <div class="small text-muted2 mb-1"><i class="bi bi-arrow-counterclockwise me-1"></i>Restauration &amp; réinitialisation <span class="badge bg-warning text-dark">propriétaire</span></div>
         <div class="d-flex flex-wrap gap-2">
           <a href="<?= APP_URL ?>/association/ecole_bd_restaurer.php?id=<?= $eid ?>" class="btn btn-outline-warning btn-sm">
             <i class="bi bi-clock-history me-1"></i>Restaurer une sauvegarde
@@ -238,8 +252,9 @@ asso_haut('Fiche — ' . $e['nom']);
           <?php endif; ?>
         </div>
       </div>
+      <?php endif; ?>
     <?php endif; ?>
-    <?php if ($e['actif'] && !$base_absente): ?>
+    <?php if ($prop && $e['actif'] && !$base_absente): ?>
       <div class="small text-muted2 mt-2">
         <i class="bi bi-info-circle me-1"></i>Restaurer, Importer et Vider exigent un établissement <strong>inactif</strong>
         (Modifier → décocher « actif »).

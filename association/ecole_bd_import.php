@@ -9,7 +9,7 @@ require_once __DIR__ . '/../connexion.php';
 require_once __DIR__ . '/../fonctions.php';
 require_once __DIR__ . '/_layout.php';
 require_once __DIR__ . '/../bd/lib/ecole_maintenance.php';
-exiger_superadmin_association();
+exiger_proprietaire_association();  // opérations lourdes : propriétaire uniquement (admin simple = sauvegarde seule)
 
 const IMPORT_TAILLE_MAX = 60 * 1024 * 1024; // 60 Mo
 
