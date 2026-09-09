@@ -12,17 +12,18 @@
 //  (association/login.php).
 
 // Entrées de navigation : [label, icône bootstrap, chemin relatif à
-// /association/, préfixes qui activent l'entrée, superadmin seulement ?].
+// /association/, préfixes qui activent l'entrée, superadmin seulement ?,
+// propriétaire seulement ?].
 function _asso_nav_entrees(): array {
     return [
-        ['Établissements',  'buildings',      'index.php',           ['index.php', 'etablissement', 'ecole_bd_'], false],
-        ['Tableau de bord', 'speedometer2',   'dashboard.php',       ['dashboard.php'],                           true],
-        ['Migrations',      'database-gear',  'migrations.php',      ['migrations.php'],                          true],
-        ['Membres',         'people',         'membres/index.php',   ['membres/'],                               true],
-        ['Journal',         'journal-text',   'journal.php',         ['journal.php'],                            true],
-        ['Registre NIU',    'person-vcard',   'niu/index.php',       ['niu/'],                                   false],
-        ['Personnel',       'person-badge',   'personnel/liste.php', ['personnel/'],                             false],
-        ['Sécurité',        'shield-lock',    'securite.php',        ['securite.php'],                            false],
+        ['Établissements',  'buildings',      'index.php',           ['index.php', 'etablissement', 'ecole_bd_'], false, false],
+        ['Tableau de bord', 'speedometer2',   'dashboard.php',       ['dashboard.php'],                           true,  false],
+        ['Migrations',      'database-gear',  'migrations.php',      ['migrations.php'],                          true,  true],
+        ['Membres',         'people',         'membres/index.php',   ['membres/'],                               true,  false],
+        ['Journal',         'journal-text',   'journal.php',         ['journal.php'],                            true,  false],
+        ['Registre NIU',    'person-vcard',   'niu/index.php',       ['niu/'],                                   false, false],
+        ['Personnel',       'person-badge',   'personnel/liste.php', ['personnel/'],                             false, false],
+        ['Sécurité',        'shield-lock',    'securite.php',        ['securite.php'],                            false, false],
     ];
 }
 
@@ -36,8 +37,9 @@ function _asso_chemin_courant(): string {
 function asso_haut(string $titre, bool $avec_nav = true): void {
     $GLOBALS['_asso_avec_nav'] = $avec_nav;
 
-    $m          = function_exists('membre_connecte') ? membre_connecte() : [];
-    $superadmin = function_exists('est_superadmin_association') && est_superadmin_association();
+    $m           = function_exists('membre_connecte') ? membre_connecte() : [];
+    $superadmin  = function_exists('est_superadmin_association') && est_superadmin_association();
+    $proprietaire = function_exists('est_proprietaire_association') && est_proprietaire_association();
     $nom_membre = trim(($m['prenom'] ?? '') . ' ' . ($m['nom'] ?? '')) ?: 'Membre';
     $initiale   = mb_strtoupper(mb_substr($m['prenom'] ?? ($m['nom'] ?? '?'), 0, 1));
 
@@ -81,8 +83,9 @@ function asso_haut(string $titre, bool $avec_nav = true): void {
 
       <nav class="asso-nav">
         <div class="nav-label">Navigation</div>
-        <?php foreach (_asso_nav_entrees() as [$label, $icone, $href, $prefixes, $super_only]): ?>
+        <?php foreach (_asso_nav_entrees() as [$label, $icone, $href, $prefixes, $super_only, $prop_only]): ?>
           <?php if ($super_only && !$superadmin) continue; ?>
+          <?php if ($prop_only && !$proprietaire) continue; ?>
           <?php
             $actif = false;
             foreach ($prefixes as $pref) {
@@ -100,7 +103,7 @@ function asso_haut(string $titre, bool $avec_nav = true): void {
           <span class="avatar"><?= h($initiale ?: 'M') ?></span>
           <div>
             <div class="u-name"><?= h($nom_membre) ?></div>
-            <div class="u-role"><?= $superadmin ? 'Superadministrateur' : 'Membre' ?></div>
+            <div class="u-role"><?= $proprietaire ? 'Propriétaire' : ($superadmin ? 'Administrateur' : 'Membre') ?></div>
           </div>
         </div>
         <a href="<?= APP_URL ?>/association/logout.php" class="logout">
@@ -114,7 +117,7 @@ function asso_haut(string $titre, bool $avec_nav = true): void {
       <header class="asso-topbar">
         <button type="button" class="asso-burger" id="assoBurger" aria-label="Menu"><i class="bi bi-list"></i></button>
         <span class="tb-title d-none d-sm-inline">Portail association</span>
-        <span class="tb-badge ms-auto"><i class="bi bi-diagram-3 me-1"></i><?= $superadmin ? 'Superadmin' : 'Membre' ?></span>
+        <span class="tb-badge ms-auto"><i class="bi bi-diagram-3 me-1"></i><?= $proprietaire ? 'Propriétaire' : ($superadmin ? 'Admin' : 'Membre') ?></span>
       </header>
 
       <div class="asso-content">
