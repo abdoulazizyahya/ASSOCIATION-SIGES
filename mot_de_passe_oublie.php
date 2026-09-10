@@ -151,7 +151,7 @@ $etab = get_etablissement();
 <div class="login-box">
   <div class="login-etab">
     <strong>Mot de passe oublié</strong>
-    <?= h($etab['Nom_Etab_Fr'] ?? 'Système de Gestion Scolaire') ?>
+    <?= h($etab['Nom_Etab_Fr'] ?? (defined('ASSOC_NOM') && ASSOC_NOM !== '' ? ASSOC_NOM : 'Système de Gestion Scolaire')) ?>
   </div>
 
   <?php if ($erreur): ?>
