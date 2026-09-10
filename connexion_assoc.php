@@ -493,6 +493,8 @@ function creer_etablissement(array $in): array {
         [$id, $vmax]
     );
 
+    regenerer_portail_accueil_best_effort();   // rafraîchit promeducamsiges.html
+
     return [
         'ok'      => true,
         'message' => "Établissement « $nom » créé (base $db, schéma v$vmax). "
@@ -500,6 +502,22 @@ function creer_etablissement(array $in): array {
         'id'      => $id,
         'db_name' => $db,
     ];
+}
+
+// Régénère la copie statique du portail d'accueil (promeducamsiges.html)
+// après création / modification / suppression d'une école. Best-effort :
+// n'interrompt jamais l'opération appelante. accueil.php reste la version
+// dynamique de référence — ceci n'est qu'un cache pour partage hors serveur.
+function regenerer_portail_accueil_best_effort(): void {
+    try {
+        $gen = __DIR__ . '/bd/assoc/generer_accueil.php';
+        if (is_file($gen)) {
+            require_once $gen;
+            if (function_exists('regenerer_portail_accueil')) {
+                regenerer_portail_accueil();
+            }
+        }
+    } catch (\Throwable $e) { /* silencieux — la vitrine n'est pas critique */ }
 }
 
 // ── Bases MySQL qu'on ne doit JAMAIS supprimer ─────────────────────
@@ -669,6 +687,8 @@ function supprimer_etablissement(int $id, array $opts = []): array {
                 'message' => "Erreur pendant la suppression : " . $ex->getMessage()
                            . " (l'annuaire a pu être partiellement modifié)."];
     }
+
+    regenerer_portail_accueil_best_effort();   // rafraîchit promeducamsiges.html
 
     return [
         'ok'      => true,
@@ -1428,6 +1448,114 @@ function assoc_recuperation_appliquer(int $id, string $pwd, ?string $login, ?str
     assoc_exec("UPDATE membre SET pwd_hash=? WHERE id=?", [password_hash($pwd, PASSWORD_DEFAULT), $id]);
     assoc_login_echec_reset($login, $ip);
     return ['ok' => true, 'message' => "Mot de passe réinitialisé — vous pouvez vous connecter."];
+}
+
+// =====================================================================
+//  QUESTIONS SECRÈTES DES MEMBRES
+//  Voie de récupération COMPLÉMENTAIRE à e-mail + téléphone. Table
+//  membre_question_secrete (bd/assoc/maj_assoc.php), numero 1|2.
+//  UI : association/securite.php (config) + association/mot_de_passe_oublie.php.
+// =====================================================================
+
+/** Normalise une réponse : minuscules + espaces réduits (comparaison tolérante). */
+function assoc_reponse_normaliser(string $r): string {
+    return preg_replace('/\s+/u', ' ', mb_strtolower(trim($r), 'UTF-8'));
+}
+
+/** La table des questions secrètes existe-t-elle (maj_assoc.php passé) ? */
+function assoc_questions_dispo(): bool {
+    static $ok = null;
+    if ($ok === null) {
+        try {
+            $ok = (bool) assoc_val(
+                "SELECT COUNT(*) FROM information_schema.tables
+                 WHERE table_schema = DATABASE() AND table_name = 'membre_question_secrete'");
+        } catch (\Throwable $e) { $ok = false; }
+    }
+    return $ok;
+}
+
+/** Libellés de questions proposés (le membre peut aussi saisir la sienne). */
+function assoc_questions_suggerees(): array {
+    return [
+        "Quel est le nom de jeune fille de votre mère ?",
+        "Quel est le nom de votre école primaire ?",
+        "Quel est le nom de votre premier animal de compagnie ?",
+        "Dans quelle ville êtes-vous né(e) ?",
+        "Quel est le prénom de votre meilleur(e) ami(e) d'enfance ?",
+        "Quel est votre plat préféré ?",
+        "Quel était le modèle de votre premier véhicule ?",
+    ];
+}
+
+/** Nombre de questions secrètes configurées pour un membre (0, 1 ou 2). */
+function assoc_membre_questions_nb(int $id_membre): int {
+    if (!$id_membre || !assoc_questions_dispo()) return 0;
+    return (int) assoc_val("SELECT COUNT(*) FROM membre_question_secrete WHERE id_membre=?", [$id_membre]);
+}
+
+/** Libellés des questions d'un membre : [1 => '…', 2 => '…']. */
+function assoc_membre_questions_get(int $id_membre): array {
+    if (!$id_membre || !assoc_questions_dispo()) return [];
+    $out = [];
+    foreach (assoc_all("SELECT numero, question FROM membre_question_secrete WHERE id_membre=? ORDER BY numero", [$id_membre]) as $r) {
+        $out[(int) $r['numero']] = $r['question'];
+    }
+    return $out;
+}
+
+/**
+ * Enregistre (remplace) les 2 questions secrètes d'un membre.
+ * $paires : [['question'=>'…','reponse'=>'…'], ['question'=>…,'reponse'=>…]]
+ */
+function assoc_membre_questions_definir(int $id_membre, array $paires): array {
+    if (!assoc_questions_dispo()) {
+        return ['ok' => false, 'message' => "Fonction indisponible : lancez bd/assoc/maj_assoc.php."];
+    }
+    if (count($paires) !== 2) return ['ok' => false, 'message' => "Il faut exactement 2 questions."];
+    $q = [];
+    foreach ($paires as $p) {
+        $qi = trim((string) ($p['question'] ?? ''));
+        $ri = trim((string) ($p['reponse'] ?? ''));
+        if ($qi === '' || $ri === '') return ['ok' => false, 'message' => "Chaque question doit avoir un libellé et une réponse."];
+        $q[] = [mb_substr($qi, 0, 160), $ri];
+    }
+    if (assoc_reponse_normaliser($q[0][0]) === assoc_reponse_normaliser($q[1][0])) {
+        return ['ok' => false, 'message' => "Les 2 questions doivent être différentes."];
+    }
+    assoc_exec("DELETE FROM membre_question_secrete WHERE id_membre=?", [$id_membre]);
+    $n = 1;
+    foreach ($q as [$qi, $ri]) {
+        assoc_exec(
+            "INSERT INTO membre_question_secrete (id_membre, numero, question, reponse_hash) VALUES (?,?,?,?)",
+            [$id_membre, $n++, $qi, password_hash(assoc_reponse_normaliser($ri), PASSWORD_DEFAULT)]
+        );
+    }
+    return ['ok' => true, 'message' => "Questions secrètes enregistrées."];
+}
+
+/** Supprime les questions secrètes d'un membre. */
+function assoc_membre_questions_supprimer(int $id_membre): void {
+    if (assoc_questions_dispo()) assoc_exec("DELETE FROM membre_question_secrete WHERE id_membre=?", [$id_membre]);
+}
+
+/**
+ * Récupération par questions secrètes : $login + les 2 réponses doivent
+ * correspondre. Rate-limité (login_echec). Retour : ligne `membre` ou null.
+ */
+function assoc_recuperation_verifier_questions(string $login, string $rep1, string $rep2, ?string $ip): ?array {
+    if (!assoc_questions_dispo()) return null;
+    if (assoc_login_bloque($login, $ip) > 0) return null;
+    $m = assoc_one("SELECT * FROM membre WHERE login=? AND actif=1", [trim($login)]);
+    if (!$m) { assoc_login_echec_noter($login, $ip); return null; }
+    $rows = assoc_all("SELECT numero, reponse_hash FROM membre_question_secrete WHERE id_membre=? ORDER BY numero", [(int) $m['id']]);
+    if (count($rows) < 2) { assoc_login_echec_noter($login, $ip); return null; }
+    $h = [];
+    foreach ($rows as $r) $h[(int) $r['numero']] = $r['reponse_hash'];
+    $ok = password_verify(assoc_reponse_normaliser($rep1), $h[1] ?? '')
+       && password_verify(assoc_reponse_normaliser($rep2), $h[2] ?? '');
+    if (!$ok) { assoc_login_echec_noter($login, $ip); return null; }
+    return $m;
 }
 
 // =====================================================================

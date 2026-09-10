@@ -24,6 +24,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['op'] ?? '') === 'creer') {
 }
 
 $membres = assoc_membres_liste();
+// Un superadmin « simple » ne voit ni ne gère le compte du propriétaire.
+// Le propriétaire (et le propriétaire se voyant lui-même) voit tout.
+$je_suis_proprietaire = est_proprietaire_association();
+$mon_id = (int) (membre_connecte()['id'] ?? 0);
+if (!$je_suis_proprietaire) {
+    $membres = array_values(array_filter($membres, fn($m) => empty($m['proprietaire']) || (int) $m['id'] === $mon_id));
+}
 $deuxfa  = function_exists('assoc_2fa_disponible') && assoc_2fa_disponible();
 
 asso_haut('Membres de l\'association');

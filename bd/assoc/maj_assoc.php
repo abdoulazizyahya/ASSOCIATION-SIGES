@@ -89,6 +89,21 @@ if (!(int) assoc_val("SELECT COUNT(*) FROM membre WHERE proprietaire=1")) {
     }
 }
 
+// ── Questions secrètes des membres (récupération de mot de passe) ──
+if (!table_existe('membre_question_secrete')) {
+    mysqli_query($link_assoc,
+        "CREATE TABLE `membre_question_secrete` (
+           `id_membre`    int          NOT NULL,
+           `numero`       tinyint(1)   NOT NULL,
+           `question`     varchar(160) NOT NULL,
+           `reponse_hash` varchar(255) NOT NULL,
+           `maj_le`       datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+           PRIMARY KEY (`id_membre`,`numero`),
+           CONSTRAINT `fk_mqs_membre` FOREIGN KEY (`id_membre`) REFERENCES `membre` (`id`) ON DELETE CASCADE
+         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+    $fait[] = "table membre_question_secrete créée";
+}
+
 // ── Limitation des connexions : table login_echec ─────────────────
 if (!table_existe('login_echec')) {
     mysqli_query($link_assoc,

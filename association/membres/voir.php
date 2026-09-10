@@ -20,8 +20,14 @@ if (!$detail) { asso_haut('Membre introuvable'); asso_bas(); exit; }
 
 $je_suis_proprietaire = est_proprietaire_association();
 $cible_proprietaire   = !empty($detail['proprietaire']);
-// Un superadmin simple ne touche pas au compte du propriétaire.
-$lecture_seule = $cible_proprietaire && !$je_suis_proprietaire;
+// Un superadmin « simple » ne VOIT pas le compte du propriétaire (sauf si
+// c'est lui-même — cas impossible ici, mais gardé pour l'anti-verrouillage).
+if ($cible_proprietaire && !$je_suis_proprietaire && $id !== $moi) {
+    flash_set('erreur', "Le compte du propriétaire de l'association n'est pas accessible.");
+    rediriger('association/membres/index.php');
+}
+// (verrou historique conservé : plus jamais atteint, mais inoffensif)
+$lecture_seule = $cible_proprietaire && !$je_suis_proprietaire && $id !== $moi;
 
 $msg = ''; $err = '';
 

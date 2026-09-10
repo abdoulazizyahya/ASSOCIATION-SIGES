@@ -61,6 +61,21 @@ CREATE TABLE IF NOT EXISTS `membre` (
   UNIQUE KEY `uq_login` (`login`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- ── Questions secrètes d'un membre (récupération de mot de passe) ───
+--  Voie de récupération complémentaire à e-mail + téléphone
+--  (association/securite.php, association/mot_de_passe_oublie.php).
+--  numero = 1 ou 2 ; question = libellé choisi ; reponse_hash = password_hash
+--  de la réponse normalisée (minuscules + espaces réduits).
+CREATE TABLE IF NOT EXISTS `membre_question_secrete` (
+  `id_membre`    int          NOT NULL,
+  `numero`       tinyint(1)   NOT NULL,
+  `question`     varchar(160) NOT NULL,
+  `reponse_hash` varchar(255) NOT NULL,
+  `maj_le`       datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id_membre`,`numero`),
+  CONSTRAINT `fk_mqs_membre` FOREIGN KEY (`id_membre`) REFERENCES `membre` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 -- ── Tentatives de connexion échouées (limitation de débit) ──────────
 CREATE TABLE IF NOT EXISTS `login_echec` (
   `id`     bigint      NOT NULL AUTO_INCREMENT,
