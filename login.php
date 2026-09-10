@@ -73,6 +73,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 // valide (basculer_base_ecole() déjà appelé plus haut).
 $etab = get_etablissement();
 $neutre = function_exists('est_contexte_neutre') && est_contexte_neutre() && empty($etab);
+
+// Habillage générique (aucune école choisie) : nom + sigle de l'association
+// configurée (config.local.php) plutôt qu'un « JN » / « Jaynitaare » figé.
+$marque_defaut = (defined('ASSOC_NOM') && ASSOC_NOM !== '') ? ASSOC_NOM : 'Système de Gestion Scolaire';
+if (preg_match_all('/\b[\p{L}]/u', $marque_defaut, $mm) && count($mm[0]) > 1) {
+    $sigle_defaut = mb_strtoupper(implode('', array_slice($mm[0], 0, 3)), 'UTF-8');
+} else {
+    $sigle_defaut = mb_strtoupper(mb_substr(preg_replace('/[^\p{L}]/u', '', $marque_defaut) ?: 'SG', 0, 2), 'UTF-8');
+}
 ?>
 <!DOCTYPE html>
 <html lang="fr">
@@ -106,11 +115,11 @@ $neutre = function_exists('est_contexte_neutre') && est_contexte_neutre() && emp
     <?php if (!empty($etab['logo']) && is_file(__DIR__ . '/assets/uploads/' . $etab['logo'])): ?>
       <img src="<?= APP_URL ?>/assets/uploads/<?= h($etab['logo']) ?>" alt="<?= h(($etab['Initial_Etab'] ?? '') ?: 'Logo') ?>">
     <?php else: ?>
-      <?= h(($etab['Initial_Etab'] ?? '') ?: 'JN') ?>
+      <?= h(($etab['Initial_Etab'] ?? '') ?: $sigle_defaut) ?>
     <?php endif; ?>
   </div>
   <div class="login-etab">
-    <strong id="loginEtabNom"><?= h($etab['Nom_Etab_Fr'] ?? 'Système de Gestion Scolaire') ?></strong>
+    <strong id="loginEtabNom"><?= h($etab['Nom_Etab_Fr'] ?? $marque_defaut) ?></strong>
     Espace de connexion
   </div>
 
@@ -177,18 +186,19 @@ $neutre = function_exists('est_contexte_neutre') && est_contexte_neutre() && emp
   var logo = document.getElementById('loginLogo');
   var nom  = document.getElementById('loginEtabNom');
   if (!sel) return;
-  var nomDefaut = nom.textContent;
+  var nomDefaut   = nom.textContent;
+  var sigleDefaut = <?= json_encode($sigle_defaut) ?>;
   function appliquer(code) {
-    if (!code) { logo.textContent = 'JN'; nom.textContent = nomDefaut; return; }
+    if (!code) { logo.textContent = sigleDefaut; nom.textContent = nomDefaut; return; }
     fetch('<?= APP_URL ?>/ajax/ecole_identite.php?code=' + encodeURIComponent(code))
       .then(function (r) { return r.json(); })
       .then(function (d) {
-        if (!d) { logo.textContent = 'JN'; nom.textContent = nomDefaut; return; }
+        if (!d) { logo.textContent = sigleDefaut; nom.textContent = nomDefaut; return; }
         nom.textContent = d.nom || nomDefaut;
         if (d.logo) {
           logo.innerHTML = '<img src="' + d.logo + '" alt="' + (d.sigle || 'Logo') + '">';
         } else {
-          logo.textContent = d.sigle || 'JN';
+          logo.textContent = d.sigle || sigleDefaut;
         }
       })
       .catch(function () {});
