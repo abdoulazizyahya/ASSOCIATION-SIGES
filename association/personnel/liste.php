@@ -50,8 +50,30 @@ $gens = assoc_all(
 
 // ── Onglet « Comptes » ─────────────────────────────────────────────
 $ecoles = $superadmin ? assoc_all("SELECT id, code, nom FROM etablissement WHERE actif=1 ORDER BY nom") : [];
-$comptes = ['lignes' => [], 'total' => 0, 'page' => 1, 'pages' => 1, 'stats' => []];
+$comptes = ['lignes' => [], 'total' => 0, 'page' => 1, 'pages' => 1, 'stats' => [], 'doublons' => []];
 $filtre  = ['etab' => (int) ($_GET['etab'] ?? 0), 'q' => trim($_GET['cq'] ?? ''), 'role' => $_GET['role'] ?? '', 'statut' => $_GET['statut'] ?? ''];
+
+// Export CSV de la liste filtrée (avant tout affichage).
+if ($onglet === 'comptes' && $superadmin && ($_GET['export'] ?? '') === 'csv') {
+    $d = assoc_comptes_systeme($filtre, 1, PHP_INT_MAX);
+    header('Content-Type: text/csv; charset=UTF-8');
+    header('Content-Disposition: attachment; filename="comptes_' . date('Ymd_His') . '.csv"');
+    $out = fopen('php://output', 'w');
+    fwrite($out, "\xEF\xBB\xBF");                       // BOM UTF-8 (Excel)
+    fputcsv($out, ['École', 'Code', 'Identifiant', 'Personne', 'Rôle', 'Statut', 'Dernière connexion', 'Identifiant aussi utilisé dans'], ';');
+    foreach ($d['toutes'] as $c) {
+        $statut = !$c['actif'] ? 'désactivé' : ($c['dormant'] ? 'dormant' : 'actif');
+        fputcsv($out, [
+            $c['ecole_nom'], $c['ecole_code'], $c['login'], $c['nom'], $c['role_lib'],
+            $statut,
+            $c['derniere_connexion'] ? date('Y-m-d H:i', strtotime($c['derniere_connexion'])) : '',
+            $c['doublon'] ? implode(', ', array_diff($c['doublon'], [$c['ecole_code']])) : '',
+        ], ';');
+    }
+    fclose($out);
+    exit;
+}
+
 if ($onglet === 'comptes' && $superadmin) {
     $comptes = assoc_comptes_systeme($filtre, max(1, (int) ($_GET['p'] ?? 1)), 60);
 }
@@ -105,12 +127,27 @@ $ong_url = fn(string $o) => APP_URL . '/association/personnel/liste.php?onglet='
 <?php elseif ($onglet === 'comptes' && $superadmin): ?>
 <!-- ═══════════════ COMPTES ═══════════════ -->
 <?php $s = $comptes['stats']; ?>
-<div class="d-flex flex-wrap gap-2 mb-3" style="font-size:.8rem">
+<div class="d-flex flex-wrap gap-2 mb-3 align-items-center" style="font-size:.8rem">
   <span class="badge badge-soft"><?= (int) ($s['total'] ?? 0) ?> compte(s)</span>
   <span class="badge bg-success"><?= (int) ($s['actifs'] ?? 0) ?> actif(s)</span>
   <span class="badge bg-secondary"><?= (int) ($s['inactifs'] ?? 0) ?> désactivé(s)</span>
   <span class="badge bg-warning text-dark"><?= (int) ($s['dormants'] ?? 0) ?> sans connexion &gt; 90 j</span>
+  <?php if (!empty($s['doublons'])): ?>
+    <span class="badge bg-info text-dark" title="Un même identifiant existe dans plusieurs écoles (bases indépendantes)"><i class="bi bi-exclamation-triangle me-1"></i><?= (int) $s['doublons'] ?> identifiant(s) en doublon</span>
+  <?php endif; ?>
+  <a class="btn btn-outline-light btn-sm ms-auto" href="?<?= h(http_build_query(array_merge($_GET, ['onglet' => 'comptes', 'export' => 'csv']))) ?>">
+    <i class="bi bi-filetype-csv me-1"></i>Exporter CSV
+  </a>
 </div>
+<?php if (!empty($comptes['doublons'])): ?>
+<div class="alert alert-info py-2 small">
+  <i class="bi bi-info-circle me-1"></i>
+  <strong>Identifiants utilisés dans plusieurs écoles</strong> (chaque école est une base indépendante — ce sont peut-être des personnes différentes) :
+  <?php $parts = [];
+    foreach ($comptes['doublons'] as $lg => $codes) $parts[] = '<span class="font-monospace">' . h($lg) . '</span> (' . h(implode(', ', $codes)) . ')';
+    echo implode(' · ', $parts); ?>
+</div>
+<?php endif; ?>
 
 <form method="get" class="row g-2 mb-3" style="font-size:.85rem">
   <input type="hidden" name="onglet" value="comptes">
@@ -152,7 +189,9 @@ $ong_url = fn(string $o) => APP_URL . '/association/personnel/liste.php?onglet='
       <?php foreach ($comptes['lignes'] as $c): ?>
         <tr class="<?= $c['actif'] ? '' : 'opacity-50' ?>">
           <td class="small"><span class="font-monospace"><?= h($c['ecole_code']) ?></span></td>
-          <td class="font-monospace"><?= h($c['login']) ?></td>
+          <td class="font-monospace"><?= h($c['login']) ?><?php if (!empty($c['doublon'])): ?>
+            <i class="bi bi-exclamation-triangle text-info ms-1" title="Identifiant aussi utilisé dans : <?= h(implode(', ', array_diff($c['doublon'], [$c['ecole_code']]))) ?>"></i>
+          <?php endif; ?></td>
           <td><?= h($c['nom']) ?></td>
           <td><span class="badge badge-soft"><?= h($c['role_lib']) ?></span></td>
           <td>

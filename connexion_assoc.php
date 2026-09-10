@@ -1902,17 +1902,54 @@ function assoc_comptes_systeme(array $f, int $page = 1, int $par_page = 40): arr
 
     usort($tous, fn($a, $b) => [$a['ecole_nom'], $a['nom']] <=> [$b['ecole_nom'], $b['nom']]);
 
-    $total = count($tous);
-    $pages = max(1, (int) ceil($total / $par_page));
-    $page  = max(1, min($page, $pages));
+    // Doublons d'identifiant entre écoles (info) : chaque base école est
+    // indépendante, un même login peut donc exister dans plusieurs écoles.
+    // On calcule sur TOUT le réseau (indépendamment du filtre école), pour
+    // que le repère reste juste même en filtrant sur une seule école.
+    $doublons = [];
+    if (empty($f['etab'])) {
+        $par_login = [];
+        foreach ($tous as $c) $par_login[mb_strtolower($c['login'])][] = $c['ecole_code'];
+        foreach ($par_login as $lg => $codes) {
+            if (count($codes) > 1) $doublons[$lg] = array_values(array_unique($codes));
+        }
+    } else {
+        // filtré sur une école : refaire un balayage léger des logins réseau
+        foreach (assoc_all("SELECT db_name, code FROM etablissement WHERE actif=1") as $e) {
+            try {
+                $l = mysqli_connect(DB_HOST, DB_USER, DB_PASS, $e['db_name']);
+                $rr = mysqli_query($l, "SELECT login_user FROM user");
+                while ($rr && ($x = mysqli_fetch_row($rr))) {
+                    $doublons[mb_strtolower($x[0])][] = $e['code'];
+                }
+                mysqli_close($l);
+            } catch (\Throwable $ex) { /* école injoignable : ignorée */ }
+        }
+        foreach ($doublons as $lg => $codes) {
+            $u = array_values(array_unique($codes));
+            if (count($u) > 1) $doublons[$lg] = $u; else unset($doublons[$lg]);
+        }
+    }
+    foreach ($tous as &$c) {
+        $c['doublon'] = $doublons[mb_strtolower($c['login'])] ?? [];
+    }
+    unset($c);
+    $stats['doublons'] = count($doublons);
+
+    $total    = count($tous);
+    $par_page = max(1, $par_page);
+    $pages    = max(1, (int) ceil($total / $par_page));
+    $page     = max(1, min($page, $pages));
 
     return [
         'lignes'   => array_slice($tous, ($page - 1) * $par_page, $par_page),
+        'toutes'   => $tous,
         'total'    => $total,
         'page'     => $page,
         'pages'    => $pages,
         'par_page' => $par_page,
         'stats'    => $stats,
+        'doublons' => $doublons,
     ];
 }
 
