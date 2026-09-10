@@ -1795,3 +1795,247 @@ function assoc_eleves_systeme(array $f, int $page = 1, int $par_page = 40): arra
         'sans_niu' => $sans_niu,
     ];
 }
+
+// =====================================================================
+//  CONSOLE DES COMPTES UTILISATEURS DE TOUTES LES ÉCOLES
+//  (association/personnel/liste.php, onglet « Comptes »)
+//  Le superadmin voit/gère les comptes `user` de chaque base école :
+//  réinitialiser le mot de passe, activer/désactiver (user.actif, v54),
+//  changer le rôle, supprimer l'accès, créer un compte.
+// =====================================================================
+
+/** Libellé lisible d'un rôle école (id_fonction). */
+function assoc_role_libelle(?string $r): string {
+    static $map = [
+        'DIRECTEUR' => 'Directeur', 'ENSEIGNANT' => 'Enseignant(e)',
+        'SECRETAIRE' => 'Secrétaire', 'COMPTABLE' => 'Comptable',
+        'FONDATEUR' => 'Fondateur',
+    ];
+    $r = (string) $r;
+    return $map[$r] ?? ($r !== '' ? ucfirst(mb_strtolower($r)) : '—');
+}
+
+/** Rôles attribuables depuis la console (jamais FONDATEUR : réservé à Personnel/Affecter). */
+function assoc_roles_console(): array {
+    return ['DIRECTEUR' => 'Directeur', 'ENSEIGNANT' => 'Enseignant(e)',
+            'SECRETAIRE' => 'Secrétaire', 'COMPTABLE' => 'Comptable'];
+}
+
+/** Une colonne existe-t-elle dans une base école déjà connectée ($l) ? */
+function ecole_colonne_existe(mysqli $l, string $table, string $colonne): bool {
+    $r = ecole_one($l,
+        "SELECT COUNT(*) c FROM information_schema.columns
+         WHERE table_schema = DATABASE() AND table_name = ? AND column_name = ?",
+        [$table, $colonne]);
+    return (int) ($r['c'] ?? 0) > 0;
+}
+
+/**
+ * Agrège les comptes `user` de toutes les écoles (ou d'une seule si $f['etab']).
+ * $f : etab (id), q (recherche), role (id_fonction), statut ('actif'|'inactif'|'sans_connexion').
+ * Retour : ['lignes'=>[...], 'total','page','pages','par_page','stats'=>[...]].
+ */
+function assoc_comptes_systeme(array $f, int $page = 1, int $par_page = 40): array {
+    $ecoles = !empty($f['etab'])
+        ? assoc_all("SELECT * FROM etablissement WHERE id=?", [(int) $f['etab']])
+        : assoc_all("SELECT * FROM etablissement WHERE actif=1 ORDER BY nom");
+
+    $q  = trim((string) ($f['q'] ?? ''));
+    $ql = mb_strtolower($q);
+    $role_f   = (string) ($f['role'] ?? '');
+    $statut_f = (string) ($f['statut'] ?? '');
+
+    $tous = [];
+    $stats = ['total' => 0, 'actifs' => 0, 'inactifs' => 0, 'dormants' => 0];
+
+    foreach ($ecoles as $e) {
+        try {
+            $l = mysqli_connect(DB_HOST, DB_USER, DB_PASS, $e['db_name']);
+            mysqli_set_charset($l, 'utf8mb4');
+        } catch (\Throwable $ex) { continue; }
+
+        $a_statut  = ecole_colonne_existe($l, 'user', 'actif');
+        $a_dc      = ecole_colonne_existe($l, 'user', 'derniere_connexion');
+        $sel_actif = $a_statut ? 'u.actif' : '1 AS actif';
+        $sel_dc    = $a_dc ? 'u.derniere_connexion' : 'NULL AS derniere_connexion';
+
+        $res = mysqli_query($l,
+            "SELECT u.id_user, u.login_user, u.matricule_ens, $sel_actif, $sel_dc,
+                    en.nom_ens, en.prenom_ens, en.id_fonction, en.statut_ens
+             FROM user u
+             JOIN enseignant en ON en.matricule_ens = u.matricule_ens
+             ORDER BY en.id_fonction, en.nom_ens");
+
+        while ($res && ($r = mysqli_fetch_assoc($res))) {
+            $actif = (int) $r['actif'] === 1;
+            $dc    = $r['derniere_connexion'];
+            $dormant = $actif && ($dc === null || strtotime($dc) < time() - 90 * 86400);
+
+            $stats['total']++;
+            if ($actif) $stats['actifs']++; else $stats['inactifs']++;
+            if ($dormant) $stats['dormants']++;
+
+            if ($role_f !== '' && (string) $r['id_fonction'] !== $role_f) continue;
+            if ($statut_f === 'actif'   && !$actif) continue;
+            if ($statut_f === 'inactif' && $actif) continue;
+            if ($statut_f === 'dormant' && !$dormant) continue;
+
+            $nom = trim(($r['nom_ens'] ?? '') . ' ' . ($r['prenom_ens'] ?? ''));
+            if ($q !== '' && mb_strpos(mb_strtolower($nom . ' ' . $r['login_user']), $ql) === false) continue;
+
+            $tous[] = [
+                'ecole_id'   => (int) $e['id'], 'ecole_code' => $e['code'], 'ecole_nom' => $e['nom'],
+                'id_user'    => (int) $r['id_user'],
+                'login'      => $r['login_user'],
+                'matricule_ens' => (int) $r['matricule_ens'],
+                'nom'        => $nom ?: '—',
+                'role'       => (string) $r['id_fonction'],
+                'role_lib'   => assoc_role_libelle($r['id_fonction']),
+                'actif'      => $actif,
+                'derniere_connexion' => $dc,
+                'dormant'    => $dormant,
+                'statut_ens' => $r['statut_ens'] ?? 'actif',
+            ];
+        }
+        mysqli_close($l);
+    }
+
+    usort($tous, fn($a, $b) => [$a['ecole_nom'], $a['nom']] <=> [$b['ecole_nom'], $b['nom']]);
+
+    $total = count($tous);
+    $pages = max(1, (int) ceil($total / $par_page));
+    $page  = max(1, min($page, $pages));
+
+    return [
+        'lignes'   => array_slice($tous, ($page - 1) * $par_page, $par_page),
+        'total'    => $total,
+        'page'     => $page,
+        'pages'    => $pages,
+        'par_page' => $par_page,
+        'stats'    => $stats,
+    ];
+}
+
+/** Personnel d'une école SANS compte de connexion (pour la création). */
+function assoc_ecole_personnel_sans_compte(int $id_etab): array {
+    try {
+        return avec_ecole($id_etab, function (mysqli $l) {
+            return ecole_all($l,
+                "SELECT en.matricule_ens, en.nom_ens, en.prenom_ens, en.id_fonction
+                 FROM enseignant en
+                 WHERE en.matricule_ens NOT IN (SELECT matricule_ens FROM user)
+                   AND COALESCE(en.statut_ens,'actif') = 'actif'
+                 ORDER BY en.nom_ens, en.prenom_ens");
+        });
+    } catch (\Throwable $e) { return []; }
+}
+
+/** Nombre de comptes DIRECTEUR actifs d'une école (garde-fou « dernier directeur »). */
+function assoc_ecole_nb_directeurs_actifs(mysqli $l): int {
+    $a_statut = ecole_colonne_existe($l, 'user', 'actif');
+    $cond = $a_statut ? 'AND u.actif = 1' : '';
+    $r = ecole_one($l,
+        "SELECT COUNT(*) c FROM user u JOIN enseignant en ON en.matricule_ens = u.matricule_ens
+         WHERE en.id_fonction = 'DIRECTEUR' $cond");
+    return (int) ($r['c'] ?? 0);
+}
+
+/**
+ * Action sur un compte école depuis la console association.
+ * $op : 'reset_mdp' (p.pwd) | 'desactiver' | 'activer' | 'role' (p.role) | 'supprimer'.
+ * Garde-fou : on ne rend pas une école ingérable (dernier DIRECTEUR actif).
+ * Retour : ['ok'=>bool, 'message'=>string].
+ */
+function assoc_compte_ecole_action(int $id_etab, int $id_user, string $op, array $p = []): array {
+    if (!est_superadmin_association()) return ['ok' => false, 'message' => "Réservé au superadmin."];
+    $e = assoc_one("SELECT id, code, nom FROM etablissement WHERE id=?", [$id_etab]);
+    if (!$e) return ['ok' => false, 'message' => "École introuvable."];
+
+    try {
+        return avec_ecole($id_etab, function (mysqli $l) use ($op, $id_user, $p, $e) {
+            $u = ecole_one($l,
+                "SELECT u.id_user, u.login_user, u.matricule_ens, en.id_fonction,
+                        en.nom_ens, en.prenom_ens
+                 FROM user u JOIN enseignant en ON en.matricule_ens = u.matricule_ens
+                 WHERE u.id_user = ?", [$id_user]);
+            if (!$u) return ['ok' => false, 'message' => "Compte introuvable dans « {$e['nom']} »."];
+
+            $a_statut       = ecole_colonne_existe($l, 'user', 'actif');
+            $est_directeur  = (string) $u['id_fonction'] === 'DIRECTEUR';
+            $dernier_dir    = $est_directeur && assoc_ecole_nb_directeurs_actifs($l) <= 1;
+            $qui            = trim($u['nom_ens'] . ' ' . ($u['prenom_ens'] ?? '')) . " (« {$u['login_user']} »)";
+
+            if ($op === 'reset_mdp') {
+                $pwd = (string) ($p['pwd'] ?? '');
+                if (strlen($pwd) < 4) return ['ok' => false, 'message' => "Mot de passe : 4 caractères minimum."];
+                ecole_exec($l, "UPDATE user SET pwd_user = ? WHERE id_user = ?",
+                    [password_hash($pwd, PASSWORD_DEFAULT), $id_user]);
+                return ['ok' => true, 'message' => "Mot de passe réinitialisé pour $qui."];
+            }
+
+            if ($op === 'desactiver') {
+                if (!$a_statut) return ['ok' => false, 'message' => "Base « {$e['nom']} » pas à jour (migration v54)."];
+                if ($dernier_dir) return ['ok' => false, 'message' => "Impossible : c'est le dernier Directeur actif de « {$e['nom']} »."];
+                ecole_exec($l, "UPDATE user SET actif = 0 WHERE id_user = ?", [$id_user]);
+                return ['ok' => true, 'message' => "Compte de $qui désactivé."];
+            }
+
+            if ($op === 'activer') {
+                if (!$a_statut) return ['ok' => false, 'message' => "Base « {$e['nom']} » pas à jour (migration v54)."];
+                ecole_exec($l, "UPDATE user SET actif = 1 WHERE id_user = ?", [$id_user]);
+                return ['ok' => true, 'message' => "Compte de $qui réactivé."];
+            }
+
+            if ($op === 'role') {
+                $role = strtoupper((string) ($p['role'] ?? ''));
+                if (!isset(assoc_roles_console()[$role])) return ['ok' => false, 'message' => "Rôle invalide."];
+                if ($est_directeur && $role !== 'DIRECTEUR' && $dernier_dir) {
+                    return ['ok' => false, 'message' => "Impossible : c'est le dernier Directeur actif de « {$e['nom']} »."];
+                }
+                ecole_exec($l, "UPDATE enseignant SET id_fonction = ? WHERE matricule_ens = ?",
+                    [$role, $u['matricule_ens']]);
+                return ['ok' => true, 'message' => "Rôle de $qui : " . assoc_role_libelle($role) . "."];
+            }
+
+            if ($op === 'supprimer') {
+                if ($dernier_dir) return ['ok' => false, 'message' => "Impossible : c'est le dernier Directeur actif de « {$e['nom']} »."];
+                ecole_exec($l, "DELETE FROM user WHERE id_user = ?", [$id_user]);
+                return ['ok' => true, 'message' => "Compte de connexion de $qui supprimé (la fiche personnel est conservée)."];
+            }
+
+            return ['ok' => false, 'message' => "Action inconnue."];
+        });
+    } catch (\Throwable $ex) {
+        return ['ok' => false, 'message' => "Erreur : " . $ex->getMessage()];
+    }
+}
+
+/** Crée un compte de connexion dans une école pour un membre du personnel. */
+function assoc_compte_ecole_creer(int $id_etab, string $login, string $pwd, int $matricule_ens): array {
+    if (!est_superadmin_association()) return ['ok' => false, 'message' => "Réservé au superadmin."];
+    $login = trim($login);
+    if (!preg_match('/^[A-Za-z0-9._-]{3,50}$/', $login)) {
+        return ['ok' => false, 'message' => "Identifiant : 3–50 caractères (lettres, chiffres, . _ -)."];
+    }
+    if (strlen($pwd) < 4) return ['ok' => false, 'message' => "Mot de passe : 4 caractères minimum."];
+    if (!$matricule_ens)  return ['ok' => false, 'message' => "Choisissez un membre du personnel."];
+
+    try {
+        return avec_ecole($id_etab, function (mysqli $l) use ($login, $pwd, $matricule_ens) {
+            $ens = ecole_one($l, "SELECT nom_ens, prenom_ens FROM enseignant WHERE matricule_ens = ?", [$matricule_ens]);
+            if (!$ens) return ['ok' => false, 'message' => "Membre du personnel introuvable."];
+            if (ecole_one($l, "SELECT id_user FROM user WHERE matricule_ens = ?", [$matricule_ens])) {
+                return ['ok' => false, 'message' => "Cette personne a déjà un compte."];
+            }
+            if (ecole_one($l, "SELECT id_user FROM user WHERE login_user = ?", [$login])) {
+                return ['ok' => false, 'message' => "L'identifiant « $login » est déjà pris dans cette école."];
+            }
+            ecole_exec($l, "INSERT INTO user (login_user, pwd_user, matricule_ens) VALUES (?, ?, ?)",
+                [$login, password_hash($pwd, PASSWORD_DEFAULT), $matricule_ens]);
+            $qui = trim($ens['nom_ens'] . ' ' . ($ens['prenom_ens'] ?? ''));
+            return ['ok' => true, 'message' => "Compte « $login » créé pour $qui."];
+        });
+    } catch (\Throwable $ex) {
+        return ['ok' => false, 'message' => "Erreur : " . $ex->getMessage()];
+    }
+}

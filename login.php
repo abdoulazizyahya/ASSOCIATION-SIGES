@@ -40,15 +40,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } elseif ($login === '' || $mdp === '') {
         $erreur = 'Veuillez remplir tous les champs.';
     } else {
+        // user.actif (migration_v54) : compte désactivé => connexion refusée,
+        // sans révéler si c'est l'identifiant ou le statut qui bloque.
+        $a_statut = db_colonne_existe('user', 'actif');
+        $col_actif = $a_statut ? ', u.actif' : '';
         $u = db_one(
-            "SELECT u.id_user, u.login_user, u.pwd_user, u.matricule_ens,
+            "SELECT u.id_user, u.login_user, u.pwd_user, u.matricule_ens $col_actif,
                     e.nom_ens, e.prenom_ens, e.id_fonction
              FROM user u
              JOIN enseignant e ON e.matricule_ens = u.matricule_ens
              WHERE u.login_user = ? LIMIT 1",
             [$login]
         );
-        if ($u && password_verify($mdp, $u['pwd_user'])) {
+        if ($u && password_verify($mdp, $u['pwd_user']) && (!$a_statut || (int) $u['actif'] === 1)) {
+            if (db_colonne_existe('user', 'derniere_connexion')) {
+                db_exec("UPDATE user SET derniere_connexion = NOW() WHERE id_user = ?", [$u['id_user']]);
+            }
             $_SESSION['user_id'] = $u['id_user'];
             $_SESSION['user']    = [
                 'id'            => $u['id_user'],
@@ -60,6 +67,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             ];
             session_regenerate_id(true);
             header('Location: ' . APP_URL . '/dashboard.php'); exit;
+        } elseif ($u && password_verify($mdp, $u['pwd_user']) && $a_statut && (int) $u['actif'] !== 1) {
+            $erreur = "Ce compte a été désactivé. Contactez l'administration de l'établissement.";
         } else {
             $erreur = 'Identifiant ou mot de passe incorrect.';
         }

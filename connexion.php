@@ -134,6 +134,26 @@ function db_val(string $sql, array $params = []) {
     return $val;
 }
 
+// Une colonne existe-t-elle dans la base école courante ? (cache statique)
+// Utile pour rester tolérant aux bases pas encore migrées (ex. user.actif,
+// user.derniere_connexion — migration_v54).
+function db_colonne_existe(string $table, string $colonne): bool {
+    static $cache = [];
+    $cle = $table . '.' . $colonne;
+    if (!array_key_exists($cle, $cache)) {
+        try {
+            $cache[$cle] = (bool) db_val(
+                "SELECT COUNT(*) FROM information_schema.columns
+                 WHERE table_schema = DATABASE() AND table_name = ? AND column_name = ?",
+                [$table, $colonne]
+            );
+        } catch (\Throwable $e) {
+            $cache[$cle] = false;
+        }
+    }
+    return $cache[$cle];
+}
+
 // Exécute INSERT/UPDATE/DELETE — retourne le nombre de lignes affectées
 function db_exec(string $sql, array $params = []): int {
     // Filet de sécurité : contexte en lecture seule (visite association SANS

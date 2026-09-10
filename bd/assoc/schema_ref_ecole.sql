@@ -1133,6 +1133,8 @@ CREATE TABLE `user` (
   `id_user` int NOT NULL AUTO_INCREMENT,
   `login_user` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL,
   `pwd_user` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `actif` tinyint(1) NOT NULL DEFAULT '1',
+  `derniere_connexion` datetime DEFAULT NULL,
   `matricule_ens` int NOT NULL,
   PRIMARY KEY (`id_user`),
   KEY `matricule_ens` (`matricule_ens`)
