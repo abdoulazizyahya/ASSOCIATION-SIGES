@@ -543,11 +543,24 @@ a:hover { color: var(--gold); }
 /* ── Progress bars ────────────────────────────────── */
 .progress-bar { background-color: var(--primary); }
 
-/* ── Visite association : lecture seule ───────────────
-   Masque les commandes d'écriture. Le blocage réel est côté serveur
-   (csrf_verifier / db_exec, est_lecture_seule()) ; ceci n'est qu'un
-   garde-fou visuel. */
+/* ── Lecture seule (visite association, rôle/règle « Privilèges » sur
+   cette page — est_lecture_seule()) : masque les commandes d'écriture.
+   La plupart des boutons « Enregistrer » de l'appli n'ont PAS de
+   type="submit" explicite (le défaut HTML suffit) : un sélecteur
+   [type="submit"] seul ne les voit pas — on cible donc tout bouton/champ
+   submit DANS un <form method="post">, en excluant les vrais non-submit
+   (type=button/reset), les filtres (data-filtre) et les déclencheurs
+   d'UI (dropdown/modal, data-bs-toggle). Les liens de suppression /
+   bascule de statut suivent tous la convention onclick="return
+   confirm(...)" de cette appli : masqués via ce sélecteur, sans toucher
+   aux boutons d'impression/aperçu PDF (jamais enveloppés d'un confirm()).
+   Le blocage réel est côté serveur (csrf_verifier / db_exec,
+   est_lecture_seule()) ; ceci n'est qu'un garde-fou visuel. */
+body.lecture-seule form[method="post" i] button:not([type="button"]):not([type="reset"]):not([data-filtre]):not([data-bs-toggle]),
+body.lecture-seule form[method="post" i] input[type="submit"]:not([data-filtre]),
+body.lecture-seule form[method="post" i] input[type="image"],
 body.lecture-seule button[type="submit"]:not([data-filtre]),
 body.lecture-seule input[type="submit"]:not([data-filtre]),
+body.lecture-seule a[onclick*="confirm("],
 body.lecture-seule .btn-danger,
 body.lecture-seule [data-ecriture] { display: none !important; }

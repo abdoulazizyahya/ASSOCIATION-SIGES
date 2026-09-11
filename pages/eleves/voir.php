@@ -12,7 +12,8 @@ if (!$eleve) { flash_set('erreur', 'Élève introuvable.'); rediriger('pages/ele
 // Écriture déléguée : superadmin association entré en écriture, ou FONDATEUR
 // (il gère les élèves — voir ecole_contexte.php::fondateur_ecriture_permise).
 $ecriture_deleguee = est_ecriture_deleguee();
-$peut_gerer = $ecriture_deleguee || in_array(role_connecte(), ['DIRECTEUR','SECRETAIRE','COMPTABLE'], true);
+$peut_gerer = ($ecriture_deleguee || in_array(role_connecte(), ['DIRECTEUR','SECRETAIRE','COMPTABLE'], true))
+            && !(function_exists('est_lecture_seule') && est_lecture_seule());
 // Fiche PDF / Certificat de scolarité / Carte scolaire : jamais pour le
 // profil COMPTABLE (Agent financier) — demande explicite du 22/08/2026, voir
 // interdire_role() dans pdf/fiche_eleve.php, certificat_scolarite.php,

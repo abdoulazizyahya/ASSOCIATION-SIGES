@@ -97,10 +97,11 @@ $gs = $groupe_style ?? [];
 <div class="alert alert-light border d-flex gap-2 align-items-start" style="font-size:.82rem">
   <i class="bi bi-info-circle text-primary mt-1"></i>
   <div>
-    Cochez ce que ce compte <strong>ne doit pas voir</strong>. Tout ce qui reste décoché
-    demeure visible selon son rôle (<?= h(libelle_role($u['id_fonction'] ?? '')) ?>).
-    Cocher un groupe masque tout son contenu. « Tableau de bord » et « Mon compte »
-    restent toujours accessibles.
+    Cochez ce que ce compte <strong>ne doit pas pouvoir enregistrer</strong>. Le menu reste
+    visible et la page consultable ; seuls les boutons Enregistrer / Modifier / Créer
+    disparaissent, avec un bandeau l'indiquant. Tout ce qui reste décoché garde l'écriture
+    selon son rôle (<?= h(libelle_role($u['id_fonction'] ?? '')) ?>). « Tableau de bord » et
+    « Mon compte » restent toujours en écriture.
   </div>
 </div>
 

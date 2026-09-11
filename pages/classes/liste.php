@@ -18,7 +18,8 @@ $role          = role_connecte();
 // ou FONDATEUR (la structure — classes / niveaux — fait partie de ce qu'il
 // enregistre ; seuls notes et finances lui restent en lecture seule, voir
 // ecole_contexte.php::fondateur_ecriture_permise).
-$peut_modifier = ($role === 'DIRECTEUR') || est_ecriture_deleguee();
+$peut_modifier = (($role === 'DIRECTEUR') || est_ecriture_deleguee())
+    && !(function_exists('est_lecture_seule') && est_lecture_seule());
 $annee         = get_annee_active();
 $val_annee     = $annee['val_annee'] ?? '';
 

@@ -20,7 +20,8 @@ $id_classe = (int)($_GET['classe'] ?? 0);
 // fonctions.php::exiger_role()).
 $asso_ecriture = est_ecriture_deleguee();
 
-$peut_gerer    = $asso_ecriture || in_array(role_connecte(), ['DIRECTEUR','SECRETAIRE','COMPTABLE'], true);
+$peut_gerer    = ($asso_ecriture || in_array(role_connecte(), ['DIRECTEUR','SECRETAIRE','COMPTABLE'], true))
+               && !(function_exists('est_lecture_seule') && est_lecture_seule());
 // L'import en masse + la config des matricules restent hors périmètre
 // COMPTABLE (demande du 22/08/2026) — pages/eleves/import.php et
 // matricule_config.php restent ['DIRECTEUR','SECRETAIRE'] (+ visite écriture).

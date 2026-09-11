@@ -12,7 +12,10 @@ exiger_acces_pedagogie();
 exiger_annee_active(); // Année scolaire réellement active requise (18/08/2026) — module Pédagogie/Discipline.
 
 $role          = role_connecte();
-$peut_modifier = ($role === 'DIRECTEUR');
+// Directeur ET fondateur (structure pédagogique, pas la saisie de notes —
+// voir ecole_contexte.php::ecriture_module_permise()).
+$peut_modifier = in_array($role, ['DIRECTEUR', 'FONDATEUR'], true)
+    && !(function_exists('est_lecture_seule') && est_lecture_seule());
 
 $onglet = $_GET['onglet'] ?? 'groupes';
 if (!in_array($onglet, ['groupes', 'matieres', 'niveau', 'bareme'], true)) $onglet = 'groupes';
