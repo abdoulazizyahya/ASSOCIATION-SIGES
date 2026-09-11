@@ -4,7 +4,11 @@
 #  (promeducam.beero.cm). Ne PAS l'utiliser en LAN / WAMP.
 # =====================================================================
 
-DirectoryIndex index.php
+# NE PAS ajouter « DirectoryIndex » ici : plusieurs mutualisés (Camoo…)
+# l'interdisent en .htaccess (AllowOverride restreint) → « Internal Server
+# Error / DirectoryIndex not allowed here ». La vitrine publique est servie
+# par index.php lui-même (cf. son en-tête) ; « Se connecter » ouvre
+# index.php?login → login.php.
 
 # ── Forcer HTTPS ────────────────────────────────────────────────────
 <IfModule mod_rewrite.c>

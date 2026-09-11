@@ -49,6 +49,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $vals[] = $id;
         assoc_exec("UPDATE etablissement SET $cols WHERE id=?", $vals);
         journaliser_action('etablissement_modifie', $id, $nom);
+        if (function_exists('regenerer_portail_accueil_best_effort')) {
+            regenerer_portail_accueil_best_effort();   // rafraîchit promeducamsiges.html
+        }
         $e = assoc_one("SELECT * FROM etablissement WHERE id=?", [$id]);
         $msg = "Établissement mis à jour.";
     }

@@ -36,3 +36,13 @@
 
 # Fichiers verrouillage Office (~$...) — jamais versionnés
 ~$*
+
+# ── Portail d'accueil : accueil.php est la source (versionnée). La copie
+# statique promeducamsiges.html est REGÉNÉRÉE (bd/assoc/generer_accueil.php,
+# + auto à la création/modif/suppression d'une école) → non versionnée.
+/promeducamsiges.html
+
+# ── .htaccess racine : en LAN, une seule ligne (DirectoryIndex accueil.php
+# index.php) ; en prod, copie de deploy/htaccess-prod.txt. Spécifique au
+# poste → non versionné (le modèle prod reste dans deploy/). ───────────
+/.htaccess
