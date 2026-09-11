@@ -44,7 +44,8 @@ function _membre_connecter(array $m): void {
         'nom' => $m['nom'], 'prenom' => $m['prenom'],
     ];
     session_regenerate_id(true);
-    journaliser_action('connexion_membre');
+    require_once __DIR__ . '/../bd/lib/audit.php';
+    audit_log('connexion');
 
     // 2FA obligatoire pour les superadmins : si elle n'est pas encore active,
     // on force la configuration (exiger_membre_association() redirige vers
@@ -74,6 +75,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             _membre_connecter($pending);
         }
         assoc_login_echec_noter($pending['login'], $ip);
+        require_once __DIR__ . '/../bd/lib/audit.php';
+        audit_log('connexion_echec', ['login' => $pending['login'], 'cible' => 'code 2FA invalide']);
         $erreur = 'Code de vérification incorrect.';
     } else {
         // ── Étape 1 : identifiant + mot de passe ──
@@ -90,6 +93,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         } else {
             assoc_login_echec_noter($login, $ip);
+            require_once __DIR__ . '/../bd/lib/audit.php';
+            audit_log('connexion_echec', ['login' => $login]);
             $erreur = 'Identifiant ou mot de passe incorrect.';
         }
     }

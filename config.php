@@ -39,6 +39,16 @@ defined('ECOLE_POOL_ACTIF') || define('ECOLE_POOL_ACTIF', false);
 
 defined('APP_NOM') || define('APP_NOM', 'SIGES · Gestion scolaire');
 
+// ── Journal d'audit (bd/lib/audit.php) ──────────────────────────────
+// AUDIT_GEOIP : localisation approximative des connexions à partir de
+//   l'IP, via le service gratuit ip-api.com (l'IP du visiteur est donc
+//   envoyée à ce tiers). Résultat mis en cache par IP (table geo_ip_cache).
+//   Mettre false dans config.local.php pour ne conserver que l'IP.
+// AUDIT_RETENTION_MOIS : ancienneté au-delà de laquelle la purge manuelle
+//   (bouton dans association/journal.php) retire les entrées.
+defined('AUDIT_GEOIP')          || define('AUDIT_GEOIP', true);
+defined('AUDIT_RETENTION_MOIS') || define('AUDIT_RETENTION_MOIS', 12);
+
 // ── Chemin de l'application depuis la racine web (APP_URL) ───────────
 // Déduit AUTOMATIQUEMENT de l'emplacement du dossier : si vous renommez
 // le dossier (ex. jaynitaare_v2 → SIGES), la navigation suit le nouveau

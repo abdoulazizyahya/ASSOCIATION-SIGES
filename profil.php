@@ -38,6 +38,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($mdp !== $conf) { flash_set('erreur', 'Les mots de passe ne correspondent pas.'); rediriger('profil.php'); }
         db_exec("UPDATE user SET login_user=?, pwd_user=? WHERE id_user=?",
                 [$login, password_hash($mdp, PASSWORD_DEFAULT), $user_id]);
+        if (function_exists('journaliser_action')) journaliser_action('mot_de_passe_change');
     } else {
         db_exec("UPDATE user SET login_user=? WHERE id_user=?", [$login, $user_id]);
     }

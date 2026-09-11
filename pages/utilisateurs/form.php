@@ -26,6 +26,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $hash = password_hash($mdp, PASSWORD_DEFAULT);
         if ($id) {
             db_exec("UPDATE user SET login_user=?, pwd_user=? WHERE id_user=?", [$login, $hash, $id]);
+            journaliser_action('mot_de_passe_reinit', null, $login);
             flash_set('succes', 'Compte mis à jour.');
         } else {
             $existe = db_val("SELECT COUNT(*) FROM user WHERE login_user=?", [$login]);
@@ -33,6 +34,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $erreur = 'Cet identifiant est déjà utilisé.';
             } else {
                 db_exec("INSERT INTO user (login_user, pwd_user, matricule_ens) VALUES (?, ?, ?)", [$login, $hash, $matricule_ens]);
+                journaliser_action('utilisateur_cree', null, $login);
                 flash_set('succes', 'Compte créé.');
             }
         }

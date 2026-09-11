@@ -104,6 +104,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $etape  = 'nouveau';
         } else {
             db_exec("UPDATE user SET pwd_user = ? WHERE id_user = ?", [password_hash($mdp, PASSWORD_DEFAULT), $uid]);
+            if (function_exists('annuaire_dispo') && annuaire_dispo()) {
+                require_once __DIR__ . '/bd/lib/audit.php';
+                audit_log('action', [
+                    'action' => 'mot_de_passe_change',
+                    'login'  => db_val("SELECT login_user FROM user WHERE id_user=?", [$uid]),
+                    'cible'  => 'réinitialisation via questions secrètes',
+                ]);
+            }
             unset($_SESSION['reset_uid'], $_SESSION['reset_qids'], $_SESSION['reset_tries'], $_SESSION['reset_ok'], $_SESSION['reset_etape']);
             flash_set('succes', 'Mot de passe réinitialisé. Vous pouvez vous connecter.');
             header('Location: ' . APP_URL . '/login.php'); exit;

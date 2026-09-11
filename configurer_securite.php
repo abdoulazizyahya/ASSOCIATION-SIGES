@@ -41,6 +41,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     db_exec("INSERT INTO user_question_secrete (id_user, id_question, reponse_hash) VALUES (?,?,?)",
             [$user_id, $id_q2, password_hash(normaliser_reponse($rep2), PASSWORD_DEFAULT)]);
 
+    if (function_exists('journaliser_action')) journaliser_action('questions_secretes');
     flash_set('succes', 'Vos questions de sécurité ont été enregistrées.');
     rediriger($retour);
 }

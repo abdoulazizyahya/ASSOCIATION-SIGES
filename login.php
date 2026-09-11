@@ -52,6 +52,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
              WHERE u.login_user = ? LIMIT 1",
             [$login]
         );
+        $id_etab_ctx = $ec['id'] ?? (function_exists('ecole_courante') ? (ecole_courante()['id'] ?? null) : null);
+        require_once __DIR__ . '/bd/lib/audit.php';
         if ($u && password_verify($mdp, $u['pwd_user']) && (!$a_statut || (int) $u['actif'] === 1)) {
             if (db_colonne_existe('user', 'derniere_connexion')) {
                 db_exec("UPDATE user SET derniere_connexion = NOW() WHERE id_user = ?", [$u['id_user']]);
@@ -66,10 +68,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'login'         => $u['login_user'],
             ];
             session_regenerate_id(true);
+            audit_log('connexion', ['id_etab' => $id_etab_ctx, 'role' => $u['id_fonction']]);
             header('Location: ' . APP_URL . '/dashboard.php'); exit;
         } elseif ($u && password_verify($mdp, $u['pwd_user']) && $a_statut && (int) $u['actif'] !== 1) {
+            audit_log('connexion_echec', ['login' => $login, 'id_etab' => $id_etab_ctx, 'cible' => 'compte désactivé']);
             $erreur = "Ce compte a été désactivé. Contactez l'administration de l'établissement.";
         } else {
+            audit_log('connexion_echec', ['login' => $login, 'id_etab' => $id_etab_ctx]);
             $erreur = 'Identifiant ou mot de passe incorrect.';
         }
     }
