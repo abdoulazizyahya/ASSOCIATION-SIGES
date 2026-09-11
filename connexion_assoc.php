@@ -657,7 +657,11 @@ function supprimer_etablissement(int $id, array $opts = []): array {
         assoc_exec("DELETE FROM personnel_affectation WHERE id_etablissement=?", [$id]);
 
         // 3. Journal : conservé pour la traçabilité, lien neutralisé.
-        assoc_exec("UPDATE journal_action SET id_etablissement=NULL WHERE id_etablissement=?", [$id]);
+        assoc_exec("UPDATE journal_audit SET id_etablissement=NULL WHERE id_etablissement=?", [$id]);
+        if (assoc_val("SELECT COUNT(*) FROM information_schema.tables
+                       WHERE table_schema=DATABASE() AND table_name='journal_action'")) {
+            assoc_exec("UPDATE journal_action SET id_etablissement=NULL WHERE id_etablissement=?", [$id]);
+        }
 
         // 4. Ligne annuaire — CASCADE sur membre_acces et schema_version_etab,
         //    SET NULL sur bd_pool.
@@ -853,34 +857,57 @@ function assoc_acces_definir(int $id_membre, string $portee, string $niveau, boo
 //  JOURNAL D'AUDIT (association/journal.php)
 // =====================================================================
 
-/** Valeurs d'« action » réellement présentes dans le journal (pour le filtre). */
-function assoc_journal_actions(): array {
-    return array_column(
-        assoc_all("SELECT DISTINCT action FROM journal_action ORDER BY action"), 'action'
-    );
+// =====================================================================
+//  JOURNAL D'AUDIT UNIFIÉ  (journal_audit — voir bd/lib/audit.php)
+//  Couvre membres de l'association ET comptes d'école. Connexions,
+//  déconnexions, échecs, actions sensibles + appareil + localisation.
+// =====================================================================
+
+/** Valeurs distinctes présentes dans le journal, pour peupler les filtres. */
+function audit_journal_filtres(): array {
+    $col = fn(string $c) => array_values(array_filter(array_column(
+        assoc_all("SELECT DISTINCT `$c` AS v FROM journal_audit WHERE `$c` IS NOT NULL AND `$c` <> '' ORDER BY `$c`"),
+        'v'
+    )));
+    return [
+        'evenement' => $col('evenement'),
+        'action'    => $col('action'),
+        'appareil'  => $col('ua_appareil'),
+        'role'      => $col('role'),
+        'pays'      => $col('geo_pays'),
+    ];
 }
 
-// Lignes du journal filtrées + total (pour la pagination).
-//  $f : ['membre'=>?int, 'etab'=>?int, 'action'=>?string, 'depuis'=>?date, 'jusqua'=>?date]
-function assoc_journal(array $f, int $page = 1, int $par_page = 50): array {
+// Lignes du journal filtrées + total (pagination).
+//  $f : id_etab?, acteur?(texte), type?(membre|user|inconnu), role?, evenement?,
+//       action?, appareil?, pays?, depuis?(date), jusqua?(date)
+//  $id_etab_impose : si non-null, restreint EN DUR à cette école (vue directeur).
+function audit_journal(array $f, int $page = 1, int $par_page = 50, ?int $id_etab_impose = null): array {
     $w = []; $p = [];
-    if (!empty($f['membre'])) { $w[] = "j.id_membre=?";        $p[] = (int) $f['membre']; }
-    if (!empty($f['etab']))   { $w[] = "j.id_etablissement=?"; $p[] = (int) $f['etab']; }
-    if (!empty($f['action'])) { $w[] = "j.action=?";           $p[] = $f['action']; }
-    if (!empty($f['depuis'])) { $w[] = "j.date >= ?";          $p[] = $f['depuis'] . ' 00:00:00'; }
-    if (!empty($f['jusqua'])) { $w[] = "j.date <= ?";          $p[] = $f['jusqua'] . ' 23:59:59'; }
+    if ($id_etab_impose !== null) { $w[] = "j.id_etablissement = ?"; $p[] = $id_etab_impose; }
+    elseif (!empty($f['id_etab'])) { $w[] = "j.id_etablissement = ?"; $p[] = (int) $f['id_etab']; }
+
+    if (!empty($f['acteur'])) {
+        $w[] = "(j.acteur_login LIKE ? OR j.acteur_nom LIKE ?)";
+        $p[] = '%' . $f['acteur'] . '%'; $p[] = '%' . $f['acteur'] . '%';
+    }
+    if (!empty($f['type']))      { $w[] = "j.acteur_type = ?"; $p[] = $f['type']; }
+    if (!empty($f['role']))      { $w[] = "j.role = ?";        $p[] = $f['role']; }
+    if (!empty($f['evenement'])) { $w[] = "j.evenement = ?";   $p[] = $f['evenement']; }
+    if (!empty($f['action']))    { $w[] = "j.action = ?";      $p[] = $f['action']; }
+    if (!empty($f['appareil']))  { $w[] = "j.ua_appareil = ?"; $p[] = $f['appareil']; }
+    if (!empty($f['pays']))      { $w[] = "j.geo_pays = ?";    $p[] = $f['pays']; }
+    if (!empty($f['depuis']))    { $w[] = "j.date >= ?";       $p[] = $f['depuis'] . ' 00:00:00'; }
+    if (!empty($f['jusqua']))    { $w[] = "j.date <= ?";       $p[] = $f['jusqua'] . ' 23:59:59'; }
     $sql_w = $w ? ('WHERE ' . implode(' AND ', $w)) : '';
 
-    $total = (int) assoc_val("SELECT COUNT(*) FROM journal_action j $sql_w", $p);
+    $total = (int) assoc_val("SELECT COUNT(*) FROM journal_audit j $sql_w", $p);
     $page  = max(1, $page);
     $off   = ($page - 1) * $par_page;
 
     $lignes = assoc_all(
-        "SELECT j.id, j.date, j.action, j.cible, j.ip,
-                m.login AS membre_login, m.nom AS membre_nom, m.prenom AS membre_prenom,
-                e.code AS etab_code, e.nom AS etab_nom
-         FROM journal_action j
-         LEFT JOIN membre m       ON m.id = j.id_membre
+        "SELECT j.*, e.code AS etab_code, e.nom AS etab_nom
+         FROM journal_audit j
          LEFT JOIN etablissement e ON e.id = j.id_etablissement
          $sql_w
          ORDER BY j.date DESC, j.id DESC
@@ -891,9 +918,98 @@ function assoc_journal(array $f, int $page = 1, int $par_page = 50): array {
             'pages' => max(1, (int) ceil($total / $par_page))];
 }
 
-/** Purge les entrées de journal plus vieilles que $mois mois. */
-function assoc_journal_purger(int $mois = 12): int {
-    return assoc_exec("DELETE FROM journal_action WHERE date < (NOW() - INTERVAL ? MONTH)", [$mois]);
+/** Purge les entrées plus vieilles que $mois mois. */
+function audit_journal_purger(int $mois = 12): int {
+    return assoc_exec("DELETE FROM journal_audit WHERE date < (NOW() - INTERVAL ? MONTH)", [$mois]);
+}
+
+// =====================================================================
+//  MODULE « PRIVILÈGES » — règles d'accès par école (acces_regle)
+//  Réglé depuis association/acces.php, appliqué côté école par
+//  ecole_contexte.php::regles_centrales() / niveau_central().
+//   portee : 'role' (nom de fonction) | 'user' (login du compte)
+//   niveau : 'masque' | 'lecture' | 'ecriture'  (absence = défaut du rôle)
+//   cle    : 'grp:<Nom de groupe>' | url d'entrée de menu
+// =====================================================================
+
+/** Toutes les règles d'une école (pour l'écran de configuration). */
+function acces_regle_lister(int $id_etab): array {
+    if (!annuaire_dispo()) return [];
+    try {
+        return assoc_all(
+            "SELECT portee, cible, cle, niveau FROM acces_regle
+             WHERE id_etablissement = ? ORDER BY portee, cible, cle",
+            [$id_etab]
+        );
+    } catch (\Throwable $e) {
+        return [];   // table pas encore créée
+    }
+}
+
+/**
+ * Remplace EN BLOC les règles d'un couple (école, portée, cible).
+ * $regles : ['grp:X' => 'masque'|'lecture'|'ecriture', 'pages/…' => …].
+ * Une valeur vide / 'defaut' supprime la ligne.
+ */
+function acces_regle_definir(int $id_etab, string $portee, string $cible, array $regles): void {
+    if (!annuaire_dispo()) return;
+    $portee = $portee === 'user' ? 'user' : 'role';
+    $cible  = trim($cible);
+    if ($cible === '') return;
+
+    assoc_exec(
+        "DELETE FROM acces_regle WHERE id_etablissement=? AND portee=? AND cible=?",
+        [$id_etab, $portee, $cible]
+    );
+    foreach ($regles as $cle => $niveau) {
+        $cle = trim((string) $cle);
+        if ($cle === '' || !in_array($niveau, ['masque', 'lecture', 'ecriture'], true)) continue;
+        assoc_exec(
+            "INSERT INTO acces_regle (id_etablissement, portee, cible, cle, niveau)
+             VALUES (?, ?, ?, ?, ?)",
+            [$id_etab, $portee, $cible, $cle, $niveau]
+        );
+    }
+}
+
+/**
+ * Règles effectives pour un utilisateur d'une école : fusion des règles de
+ * son rôle et des règles nominatives (login), la portée 'user' l'emportant,
+ * puis en cas d'égalité de portée : masque > lecture > ecriture.
+ * Retour : ['grp:X' => niveau, 'pages/…' => niveau].
+ */
+function acces_regle_pour(int $id_etab, string $role, ?string $login): array {
+    if (!annuaire_dispo() || $id_etab <= 0) return [];
+    static $cache = [];
+    $k = $id_etab . '|' . $role . '|' . ($login ?? '');
+    if (isset($cache[$k])) return $cache[$k];
+
+    $rang = ['ecriture' => 1, 'lecture' => 2, 'masque' => 3];
+    $par_role = [];
+    $par_user = [];
+    try {
+        $rows = assoc_all(
+            "SELECT portee, cle, niveau FROM acces_regle
+             WHERE id_etablissement = ?
+               AND ( (portee='role' AND cible=?) OR (portee='user' AND cible=?) )",
+            [$id_etab, $role, (string) $login]
+        );
+    } catch (\Throwable $e) {
+        return $cache[$k] = [];
+    }
+    foreach ($rows as $r) {
+        if ($r['portee'] === 'user') {
+            if (!isset($par_user[$r['cle']]) || $rang[$r['niveau']] > $rang[$par_user[$r['cle']]]) {
+                $par_user[$r['cle']] = $r['niveau'];
+            }
+        } else {
+            if (!isset($par_role[$r['cle']]) || $rang[$r['niveau']] > $rang[$par_role[$r['cle']]]) {
+                $par_role[$r['cle']] = $r['niveau'];
+            }
+        }
+    }
+    // user écrase role clé par clé.
+    return $cache[$k] = array_merge($par_role, $par_user);
 }
 
 // =====================================================================

@@ -10,7 +10,7 @@ require_once __DIR__ . '/../../config.php';
 require_once __DIR__ . '/../../connexion.php';
 require_once __DIR__ . '/../../fonctions.php';
 require_once __DIR__ . '/../../paie_fonctions.php';
-exiger_role(['DIRECTEUR']);
+exiger_role(['DIRECTEUR', 'FONDATEUR', 'COMPTABLE']);  // vue accordée à tous ; l'écriture reste réservée à COMPTABLE (ecriture_module_permise)
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     csrf_verifier();

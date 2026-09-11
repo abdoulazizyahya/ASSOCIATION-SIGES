@@ -16,14 +16,17 @@ require_once __DIR__ . '/paie_fonctions.php'; // solde_avance()
 exiger_connexion();
 
 $role      = role_connecte();
-// Visibilité par rôle (demande explicite du 22/08/2026, suite à l'ajout du
-// rôle COMPTABLE) : Finances/Dépenses = mêmes rôles que le menu Finances
-// (DIRECTEUR/SECRETAIRE/COMPTABLE) ; Paie/RH reste DIRECTEUR/SECRETAIRE
-// uniquement (COMPTABLE n'a jamais accès à ce module — layout/header.php) ;
+// Visibilité par rôle. Séparation des pouvoirs (11/09/2026) : le DIRECTEUR
+// ne voit plus aucune donnée financière (capacite_finances() = false pour
+// lui) ; le FONDATEUR retrouve la vue globale complète. La saisie de la paie
+// revient à l'agent financier / la secrétaire.
 // Pédagogie masquée pour COMPTABLE SAUF s'il est EN MÊME TEMPS affecté à
 // enseigner (agent_est_aussi_enseignant(), même règle que le menu).
-$peut_voir_finances  = in_array($role, ['DIRECTEUR', 'SECRETAIRE', 'COMPTABLE'], true);
-$peut_voir_paie      = in_array($role, ['DIRECTEUR', 'SECRETAIRE'], true);
+$peut_voir_finances  = function_exists('capacite_finances') ? capacite_finances()
+                     : in_array($role, ['SECRETAIRE', 'COMPTABLE'], true);
+$peut_voir_paie      = in_array($role, ['SECRETAIRE', 'COMPTABLE'], true)
+                     || (function_exists('est_fondateur') && est_fondateur())
+                     || (function_exists('est_visite_association') && est_visite_association());
 $peut_voir_pedagogie = $role !== 'COMPTABLE' || agent_est_aussi_enseignant();
 $is_admin            = $peut_voir_finances; // alias conservé : encore utilisé plus bas pour Finances/Dépenses
 

@@ -119,6 +119,88 @@ if (!table_existe('login_echec')) {
     $fait[] = "table login_echec créée";
 }
 
+// ── Journal d'audit unifié + cache géo IP ────────────────────────────
+if (!table_existe('journal_audit')) {
+    mysqli_query($link_assoc,
+        "CREATE TABLE `journal_audit` (
+           `id`               bigint       NOT NULL AUTO_INCREMENT,
+           `date`             datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+           `evenement`        varchar(20)  NOT NULL,
+           `action`           varchar(60)  DEFAULT NULL,
+           `cible`            varchar(255) DEFAULT NULL,
+           `acteur_type`      enum('membre','user','inconnu') NOT NULL DEFAULT 'inconnu',
+           `acteur_id`        int          DEFAULT NULL,
+           `acteur_login`     varchar(60)  DEFAULT NULL,
+           `acteur_nom`       varchar(120) DEFAULT NULL,
+           `role`             varchar(30)  DEFAULT NULL,
+           `id_etablissement` int          DEFAULT NULL,
+           `ip`               varchar(45)  DEFAULT NULL,
+           `ua_navigateur`    varchar(60)  DEFAULT NULL,
+           `ua_os`            varchar(60)  DEFAULT NULL,
+           `ua_appareil`      varchar(12)  DEFAULT NULL,
+           `ua_brut`          varchar(400) DEFAULT NULL,
+           `geo_pays`         varchar(60)  DEFAULT NULL,
+           `geo_region`       varchar(80)  DEFAULT NULL,
+           `geo_ville`        varchar(80)  DEFAULT NULL,
+           `geo_operateur`    varchar(120) DEFAULT NULL,
+           PRIMARY KEY (`id`),
+           KEY `k_date`   (`date`),
+           KEY `k_etab`   (`id_etablissement`,`date`),
+           KEY `k_acteur` (`acteur_type`,`acteur_login`)
+         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+    $fait[] = "table journal_audit créée";
+
+    // Reprise unique de l'ancien journal_action (traçabilité conservée).
+    if (table_existe('journal_action')
+        && (int) assoc_val("SELECT COUNT(*) FROM journal_action")
+        && !(int) assoc_val("SELECT COUNT(*) FROM journal_audit")) {
+        mysqli_query($link_assoc,
+            "INSERT INTO journal_audit
+               (date, evenement, action, cible, acteur_type, acteur_id, id_etablissement, ip)
+             SELECT j.date,
+                    CASE j.action WHEN 'connexion_membre' THEN 'connexion'
+                                  WHEN 'deconnexion_membre' THEN 'deconnexion'
+                                  ELSE 'action' END,
+                    CASE WHEN j.action IN ('connexion_membre','deconnexion_membre') THEN NULL ELSE j.action END,
+                    j.cible, 'membre', j.id_membre, j.id_etablissement, j.ip
+             FROM journal_action j");
+        $n = mysqli_affected_rows($link_assoc);
+        $fait[] = "journal_action repris ($n ligne(s)) dans journal_audit";
+    }
+}
+if (!table_existe('geo_ip_cache')) {
+    mysqli_query($link_assoc,
+        "CREATE TABLE `geo_ip_cache` (
+           `ip`        varchar(45)  NOT NULL,
+           `pays`      varchar(60)  DEFAULT NULL,
+           `region`    varchar(80)  DEFAULT NULL,
+           `ville`     varchar(80)  DEFAULT NULL,
+           `operateur` varchar(120) DEFAULT NULL,
+           `ok`        tinyint(1)   NOT NULL DEFAULT 0,
+           `maj_le`    datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+           PRIMARY KEY (`ip`)
+         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+    $fait[] = "table geo_ip_cache créée";
+}
+
+// ── Module « Privilèges » : règles d'accès par école ─────────────────
+if (!table_existe('acces_regle')) {
+    mysqli_query($link_assoc,
+        "CREATE TABLE `acces_regle` (
+           `id`               bigint      NOT NULL AUTO_INCREMENT,
+           `id_etablissement` int         NOT NULL,
+           `portee`           enum('role','user') NOT NULL,
+           `cible`            varchar(60)  NOT NULL,
+           `cle`              varchar(120) NOT NULL,
+           `niveau`           enum('masque','lecture','ecriture') NOT NULL,
+           `maj_le`           datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+           PRIMARY KEY (`id`),
+           UNIQUE KEY `u_regle` (`id_etablissement`,`portee`,`cible`,`cle`),
+           KEY `k_etab` (`id_etablissement`)
+         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+    $fait[] = "table acces_regle créée";
+}
+
 if ($fait) {
     foreach ($fait as $f) echo "  OK  $f\n";
 } else {

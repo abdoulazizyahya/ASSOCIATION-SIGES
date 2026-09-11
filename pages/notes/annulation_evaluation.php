@@ -19,7 +19,7 @@ require_once __DIR__ . '/../../config.php';
 require_once __DIR__ . '/../../connexion.php';
 require_once __DIR__ . '/../../fonctions.php';
 require_once __DIR__ . '/../../notes_apc.php';
-exiger_role(['DIRECTEUR']);
+exiger_role(['DIRECTEUR', 'SECRETAIRE']);  // vue accordée au directeur ; l'annulation reste réservée à SECRETAIRE (ecriture_module_permise)
 exiger_annee_active(); // Année scolaire réellement active requise (18/08/2026) — module Pédagogie/Discipline.
 
 $annee     = get_annee_active();

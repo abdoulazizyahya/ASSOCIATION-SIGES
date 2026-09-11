@@ -185,18 +185,64 @@ CREATE TABLE IF NOT EXISTS `schema_version_etab` (
   CONSTRAINT `fk_ver_etab` FOREIGN KEY (`id_etablissement`) REFERENCES `etablissement` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- ── Journal des actions des membres (traçabilité des « visites ») ────
-CREATE TABLE IF NOT EXISTS `journal_action` (
-  `id`               bigint NOT NULL AUTO_INCREMENT,
-  `id_membre`        int DEFAULT NULL,
-  `id_etablissement` int DEFAULT NULL,
-  `action`           varchar(50)  NOT NULL,
-  `cible`            varchar(255) DEFAULT NULL,
+-- ── Journal d'audit unifié (connexions + actions de TOUS les comptes) ─
+--  Remplace journal_action : couvre aussi les comptes d'école (directeur,
+--  fondateur, enseignant, comptable) et enregistre appareil + localisation.
+--  Voir bd/lib/audit.php (audit_log / audit_ua / audit_geo).
+CREATE TABLE IF NOT EXISTS `journal_audit` (
+  `id`               bigint       NOT NULL AUTO_INCREMENT,
   `date`             datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `evenement`        varchar(20)  NOT NULL,                 -- connexion | connexion_echec | deconnexion | action
+  `action`           varchar(60)  DEFAULT NULL,            -- slug quand evenement='action'
+  `cible`            varchar(255) DEFAULT NULL,
+  `acteur_type`      enum('membre','user','inconnu') NOT NULL DEFAULT 'inconnu',
+  `acteur_id`        int          DEFAULT NULL,
+  `acteur_login`     varchar(60)  DEFAULT NULL,
+  `acteur_nom`       varchar(120) DEFAULT NULL,
+  `role`             varchar(30)  DEFAULT NULL,            -- DIRECTEUR, ENSEIGNANT, COMPTABLE, FONDATEUR, SUPERADMIN, MEMBRE
+  `id_etablissement` int          DEFAULT NULL,
   `ip`               varchar(45)  DEFAULT NULL,
+  `ua_navigateur`    varchar(60)  DEFAULT NULL,
+  `ua_os`            varchar(60)  DEFAULT NULL,
+  `ua_appareil`      varchar(12)  DEFAULT NULL,            -- ordinateur | tablette | mobile | bot
+  `ua_brut`          varchar(400) DEFAULT NULL,
+  `geo_pays`         varchar(60)  DEFAULT NULL,
+  `geo_region`       varchar(80)  DEFAULT NULL,
+  `geo_ville`        varchar(80)  DEFAULT NULL,
+  `geo_operateur`    varchar(120) DEFAULT NULL,
   PRIMARY KEY (`id`),
-  KEY `k_membre` (`id_membre`),
-  KEY `k_date`   (`date`)
+  KEY `k_date`   (`date`),
+  KEY `k_etab`   (`id_etablissement`,`date`),
+  KEY `k_acteur` (`acteur_type`,`acteur_login`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ── Cache de géolocalisation IP (ip-api.com) ────────────────────────
+CREATE TABLE IF NOT EXISTS `geo_ip_cache` (
+  `ip`         varchar(45)  NOT NULL,
+  `pays`       varchar(60)  DEFAULT NULL,
+  `region`     varchar(80)  DEFAULT NULL,
+  `ville`      varchar(80)  DEFAULT NULL,
+  `operateur`  varchar(120) DEFAULT NULL,
+  `ok`         tinyint(1)   NOT NULL DEFAULT 0,
+  `maj_le`     datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`ip`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ── Module « Privilèges » : règles d'accès par école (association/acces.php) ─
+--  portee : 'role' (nom de fonction) | 'user' (login du compte école)
+--  niveau : 'masque' | 'lecture' | 'ecriture'  (aucune ligne = défaut du rôle)
+--  cle    : 'grp:<Nom de groupe de menu>' | url d'entrée de menu
+CREATE TABLE IF NOT EXISTS `acces_regle` (
+  `id`               bigint      NOT NULL AUTO_INCREMENT,
+  `id_etablissement` int         NOT NULL,
+  `portee`           enum('role','user') NOT NULL,
+  `cible`            varchar(60)  NOT NULL,
+  `cle`              varchar(120) NOT NULL,
+  `niveau`           enum('masque','lecture','ecriture') NOT NULL,
+  `maj_le`           datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `u_regle` (`id_etablissement`,`portee`,`cible`,`cle`),
+  KEY `k_etab` (`id_etablissement`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ── Pool de bases vides pré-créées (hébergement mutualisé) ───────────

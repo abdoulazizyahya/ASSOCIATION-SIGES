@@ -20,6 +20,7 @@ function _asso_nav_entrees(): array {
         ['Tableau de bord', 'speedometer2',   'dashboard.php',       ['dashboard.php'],                           true,  false],
         ['Migrations',      'database-gear',  'migrations.php',      ['migrations.php'],                          true,  true],
         ['Membres',         'people',         'membres/index.php',   ['membres/'],                               true,  false],
+        ['Privilèges',      'sliders',        'acces.php',           ['acces.php'],                              true,  false],
         ['Journal',         'journal-text',   'journal.php',         ['journal.php'],                            true,  false],
         ['Registre NIU',    'person-vcard',   'niu/index.php',       ['niu/'],                                   false, false],
         ['Personnel',       'person-badge',   'personnel/liste.php', ['personnel/'],                             false, false],

@@ -152,9 +152,15 @@ function lien_actif(string $url): string {
         <?php
         $visibles = array_filter($items, function($it) use ($roles_effectifs, $menu_voit_tout, $groupe) {
             if ($it[0] === '--') return true;
-            $par_role = $menu_voit_tout || empty($it[3]) || array_intersect($roles_effectifs, $it[3]);
+            // Règle « Privilèges » centrale : un octroi 'lecture'/'ecriture'
+            // révèle une entrée hors du périmètre de rôle par défaut ; un
+            // 'masque' est appliqué par menu_acces_autorise() ci-dessous.
+            $nc = function_exists('niveau_central') ? niveau_central($groupe, $it[1]) : null;
+            $par_role = $menu_voit_tout || empty($it[3])
+                || array_intersect($roles_effectifs, $it[3])
+                || in_array($nc, ['lecture', 'ecriture'], true);
             if (!$par_role) return false;
-            // Privilèges par utilisateur : entrée / groupe retiré au compte.
+            // Privilèges par utilisateur (local) + 'masque' central.
             return !function_exists('menu_acces_autorise') || menu_acces_autorise($groupe, $it[1]);
         });
         // Un séparateur seul (tous les liens qui le suivent masqués par les
@@ -281,6 +287,24 @@ function lien_actif(string $url): string {
       <a href="<?= APP_URL ?>/pages/fondateur/directeur.php" class="ms-auto btn btn-sm btn-outline-secondary py-0 px-2" style="font-size:.78rem">
         <i class="bi bi-person-badge me-1"></i>Gérer le directeur
       </a>
+    </div>
+    <?php elseif (!empty($user) && $lecture_seule):
+      // Bandeau générique : cette page précise est en lecture seule pour le
+      // compte connecté (rôle par défaut sur un module argent/pédagogie,
+      // règle « Privilèges » centrale, ou entrée retirée via acces_utilisateur
+      // — voir ecole_contexte.php::est_lecture_seule()). Le menu reste
+      // visible et cliquable (demande explicite du 11/09/2026) : seule
+      // l'écriture disparaît sur CETTE page (boutons masqués, assets/css/
+      // style.css ; refus réel côté serveur, csrf_verifier()/db_exec()).
+      $label_rubrique = function_exists('page_menu_label') ? page_menu_label() : null;
+    ?>
+    <div class="d-flex flex-wrap align-items-center gap-2 px-3 py-1"
+         style="background:#fff8e6;border-bottom:1px solid #f0dca0;font-size:.8rem;color:#7a5b00">
+      <span>
+        <i class="bi bi-eye me-1"></i>
+        <strong>Lecture seule<?= $label_rubrique ? ' — ' . h($label_rubrique) : '' ?></strong>
+        — vous pouvez consulter cette page, mais pas y enregistrer.
+      </span>
     </div>
     <?php endif; ?>
 

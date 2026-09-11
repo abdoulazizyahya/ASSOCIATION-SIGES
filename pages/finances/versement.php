@@ -95,6 +95,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
                         [$id_eleve, $id_classe, $val_annee, $id_obligation, $montant, $date_paiement, $ref, $mode_paiement, utilisateur_connecte()['id'] ?? null]
                     );
+                    journaliser_action('paiement_saisi', null, number_format($montant, 0, ',', ' ') . ' F — ' . ($oblig['nom_obligation'] ?? ''));
                     flash_set('succes', 'Versement enregistré.');
                 }
             }

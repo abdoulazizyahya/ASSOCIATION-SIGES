@@ -192,16 +192,10 @@ function exiger_connexion(): void {
         header('Location: ' . APP_URL . '/configurer_securite.php');
         exit;
     }
-    // Privilèges par utilisateur : un menu / sous-menu retiré au compte
-    // (acces_utilisateur) bloque aussi l'accès direct par URL — pas
-    // seulement le masquage du menu dans layout/header.php.
-    if (!in_array($script_courant, $exemptes, true) && acces_page_bloquee()) {
-        http_response_code(403);
-        die('<div style="font-family:system-ui,sans-serif;max-width:520px;margin:3rem auto;padding:1.5rem;'
-          . 'border:1px solid #f5b5b5;background:#fde8e8;border-radius:10px;color:#8a1c1c">'
-          . '<strong>Accès restreint.</strong><br>Ce menu a été retiré de votre compte par un administrateur.'
-          . '<div style="margin-top:1rem"><a href="' . APP_URL . '/dashboard.php">← Tableau de bord</a></div></div>');
-    }
+    // Privilèges par utilisateur / règle centrale / rôle sans accès à ce
+    // menu : NE bloque plus la page (demande explicite du 11/09/2026 — un
+    // menu « retiré » doit rester consultable, seule l'écriture disparaît).
+    // Voir acces_page_lecture_seule(), consultée par est_lecture_seule().
 }
 
 // ── Privilèges par utilisateur (menus / sous-menus retirés) ──────────
@@ -247,11 +241,17 @@ function acces_refuses_utilisateur(?int $id_user = null): array {
  */
 function menu_acces_autorise(string $groupe, string $url): bool {
     if (function_exists('est_visite_association') && est_visite_association()) return true;
-    if (function_exists('est_fondateur') && est_fondateur()) return true;
-    $refuses = acces_refuses_utilisateur();
-    if (!$refuses) return true;
-    if (isset($refuses['grp:' . $groupe])) return false;
-    if (isset($refuses[$url])) return false;
+    // Règle « Privilèges » centrale : 'masque' cache l'entrée pour ce
+    // rôle/compte (y compris le fondateur). 'lecture'/'ecriture' = octroi,
+    // géré côté header.php (révèle une entrée hors périmètre de rôle).
+    if (function_exists('niveau_central') && niveau_central($groupe, $url) === 'masque') return false;
+    // La deny-list locale par compte (acces_utilisateur) ne masque plus le
+    // menu (demande explicite du 11/09/2026) : l'entrée reste visible et
+    // cliquable, seule l'écriture disparaît (est_lecture_seule() via
+    // acces_page_lecture_seule() ; bandeau + boutons masqués, layout/
+    // header.php + assets/css/style.css). Pour la cacher réellement, poser
+    // une règle centrale 'masque' (association/acces.php) plutôt qu'une
+    // entrée acces_utilisateur.
     return true;
 }
 
@@ -264,43 +264,84 @@ function page_courante_relative(): string {
 }
 
 /**
+ * Libellé de menu de la page courante (ex. « Saisie des notes »), ou null
+ * si la page n'est pas une entrée directe du menu. Utilisé par le bandeau
+ * « lecture seule » (layout/header.php) pour nommer la rubrique concernée.
+ */
+function page_menu_label(): ?string {
+    $rel = page_courante_relative();
+    if ($rel === '') return null;
+    foreach (menu_definition() as $items) {
+        foreach ($items as $it) {
+            if (($it[0] ?? '') === '--') continue;
+            if (($it[1] ?? '') === $rel) return $it[0];
+        }
+    }
+    return null;
+}
+
+/**
  * La page courante appartient-elle à un menu / sous-menu retiré au compte
- * connecté ? Bloque l'entrée de menu exacte, tout un groupe, et les pages
- * « filles » d'un dossier de module dont TOUTES les entrées de menu sont
- * refusées (ex. pages/eleves/voir.php si « Élèves » est retiré).
- * 'dashboard.php', 'profil.php' et 'logout.php' ne sont jamais bloqués
+ * connecté (deny-list acces_utilisateur) OU son rôle n'y a par défaut aucune
+ * entrée de menu ? Ne BLOQUE plus la page depuis le 11/09/2026 (demande
+ * explicite) : le retour sert uniquement à forcer la LECTURE SEULE
+ * (est_lecture_seule()) — la page reste consultable, les boutons
+ * d'enregistrement disparaissent / les écritures sont refusées en amont.
+ * 'dashboard.php', 'profil.php' et 'logout.php' ne sont jamais concernés
  * (anti-verrouillage — voir aussi pages/utilisateurs/acces.php).
  */
-function acces_page_bloquee(): bool {
+function acces_page_lecture_seule(): bool {
     if (function_exists('est_visite_association') && est_visite_association()) return false;
-    if (function_exists('est_fondateur') && est_fondateur()) return false;
-    $refuses = acces_refuses_utilisateur();
-    if (!$refuses) return false;
 
     $rel = page_courante_relative();
     if ($rel === '') return false;
     if (in_array(basename($rel), ['dashboard.php', 'profil.php', 'logout.php'], true)) return false;
 
-    $par_url = $par_dossier = [];
-    foreach (menu_definition() as $groupe => $items) {
-        foreach ($items as $it) {
-            if ($it[0] === '--') continue;
-            $u = $it[1];
-            $par_url[$u] = $groupe;
-            $d = strpos($u, '/') !== false ? basename(dirname($u)) : '';
-            if ($d !== '') $par_dossier[$d][$u] = $groupe;
+    $fondateur = function_exists('est_fondateur') && est_fondateur();
+    $refuses   = acces_refuses_utilisateur();                 // deny-list locale (par compte)
+
+    // Rôles « effectifs » (mêmes règles que le rendu du menu, header.php).
+    $role      = function_exists('role_connecte') ? role_connecte() : '';
+    $roles_eff = $role !== '' ? [$role] : [];
+    if ($role !== 'ENSEIGNANT' && function_exists('agent_est_aussi_enseignant') && agent_est_aussi_enseignant()) {
+        $roles_eff[] = 'ENSEIGNANT';
+    }
+
+    // Index url / dossier → [groupe, rôles autorisés de l'entrée].
+    static $index = null;
+    if ($index === null) {
+        $index = ['url' => [], 'dossier' => []];
+        foreach (menu_definition() as $groupe => $items) {
+            foreach ($items as $it) {
+                if (($it[0] ?? '') === '--') continue;
+                $meta = ['g' => $groupe, 'roles' => $it[3] ?? []];
+                $u = $it[1];
+                $index['url'][$u] = $meta;
+                $d = strpos($u, '/') !== false ? basename(dirname($u)) : '';
+                if ($d !== '') $index['dossier'][$d][$u] = $meta;
+            }
         }
     }
-    $refusee = static function (string $u, string $g) use ($refuses): bool {
-        return isset($refuses['grp:' . $g]) || isset($refuses[$u]);
+
+    // Une entrée est « interdite » au profil courant si la deny-list locale la
+    // retire OU si son rôle n'y figure pas — sauf fondateur (lecture globale,
+    // déjà géré par ailleurs, donc jamais forcé lecture seule PAR CE biais).
+    $interdite = function (string $u, array $meta) use ($refuses, $roles_eff, $fondateur): bool {
+        $g = $meta['g'];
+        if (isset($refuses['grp:' . $g]) || isset($refuses[$u])) return true;
+        if ($fondateur) return false;
+        $roles = $meta['roles'];
+        return !empty($roles) && !array_intersect($roles_eff, $roles);
     };
 
-    if (isset($par_url[$rel])) return $refusee($rel, $par_url[$rel]);
+    if (isset($index['url'][$rel])) return $interdite($rel, $index['url'][$rel]);
 
+    // Page « fille » d'un dossier de module : lecture seule si TOUTES les
+    // entrées de menu de ce dossier sont interdites au profil.
     $d = strpos($rel, '/') !== false ? basename(dirname($rel)) : '';
-    if ($d !== '' && !empty($par_dossier[$d])) {
-        foreach ($par_dossier[$d] as $u => $g) {
-            if (!$refusee($u, $g)) return false;
+    if ($d !== '' && !empty($index['dossier'][$d])) {
+        foreach ($index['dossier'][$d] as $u => $meta) {
+            if (!$interdite($u, $meta)) return false;
         }
         return true;
     }
@@ -439,6 +480,14 @@ function exiger_role(array $roles): void {
     if (function_exists('est_visite_association') && est_visite_association()) {
         return;
     }
+    // Règle « Privilèges » centrale (association/acces.php) : un octroi
+    // 'lecture' ou 'ecriture' sur cette page ouvre l'accès à ce rôle/compte
+    // même s'il n'est pas dans la liste blanche. L'écriture reste gouvernée
+    // par est_lecture_seule().
+    if (function_exists('niveau_central_page_courante')
+        && in_array(niveau_central_page_courante(), ['lecture', 'ecriture'], true)) {
+        return;
+    }
     // FONDATEUR : accès en LECTURE à toutes les pages de son école (mêmes
     // écritures bloquées en aval). Sa seule page d'écriture — directeur.php —
     // pose sa propre garde exiger_role(['FONDATEUR']) qui passe par ici aussi.
@@ -465,6 +514,8 @@ function exiger_role(array $roles): void {
 function exiger_acces_pedagogie(): void {
     exiger_connexion();
     if (function_exists('est_visite_association') && est_visite_association()) return;
+    if (function_exists('niveau_central_page_courante')
+        && in_array(niveau_central_page_courante(), ['lecture', 'ecriture'], true)) return;
     if (function_exists('est_fondateur') && est_fondateur()) return;
     if (in_array(role_connecte(), ['DIRECTEUR', 'ENSEIGNANT', 'SECRETAIRE'], true)) return;
     if (agent_est_aussi_enseignant()) return;
@@ -586,9 +637,10 @@ function csrf_verifier(): void {
     // (POST) est refusé — point de contrôle unique, tous les enregistrements
     // de l'application passent par ici. Filet complémentaire : db_exec().
     if (function_exists('est_lecture_seule') && est_lecture_seule()) {
-        $motif = (function_exists('est_fondateur') && est_fondateur())
-            ? "Espace fondateur — cette rubrique (notes / finances) est en consultation seule."
-            : "Visite association — consultation en lecture seule.";
+        $motif = (function_exists('est_visite_association') && est_visite_association())
+            ? "Visite association — consultation en lecture seule."
+            : "Cette rubrique est en consultation seule pour votre profil "
+              . "(l'enregistrement revient à l'agent financier / aux enseignant(e)s).";
         die('<div style="font-family:sans-serif;padding:2rem;color:#b45309">'
           . h($motif) . ' Aucune modification n\'est possible ici.</div>');
     }

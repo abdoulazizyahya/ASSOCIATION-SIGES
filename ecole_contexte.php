@@ -56,24 +56,56 @@ function est_fondateur(): bool {
     return ($_SESSION['user']['role'] ?? '') === 'FONDATEUR';
 }
 
-// Le FONDATEUR peut-il écrire sur la page courante ?
-//  - toujours : directeur.php (gérer le directeur), configurer_securite.php
-//    (ses questions secrètes), profil.php (son compte) ;
-//  - jamais : modules « argent » (finances / dépenses / paie) et
-//    « pédagogie » (notes, bulletins, conseils, statistiques, résultats,
-//    compétences, matières arabe, absences) — consultation seule ;
-//  - sinon (élèves, personnel, comptes, classes, niveaux, paramètres,
-//    dossiers…) : écriture autorisée.
-function fondateur_ecriture_permise(): bool {
+// Séparation des pouvoirs (11/09/2026) : dans les modules « argent »
+// (finances / dépenses / paie), seul l'agent financier (COMPTABLE) écrit —
+// tous les autres profils (directeur, fondateur, secrétaire, membre
+// association…) restent en LECTURE SEULE, sauf les pages de CONFIGURATION
+// (frais/obligations, catégories de dépense) ouvertes en plus au directeur
+// et au fondateur. Dans les modules « pédagogie » (notes, bulletins,
+// conseils, statistiques, résultats, compétences, matières arabe,
+// absences), seuls enseignant(e) / secrétaire écrivent (+ un agent
+// financier EN MÊME TEMPS affecté à enseigner, agent_est_aussi_enseignant()).
+// Le reste (élèves, personnel, comptes, classes, niveaux, paramètres…) n'est
+// pas restreint ici : chaque page garde son propre exiger_role().
+// Une règle centrale « Privilèges » (association/acces.php) peut lever ou
+// durcir ce défaut par école — cf. est_lecture_seule(), qui l'applique AVANT
+// de consulter cette fonction.
+//
+// $role : rôle testé (défaut = rôle connecté). Renvoie true si l'écriture
+// est permise sur la page courante pour ce profil.
+function ecriture_module_permise(?string $role = null): bool {
+    $role   = $role ?? (function_exists('role_connecte') ? role_connecte() : '');
     $script = str_replace('\\', '/', $_SERVER['SCRIPT_NAME'] ?? '');
     $base   = basename($script);
 
+    // Toujours autorisées, quel que soit le module.
     if (in_array($base, ['directeur.php', 'configurer_securite.php', 'profil.php'], true)) {
         return true;
     }
 
-    $modules_lecture_seule = [
-        '/pages/finances/', '/pages/depenses/', '/pages/paie/',
+    $rel = ltrim(preg_replace('~^.*/(?=pages/)~', '', $script), '/');
+
+    // ── Modules « argent » : seul l'agent financier écrit ────────────
+    $modules_argent = ['/pages/finances/', '/pages/depenses/', '/pages/paie/'];
+    $config_argent  = [
+        'pages/finances/obligations.php', 'pages/finances/excel_obligations.php',
+        'pages/depenses/categories.php',
+    ];
+    foreach ($modules_argent as $frag) {
+        if (strpos($script, $frag) !== false) {
+            if (in_array($rel, $config_argent, true)) {
+                return in_array($role, ['DIRECTEUR', 'FONDATEUR', 'COMPTABLE', 'MEMBRE_ASSOCIATION'], true);
+            }
+            return $role === 'COMPTABLE';
+        }
+    }
+
+    // ── Modules « pédagogie » : enseignant(e) / secrétaire écrivent ──
+    //  Exception « configuration » : les groupes de compétences / matières
+    //  ET leurs barèmes (structure pédagogique — pas la saisie de notes au
+    //  jour le jour) restent ouverts au directeur et au fondateur, comme les
+    //  niveaux/classes/élèves (demande explicite du 11/09/2026).
+    $modules_pedagogie = [
         '/pages/notes/', '/pages/notes_arabe/',
         '/pages/bulletins/', '/pages/bulletins_arabe/',
         '/pages/conseil_classe/', '/pages/conseil_classe_arabe/',
@@ -82,18 +114,137 @@ function fondateur_ecriture_permise(): bool {
         '/pages/competences/', '/pages/matieres_arabe/',
         '/pages/absences/',
     ];
-    foreach ($modules_lecture_seule as $frag) {
-        if (strpos($script, $frag) !== false) return false;
+    $config_pedagogie = ['pages/competences/liste.php', 'pages/matieres_arabe/liste.php'];
+    foreach ($modules_pedagogie as $frag) {
+        if (strpos($script, $frag) !== false) {
+            if (in_array($rel, $config_pedagogie, true) && in_array($role, ['DIRECTEUR', 'FONDATEUR'], true)) {
+                return true;
+            }
+            if (in_array($role, ['ENSEIGNANT', 'SECRETAIRE'], true)) return true;
+            // Un agent financier EN MÊME TEMPS affecté à enseigner garde la
+            // main sur SES classes (même règle que le menu, header.php).
+            return $role === 'COMPTABLE' && function_exists('agent_est_aussi_enseignant') && agent_est_aussi_enseignant();
+        }
     }
+
+    // Structure (élèves, personnel, comptes, classes, niveaux, paramètres,
+    // dossiers…) : pas de restriction ici — gouvernée par exiger_role().
     return true;
 }
 
-// Écritures interdites (lecture seule) : visite association SANS droit
-// d'écriture, OU FONDATEUR hors de ses pages autorisées.
+// Alias historique (appelé par est_ecriture_deleguee, csrf_verifier…).
+function fondateur_ecriture_permise(): bool {
+    return ecriture_module_permise('FONDATEUR');
+}
+
+// « Peut voir les données financières » (montants, soldes, encaissements) —
+// tableau de bord + menu Finances/Dépenses/Paie. Le DIRECTEUR et l'ENSEIGNANT
+// en sont exclus par défaut ; le FONDATEUR, l'agent financier, la secrétaire,
+// le propriétaire et une visite association les voient.
+function capacite_finances(): bool {
+    if (est_visite_association() || est_proprietaire_association()) return true;
+    if (est_fondateur()) return true;
+    return in_array(role_connecte(), ['COMPTABLE', 'SECRETAIRE'], true);
+}
+
+// Écritures interdites (lecture seule). Ordre : le propriétaire n'est jamais
+// bridé ; une règle centrale « Privilèges » prime ensuite ; puis un menu
+// retiré (deny-list locale / rôle sans accès par défaut) force la lecture
+// seule sans bloquer la page (11/09/2026) ; enfin les défauts par module
+// (visite association, argent = agent financier, pédagogie = enseignant(e)
+// / secrétaire).
 function est_lecture_seule(): bool {
-    if (est_visite_association() && empty($_SESSION['visite_asso_ecriture'])) return true;
-    if (est_fondateur() && !fondateur_ecriture_permise()) return true;
-    return false;
+    if (est_proprietaire_association()) return false;
+
+    $c = niveau_central_page_courante();          // 'masque'|'lecture'|'ecriture'|null
+    if ($c === 'ecriture')             return false;
+    if ($c === 'lecture' || $c === 'masque') return true;
+
+    if (est_visite_association()) {
+        if (empty($_SESSION['visite_asso_ecriture'])) return true;
+        return !ecriture_module_permise('MEMBRE_ASSOCIATION');
+    }
+
+    // Un menu retiré (par le directeur via acces_utilisateur, ou parce que le
+    // rôle n'a par défaut aucune entrée de menu pour cette page) : la page
+    // reste consultable, mais en lecture seule.
+    if (function_exists('acces_page_lecture_seule') && acces_page_lecture_seule()) {
+        return true;
+    }
+
+    return !ecriture_module_permise(role_connecte());
+}
+
+// ── Règles « Privilèges » centrales (association/acces.php) ──────────
+//  Table promeducam_assoc.acces_regle : par école, par rôle OU par compte,
+//  un niveau ('masque' | 'lecture' | 'ecriture') sur un groupe de menu
+//  ('grp:Nom') ou une entrée précise (son url). Absence de règle = défaut
+//  du rôle. Voir connexion_assoc.php::acces_regle_pour().
+
+/** Règles applicables à l'utilisateur connecté dans l'école courante. */
+function regles_centrales(): array {
+    static $cache = null;
+    if ($cache !== null) return $cache;
+    // Un membre association « en visite » n'est jamais restreint par ce module.
+    if (est_visite_association() || !function_exists('acces_regle_pour')) return $cache = [];
+    $ec = ecole_courante();
+    $id = $ec['id'] ?? null;
+    if (!$id) return $cache = [];
+    return $cache = acces_regle_pour(
+        (int) $id,
+        role_connecte(),
+        $_SESSION['user']['login'] ?? null
+    );
+}
+
+/** Niveau central pour un couple (groupe, url), ou null si aucune règle. */
+function niveau_central(string $groupe, string $url): ?string {
+    $r = regles_centrales();
+    return $r[$url] ?? $r['grp:' . $groupe] ?? null;
+}
+
+/** Niveau central de la page en cours d'affichage (résout groupe + url via le menu). */
+function niveau_central_page_courante(): ?string {
+    if (!function_exists('menu_definition') || !function_exists('page_courante_relative')) return null;
+    $r = regles_centrales();
+    if (!$r) return null;
+
+    $rel = page_courante_relative();
+    if ($rel === '') return null;
+
+    // Index url → groupe, et dossier → [url => groupe] (même logique que
+    // acces_page_lecture_seule(), fonctions.php).
+    static $index = null;
+    if ($index === null) {
+        $index = ['url' => [], 'dossier' => []];
+        foreach (menu_definition() as $groupe => $items) {
+            foreach ($items as $it) {
+                if (($it[0] ?? '') === '--') continue;
+                $u = $it[1];
+                $index['url'][$u] = $groupe;
+                $d = strpos($u, '/') !== false ? basename(dirname($u)) : '';
+                if ($d !== '') $index['dossier'][$d][$u] = $groupe;
+            }
+        }
+    }
+
+    if (isset($index['url'][$rel])) {
+        return niveau_central($index['url'][$rel], $rel);
+    }
+    // Page « fille » d'un dossier de module : on prend la règle du groupe si
+    // toutes les entrées du dossier appartiennent au même groupe.
+    $d = strpos($rel, '/') !== false ? basename(dirname($rel)) : '';
+    if ($d !== '' && !empty($index['dossier'][$d])) {
+        $niveaux = [];
+        foreach ($index['dossier'][$d] as $u => $g) {
+            $niveaux[] = niveau_central($g, $u);
+        }
+        // priorité masque > lecture > ecriture ; null si aucune règle
+        foreach (['masque', 'lecture', 'ecriture'] as $prio) {
+            if (in_array($prio, $niveaux, true)) return $prio;
+        }
+    }
+    return null;
 }
 
 // « Écriture déléguée » : l'utilisateur n'a pas de rôle école classique
@@ -280,15 +431,16 @@ function exiger_membre_association(): void {
     }
 }
 
-/** Journalise une action d'un membre (traçabilité des visites/écritures). */
+/**
+ * Journalise une ACTION (visite d'école, écriture, opération sensible…).
+ * Adaptateur vers le journal d'audit unifié (bd/lib/audit.php) : l'acteur
+ * (membre association OU compte d'école), l'appareil et la localisation
+ * sont résolus automatiquement par audit_log().
+ */
 function journaliser_action(string $action, ?int $id_etab = null, ?string $cible = null): void {
     if (!annuaire_dispo()) return;
-    $m = membre_connecte();
-    assoc_exec(
-        "INSERT INTO journal_action (id_membre, id_etablissement, action, cible, ip)
-         VALUES (?, ?, ?, ?, ?)",
-        [$m['id'] ?? null, $id_etab, $action, $cible, $_SERVER['REMOTE_ADDR'] ?? null]
-    );
+    require_once __DIR__ . '/bd/lib/audit.php';
+    audit_log('action', ['action' => $action, 'id_etab' => $id_etab, 'cible' => $cible]);
 }
 
 // ── Registre NIU central (jaynitaare_assoc.eleve_niu) ───────────────
