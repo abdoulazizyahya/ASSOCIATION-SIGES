@@ -125,6 +125,10 @@ if (preg_match_all('/\b[\p{L}]/u', $marque_defaut, $mm) && count($mm[0]) > 1) {
 </head>
 <body>
 <div class="login-box">
+  <a href="<?= APP_URL ?>/" class="d-inline-flex align-items-center gap-1 mb-2"
+     style="font-size:.75rem;color:#6b7280;text-decoration:none">
+    <i class="bi bi-arrow-left"></i>Retour à l'accueil
+  </a>
   <div class="login-logo" id="loginLogo">
     <?php if (!empty($etab['logo']) && is_file(__DIR__ . '/assets/uploads/' . $etab['logo'])): ?>
       <img src="<?= APP_URL ?>/assets/uploads/<?= h($etab['logo']) ?>" alt="<?= h(($etab['Initial_Etab'] ?? '') ?: 'Logo') ?>">
