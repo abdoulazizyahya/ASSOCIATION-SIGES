@@ -1307,6 +1307,13 @@ function finances_numero_recu_eleve(int $id_eleve, string $val_annee): string {
 // classe actuelle, cohérent avec le reste de la page) — pas de filtre sur
 // le statut de l'élève : un versement réel garde son droit à un reçu même
 // si l'élève est devenu inactif depuis.
+//
+// PAS de comptage de versements/groupes ici (demande explicite du
+// 13/09/2026) : le reçu (voir pdf/recu_lib.php) est un document PAR ÉLÈVE
+// qui regroupe TOUS ses versements de l'année — un élève ayant fait
+// plusieurs paiements distincts sur la période n'aura jamais qu'UN SEUL
+// reçu à l'impression. Le nombre de reçus imprimés = COUNT() du résultat
+// de cette fonction, jamais une somme de versements.
 function finances_eleves_payes_periode(string $val_annee, string $debut, string $fin, int $id_classe = 0, int $id_eleve = 0): array {
     $where  = ['i.val_annee=?', 'p.date_paiement BETWEEN ? AND ?'];
     $params = [$val_annee, $debut, $fin];
@@ -1315,8 +1322,7 @@ function finances_eleves_payes_periode(string $val_annee, string $debut, string 
 
     return db_all(
         "SELECT i.id_eleve, i.IDClasses, e.Nom_elv, e.Prenom_elv, e.Mat_elv, c.DesignationClasses,
-                SUM(p.montant_paiement) AS montant_periode,
-                COUNT(DISTINCT COALESCE(p.id_versement, p.id_pay)) AS nb_versements
+                SUM(p.montant_paiement) AS montant_periode
          FROM inscrire i
          JOIN eleve e ON e.id_eleve = i.id_eleve
          JOIN classe c ON c.IDClasses = i.IDClasses

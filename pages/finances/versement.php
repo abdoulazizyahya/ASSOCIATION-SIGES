@@ -743,8 +743,10 @@ $fin_imp   = $_GET['fin'] ?? date('Y-m-d');
 if ($fin_imp < $debut_imp) { [$debut_imp, $fin_imp] = [$fin_imp, $debut_imp]; } // tolérance si dates inversées
 
 $eleves_periode      = finances_eleves_payes_periode($val_annee, $debut_imp, $fin_imp, $id_classe, $id_eleve);
+// Un reçu = un élève (le reçu regroupe TOUS ses versements de l'année,
+// voir pdf/recu_lib.php) — jamais une somme de versements/groupes
+// distincts (demande explicite du 13/09/2026, corrige un comptage erroné).
 $imp_nb_eleves       = count($eleves_periode);
-$imp_nb_versements   = array_sum(array_column($eleves_periode, 'nb_versements'));
 $imp_montant         = array_sum(array_column($eleves_periode, 'montant_periode'));
 $imp_nom_classe      = $id_classe ? db_val("SELECT DesignationClasses FROM classe WHERE IDClasses=?", [$id_classe]) : null;
 ?>
@@ -780,7 +782,7 @@ $imp_nom_classe      = $id_classe ? db_val("SELECT DesignationClasses FROM class
     <div class="card text-center py-2"><div class="text-muted" style="font-size:.68rem">ÉLÈVES CONCERNÉS</div><div class="fw-bold fs-5"><?= $imp_nb_eleves ?></div></div>
   </div>
   <div class="col-4">
-    <div class="card text-center py-2"><div class="text-muted" style="font-size:.68rem">REÇUS</div><div class="fw-bold fs-5"><?= $imp_nb_versements ?></div></div>
+    <div class="card text-center py-2"><div class="text-muted" style="font-size:.68rem">REÇUS</div><div class="fw-bold fs-5"><?= $imp_nb_eleves ?></div></div>
   </div>
   <div class="col-4">
     <div class="card text-center py-2"><div class="text-muted" style="font-size:.68rem">MONTANT ENCAISSÉ</div><div class="fw-bold fs-5"><?= number_format($imp_montant, 0, ',', ' ') ?> F</div></div>
@@ -799,7 +801,7 @@ $imp_nom_classe      = $id_classe ? db_val("SELECT DesignationClasses FROM class
   </div>
   <div class="table-responsive">
     <table class="table table-abz table-hover align-middle mb-0" style="font-size:.8rem">
-      <thead><tr><th>Élève</th><th>Matricule</th><th>Classe</th><th class="text-end">Montant payé</th><th class="text-end">Reçus</th></tr></thead>
+      <thead><tr><th>Élève</th><th>Matricule</th><th>Classe</th><th class="text-end">Montant payé</th></tr></thead>
       <tbody>
         <?php foreach ($eleves_periode as $ep): ?>
         <tr>
@@ -807,15 +809,14 @@ $imp_nom_classe      = $id_classe ? db_val("SELECT DesignationClasses FROM class
           <td><?= h($ep['Mat_elv']) ?></td>
           <td><?= h($ep['DesignationClasses']) ?></td>
           <td class="text-end"><?= number_format((float) $ep['montant_periode'], 0, ',', ' ') ?> F</td>
-          <td class="text-end"><?= (int) $ep['nb_versements'] ?></td>
         </tr>
         <?php endforeach; ?>
         <?php if (!$eleves_periode): ?>
-          <tr><td colspan="5" class="text-center text-muted py-3">Aucun élève n'a effectué de paiement sur cette période.</td></tr>
+          <tr><td colspan="4" class="text-center text-muted py-3">Aucun élève n'a effectué de paiement sur cette période.</td></tr>
         <?php endif; ?>
       </tbody>
       <?php if ($eleves_periode): ?>
-      <tfoot><tr class="fw-bold"><td colspan="3">TOTAL</td><td class="text-end"><?= number_format($imp_montant, 0, ',', ' ') ?> F</td><td class="text-end"><?= $imp_nb_versements ?></td></tr></tfoot>
+      <tfoot><tr class="fw-bold"><td colspan="3">TOTAL</td><td class="text-end"><?= number_format($imp_montant, 0, ',', ' ') ?> F</td></tr></tfoot>
       <?php endif; ?>
     </table>
   </div>
