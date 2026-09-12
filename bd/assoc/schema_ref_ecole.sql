@@ -978,6 +978,7 @@ DROP TABLE IF EXISTS `paiement_frais`;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `paiement_frais` (
   `id_pay` int NOT NULL AUTO_INCREMENT,
+  `id_versement` int DEFAULT NULL,
   `id_eleve` int unsigned NOT NULL,
   `classe` int NOT NULL,
   `val_annee` varchar(10) COLLATE utf8mb4_unicode_ci NOT NULL,
@@ -993,6 +994,7 @@ CREATE TABLE `paiement_frais` (
   KEY `id_obligation` (`id_obligation`),
   KEY `idx_paiement_eleve` (`id_eleve`),
   KEY `id_utilisateur` (`id_utilisateur`),
+  KEY `idx_paiement_frais_id_versement` (`id_versement`),
   CONSTRAINT `fk_paiement_eleve` FOREIGN KEY (`id_eleve`) REFERENCES `eleve` (`id_eleve`) ON DELETE CASCADE ON UPDATE CASCADE,
   CONSTRAINT `fk_paiement_utilisateur` FOREIGN KEY (`id_utilisateur`) REFERENCES `user` (`id_user`) ON DELETE SET NULL ON UPDATE CASCADE,
   CONSTRAINT `paiement_frais_ibfk_2` FOREIGN KEY (`classe`) REFERENCES `classe` (`IDClasses`) ON DELETE CASCADE ON UPDATE CASCADE,

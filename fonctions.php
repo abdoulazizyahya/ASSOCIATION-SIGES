@@ -1264,11 +1264,22 @@ function libelle_role(string $role): string {
 }
 
 // ── Finances : numéro de reçu ───────────────────────────────
-// Dérivé de id_pay (paiement_frais) plutôt que stocké dans une colonne
-// séparée : pas de séquence à maintenir, jamais de collision, cohérent même
-// après suppression d'un versement.
+// Dérivé de id_pay (paiement_frais) — ou de id_versement quand plusieurs
+// lignes appartiennent au même versement (cotisation répartie sur
+// plusieurs frais) — plutôt que stocké dans une colonne séparée : pas de
+// séquence à maintenir, jamais de collision, cohérent même après
+// suppression d'un versement.
 function finances_numero_recu(int $id_pay): string {
     return 'REC-' . str_pad((string) $id_pay, 6, '0', STR_PAD_LEFT);
+}
+
+// Identifiant de groupe d'une ligne paiement_frais : id_versement quand la
+// ligne fait partie d'un versement réparti sur plusieurs frais, sinon son
+// propre id_pay (ligne historique ou versement non réparti). Un même
+// versement — même réparti — n'a ainsi qu'UN SEUL numéro de reçu (demande
+// explicite du 12/09/2026).
+function finances_id_versement(array $p): int {
+    return (int) ($p['id_versement'] ?: $p['id_pay']);
 }
 
 // Reçu de paiement PAR ÉLÈVE (pages/finances/recu.php, demande explicite du

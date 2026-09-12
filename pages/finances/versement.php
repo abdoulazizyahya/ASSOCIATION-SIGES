@@ -169,12 +169,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         $restant -= $part;
                     }
                     $id_agent = utilisateur_connecte()['id'] ?? null;
+                    // Un versement réparti sur plusieurs frais reste UN SEUL paiement :
+                    // toutes les lignes partagent le même id_versement (= id_pay de la
+                    // première ligne insérée), pour n'avoir qu'un seul numéro de reçu
+                    // (demande explicite du 12/09/2026, voir finances_numero_recu()).
+                    $id_versement = null;
                     foreach ($repartition as $r) {
                         db_exec(
-                            "INSERT INTO paiement_frais (id_eleve, classe, val_annee, id_obligation, montant_paiement, date_paiement, ref_paiement, mode_paiement, id_utilisateur)
-                             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                            [$id_eleve, $id_classe, $val_annee, $r['id'], $r['montant'], $date_paiement, $ref, $mode_paiement, $id_agent]
+                            "INSERT INTO paiement_frais (id_versement, id_eleve, classe, val_annee, id_obligation, montant_paiement, date_paiement, ref_paiement, mode_paiement, id_utilisateur)
+                             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                            [$id_versement, $id_eleve, $id_classe, $val_annee, $r['id'], $r['montant'], $date_paiement, $ref, $mode_paiement, $id_agent]
                         );
+                        if ($id_versement === null) {
+                            $id_versement = db_last_id();
+                            db_exec("UPDATE paiement_frais SET id_versement=? WHERE id_pay=?", [$id_versement, $id_versement]);
+                        }
                     }
                     $detail = implode(', ', array_map(
                         fn($r) => $r['nom'] . ' : ' . number_format($r['montant'], 0, ',', ' ') . ' F',
@@ -596,7 +605,7 @@ document.getElementById('cot-montant').addEventListener('input', function() {
       <tbody>
         <?php foreach ($historique as $p): ?>
           <tr>
-            <td class="text-muted" style="font-size:.75rem"><?= h(finances_numero_recu((int) $p['id_pay'])) ?></td>
+            <td class="text-muted" style="font-size:.75rem"><?= h(finances_numero_recu(finances_id_versement($p))) ?></td>
             <td><?= $p['nom_obligation'] ? h($p['nom_obligation']) : '<span class="text-muted fst-italic">Non ventilé</span>' ?></td>
             <td class="text-end"><?= number_format((float) $p['montant_paiement'], 0, ',', ' ') ?> F</td>
             <td><?= finances_mode_paiement_badge($p['mode_paiement'] ?? null) ?></td>
