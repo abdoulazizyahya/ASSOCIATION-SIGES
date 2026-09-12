@@ -59,7 +59,7 @@ $pourcentage_reduction = eleve_pourcentage_reduction($id_eleve);
 $total_du_normal = (float) db_val("SELECT COALESCE(SUM(montant_obligation),0) FROM obligation WHERE niveau_obligation=?", [$classe['Niveau']]);
 $total_du = $pourcentage_reduction > 0 ? round($total_du_normal * (1 - $pourcentage_reduction / 100), 2) : $total_du_normal;
 $versements = db_all(
-    "SELECT id_pay, id_versement, montant_paiement, date_paiement FROM paiement_frais WHERE id_eleve=? AND val_annee=? ORDER BY date_paiement, id_pay",
+    "SELECT montant_paiement, date_paiement FROM paiement_frais WHERE id_eleve=? AND val_annee=? ORDER BY date_paiement, id_pay",
     [$id_eleve, $val_annee]
 );
 if (!$versements) die('Aucun versement enregistré pour cet élève.');
@@ -187,60 +187,42 @@ $dessiner_copie = function (float $offY, string $etiquette) use (
     $rowH   = $n > 3 ? min(3.5, 13.5 / $n) : 3.5;
     $rowFont = $rowH >= 3.2 ? 9 : max(4.5, $rowH * 2.6);
     $totalH = 3.5;
-    // Colonne N° ajoutée (demande explicite du 12/09/2026 : un même
-    // versement réparti sur plusieurs frais doit afficher le même numéro
-    // de reçu sur CHAQUE ligne concernée — voir finances_id_versement()).
-    // Largeur totale inchangée (69mm, x0=12 → x4=81) pour ne pas empiéter
-    // sur le bloc résumé qui démarre à x=85.
-    $x0 = 12; $wNo = 19; $wFrais = 13; $wMontant = 18; $wDate = 19;
-    $x1 = $x0 + $wNo; $x2 = $x1 + $wFrais; $x3 = $x2 + $wMontant; $x4 = $x3 + $wDate;
-    $noFont = 8;
+    $x0 = 12; $wFrais = 25; $wMontant = 22; $wDate = 22;
+    $x1 = $x0 + $wFrais; $x2 = $x1 + $wMontant; $x3 = $x2 + $wDate;
 
     $pdf->SetDrawColor(0);
     $pdf->SetLineWidth(0.3);
     $pdf->SetFillColor($BLEU[0], $BLEU[1], $BLEU[2]);
-    $pdf->Rect($x0, $tableTop, $wNo, $headerH, 'B');
-    $pdf->Rect($x1, $tableTop, $wFrais, $headerH + $n * $rowH, 'B'); // FRAIS (fusionnée sur toute la hauteur)
-    $pdf->Rect($x2, $tableTop, $wMontant, $headerH, 'B');
-    $pdf->Rect($x3, $tableTop, $wDate, $headerH, 'B');
+    $pdf->Rect($x0, $tableTop, $wFrais, $headerH + $n * $rowH, 'B'); // FRAIS (fusionnée sur toute la hauteur)
+    $pdf->Rect($x1, $tableTop, $wMontant, $headerH, 'B');
+    $pdf->Rect($x2, $tableTop, $wDate, $headerH, 'B');
     $pdf->SetFont('Arial', 'B', 9);
-    $pdf->Text($x0 + ($wNo - $pdf->GetStringWidth('N°')) / 2, $tableTop + $headerH - 1.05, $u('N°'));
-    $pdf->Text($x1 + ($wFrais - $pdf->GetStringWidth('FRAIS')) / 2, $tableTop + $headerH + $n * $rowH / 2 + 0.6, $u('FRAIS'));
-    $pdf->Text($x2 + ($wMontant - $pdf->GetStringWidth('MONTANT')) / 2, $tableTop + $headerH - 1.05, $u('MONTANT'));
-    $pdf->Text($x3 + ($wDate - $pdf->GetStringWidth('DATE')) / 2, $tableTop + $headerH - 1.05, $u('DATE'));
+    $pdf->Text($x0 + 7.74, $tableTop + $headerH + $n * $rowH / 2 + 0.6, $u('FRAIS'));
+    $pdf->Text($x1 + 3.06, $tableTop + $headerH - 1.05, $u('MONTANT'));
+    $pdf->Text($x2 + 3.94, $tableTop + $headerH - 1.05, $u('DATE'));
 
     $pdf->SetFont('Arial', '', $rowFont);
     $yBaselineOffset = min(0.5, $rowH * 0.16);
     $y = $tableTop + $headerH;
     foreach ($versements as $v) {
         $y += $rowH;
-        $numero_txt = finances_numero_recu(finances_id_versement($v));
-        $pdf->SetFont('Arial', '', $noFont);
-        $pdf->Text($x0 + ($wNo - $pdf->GetStringWidth($numero_txt)) / 2, $y - $yBaselineOffset, $numero_txt);
-        $pdf->SetFont('Arial', '', $rowFont);
         $montant_txt = number_format((float) $v['montant_paiement'], 0, ',', ' ');
-        $pdf->Text($x2 + ($wMontant - $pdf->GetStringWidth($montant_txt)) / 2, $y - $yBaselineOffset, $montant_txt);
-        $date_txt = $u(date_fr($v['date_paiement']));
-        $pdf->Text($x3 + ($wDate - $pdf->GetStringWidth($date_txt)) / 2, $y - $yBaselineOffset, $date_txt);
-        // Ligne de séparation par ligne : sous N° (x0-x1) et sous
-        // MONTANT+DATE (x2-x4) — PAS sous FRAIS (x1-x2), colonne fusionnée
-        // sur toute la hauteur, sans séparateur interne.
-        $pdf->Line($x0, $y, $x1, $y);
-        $pdf->Line($x2, $y, $x4, $y);
+        $pdf->Text($x1 + ($wMontant - $pdf->GetStringWidth($montant_txt)) / 2, $y - $yBaselineOffset, $montant_txt);
+        $pdf->Text($x2 + 3, $y - $yBaselineOffset, $u(date_fr($v['date_paiement'])));
+        $pdf->Line($x1, $y, $x3, $y);
     }
-    $pdf->Line($x0, $tableTop + $headerH, $x0, $y);
+    $pdf->Line($x1, $tableTop + $headerH, $x1, $y);
+    $pdf->Line($x2, $tableTop + $headerH, $x2, $y);
     $pdf->Line($x3, $tableTop + $headerH, $x3, $y);
-    $pdf->Line($x4, $tableTop + $headerH, $x4, $y);
 
     $pdf->SetFillColor($BLEU[0], $BLEU[1], $BLEU[2]);
-    $pdf->Rect($x0, $y, $wNo, $totalH, 'B');
-    $pdf->Rect($x1, $y, $wFrais, $totalH, 'B');
-    $pdf->Rect($x2, $y, $wMontant, $totalH, 'B');
-    $pdf->Rect($x3, $y, $wDate, $totalH, 'B');
+    $pdf->Rect($x0, $y, $wFrais, $totalH, 'B');
+    $pdf->Rect($x1, $y, $wMontant, $totalH, 'B');
+    $pdf->Rect($x2, $y, $wDate, $totalH, 'B');
     $pdf->SetFont('Arial', 'B', 9);
-    $pdf->Text($x1 + ($wFrais - $pdf->GetStringWidth('TOTAL')) / 2, $y + $totalH - 0.6, $u('TOTAL'));
+    $pdf->Text($x0 + 7.21, $y + $totalH - 0.6, $u('TOTAL'));
     $total_txt = number_format($total_paye, 0, ',', ' ');
-    $pdf->Text($x2 + ($wMontant - $pdf->GetStringWidth($total_txt)) / 2, $y + $totalH - 0.6, $total_txt);
+    $pdf->Text($x1 + ($wMontant - $pdf->GetStringWidth($total_txt)) / 2, $y + $totalH - 0.6, $total_txt);
 
     // ── Résumé (Total dû / Payé / Reste) — position FIXE (mêmes 3 lignes
     //    espacées de 7mm que le modèle de référence, 60.5/67.5/74.5),
