@@ -838,14 +838,16 @@ if ($eleves_periode) {
           <td><?= h($ep['DesignationClasses']) ?></td>
           <td class="text-end"><?= number_format((float) $ep['montant_periode'], 0, ',', ' ') ?> F</td>
           <td class="text-center">
+            <button type="button" class="btn btn-sm btn-light" style="padding:2px 6px" title="Imprimer le reçu"
+                    onclick="afficherApercu('<?= APP_URL ?>/pages/finances/recu.php?eleve=<?= $id_ep ?>&classe=<?= (int) $ep['IDClasses'] ?>', 'Reçu de paiement', null, 'portrait')">
+              <i class="bi bi-file-earmark-pdf text-danger"></i>
+            </button>
             <?php if ($solde_ep !== null && $solde_ep > 0.01): ?>
               <a class="btn btn-sm btn-light" style="padding:2px 6px" title="Solde restant : <?= number_format($solde_ep, 0, ',', ' ') ?> F — enregistrer un paiement"
                  data-ajax-nav
                  href="<?= APP_URL ?>/pages/finances/versement.php?onglet=cotisation&classe=<?= (int) $ep['IDClasses'] ?>&eleve=<?= $id_ep ?>">
                 <i class="bi bi-cash-coin text-success"></i>
               </a>
-            <?php else: ?>
-              <span class="text-muted">—</span>
             <?php endif; ?>
           </td>
         </tr>
