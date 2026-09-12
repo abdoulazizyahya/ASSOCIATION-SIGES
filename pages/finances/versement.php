@@ -203,7 +203,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 $id_classe = (int) ($_GET['classe'] ?? 0);
 $id_eleve  = (int) ($_GET['eleve'] ?? 0);
 $onglet    = $_GET['onglet'] ?? 'cotisation';
-if (!in_array($onglet, ['cotisation', 'detail'], true)) $onglet = 'cotisation';
+if (!in_array($onglet, ['cotisation', 'detail', 'impression'], true)) $onglet = 'cotisation';
 
 // Écriture réelle sur cette page (seul l'agent Comptable écrit sur Finances
 // par défaut ; le propriétaire de l'association n'est jamais bridé — voir
@@ -339,8 +339,9 @@ if (!$es_partiel) {
   </div>
 </div>
 
-<?php if ($eleve && $classe): ?>
-
+<!-- Barre d'onglets TOUJOURS visible (avant : seulement si eleve+classe
+     choisis) — l'onglet « Imprimer les reçus » fonctionne sans élève précis
+     (classe seule, ou même « toutes les classes »), demande du 13/09/2026. -->
 <ul class="nav nav-tabs mb-2" style="border-bottom:2px solid #e5e7eb">
   <li class="nav-item">
     <a class="nav-link <?= $onglet === 'cotisation' ? 'active' : '' ?>" data-ajax-nav
@@ -354,7 +355,21 @@ if (!$es_partiel) {
       <i class="bi bi-list-check me-1"></i>Détail par frais
     </a>
   </li>
+  <li class="nav-item">
+    <a class="nav-link <?= $onglet === 'impression' ? 'active' : '' ?>" data-ajax-nav
+       href="<?= APP_URL ?>/pages/finances/versement.php?onglet=impression<?= $id_classe ? '&classe=' . $id_classe : '' ?>">
+      <i class="bi bi-printer me-1"></i>Imprimer les reçus
+    </a>
+  </li>
 </ul>
+
+<?php if ($onglet !== 'impression' && !($eleve && $classe)): ?>
+<div class="alert alert-light border text-center text-muted py-4">
+  <i class="bi bi-arrow-up-circle me-1"></i>Choisissez une classe puis un élève pour gérer ses paiements.
+</div>
+<?php endif; ?>
+
+<?php if ($eleve && $classe): ?>
 
 <div class="card mb-2">
   <div class="card-body py-2">
@@ -714,6 +729,98 @@ function ouvrirModifier(p) {
 </script>
 
 <?php endif; // eleve && classe ?>
+
+<?php if ($onglet === 'impression'): ?>
+<!-- ══════════════════════════════════════════════
+     ONGLET 3 — Imprimer les reçus : reçus PDF en lot
+     pour les élèves ayant payé sur une date/période
+     donnée — classe, élève, ou toutes les classes
+     (demande explicite du 13/09/2026).
+══════════════════════════════════════════════ -->
+<?php
+$debut_imp = $_GET['debut'] ?? date('Y-m-d');
+$fin_imp   = $_GET['fin'] ?? date('Y-m-d');
+if ($fin_imp < $debut_imp) { [$debut_imp, $fin_imp] = [$fin_imp, $debut_imp]; } // tolérance si dates inversées
+
+$eleves_periode      = finances_eleves_payes_periode($val_annee, $debut_imp, $fin_imp, $id_classe, $id_eleve);
+$imp_nb_eleves       = count($eleves_periode);
+$imp_nb_versements   = array_sum(array_column($eleves_periode, 'nb_versements'));
+$imp_montant         = array_sum(array_column($eleves_periode, 'montant_periode'));
+$imp_nom_classe      = $id_classe ? db_val("SELECT DesignationClasses FROM classe WHERE IDClasses=?", [$id_classe]) : null;
+?>
+<div class="card mb-2">
+  <div class="card-header py-2" style="background:#f8faff"><span class="fw-semibold" style="font-size:.82rem">Date / période</span></div>
+  <div class="card-body py-2">
+    <form data-ajax-nav-form method="get" action="<?= APP_URL ?>/pages/finances/versement.php" class="row g-2 align-items-end">
+      <input type="hidden" name="onglet" value="impression">
+      <input type="hidden" name="classe" value="<?= $id_classe ?>">
+      <input type="hidden" name="eleve" value="<?= $id_eleve ?>">
+      <div class="col-6 col-md-3">
+        <label class="form-label">Du</label>
+        <input type="date" name="debut" class="form-control form-control-sm" value="<?= h($debut_imp) ?>" data-ajax-nav-auto>
+      </div>
+      <div class="col-6 col-md-3">
+        <label class="form-label">Au</label>
+        <input type="date" name="fin" class="form-control form-control-sm" value="<?= h($fin_imp) ?>" data-ajax-nav-auto>
+      </div>
+      <div class="col-md-3">
+        <button class="btn btn-outline-secondary btn-sm"><i class="bi bi-funnel me-1"></i>Filtrer</button>
+      </div>
+    </form>
+    <div class="form-text mt-1" style="font-size:.72rem">
+      <i class="bi bi-info-circle me-1"></i>
+      <?= $id_eleve && $eleve ? 'Élève : ' . h(mb_strtoupper($eleve['Nom_elv']) . ' ' . ($eleve['Prenom_elv'] ?? '')) : ($imp_nom_classe ? 'Classe : ' . h($imp_nom_classe) : 'Toutes les classes') ?>
+      — utilisez les menus Classe/Élève ci-dessus pour restreindre.
+    </div>
+  </div>
+</div>
+
+<div class="row g-2 mb-2">
+  <div class="col-4">
+    <div class="card text-center py-2"><div class="text-muted" style="font-size:.68rem">ÉLÈVES CONCERNÉS</div><div class="fw-bold fs-5"><?= $imp_nb_eleves ?></div></div>
+  </div>
+  <div class="col-4">
+    <div class="card text-center py-2"><div class="text-muted" style="font-size:.68rem">REÇUS</div><div class="fw-bold fs-5"><?= $imp_nb_versements ?></div></div>
+  </div>
+  <div class="col-4">
+    <div class="card text-center py-2"><div class="text-muted" style="font-size:.68rem">MONTANT ENCAISSÉ</div><div class="fw-bold fs-5"><?= number_format($imp_montant, 0, ',', ' ') ?> F</div></div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-header py-2 d-flex justify-content-between align-items-center flex-wrap gap-2" style="background:#f8faff">
+    <span class="fw-semibold" style="font-size:.82rem">
+      Élèves ayant payé du <?= h(date_fr($debut_imp)) ?><?= $fin_imp !== $debut_imp ? ' au ' . h(date_fr($fin_imp)) : '' ?>
+    </span>
+    <button type="button" class="btn btn-primary btn-sm" <?= $imp_nb_eleves ? '' : 'disabled' ?>
+            onclick="afficherApercu('<?= APP_URL ?>/pages/finances/recus_lot.php?debut=<?= urlencode($debut_imp) ?>&fin=<?= urlencode($fin_imp) ?>&classe=<?= $id_classe ?>&eleve=<?= $id_eleve ?>', 'Reçus imprimés', null, 'portrait')">
+      <i class="bi bi-printer me-1"></i>Imprimer<?= $imp_nb_eleves ? " ({$imp_nb_eleves})" : '' ?>
+    </button>
+  </div>
+  <div class="table-responsive">
+    <table class="table table-abz table-hover align-middle mb-0" style="font-size:.8rem">
+      <thead><tr><th>Élève</th><th>Matricule</th><th>Classe</th><th class="text-end">Montant payé</th><th class="text-end">Reçus</th></tr></thead>
+      <tbody>
+        <?php foreach ($eleves_periode as $ep): ?>
+        <tr>
+          <td><?= h(mb_strtoupper($ep['Nom_elv']) . ' ' . ($ep['Prenom_elv'] ?? '')) ?></td>
+          <td><?= h($ep['Mat_elv']) ?></td>
+          <td><?= h($ep['DesignationClasses']) ?></td>
+          <td class="text-end"><?= number_format((float) $ep['montant_periode'], 0, ',', ' ') ?> F</td>
+          <td class="text-end"><?= (int) $ep['nb_versements'] ?></td>
+        </tr>
+        <?php endforeach; ?>
+        <?php if (!$eleves_periode): ?>
+          <tr><td colspan="5" class="text-center text-muted py-3">Aucun élève n'a effectué de paiement sur cette période.</td></tr>
+        <?php endif; ?>
+      </tbody>
+      <?php if ($eleves_periode): ?>
+      <tfoot><tr class="fw-bold"><td colspan="3">TOTAL</td><td class="text-end"><?= number_format($imp_montant, 0, ',', ' ') ?> F</td><td class="text-end"><?= $imp_nb_versements ?></td></tr></tfoot>
+      <?php endif; ?>
+    </table>
+  </div>
+</div>
+<?php endif; // onglet === impression ?>
 
 <script>
 // var (pas const/let) : ce script est réexécuté à chaque rechargement AJAX

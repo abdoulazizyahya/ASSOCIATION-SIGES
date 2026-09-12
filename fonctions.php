@@ -1295,6 +1295,39 @@ function finances_numero_recu_eleve(int $id_eleve, string $val_annee): string {
     return str_pad((string) $id_eleve, 4, '0', STR_PAD_LEFT) . '/' . $annee_courte;
 }
 
+// Élèves ayant effectué au moins un versement dans [$debut,$fin] (bornes
+// incluses, dates 'Y-m-d') — pages/finances/versement.php (onglet
+// « Imprimer les reçus ») et pages/finances/recus_lot.php (impression
+// groupée), demande explicite du 13/09/2026 : reçus imprimables en lot
+// pour une date/période donnée, par classe ou par élève, ou pour toutes
+// les classes. $id_classe/$id_eleve = 0 pour « toutes les classes »/« tous
+// les élèves ». Classe renvoyée = classe COURANTE de l'élève (via
+// `inscrire`), pas celle enregistrée sur le versement au moment du
+// paiement (un élève transféré en cours d'année doit apparaître dans sa
+// classe actuelle, cohérent avec le reste de la page) — pas de filtre sur
+// le statut de l'élève : un versement réel garde son droit à un reçu même
+// si l'élève est devenu inactif depuis.
+function finances_eleves_payes_periode(string $val_annee, string $debut, string $fin, int $id_classe = 0, int $id_eleve = 0): array {
+    $where  = ['i.val_annee=?', 'p.date_paiement BETWEEN ? AND ?'];
+    $params = [$val_annee, $debut, $fin];
+    if ($id_classe) { $where[] = 'i.IDClasses=?'; $params[] = $id_classe; }
+    if ($id_eleve)  { $where[] = 'i.id_eleve=?';  $params[] = $id_eleve; }
+
+    return db_all(
+        "SELECT i.id_eleve, i.IDClasses, e.Nom_elv, e.Prenom_elv, e.Mat_elv, c.DesignationClasses,
+                SUM(p.montant_paiement) AS montant_periode,
+                COUNT(DISTINCT COALESCE(p.id_versement, p.id_pay)) AS nb_versements
+         FROM inscrire i
+         JOIN eleve e ON e.id_eleve = i.id_eleve
+         JOIN classe c ON c.IDClasses = i.IDClasses
+         JOIN paiement_frais p ON p.id_eleve = i.id_eleve AND p.val_annee = i.val_annee
+         WHERE " . implode(' AND ', $where) . "
+         GROUP BY i.id_eleve, i.IDClasses, e.Nom_elv, e.Prenom_elv, e.Mat_elv, c.DesignationClasses
+         ORDER BY c.DesignationClasses, e.Nom_elv, e.Prenom_elv",
+        $params
+    );
+}
+
 // Même principe que finances_numero_recu() mais pour les dépenses (module
 // Gestion des dépenses, migration v33) — dérivé de id_depense, pas de
 // séquence séparée à maintenir.
