@@ -27,6 +27,17 @@ $inscriptions = db_all(
 );
 $classe_actuelle = $inscriptions[0]['DesignationClasses'] ?? null;
 
+// Inscription de l'ANNÉE ACTIVE précisément (pas juste la plus récente) —
+// sert de lien direct vers l'historique des paiements de cet élève
+// (pages/finances/versement.php, qui a besoin d'une classe + d'un élève).
+$val_annee_ins  = get_annee_active()['val_annee'] ?? '';
+$inscr_active   = null;
+foreach ($inscriptions as $i) { if ($i['val_annee'] === $val_annee_ins) { $inscr_active = $i; break; } }
+// Peut voir la page Finances > Paiements (même périmètre que exiger_role()
+// de versement.php ; ENSEIGNANT n'y a jamais eu accès).
+$peut_voir_paiements = in_array(role_connecte(), ['DIRECTEUR', 'SECRETAIRE', 'COMPTABLE', 'FONDATEUR'], true)
+    || (function_exists('est_visite_association') && est_visite_association());
+
 $parents = db_all("SELECT * FROM parent WHERE id_eleve=?", [$id]);
 $pere    = null; $mere = null; $autres_tuteurs = [];
 foreach ($parents as $p) {
@@ -109,6 +120,20 @@ if (!$es_partiel) {
     <button type="button" class="btn btn-outline-primary btn-sm" data-bs-toggle="modal" data-bs-target="#modalCarte">
       <i class="bi bi-credit-card me-1"></i>Carte scolaire
     </button>
+  </div>
+  <?php endif; ?>
+  <?php if ($peut_voir_paiements): ?>
+  <div class="d-flex gap-1 flex-wrap">
+    <?php if ($inscr_active): ?>
+      <a href="<?= APP_URL ?>/pages/finances/versement.php?onglet=detail&classe=<?= (int) $inscr_active['IDClasses'] ?>&eleve=<?= $id ?>"
+         class="btn btn-outline-primary btn-sm">
+        <i class="bi bi-cash-coin me-1"></i>Paiements
+      </a>
+    <?php else: ?>
+      <span class="btn btn-outline-secondary btn-sm disabled" title="Aucune inscription pour l'année active">
+        <i class="bi bi-cash-coin me-1"></i>Paiements
+      </span>
+    <?php endif; ?>
   </div>
   <?php endif; ?>
   <?php if ($peut_gerer): ?>

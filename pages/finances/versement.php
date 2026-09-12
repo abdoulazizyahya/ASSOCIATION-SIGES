@@ -196,6 +196,15 @@ $id_eleve  = (int) ($_GET['eleve'] ?? 0);
 $onglet    = $_GET['onglet'] ?? 'cotisation';
 if (!in_array($onglet, ['cotisation', 'detail'], true)) $onglet = 'cotisation';
 
+// Écriture réelle sur cette page (seul l'agent Comptable écrit sur Finances
+// par défaut ; le propriétaire de l'association n'est jamais bridé — voir
+// ecole_contexte.php::est_lecture_seule()/ecriture_module_permise()).
+// Sert à masquer les boutons Modifier/Supprimer du tableau ci-dessous :
+// sans ça, « Modifier » (bouton type=button, pas couvert par la règle CSS
+// .lecture-seule) ouvrait la modale dont le bouton Enregistrer, lui, était
+// déjà masqué — une impasse plutôt qu'une vraie lecture seule.
+$peut_gerer_paiements = !(function_exists('est_lecture_seule') && est_lecture_seule());
+
 $classes = db_all(
     "SELECT c.IDClasses, c.DesignationClasses, n.OrdreNiveau FROM classe c
      LEFT JOIN niveau n ON n.LibelleNiveau = c.Niveau
@@ -447,6 +456,7 @@ function ouvrirRecuFinances() {
      ONGLET 1 — Cotisation : un seul montant, réparti
      automatiquement du plus petit au plus grand frais.
 ══════════════════════════════════════════════ -->
+<?php if ($peut_gerer_paiements): ?>
 <div class="card mb-2">
   <div class="card-header py-2" style="background:#f8faff"><span class="fw-semibold" style="font-size:.82rem">Enregistrer une cotisation</span></div>
   <div class="card-body">
@@ -520,12 +530,14 @@ document.getElementById('cot-montant').addEventListener('input', function() {
     zone.style.display = '';
 });
 </script>
-<?php endif; ?>
+<?php endif; // $peut_gerer_paiements ?>
+<?php endif; // onglet === cotisation ?>
 
 <?php if ($onglet === 'detail'): ?>
 <!-- ══════════════════════════════════════════════
      ONGLET 2 — Détail par frais (formulaire existant, inchangé)
 ══════════════════════════════════════════════ -->
+<?php if ($peut_gerer_paiements): ?>
 <div class="card mb-2">
   <div class="card-header py-2" style="background:#f8faff"><span class="fw-semibold" style="font-size:.82rem">Enregistrer un versement</span></div>
   <div class="card-body">
@@ -571,6 +583,7 @@ document.getElementById('cot-montant').addEventListener('input', function() {
     </form>
   </div>
 </div>
+<?php endif; // $peut_gerer_paiements ?>
 
 <div class="card">
   <div class="card-header py-2" style="background:#f8faff"><span class="fw-semibold" style="font-size:.82rem">Historique des versements</span></div>
@@ -587,6 +600,7 @@ document.getElementById('cot-montant').addEventListener('input', function() {
             <td><?= h(date_fr($p['date_paiement'])) ?></td>
             <td><?= h($p['ref_paiement'] ?: '—') ?></td>
             <td class="text-center">
+              <?php if ($peut_gerer_paiements): ?>
               <button type="button" class="btn btn-sm btn-light" style="padding:2px 6px" title="Modifier"
                       onclick='ouvrirModifier(<?= json_encode([
                           "id_pay" => (int) $p["id_pay"], "id_obligation" => (int) $p["id_obligation"],
@@ -605,6 +619,9 @@ document.getElementById('cot-montant').addEventListener('input', function() {
                   <i class="bi bi-trash text-danger" style="font-size:.78rem"></i>
                 </button>
               </form>
+              <?php else: ?>
+                <span class="text-muted">—</span>
+              <?php endif; ?>
             </td>
           </tr>
         <?php endforeach; ?>
