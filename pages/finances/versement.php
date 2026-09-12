@@ -749,6 +749,31 @@ $eleves_periode      = finances_eleves_payes_periode($val_annee, $debut_imp, $fi
 $imp_nb_eleves       = count($eleves_periode);
 $imp_montant         = array_sum(array_column($eleves_periode, 'montant_periode'));
 $imp_nom_classe      = $id_classe ? db_val("SELECT DesignationClasses FROM classe WHERE IDClasses=?", [$id_classe]) : null;
+
+// Solde restant de chaque élève affiché — colonne Actions, demande
+// explicite du 13/09/2026 : icône « enregistrer un paiement » UNIQUEMENT
+// pour ceux qui n'ont pas encore soldé, vers l'onglet Cotisation avec sa
+// classe/élève déjà sélectionnés. Réutilise finances_du_par_eleve()
+// (même calcul « dû » que État par classe/Impayés, cas social inclus) —
+// un élève absent de cette liste (inactif) n'a pas de solde calculable :
+// pas d'icône, prudence plutôt qu'un chiffre potentiellement faux.
+$imp_solde_par_eleve = [];
+if ($eleves_periode) {
+    $ids_imp = array_column($eleves_periode, 'id_eleve');
+    $paye_annee_imp = [];
+    $in_ids = implode(',', array_fill(0, count($ids_imp), '?'));
+    foreach (db_all(
+        "SELECT id_eleve, SUM(montant_paiement) AS paye FROM paiement_frais WHERE val_annee=? AND id_eleve IN ($in_ids) GROUP BY id_eleve",
+        array_merge([$val_annee], $ids_imp)
+    ) as $r) {
+        $paye_annee_imp[(int) $r['id_eleve']] = (float) $r['paye'];
+    }
+    foreach (finances_du_par_eleve($val_annee, $id_classe ?: null) as $d) {
+        $id = (int) $d['id_eleve'];
+        if (!in_array($id, $ids_imp, true)) continue;
+        $imp_solde_par_eleve[$id] = $d['du'] - ($paye_annee_imp[$id] ?? 0.0);
+    }
+}
 ?>
 <div class="card mb-2">
   <div class="card-header py-2" style="background:#f8faff"><span class="fw-semibold" style="font-size:.82rem">Date / période</span></div>
@@ -801,22 +826,36 @@ $imp_nom_classe      = $id_classe ? db_val("SELECT DesignationClasses FROM class
   </div>
   <div class="table-responsive">
     <table class="table table-abz table-hover align-middle mb-0" style="font-size:.8rem">
-      <thead><tr><th>Élève</th><th>Matricule</th><th>Classe</th><th class="text-end">Montant payé</th></tr></thead>
+      <thead><tr><th>Élève</th><th>Matricule</th><th>Classe</th><th class="text-end">Montant payé</th><th class="text-center">Actions</th></tr></thead>
       <tbody>
-        <?php foreach ($eleves_periode as $ep): ?>
+        <?php foreach ($eleves_periode as $ep):
+          $id_ep      = (int) $ep['id_eleve'];
+          $solde_ep   = $imp_solde_par_eleve[$id_ep] ?? null;
+        ?>
         <tr>
           <td><?= h(mb_strtoupper($ep['Nom_elv']) . ' ' . ($ep['Prenom_elv'] ?? '')) ?></td>
           <td><?= h($ep['Mat_elv']) ?></td>
           <td><?= h($ep['DesignationClasses']) ?></td>
           <td class="text-end"><?= number_format((float) $ep['montant_periode'], 0, ',', ' ') ?> F</td>
+          <td class="text-center">
+            <?php if ($solde_ep !== null && $solde_ep > 0.01): ?>
+              <a class="btn btn-sm btn-light" style="padding:2px 6px" title="Solde restant : <?= number_format($solde_ep, 0, ',', ' ') ?> F — enregistrer un paiement"
+                 data-ajax-nav
+                 href="<?= APP_URL ?>/pages/finances/versement.php?onglet=cotisation&classe=<?= (int) $ep['IDClasses'] ?>&eleve=<?= $id_ep ?>">
+                <i class="bi bi-cash-coin text-success"></i>
+              </a>
+            <?php else: ?>
+              <span class="text-muted">—</span>
+            <?php endif; ?>
+          </td>
         </tr>
         <?php endforeach; ?>
         <?php if (!$eleves_periode): ?>
-          <tr><td colspan="4" class="text-center text-muted py-3">Aucun élève n'a effectué de paiement sur cette période.</td></tr>
+          <tr><td colspan="5" class="text-center text-muted py-3">Aucun élève n'a effectué de paiement sur cette période.</td></tr>
         <?php endif; ?>
       </tbody>
       <?php if ($eleves_periode): ?>
-      <tfoot><tr class="fw-bold"><td colspan="3">TOTAL</td><td class="text-end"><?= number_format($imp_montant, 0, ',', ' ') ?> F</td></tr></tfoot>
+      <tfoot><tr class="fw-bold"><td colspan="3">TOTAL</td><td class="text-end"><?= number_format($imp_montant, 0, ',', ' ') ?> F</td><td></td></tr></tfoot>
       <?php endif; ?>
     </table>
   </div>
