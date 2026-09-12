@@ -124,6 +124,21 @@ function asso_haut(string $titre, bool $avec_nav = true): void {
       <div class="asso-content">
         <div class="asso-wrap">
           <div id="flash-zone"><?= function_exists('flash_html') ? flash_html() : '' ?></div>
+          <?php if ($proprietaire && $courant !== 'migrations.php'):
+            // Bandeau « schéma en retard » — demande explicite du 13/09/2026 :
+            // rappel visible pour le propriétaire, AUCUNE application
+            // automatique (voir connexion_assoc.php::assoc_migrations_en_retard()).
+            // Masqué sur migrations.php elle-même (déjà tout le détail là-bas).
+            $migr_retard_asso = function_exists('assoc_migrations_en_retard') ? assoc_migrations_en_retard() : [];
+            if ($migr_retard_asso): ?>
+          <div class="alert alert-warning d-flex flex-wrap align-items-center gap-2 py-2 px-3 mb-3" style="font-size:.82rem">
+            <i class="bi bi-database-gear"></i>
+            <span><strong><?= count($migr_retard_asso) ?></strong> école(s) avec un schéma en retard
+              (<?= h(implode(', ', array_map(fn($e) => $e['code'], $migr_retard_asso))) ?>) —
+              certaines nouveautés peuvent ne pas fonctionner tant que la migration n'est pas appliquée.</span>
+            <a href="<?= APP_URL ?>/association/migrations.php" class="btn btn-sm btn-warning ms-auto">Voir les migrations</a>
+          </div>
+          <?php endif; endif; ?>
           <h1 class="asso-page-title"><?= h($titre) ?></h1>
 <?php endif; ?>
 <?php

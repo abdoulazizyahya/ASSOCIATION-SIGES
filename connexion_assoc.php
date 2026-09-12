@@ -1331,6 +1331,16 @@ function assoc_migrations_etat(): array {
     return ['ecoles' => $out, 'vmax' => $vmax, 'nb_migrations' => count($dispo)];
 }
 
+// Écoles ACTIVES dont le schéma a du retard — résumé léger pour le bandeau
+// d'avertissement du propriétaire (layout/header.php, association/_layout.php),
+// demande explicite du 13/09/2026 : AUCUNE application automatique, juste un
+// rappel visible avec lien direct vers /association/migrations.php (où le
+// clic « Migrer » reste requis, avec sa sauvegarde de sécurité).
+function assoc_migrations_en_retard(): array {
+    if (!annuaire_dispo()) return [];
+    return array_values(array_filter(assoc_migrations_etat()['ecoles'], fn($e) => $e['actif'] && !$e['a_jour']));
+}
+
 /**
  * Applique les migrations manquantes à UNE école. Sauvegarde de sécurité
  * d'abord (sauf $backup=false). S'arrête à la première migration en échec.

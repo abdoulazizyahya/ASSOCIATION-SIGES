@@ -36,6 +36,15 @@ $est_fondateur = function_exists('est_fondateur') && est_fondateur();
 $menu_voit_tout = $visite_asso || $est_fondateur;
 $lecture_seule = function_exists('est_lecture_seule') && est_lecture_seule();
 
+// Bandeau « schéma en retard » (propriétaire uniquement) — demande
+// explicite du 13/09/2026 : après un déploiement, le propriétaire est
+// prévenu qu'une/des écoles n'ont pas reçu les dernières migrations, mais
+// RIEN n'est appliqué automatiquement (voir connexion_assoc.php::
+// assoc_migrations_en_retard()) — le clic « Migrer » sur
+// /association/migrations.php reste toujours requis.
+$migr_retard = (function_exists('est_proprietaire_association') && est_proprietaire_association()
+    && function_exists('assoc_migrations_en_retard')) ? assoc_migrations_en_retard() : [];
+
 // Année RÉELLEMENT active (Etat_annee_scolaire=1), pas juste le repli de
 // get_annee_active() sur l'année la plus récente — demande explicite du
 // 18/08/2026 : tant qu'aucune année n'est explicitement activée, les menus
@@ -305,6 +314,24 @@ function lien_actif(string $url): string {
         <strong>Lecture seule<?= $label_rubrique ? ' — ' . h($label_rubrique) : '' ?></strong>
         — vous pouvez consulter cette page, mais pas y enregistrer.
       </span>
+    </div>
+    <?php endif; ?>
+
+    <?php if ($migr_retard): ?>
+    <!-- Bandeau schéma en retard (propriétaire uniquement) — jamais de
+         migration automatique, juste un rappel + lien direct. Indépendant
+         des 3 bandeaux ci-dessus (peut s'afficher en même temps). -->
+    <div class="d-flex flex-wrap align-items-center gap-2 px-3 py-1"
+         style="background:#fff3cd;border-bottom:1px solid #ffe69c;color:#664d03;font-size:.8rem">
+      <span>
+        <i class="bi bi-database-gear me-1"></i>
+        <strong>Schéma en retard</strong>
+        — <?= count($migr_retard) ?> école(s) (<?= h(implode(', ', array_map(fn($e) => $e['code'], $migr_retard))) ?>)
+        n'ont pas encore reçu les dernières migrations : certaines nouveautés peuvent ne pas fonctionner tant que ce n'est pas fait.
+      </span>
+      <a href="<?= APP_URL ?>/association/migrations.php" class="ms-auto btn btn-sm btn-outline-secondary py-0 px-2" style="font-size:.78rem">
+        <i class="bi bi-arrow-right-circle me-1"></i>Voir les migrations
+      </a>
     </div>
     <?php endif; ?>
 
