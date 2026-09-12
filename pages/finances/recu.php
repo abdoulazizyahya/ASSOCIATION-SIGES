@@ -96,6 +96,22 @@ $dessiner_copie = function (float $offY, string $etiquette) use (
 ): void {
     $u = fn(string $s) => pdf_u($s);
 
+    // Écrit $texte à ($x,$y) en réduisant la police (jusqu'à 5.5pt) si besoin
+    // pour qu'il tienne dans $largeurMax — sans quoi un nom d'établissement
+    // long (ex. « GROUPE SCOLAIRE BILINGUE ISLAMIQUE D'EXCELLENCE DE GADA
+    // MABANGA ») déborde sur la colonne anglaise ou hors de la page (retour
+    // utilisateur du 12/09/2026). Taille identique à l'original tant que le
+    // texte tient déjà — aucun changement visuel pour les noms courts.
+    $texteAjuste = function (string $texte, float $x, float $y, float $largeurMax, string $style, float $taille) use ($pdf, $u): void {
+        $txt = $u($texte);
+        $pdf->SetFont('Arial', $style, $taille);
+        while ($taille > 5.5 && $pdf->GetStringWidth($txt) > $largeurMax) {
+            $taille -= 0.25;
+            $pdf->SetFont('Arial', $style, $taille);
+        }
+        $pdf->Text($x, $y, $txt);
+    };
+
     // Cadre (bordure arrondie fine)
     $pdf->SetDrawColor(0);
     $pdf->SetLineWidth(0.27);
@@ -110,19 +126,18 @@ $dessiner_copie = function (float $offY, string $etiquette) use (
         $pdf->Image($logo_path, 95, 4.3 + $offY, 20, 18);
     }
 
-    // En-tête bilingue (3 lignes FR gauche / EN droite)
+    // En-tête bilingue (3 lignes FR gauche / EN droite) — police posée par
+    // $texteAjuste() pour chaque ligne (rétrécit si le texte est trop long).
     $pdf->SetTextColor(0);
-    $pdf->SetFont('Arial', '', 8);
     // pays_etab_fr (pas republique_fr, colonne supprimée de `etablissement`
     // — voir pdf/bulletin_trimestriel_arabe.php pour le même remplacement)
     // contient déjà le texte complet "RÉPUBLIQUE DU CAMEROUN".
-    $pdf->Text(23.35, 7.55 + $offY, $u($etab_brut['pays_etab_fr'] ?? 'REPUBLIQUE DU CAMEROUN'));
-    $pdf->Text(149.39, 7.55 + $offY, $u('REPUBLIC OF CAMEROON'));
-    $pdf->Text(26.06, 10.95 + $offY, $u($etab_brut['region_etab_fr'] ?: "REGION DE L'ADAMAOUA"));
-    $pdf->Text(154.25, 10.95 + $offY, $u($etab_brut['region_etab_en'] ?: 'ADAMAWA REGION'));
-    $pdf->SetFont('Arial', 'B', 9);
-    $pdf->Text(14.21, 14.45 + $offY, $u($etab_brut['Nom_Etab_Fr'] ?: 'GSBI LES POUSSINS DE JAYNITAARE'));
-    $pdf->Text(140.25, 14.45 + $offY, $u($etab_brut['Nom_Etab_An'] ?: 'BISG THE CHICKS OF JAYNITAARE'));
+    $texteAjuste($etab_brut['pays_etab_fr'] ?? 'REPUBLIQUE DU CAMEROUN', 23.35, 7.55 + $offY, 124, '', 8);
+    $texteAjuste('REPUBLIC OF CAMEROON', 149.39, 7.55 + $offY, 52, '', 8);
+    $texteAjuste($etab_brut['region_etab_fr'] ?: "REGION DE L'ADAMAOUA", 26.06, 10.95 + $offY, 121, '', 8);
+    $texteAjuste($etab_brut['region_etab_en'] ?: 'ADAMAWA REGION', 154.25, 10.95 + $offY, 47, '', 8);
+    $texteAjuste($etab_brut['Nom_Etab_Fr'] ?: 'GSBI LES POUSSINS DE JAYNITAARE', 14.21, 14.45 + $offY, 124, 'B', 9);
+    $texteAjuste($etab_brut['Nom_Etab_An'] ?: 'BISG THE CHICKS OF JAYNITAARE', 140.25, 14.45 + $offY, 65, 'B', 9);
 
     // Ruban de titre + case numéro
     pdf_ruban_chevron($pdf, 64, 145, 23.3 + $offY, 29.3 + $offY, 6, $BLEU);

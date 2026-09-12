@@ -584,7 +584,10 @@ document.getElementById('cot-montant').addEventListener('input', function() {
   </div>
 </div>
 <?php endif; // $peut_gerer_paiements ?>
+<?php endif; // onglet === detail (le formulaire « Enregistrer un versement » lui est propre) ?>
 
+<!-- Historique des versements : commun aux 2 onglets (Cotisation ET Détail)
+     — demande explicite du 12/09/2026, avant visible seulement en Détail. -->
 <div class="card">
   <div class="card-header py-2" style="background:#f8faff"><span class="fw-semibold" style="font-size:.82rem">Historique des versements</span></div>
   <div class="table-responsive">
@@ -700,7 +703,6 @@ function ouvrirModifier(p) {
     new bootstrap.Modal(document.getElementById('modalVersement')).show();
 }
 </script>
-<?php endif; // onglet detail ?>
 
 <?php endif; // eleve && classe ?>
 
