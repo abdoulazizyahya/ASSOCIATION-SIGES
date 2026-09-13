@@ -74,3 +74,10 @@ define('BACKUP_TOKEN', 'METTRE_UN_JETON_ALEATOIRE_LONG');
 // -----END PRIVATE KEY-----
 // PEM
 // );
+
+// ── Secret du système de licence (bd/lib/licence.php) ──────────────
+// OBLIGATOIRE en production — la valeur par défaut de config.php est
+// volontairement insécure. Générer UNE FOIS pour toute l'installation :
+//   php -r "echo bin2hex(random_bytes(32));"
+// ⚠ Ne JAMAIS la changer ensuite (invaliderait les licences déjà émises).
+// define('LICENCE_SECRET', 'COLLER_ICI_LA_VALEUR_ALEATOIRE_GENEREE');

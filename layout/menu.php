@@ -104,6 +104,12 @@ return [
         ['Configurations',    'pages/parametres/index.php',    'gear',        ['DIRECTEUR','FONDATEUR']],
         ['Utilisateurs',      'pages/utilisateurs/liste.php',  'person-gear', ['DIRECTEUR']],
         ['Journal d\'audit',  'pages/utilisateurs/journal.php','shield-check',['DIRECTEUR','FONDATEUR']],
+        // Licence (bd/lib/licence.php) : ouvert à TOUS ([] = tout rôle voit
+        // l'entrée) — la page elle-même ne montre le statut qu'en lecture
+        // pour la plupart des comptes ; seul le propriétaire (génération de
+        // clé / renouvellement direct) et le Directeur/Fondateur (saisie
+        // d'une clé reçue) y ont des actions.
+        ['Licence',           'pages/parametres/licence.php',  'award',       []],
     ],
     // Configuration : le paramétrage que DIRECTEUR / FONDATEUR peuvent
     // enregistrer (structure de facturation) sans avoir accès au menu

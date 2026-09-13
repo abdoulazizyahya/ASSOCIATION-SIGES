@@ -45,6 +45,20 @@ $lecture_seule = function_exists('est_lecture_seule') && est_lecture_seule();
 $migr_retard = (function_exists('est_proprietaire_association') && est_proprietaire_association()
     && function_exists('assoc_migrations_en_retard')) ? assoc_migrations_en_retard() : [];
 
+// Licence (bd/lib/licence.php, migration v56) — bandeau visible par TOUS
+// les rôles, non masquable (demande explicite du 13/09/2026). Fail-closed
+// déjà géré par licence_etat() elle-même : ici on affiche simplement le
+// résultat, jamais de logique de secours qui masquerait une anomalie.
+$licence_etat_info = function_exists('licence_etat') ? licence_etat() : ['etat' => 'ok', 'jours_restants' => null, 'motif' => null];
+$licence_expiree   = $licence_etat_info['etat'] === 'expiree';
+// Défense en profondeur côté client (désactive, ne masque pas juste, les
+// boutons d'enregistrement) — le blocage réel reste db_exec() (connexion.php).
+// Exemptée : la page de licence elle-même (sinon impossible de la corriger),
+// et le propriétaire (jamais bridé, comme pour $lecture_seule).
+$licence_sur_sa_page = str_ends_with(page_courante_relative(), 'pages/parametres/licence.php');
+$licence_bloque_ecriture = $licence_expiree && !$licence_sur_sa_page
+    && !(function_exists('est_proprietaire_association') && est_proprietaire_association());
+
 // Année RÉELLEMENT active (Etat_annee_scolaire=1), pas juste le repli de
 // get_annee_active() sur l'année la plus récente — demande explicite du
 // 18/08/2026 : tant qu'aucune année n'est explicitement activée, les menus
@@ -134,7 +148,7 @@ function lien_actif(string $url): string {
   ?>
   <link rel="stylesheet" href="<?= APP_URL ?>/assets/css/style.css?v=<?= $style_css_ver ?>">
 </head>
-<body data-annee-active="<?= $annee_reellement_active ? '1' : '0' ?>" class="<?= $lecture_seule ? 'lecture-seule' : '' ?>">
+<body data-annee-active="<?= $annee_reellement_active ? '1' : '0' ?>" class="<?= ($lecture_seule || $licence_bloque_ecriture) ? 'lecture-seule' : '' ?>">
 <div class="abz-shell">
 
   <!-- ═══ SIDEBAR ═══ -->
@@ -331,6 +345,35 @@ function lien_actif(string $url): string {
       </span>
       <a href="<?= APP_URL ?>/association/migrations.php" class="ms-auto btn btn-sm btn-outline-secondary py-0 px-2" style="font-size:.78rem">
         <i class="bi bi-arrow-right-circle me-1"></i>Voir les migrations
+      </a>
+    </div>
+    <?php endif; ?>
+
+    <?php if ($licence_etat_info['etat'] !== 'ok'): ?>
+    <!-- Bandeau licence — visible par TOUS les rôles, non masquable/fermable
+         (pas de bouton de fermeture), demande explicite du 13/09/2026.
+         Rouge = expirée, orange = ≤30 jours restants. Indépendant des
+         bandeaux ci-dessus (peut s'afficher en même temps). -->
+    <div class="d-flex flex-wrap align-items-center gap-2 px-3 py-1"
+         style="<?= $licence_etat_info['etat'] === 'expiree'
+             ? 'background:#f8d7da;border-bottom:1px solid #f1aeb5;color:#58151c'
+             : 'background:#fff3cd;border-bottom:1px solid #ffe69c;color:#664d03' ?>;font-size:.8rem">
+      <span>
+        <i class="bi bi-<?= $licence_etat_info['etat'] === 'expiree' ? 'exclamation-octagon' : 'clock-history' ?> me-1"></i>
+        <?php if ($licence_etat_info['etat'] === 'expiree'): ?>
+          <strong>Licence expirée</strong>
+          <?php if (!empty($licence_etat_info['licence']['date_expiration'])): ?>
+            — depuis le <?= h(date_fr($licence_etat_info['licence']['date_expiration'])) ?>
+          <?php endif; ?>
+          — l'application est en LECTURE SEULE. Contactez le propriétaire de l'association pour renouveler.
+        <?php else: ?>
+          <strong>Licence bientôt expirée</strong>
+          — <?= (int) $licence_etat_info['jours_restants'] ?> jour(s) restant(s)
+          (<?= h(date_fr($licence_etat_info['licence']['date_expiration'] ?? '')) ?>).
+        <?php endif; ?>
+      </span>
+      <a href="<?= APP_URL ?>/pages/parametres/licence.php" class="ms-auto btn btn-sm <?= $licence_etat_info['etat'] === 'expiree' ? 'btn-danger' : 'btn-outline-secondary' ?> py-0 px-2" style="font-size:.78rem">
+        <i class="bi bi-award me-1"></i>Voir la licence
       </a>
     </div>
     <?php endif; ?>

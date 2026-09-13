@@ -1158,6 +1158,51 @@ CREATE TABLE `user_question_secrete` (
   CONSTRAINT `fk_uqs_user` FOREIGN KEY (`id_user`) REFERENCES `user` (`id_user`) ON DELETE CASCADE ON UPDATE CASCADE
 ) ENGINE=InnoDB AUTO_INCREMENT=101 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
+
+-- ── Licence (bd/lib/licence.php, migration v56) — ajoutées le 13/09/2026,
+--    voir bd/migration_v56.sql pour la version idempotente appliquée aux
+--    écoles existantes (mêmes définitions, dupliquées ici pour toute
+--    NOUVELLE école créée directement avec ce schéma de référence).
+CREATE TABLE `licence` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `cle_licence` varchar(255) DEFAULT NULL,
+  `date_debut` date NOT NULL,
+  `date_expiration` date NOT NULL,
+  `statut` enum('active','suspendue','expiree') NOT NULL DEFAULT 'active',
+  `derniere_modification_par` varchar(190) DEFAULT NULL,
+  `date_derniere_modification` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `signature` varchar(64) NOT NULL,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE `licence_historique` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `date_debut_avant` date DEFAULT NULL,
+  `date_fin_avant` date DEFAULT NULL,
+  `date_debut_apres` date NOT NULL,
+  `date_fin_apres` date NOT NULL,
+  `methode` enum('direct','cle') NOT NULL,
+  `modifie_par` varchar(190) DEFAULT NULL,
+  `date_modification` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE `licence_securite` (
+  `id` tinyint NOT NULL,
+  `tentatives_echouees` int NOT NULL DEFAULT 0,
+  `bloque_le` datetime DEFAULT NULL,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+INSERT INTO `licence_securite` (`id`, `tentatives_echouees`, `bloque_le`) VALUES (1, 0, NULL);
+
+CREATE TABLE `licence_cles_utilisees` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `cle_hash` char(64) NOT NULL,
+  `utilisee_le` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `idx_licence_cles_hash` (`cle_hash`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 /*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
 
 /*!40101 SET SQL_MODE=@OLD_SQL_MODE */;

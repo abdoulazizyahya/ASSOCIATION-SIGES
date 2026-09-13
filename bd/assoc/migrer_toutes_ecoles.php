@@ -55,6 +55,25 @@ foreach (assoc_all("SELECT id, code, nom, db_name FROM etablissement WHERE actif
             // erreur eventuelle du dernier statement
             if (mysqli_errno($l)) throw new RuntimeException(mysqli_error($l));
             assoc_exec("UPDATE schema_version_etab SET version=? WHERE id_etablissement=?", [$v, $e['id']]);
+            // Licence (migration v56) : période d'ESSAI de 60 jours pour une
+            // école EXISTANTE qui vient de recevoir les tables de licence —
+            // sans ça elle serait immédiatement bloquée en écriture (aucune
+            // ligne `licence` = 'expiree', fail-closed). Voir aussi le même
+            // bootstrap dans connexion_assoc.php::charger_schema_ecole()
+            // (nouvelles écoles) et assoc_migrer_ecole() (bouton Migrer).
+            if ($v === 56) {
+                require_once __DIR__ . '/../lib/licence.php';
+                $lic_debut = date('Y-m-d');
+                $lic_fin   = date('Y-m-d', strtotime('+60 days'));
+                $lic_sig   = licence_signature($lic_fin, null, 'active');
+                $stl = mysqli_prepare($l,
+                    "INSERT INTO licence (cle_licence, date_debut, date_expiration, statut, derniere_modification_par, date_derniere_modification, signature)
+                     VALUES (NULL, ?, ?, 'active', 'systeme:migration_v56', NOW(), ?)");
+                mysqli_stmt_bind_param($stl, 'sss', $lic_debut, $lic_fin, $lic_sig);
+                mysqli_stmt_execute($stl);
+                mysqli_stmt_close($stl);
+                echo "   licence : essai 60 jours amorce (jusqu'au $lic_fin)\n";
+            }
             echo "   OK v$v\n";
         } catch (\Throwable $ex) {
             echo "   ECHEC v$v : " . $ex->getMessage() . "\n";

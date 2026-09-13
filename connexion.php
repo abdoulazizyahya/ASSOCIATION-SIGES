@@ -26,6 +26,7 @@ try {
 //  reste null et on retombe sur DB_NAME (installation mono-école).
 require_once __DIR__ . '/connexion_assoc.php';   // $link_assoc (ou null) + assoc_*
 require_once __DIR__ . '/ecole_contexte.php';
+require_once __DIR__ . '/bd/lib/licence.php';    // db_exec() ci-dessous applique le fail-closed
 
 /** @var array|null $ETAB_COURANT  Ligne annuaire de l'école active (null = contexte association ou annuaire absent). */
 $ETAB_COURANT = annuaire_dispo() ? resoudre_etablissement() : null;
@@ -163,6 +164,50 @@ function db_exec(string $sql, array $params = []): int {
     if (function_exists('est_lecture_seule') && est_lecture_seule()
         && preg_match('/^\s*(INSERT|UPDATE|DELETE|REPLACE|TRUNCATE|ALTER|DROP|CREATE)\b/i', $sql)) {
         throw new RuntimeException('Contexte en lecture seule — écriture refusée.');
+    }
+    // Licence (bd/lib/licence.php, migration v56) : POINT D'ENTRÉE UNIQUE du
+    // blocage en écriture par licence expirée — demande explicite du
+    // 13/09/2026. Hors annuaire association (base courante = DB_NAME_ASSOC,
+    // qui a son propre cycle de vie indépendant de toute école) et hors les
+    // 4 tables de licence elles-mêmes (sinon impossible de renouveler /
+    // sortir du blocage). Le propriétaire n'est jamais bridé (comme pour
+    // est_lecture_seule() ci-dessus) : c'est l'autorité de la licence, pas
+    // sa cible. licence_etat() est fail-closed : toute anomalie renvoie
+    // 'expiree', jamais 'ok' par défaut.
+    // Scripts de CONTINUITÉ D'ACCÈS AU COMPTE toujours exemptés (bugs réels
+    // trouvés en test le 13/09/2026) : configurer_securite.php (étape
+    // OBLIGATOIRE avant tout accès, exiger_connexion()/fonctions.php — sans
+    // cette exemption, un compte pas encore configuré restait bloqué en
+    // boucle infinie, jamais capable d'enregistrer ses 2 questions
+    // secrètes) et mot_de_passe_oublie.php (un directeur/fondateur qui a
+    // oublié son mot de passe doit pouvoir le réinitialiser pour ensuite
+    // atteindre la page Licence et renouveler — sinon double blocage sans
+    // issue). Ni l'un ni l'autre n'écrit de données métier.
+    //
+    // ⚠ La base COURANTE est relue ICI via SELECT DATABASE() (pas la
+    // variable $bd_active posée une fois à l'inclusion de connexion.php) :
+    // basculer_base_ecole() (ecole_contexte.php, appelée par login.php après
+    // le choix d'établissement) ne met PAS à jour $bd_active en changeant de
+    // base sur $link — un $bd_active resté à DB_NAME_ASSOC aurait fait
+    // sauter le gate en entier pour toute écriture faite juste après un
+    // changement d'école dans la même requête (bug réel trouvé en test :
+    // la connexion elle-même passait alors que la licence était expirée).
+    global $link;
+    $db_courante = null;
+    if (preg_match('/^\s*(INSERT|UPDATE|DELETE|REPLACE|TRUNCATE|ALTER|DROP|CREATE)\b/i', $sql) && $link instanceof mysqli) {
+        $_r = @mysqli_query($link, 'SELECT DATABASE()');
+        $db_courante = $_r ? (mysqli_fetch_row($_r)[0] ?? null) : null;
+    }
+    if ($db_courante !== null
+        && $db_courante !== DB_NAME_ASSOC
+        && function_exists('licence_etat')
+        && !(function_exists('est_proprietaire_association') && est_proprietaire_association())
+        && !in_array(basename($_SERVER['SCRIPT_NAME'] ?? ''), ['configurer_securite.php', 'mot_de_passe_oublie.php'], true)
+        && !preg_match('/\blicence(_historique|_securite|_cles_utilisees)?\b/i', $sql)
+    ) {
+        if (licence_etat()['etat'] === 'expiree') {
+            throw new RuntimeException('Licence expirée — écriture refusée. Contactez le propriétaire pour renouveler.');
+        }
     }
     $stmt = _db_stmt($sql, $params);
     $n    = mysqli_stmt_affected_rows($stmt);

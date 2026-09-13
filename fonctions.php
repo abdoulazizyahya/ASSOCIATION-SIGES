@@ -187,6 +187,15 @@ function exiger_connexion(): void {
         exit;
     }
     $script_courant = basename($_SERVER['SCRIPT_NAME'] ?? '');
+    // Licence (bd/lib/licence.php) : blocage anti-brute-force — coupe une
+    // session DÉJÀ OUVERTE immédiatement (pas seulement à la prochaine
+    // connexion, voir login.php pour ce cas-là), demande explicite du
+    // 13/09/2026. Seule exemption : se déconnecter reste toujours possible.
+    if ($script_courant !== 'logout.php' && function_exists('licence_bloque') && licence_bloque()) {
+        session_destroy();
+        header('Location: ' . APP_URL . '/login.php?bloque=1');
+        exit;
+    }
     $exemptes = ['configurer_securite.php', 'logout.php'];
     if (!in_array($script_courant, $exemptes, true) && !utilisateur_a_questions((int) ($_SESSION['user_id'] ?? 0))) {
         header('Location: ' . APP_URL . '/configurer_securite.php');
@@ -643,6 +652,20 @@ function csrf_verifier(): void {
               . "(l'enregistrement revient à l'agent financier / aux enseignant(e)s).";
         die('<div style="font-family:sans-serif;padding:2rem;color:#b45309">'
           . h($motif) . ' Aucune modification n\'est possible ici.</div>');
+    }
+    // Licence (bd/lib/licence.php) : message CONVIVIAL tôt, avant même
+    // d'atteindre l'action de la page — db_exec() (connexion.php) reste le
+    // filet de sécurité bas niveau (chaque écriture SQL individuellement),
+    // mais SANS ce garde ici, une licence expirée faisait planter la page
+    // avec une trace technique brute (RuntimeException non attrapée) au
+    // lieu d'un message clair (bug réel trouvé en test le 13/09/2026).
+    // Toutes les exemptions (propriétaire, annuaire association, continuité
+    // de compte, page Licence elle-même) sont centralisées dans
+    // licence_ecriture_bloquee() (bd/lib/licence.php).
+    if (function_exists('licence_ecriture_bloquee') && licence_ecriture_bloquee()) {
+        die('<div style="font-family:sans-serif;padding:2rem;color:#8a1c1c">'
+          . 'Licence expirée — l\'application est en lecture seule. Contactez le propriétaire de l\'association pour renouveler '
+          . '(menu Paramètres &gt; Licence).</div>');
     }
     $token = $_POST['csrf'] ?? $_GET['csrf'] ?? '';
     if (!hash_equals($_SESSION['csrf'] ?? '', $token)) {

@@ -39,6 +39,20 @@ defined('ECOLE_POOL_ACTIF') || define('ECOLE_POOL_ACTIF', false);
 
 defined('APP_NOM') || define('APP_NOM', 'SIGES · Gestion scolaire');
 
+// ── Licence (bd/lib/licence.php, migration v56) ──────────────────────
+// Secret utilisé À LA FOIS pour la signature anti-tamper de la ligne
+// `licence` (par école) ET le chiffrement AES-256-GCM des clés générées.
+// Valeur par défaut ci-dessous VOLONTAIREMENT insécure (pour que l'appli
+// fonctionne « out of the box » en LAN) — À SURCHARGER dans
+// config.local.php pour toute installation réelle (voir
+// config.local.php.example) avec une vraie valeur aléatoire, générée une
+// fois pour toutes via :
+//   php -r "echo bin2hex(random_bytes(32));"
+// ⚠ Ne JAMAIS changer cette valeur après la première licence générée sur
+// une installation : les signatures et clés déjà émises deviendraient
+// invalides (comme BULLETIN_VERIF_PRIVATE_KEY_PEM ci-dessus).
+defined('LICENCE_SECRET') || define('LICENCE_SECRET', 'CHANGEZ-MOI-secret-non-securise-par-defaut');
+
 // ── Journal d'audit (bd/lib/audit.php) ──────────────────────────────
 // AUDIT_GEOIP : localisation approximative des connexions à partir de
 //   l'IP, via le service gratuit ip-api.com (l'IP du visiteur est donc

@@ -188,6 +188,23 @@ function charger_schema_ecole(mysqli $l, array $seed): int {
     // bd/assoc/seed_ref_ecole.sql. Absence tolérée (rétro-compat).
     charger_seed_ref_ecole($l);
 
+    // Licence (bd/lib/licence.php, migration v56) : période d'ESSAI de 60
+    // jours par défaut — sans ça, une école toute neuve serait IMMÉDIATEMENT
+    // bloquée en écriture (licence_etat() fail-closed : aucune ligne =
+    // 'expiree'), avant même que le propriétaire ait pu générer une clé.
+    // Le propriétaire renouvelle/génère une clé ensuite normalement.
+    if (function_exists('licence_signature')) {
+        $lic_debut = date('Y-m-d');
+        $lic_fin   = date('Y-m-d', strtotime('+60 days'));
+        $lic_sig   = licence_signature($lic_fin, null, 'active');
+        $stl = mysqli_prepare($l,
+            "INSERT INTO licence (cle_licence, date_debut, date_expiration, statut, derniere_modification_par, date_derniere_modification, signature)
+             VALUES (NULL, ?, ?, 'active', 'systeme:creation_ecole', NOW(), ?)");
+        mysqli_stmt_bind_param($stl, 'sss', $lic_debut, $lic_fin, $lic_sig);
+        mysqli_stmt_execute($stl);
+        mysqli_stmt_close($stl);
+    }
+
     $st = mysqli_prepare($l,
         "INSERT INTO etablissement (IDEtablissement, Nom_Etab_Fr, Nom_Etab_An, Initial_Etab, ville_etab)
          VALUES (1, ?, ?, ?, ?)
@@ -1385,6 +1402,19 @@ function assoc_migrer_ecole(int $id, bool $backup = true): array {
                  ON DUPLICATE KEY UPDATE version=GREATEST(version, VALUES(version))",
                 [$id, $v]
             );
+            // Licence (migration v56) : même bootstrap d'essai 60 jours que
+            // bd/assoc/migrer_toutes_ecoles.php — voir ce fichier pour le détail.
+            if ($v === 56 && function_exists('licence_signature')) {
+                $lic_debut = date('Y-m-d');
+                $lic_fin   = date('Y-m-d', strtotime('+60 days'));
+                $lic_sig   = licence_signature($lic_fin, null, 'active');
+                $stl = mysqli_prepare($l,
+                    "INSERT INTO licence (cle_licence, date_debut, date_expiration, statut, derniere_modification_par, date_derniere_modification, signature)
+                     VALUES (NULL, ?, ?, 'active', 'systeme:migration_v56', NOW(), ?)");
+                mysqli_stmt_bind_param($stl, 'sss', $lic_debut, $lic_fin, $lic_sig);
+                mysqli_stmt_execute($stl);
+                mysqli_stmt_close($stl);
+            }
             $ok[] = $v;
         } catch (\Throwable $ex) {
             $echec = "v$v : " . $ex->getMessage();

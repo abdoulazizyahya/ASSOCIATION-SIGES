@@ -9,7 +9,12 @@ if (est_connecte()) {
     header('Location: ' . APP_URL . '/dashboard.php'); exit;
 }
 
-$erreur = '';
+// ?bloque=1 : session coupée immédiatement par exiger_connexion() suite à
+// un blocage licence déclenché PENDANT qu'un compte était déjà connecté
+// (fonctions.php) — même message que le refus de connexion ci-dessous.
+$erreur = (($_GET['bloque'] ?? '') === '1')
+    ? "Accès bloqué : trop de tentatives de clé de licence invalides. Contactez le propriétaire de l'association."
+    : '';
 
 // Multi-établissement : liste des écoles à proposer si l'annuaire est
 // présent ET qu'il y en a plus d'une. Sinon, comportement mono-école
@@ -54,9 +59,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         );
         $id_etab_ctx = $ec['id'] ?? (function_exists('ecole_courante') ? (ecole_courante()['id'] ?? null) : null);
         require_once __DIR__ . '/bd/lib/audit.php';
-        if ($u && password_verify($mdp, $u['pwd_user']) && (!$a_statut || (int) $u['actif'] === 1)) {
+        // Licence (bd/lib/licence.php) : blocage anti-brute-force sur la
+        // saisie de clé — refuse la connexion MÊME avec le bon mot de passe,
+        // demande explicite du 13/09/2026. Le propriétaire n'a pas de compte
+        // local (jamais concerné — il passe par /association/login.php).
+        if (function_exists('licence_bloque') && licence_bloque()) {
+            audit_log('connexion_echec', ['login' => $login, 'id_etab' => $id_etab_ctx, 'cible' => 'licence bloquée']);
+            $erreur = "Accès bloqué : trop de tentatives de clé de licence invalides. Contactez le propriétaire de l'association.";
+        } elseif ($u && password_verify($mdp, $u['pwd_user']) && (!$a_statut || (int) $u['actif'] === 1)) {
             if (db_colonne_existe('user', 'derniere_connexion')) {
-                db_exec("UPDATE user SET derniere_connexion = NOW() WHERE id_user = ?", [$u['id_user']]);
+                // Écriture best-effort : bug réel trouvé en test le
+                // 13/09/2026 — sans ce try/catch, une licence expirée
+                // (bd/lib/licence.php) bloquait CETTE écriture non
+                // essentielle et empêchait TOUTE connexion (y compris pour
+                // atteindre la page Licence et corriger la situation).
+                try { db_exec("UPDATE user SET derniere_connexion = NOW() WHERE id_user = ?", [$u['id_user']]); }
+                catch (\Throwable $e) { /* jamais bloquant — simple horodatage */ }
             }
             $_SESSION['user_id'] = $u['id_user'];
             $_SESSION['user']    = [
