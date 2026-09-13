@@ -1191,9 +1191,10 @@ CREATE TABLE `licence_securite` (
   `id` tinyint NOT NULL,
   `tentatives_echouees` int NOT NULL DEFAULT 0,
   `bloque_le` datetime DEFAULT NULL,
+  `dernier_maintenant_vu` datetime DEFAULT NULL,
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-INSERT INTO `licence_securite` (`id`, `tentatives_echouees`, `bloque_le`) VALUES (1, 0, NULL);
+INSERT INTO `licence_securite` (`id`, `tentatives_echouees`, `bloque_le`, `dernier_maintenant_vu`) VALUES (1, 0, NULL, NULL);
 
 CREATE TABLE `licence_cles_utilisees` (
   `id` int NOT NULL AUTO_INCREMENT,

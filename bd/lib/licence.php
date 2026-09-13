@@ -163,11 +163,67 @@ function licence_etat_calculer(): array {
     if ($lic['statut'] !== 'active') {
         return ['etat' => 'expiree', 'jours_restants' => 0, 'motif' => 'statut_' . $lic['statut'], 'licence' => $lic];
     }
+    // Anti-recul d'horloge (migration v57, demande explicite du 13/09/2026,
+    // suite à un test de contournement) : la signature HMAC protège
+    // date_expiration contre une modification EN BASE, mais rien ne protège
+    // par nature contre une horloge SYSTÈME reculée avant date_expiration —
+    // reculer l'heure ferait réapparaître une licence expirée comme valide,
+    // sans laisser de trace. licence_horloge_reculee() détecte l'anomalie
+    // via un watermark qui ne progresse jamais en arrière.
+    if (licence_horloge_reculee()) {
+        return ['etat' => 'expiree', 'jours_restants' => 0, 'motif' => 'horloge_reculee', 'licence' => $lic];
+    }
     $jours = (int) (new DateTimeImmutable('today'))->diff(new DateTimeImmutable($lic['date_expiration']))->format('%r%a');
     if ($jours < 0) {
         return ['etat' => 'expiree', 'jours_restants' => 0, 'motif' => 'date_depassee', 'licence' => $lic];
     }
     return ['etat' => $jours <= 30 ? 'alerte' : 'ok', 'jours_restants' => $jours, 'motif' => null, 'licence' => $lic];
+}
+
+// Tolérance (heures) avant de traiter un recul d'horloge comme une anomalie
+// — absorbe une resynchronisation NTP légitime ou un changement de fuseau,
+// sans laisser passer un recul délibéré de plusieurs jours/semaines/mois
+// (le cas réellement visé : contourner une expiration).
+const LICENCE_TOLERANCE_HORLOGE_HEURES = 6;
+
+// Compare l'horloge système courante au dernier « maintenant » observé
+// (licence_securite.dernier_maintenant_vu, colonne ajoutée en v57) — ce
+// watermark ne progresse QUE vers l'avant. Renvoie true si l'horloge
+// actuelle est nettement ANTÉRIEURE au watermark (recul détecté), et fait
+// progresser le watermark sinon (throttlé : seulement si ≥1h d'écart, pour
+// limiter les écritures à chaque vérification de licence). Fail-OPEN si la
+// colonne n'existe pas encore (install pas migrée en v57) — cette
+// protection est additive, jamais LE mécanisme fail-closed central.
+//
+// ⚠ L'écart est calculé ENTIÈREMENT CÔTÉ SQL (TIMESTAMPDIFF, MySQL NOW())
+// plutôt qu'en comparant un DateTimeImmutable PHP à une valeur écrite par
+// NOW() : un décalage de fuseau horaire entre PHP (date.timezone) et MySQL
+// (time_zone de session) — réel, constaté en test sur cette machine, ~1h
+// d'écart — fausserait sinon SYSTÉMATIQUEMENT la comparaison à chaque
+// appel, quelle que soit la tolérance. En ne faisant jamais interagir
+// l'horloge de PHP avec une valeur MySQL, la comparaison reste cohérente
+// avec elle-même quel que soit le fuseau configuré de chaque côté.
+function licence_horloge_reculee(): bool {
+    try {
+        $row = db_one("SELECT TIMESTAMPDIFF(SECOND, NOW(), dernier_maintenant_vu) AS ecart_s, dernier_maintenant_vu FROM licence_securite WHERE id=1");
+    } catch (\Throwable $e) {
+        return false;
+    }
+    if ($row === null || $row['dernier_maintenant_vu'] === null) {
+        try { db_exec("UPDATE licence_securite SET dernier_maintenant_vu=NOW() WHERE id=1"); } catch (\Throwable $e) {}
+        return false;
+    }
+    // Positif si le watermark est POSTÉRIEUR à maintenant (donc un "maintenant"
+    // plus tardif a déjà été vu — l'horloge courante semble avoir reculé).
+    $ecart_h = ((int) $row['ecart_s']) / 3600;
+    if ($ecart_h > LICENCE_TOLERANCE_HORLOGE_HEURES) {
+        return true;
+    }
+    if ($ecart_h < -1) {
+        try { db_exec("UPDATE licence_securite SET dernier_maintenant_vu=NOW() WHERE id=1 AND (dernier_maintenant_vu IS NULL OR dernier_maintenant_vu < NOW())"); }
+        catch (\Throwable $e) {}
+    }
+    return false;
 }
 
 // Vrai si l'écriture COURANTE doit être refusée pour cause de licence
