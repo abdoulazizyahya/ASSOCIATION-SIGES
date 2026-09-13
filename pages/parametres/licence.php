@@ -249,13 +249,26 @@ require_once __DIR__ . '/../../layout/header.php';
     <table class="table table-abz table-hover align-middle mb-0" style="font-size:.8rem">
       <thead><tr><th>Date</th><th>Méthode</th><th>Début (avant → après)</th><th>Fin (avant → après)</th><th>Auteur</th></tr></thead>
       <tbody>
-        <?php foreach ($historique as $h_row): ?>
+        <?php foreach ($historique as $h_row):
+          // Identité du propriétaire JAMAIS affichée (demande explicite du
+          // 14/09/2026, même principe que association/membres/index.php qui
+          // masque déjà sa ligne aux autres superadmins) — $auteur (plus
+          // haut dans ce fichier) stocke « propriétaire:<login> » en base
+          // pour l'audit interne, mais l'UI ne montre jamais que le rôle
+          // générique « Propriétaire », à AUCUN spectateur (y compris le
+          // propriétaire lui-même consultant sa propre trace : son login
+          // n'apporte rien de plus ici que le rôle).
+          $auteur_aff = $h_row['modifie_par'] ?? null;
+          if ($auteur_aff !== null && str_starts_with($auteur_aff, 'propriétaire:')) {
+              $auteur_aff = 'Propriétaire';
+          }
+        ?>
         <tr>
           <td><?= h(date('d/m/Y H:i', strtotime($h_row['date_modification']))) ?></td>
           <td><?= $h_row['methode'] === 'direct' ? '<span class="badge bg-secondary">Direct</span>' : '<span class="badge bg-info text-dark">Clé</span>' ?></td>
           <td><?= h(date_fr($h_row['date_debut_avant'])) ?> → <?= h(date_fr($h_row['date_debut_apres'])) ?></td>
           <td><?= h(date_fr($h_row['date_fin_avant'])) ?> → <?= h(date_fr($h_row['date_fin_apres'])) ?></td>
-          <td><?= h($h_row['modifie_par'] ?? '—') ?></td>
+          <td><?= h($auteur_aff ?? '—') ?></td>
         </tr>
         <?php endforeach; ?>
       </tbody>
