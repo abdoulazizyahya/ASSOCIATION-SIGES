@@ -1286,6 +1286,26 @@ function libelle_role(string $role): string {
     };
 }
 
+// ── Fonctions assignables à un membre du personnel (pages/enseignants/
+//    form.php + save.php — même liste des deux côtés) ─────────────────
+// FONDATEUR est TOUJOURS exclu pour un Directeur (attribué uniquement par
+// le superadmin association, association/personnel/affecter.php — même
+// principe que pages/utilisateurs/liste.php::changer_role) — sauf pour le
+// superadmin association LUI-MÊME (visite écriture d'une école), qui doit
+// pouvoir l'attribuer directement depuis cet écran. SUPERADMIN/PROPRIETAIRE
+// filtrés par précaution : ce sont des concepts association, jamais des
+// lignes de la table `fonction` d'une école, mais si l'un y apparaissait un
+// jour par erreur, il ne doit jamais être assignable ici. Demande explicite
+// du 15/09/2026.
+function fonctions_assignables(): array {
+    $superadmin = function_exists('est_superadmin_association') && est_superadmin_association();
+    $exclues    = $superadmin ? ['SUPERADMIN', 'PROPRIETAIRE'] : ['SUPERADMIN', 'PROPRIETAIRE', 'FONDATEUR'];
+    return array_values(array_diff(
+        array_column(db_all("SELECT id_fonction FROM fonction ORDER BY id_fonction"), 'id_fonction'),
+        $exclues
+    ));
+}
+
 // ── Finances : numéro de reçu ───────────────────────────────
 // Dérivé de id_pay (paiement_frais) — ou de id_versement quand plusieurs
 // lignes appartiennent au même versement (cotisation répartie sur

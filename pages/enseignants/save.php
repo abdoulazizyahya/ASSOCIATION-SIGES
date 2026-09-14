@@ -51,7 +51,12 @@ if ($nom === '') {
     flash_set('erreur', 'Le nom est obligatoire.');
     rediriger('pages/enseignants/form.php' . ($mat_existant ? '?mat=' . $mat_existant : ''));
 }
-if (!in_array($fonction, ['DIRECTEUR', 'ENSEIGNANT', 'SECRETAIRE'], true)) {
+// Liste AUTORITAIRE côté serveur — même fonctions.php::fonctions_assignables()
+// que le <select> de form.php (COMPTABLE était oublié ici avant le
+// 15/09/2026 alors que déjà proposé dans le menu déroulant ; FONDATEUR
+// jamais assignable par un Directeur, seulement par le superadmin
+// association en visite écriture — voir le commentaire de la fonction).
+if (!in_array($fonction, fonctions_assignables(), true)) {
     flash_set('erreur', 'Fonction invalide.');
     rediriger('pages/enseignants/form.php' . ($mat_existant ? '?mat=' . $mat_existant : ''));
 }

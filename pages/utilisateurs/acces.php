@@ -24,7 +24,7 @@ $u  = $id ? db_one(
      FROM user u JOIN enseignant e ON e.matricule_ens = u.matricule_ens
      WHERE u.id_user = ?", [$id]
 ) : null;
-if (!$u) { flash_set('erreur', 'Compte introuvable.'); rediriger('pages/utilisateurs/liste.php'); }
+if (!$u) { flash_set('erreur', 'Compte introuvable.'); rediriger('pages/utilisateurs/liste.php?onglet=privileges'); }
 
 // Anti-verrouillage : on ne restreint pas son propre compte, ni ces entrées.
 $est_moi        = $id === (int) ($_SESSION['user_id'] ?? 0);
@@ -87,7 +87,7 @@ $gs = $groupe_style ?? [];
       · identifiant <strong><?= h($u['login_user']) ?></strong>
     </div>
   </div>
-  <a href="<?= APP_URL ?>/pages/utilisateurs/liste.php" class="btn btn-outline-secondary btn-sm">
+  <a href="<?= APP_URL ?>/pages/utilisateurs/liste.php?onglet=privileges" class="btn btn-outline-secondary btn-sm">
     <i class="bi bi-arrow-left me-1"></i>Retour
   </a>
 </div>
@@ -159,7 +159,7 @@ $gs = $groupe_style ?? [];
 
   <div class="mt-3 d-flex gap-2">
     <button class="btn btn-primary btn-sm" <?= $est_moi ? 'disabled' : '' ?>><i class="bi bi-check-lg me-1"></i>Enregistrer les privilèges</button>
-    <a href="<?= APP_URL ?>/pages/utilisateurs/liste.php" class="btn btn-outline-secondary btn-sm">Annuler</a>
+    <a href="<?= APP_URL ?>/pages/utilisateurs/liste.php?onglet=privileges" class="btn btn-outline-secondary btn-sm">Annuler</a>
   </div>
 </form>
 

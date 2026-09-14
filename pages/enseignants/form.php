@@ -183,9 +183,9 @@ if (!$es_partiel) {
             <div class="col-md-4">
               <label class="form-label">Fonction</label>
               <select name="fonction" class="form-select">
-                <?php foreach (db_all("SELECT id_fonction FROM fonction ORDER BY id_fonction") as $f): ?>
-                  <option value="<?= h($f['id_fonction']) ?>" <?= $ve('id_fonction') === $f['id_fonction'] ? 'selected' : '' ?>>
-                    <?= h(libelle_role($f['id_fonction'])) ?>
+                <?php foreach (fonctions_assignables() as $fc): ?>
+                  <option value="<?= h($fc) ?>" <?= $ve('id_fonction') === $fc ? 'selected' : '' ?>>
+                    <?= h(libelle_role($fc)) ?>
                   </option>
                 <?php endforeach; ?>
               </select>
