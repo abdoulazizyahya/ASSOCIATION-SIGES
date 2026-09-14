@@ -92,18 +92,31 @@ function audit_vue_evenement_badge(array $l): string
     return $out;
 }
 
-/** Icône + navigateur / OS — nom donné par le compte (appareil_connu) si disponible. */
+/**
+ * Icône + libellé principal, par ordre de préférence :
+ *   1) nom donné par le compte lui-même (appareil_connu.nom, « Mon compte »)
+ *   2) modèle commercial transmis par le navigateur (Android seulement,
+ *      ex. « TECNO L34 » — iPhone/iPad/ordinateur ne le transmettent jamais)
+ *   3) type générique (Ordinateur / Tablette / Téléphone)
+ * Navigateur/OS redescendent toujours en détail secondaire.
+ */
 function audit_vue_appareil(array $l): string
 {
-    $t    = $l['ua_appareil'] ?? '';
-    $ico  = ['ordinateur' => 'bi-laptop', 'tablette' => 'bi-tablet', 'mobile' => 'bi-phone', 'bot' => 'bi-robot'][$t] ?? 'bi-question-circle';
-    $type = ['ordinateur' => 'Ordinateur', 'tablette' => 'Tablette', 'mobile' => 'Téléphone', 'bot' => 'Robot / outil'][$t] ?? '—';
-    $nom  = trim((string) ($l['appareil_nom'] ?? ''));
-    // Nommé par le compte : le nom devient le libellé principal, le type
-    // générique (Ordinateur/Téléphone) redescend dans le détail secondaire.
-    $lib      = $nom !== '' ? $nom : $type;
-    $detail   = trim(implode(' · ', array_filter($nom !== '' ? [$type, $l['ua_navigateur'] ?? null, $l['ua_os'] ?? null]
-                                                              : [$l['ua_navigateur'] ?? null, $l['ua_os'] ?? null])));
+    $t      = $l['ua_appareil'] ?? '';
+    $ico    = ['ordinateur' => 'bi-laptop', 'tablette' => 'bi-tablet', 'mobile' => 'bi-phone', 'bot' => 'bi-robot'][$t] ?? 'bi-question-circle';
+    $type   = ['ordinateur' => 'Ordinateur', 'tablette' => 'Tablette', 'mobile' => 'Téléphone', 'bot' => 'Robot / outil'][$t] ?? '—';
+    $nom    = trim((string) ($l['appareil_nom'] ?? ''));
+    $modele = trim((string) ($l['ua_modele'] ?? ''));
+
+    $lib = $nom !== '' ? $nom : ($modele !== '' ? $modele : $type);
+    // Détail secondaire : tout ce qui n'est pas déjà le libellé principal.
+    $reste = array_filter([
+        $nom !== '' && $modele !== '' ? $modele : ($nom !== '' ? $type : null),
+        $l['ua_navigateur'] ?? null,
+        $l['ua_os'] ?? null,
+    ]);
+    $detail = trim(implode(' · ', $reste));
+
     $out = '<span class="text-nowrap"><i class="bi ' . $ico . ' me-1"></i>' . h($lib) . '</span>';
     if ($detail !== '') {
         $out .= '<span class="text-muted2 d-block" style="font-size:.72rem" title="' . h((string) ($l['ua_brut'] ?? '')) . '">' . h($detail) . '</span>';

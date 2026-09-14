@@ -23,13 +23,13 @@ function audit_ua(): array
     $ua   = (string) ($_SERVER['HTTP_USER_AGENT'] ?? '');
     $brut = mb_substr($ua, 0, 400) ?: null;
     if ($ua === '') {
-        return ['navigateur' => null, 'os' => null, 'appareil' => null, 'brut' => null];
+        return ['navigateur' => null, 'os' => null, 'appareil' => null, 'modele' => null, 'brut' => null];
     }
 
     // Robots / outils
     if (preg_match('~bot\b|crawler|spider|crawl|facebookexternalhit|bingpreview|slurp|'
         . 'curl/|wget/|python-requests|go-http-client|headless|monitoring|uptime~i', $ua)) {
-        return ['navigateur' => 'Robot / outil', 'os' => null, 'appareil' => 'bot', 'brut' => $brut];
+        return ['navigateur' => 'Robot / outil', 'os' => null, 'appareil' => 'bot', 'modele' => null, 'brut' => $brut];
     }
 
     // ── OS ──
@@ -70,7 +70,24 @@ function audit_ua(): array
         $appareil = 'ordinateur';
     }
 
-    return ['navigateur' => $nav, 'os' => $os, 'appareil' => $appareil, 'brut' => $brut];
+    // ── Modèle commercial (marque + référence) ──
+    // Seul Android le transmet dans le User-Agent (ex. "TECNO L34", "SM-
+    // G991B", "moto g(20)") — c'est ce qu'affiche demain audit_vue_appareil()
+    // au lieu du type générique « Téléphone ». iPhone/iPad NE transmettent
+    // JAMAIS le modèle exact (choix délibéré d'Apple, toujours juste
+    // « iPhone »/« iPad ») et un ordinateur (Windows/macOS/Linux) ne
+    // transmet ni marque ni modèle — aucune techno web n'y a accès dans ces
+    // cas, $modele reste donc null (audit_vue_appareil() retombe alors sur
+    // le type générique + OS/navigateur, seule info disponible).
+    $modele = null;
+    if (preg_match('~Android\s+[\d.]+;\s*(.+)\)\s*(?:AppleWebKit|Gecko|Version)~i', $ua, $m)) {
+        $bloc = trim(preg_split('~\s+Build/|;~i', $m[1])[0]);
+        if ($bloc !== '' && mb_strlen($bloc) >= 2 && !preg_match('~^(wv|k)$~i', $bloc)) {
+            $modele = mb_substr($bloc, 0, 40);
+        }
+    }
+
+    return ['navigateur' => $nav, 'os' => $os, 'appareil' => $appareil, 'modele' => $modele, 'brut' => $brut];
 }
 
 // ─────────────────────────────────────────────────────────────────────
@@ -244,16 +261,16 @@ function audit_log(string $evenement, array $ctx = []): void
         assoc_exec(
             "INSERT INTO journal_audit
                (evenement, action, cible, acteur_type, acteur_id, acteur_login, acteur_nom, role,
-                id_etablissement, ip, ua_navigateur, ua_os, ua_appareil, ua_brut,
+                id_etablissement, ip, ua_navigateur, ua_os, ua_appareil, ua_modele, ua_brut,
                 geo_pays, geo_region, geo_ville, geo_operateur, device_id)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             [
                 $evenement,
                 $ctx['action'] ?? null,
                 $ctx['cible'] ?? null,
                 $type, $aid, $login, $nom, $role,
                 $id_etab, $ip,
-                $ua['navigateur'], $ua['os'], $ua['appareil'], $ua['brut'],
+                $ua['navigateur'], $ua['os'], $ua['appareil'], $ua['modele'], $ua['brut'],
                 $geo['pays'], $geo['region'], $geo['ville'], $geo['operateur'],
                 $device,
             ]
@@ -270,12 +287,12 @@ function audit_log(string $evenement, array $ctx = []): void
         try {
             assoc_exec(
                 "INSERT INTO appareil_connu
-                   (device_id, acteur_type, acteur_id, ua_appareil, ua_navigateur, ua_os, premiere_connexion, derniere_connexion)
-                 VALUES (?, ?, ?, ?, ?, ?, NOW(), NOW())
+                   (device_id, acteur_type, acteur_id, ua_appareil, ua_modele, ua_navigateur, ua_os, premiere_connexion, derniere_connexion)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
                  ON DUPLICATE KEY UPDATE
-                   ua_appareil = VALUES(ua_appareil), ua_navigateur = VALUES(ua_navigateur),
-                   ua_os = VALUES(ua_os), derniere_connexion = NOW()",
-                [$device, $type, $aid, $ua['appareil'], $ua['navigateur'], $ua['os']]
+                   ua_appareil = VALUES(ua_appareil), ua_modele = VALUES(ua_modele),
+                   ua_navigateur = VALUES(ua_navigateur), ua_os = VALUES(ua_os), derniere_connexion = NOW()",
+                [$device, $type, $aid, $ua['appareil'], $ua['modele'], $ua['navigateur'], $ua['os']]
             );
         } catch (\Throwable $e) {
         }

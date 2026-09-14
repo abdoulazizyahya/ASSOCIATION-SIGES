@@ -206,6 +206,7 @@ CREATE TABLE IF NOT EXISTS `journal_audit` (
   `ua_navigateur`    varchar(60)  DEFAULT NULL,
   `ua_os`            varchar(60)  DEFAULT NULL,
   `ua_appareil`      varchar(12)  DEFAULT NULL,            -- ordinateur | tablette | mobile | bot
+  `ua_modele`        varchar(40)  DEFAULT NULL,            -- marque+référence (Android seulement, ex. "TECNO L34")
   `ua_brut`          varchar(400) DEFAULT NULL,
   `geo_pays`         varchar(60)  DEFAULT NULL,
   `geo_region`       varchar(80)  DEFAULT NULL,
@@ -235,6 +236,7 @@ CREATE TABLE IF NOT EXISTS `appareil_connu` (
   `acteur_id`          int          NOT NULL,
   `nom`                varchar(60)  DEFAULT NULL,          -- NULL tant que le compte ne l'a pas nommé
   `ua_appareil`        varchar(12)  DEFAULT NULL,           -- dernier type vu (ordinateur|tablette|mobile|bot)
+  `ua_modele`          varchar(40)  DEFAULT NULL,           -- dernier modèle vu (Android seulement, ex. "TECNO L34")
   `ua_navigateur`      varchar(60)  DEFAULT NULL,
   `ua_os`              varchar(60)  DEFAULT NULL,
   `premiere_connexion` datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP,

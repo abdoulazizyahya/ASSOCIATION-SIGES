@@ -205,6 +205,13 @@ if (!col_existe('journal_audit', 'device_id')) {
     mysqli_query($link_assoc, "ALTER TABLE `journal_audit` ADD KEY `k_appareil` (`device_id`,`acteur_type`,`acteur_id`)");
     $fait[] = "journal_audit.device_id ajoutée";
 }
+// ── Modèle d'appareil (marque + référence, Android seulement — ex. « TECNO
+//    L34 ») : extrait du User-Agent, affiché à la place du type générique
+//    « Téléphone » quand le compte n'a pas encore nommé son appareil.
+if (!col_existe('journal_audit', 'ua_modele')) {
+    mysqli_query($link_assoc, "ALTER TABLE `journal_audit` ADD COLUMN `ua_modele` varchar(40) DEFAULT NULL AFTER `ua_appareil`");
+    $fait[] = "journal_audit.ua_modele ajoutée";
+}
 if (!table_existe('appareil_connu')) {
     mysqli_query($link_assoc,
         "CREATE TABLE `appareil_connu` (
@@ -214,6 +221,7 @@ if (!table_existe('appareil_connu')) {
            `acteur_id`          int          NOT NULL,
            `nom`                varchar(60)  DEFAULT NULL,
            `ua_appareil`        varchar(12)  DEFAULT NULL,
+           `ua_modele`          varchar(40)  DEFAULT NULL,
            `ua_navigateur`      varchar(60)  DEFAULT NULL,
            `ua_os`              varchar(60)  DEFAULT NULL,
            `premiere_connexion` datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -223,6 +231,10 @@ if (!table_existe('appareil_connu')) {
            KEY `k_acteur` (`acteur_type`,`acteur_id`)
          ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
     $fait[] = "table appareil_connu créée";
+}
+if (table_existe('appareil_connu') && !col_existe('appareil_connu', 'ua_modele')) {
+    mysqli_query($link_assoc, "ALTER TABLE `appareil_connu` ADD COLUMN `ua_modele` varchar(40) DEFAULT NULL AFTER `ua_appareil`");
+    $fait[] = "appareil_connu.ua_modele ajoutée";
 }
 
 // ── Module « Privilèges » : règles d'accès par école ─────────────────

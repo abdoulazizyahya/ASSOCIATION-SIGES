@@ -190,9 +190,14 @@ $rc = $role_colors[$compte['id_fonction'] ?? ''] ?? ['bg' => '#f3f4f6', 'txt' =>
         <?php if (!$mes_appareils): ?>
           <div class="text-muted" style="font-size:.78rem">Aucun appareil reconnu pour l'instant.</div>
         <?php else: foreach ($mes_appareils as $ap):
-          $ico = ['ordinateur' => 'bi-laptop', 'tablette' => 'bi-tablet', 'mobile' => 'bi-phone'][$ap['ua_appareil'] ?? ''] ?? 'bi-question-circle';
-          $type = ['ordinateur' => 'Ordinateur', 'tablette' => 'Tablette', 'mobile' => 'Téléphone'][$ap['ua_appareil'] ?? ''] ?? '—';
-          $detail = trim(implode(' · ', array_filter([$ap['ua_navigateur'] ?? null, $ap['ua_os'] ?? null])));
+          $ico    = ['ordinateur' => 'bi-laptop', 'tablette' => 'bi-tablet', 'mobile' => 'bi-phone'][$ap['ua_appareil'] ?? ''] ?? 'bi-question-circle';
+          $type   = ['ordinateur' => 'Ordinateur', 'tablette' => 'Tablette', 'mobile' => 'Téléphone'][$ap['ua_appareil'] ?? ''] ?? '—';
+          $modele = trim((string) ($ap['ua_modele'] ?? ''));
+          // Placeholder : le modèle détecté (ex. « TECNO L34 ») quand il
+          // existe — sinon le type générique. Toujours suggéré, jamais
+          // enregistré tant que le compte ne valide pas lui-même.
+          $suggestion = $modele !== '' ? $modele : $type;
+          $detail = trim(implode(' · ', array_filter([$modele !== '' ? $type : null, $ap['ua_navigateur'] ?? null, $ap['ua_os'] ?? null])));
           $ici = $ap['device_id'] === $mon_appareil_actu;
         ?>
         <form method="post" class="d-flex align-items-center gap-2 py-2 border-bottom flex-wrap">
@@ -201,10 +206,10 @@ $rc = $role_colors[$compte['id_fonction'] ?? ''] ?? ['bg' => '#f3f4f6', 'txt' =>
           <input type="hidden" name="id_appareil" value="<?= (int) $ap['id'] ?>">
           <i class="bi <?= $ico ?>" style="font-size:1.1rem;color:#9ca3af"></i>
           <div style="min-width:160px">
-            <input type="text" name="nom_appareil" class="form-control form-control-sm" placeholder="<?= h($type) ?>"
+            <input type="text" name="nom_appareil" class="form-control form-control-sm" placeholder="<?= h($suggestion) ?>"
                    value="<?= h($ap['nom'] ?? '') ?>" maxlength="60">
           </div>
-          <span class="text-muted" style="font-size:.72rem"><?= h($type) ?><?= $detail !== '' ? ' · ' . h($detail) : '' ?></span>
+          <span class="text-muted" style="font-size:.72rem"><?= h($detail !== '' ? $detail : $type) ?></span>
           <?php if ($ici): ?><span class="badge bg-success" style="font-size:.65rem">Cet appareil</span><?php endif; ?>
           <span class="text-muted ms-auto" style="font-size:.7rem">
             Vu le <?= h(date('d/m/Y', strtotime((string) $ap['derniere_connexion']))) ?>
