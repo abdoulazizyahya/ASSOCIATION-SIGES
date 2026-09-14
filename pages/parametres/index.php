@@ -32,6 +32,16 @@ require_once __DIR__ . '/../../connexion.php';
 require_once __DIR__ . '/../../fonctions.php';
 exiger_role(['DIRECTEUR']);
 
+// Années scolaires : création/activation/désactivation/suppression réservées
+// au PROPRIÉTAIRE de tout le système (est_proprietaire_association(), même
+// principe que la licence — voir bd/lib/licence.php) — demande explicite du
+// 15/09/2026. Aucun compte local (Directeur, Fondateur, Secrétaire...) ne
+// peut plus y toucher, y compris le Directeur pourtant seul habilité sur le
+// reste de cette page : la rentrée scolaire (bascule d'année, passage en
+// classe supérieure) n'est déclenchée que par une visite association du
+// propriétaire (entrer_ecole.php?mode=ecriture).
+$est_proprietaire = function_exists('est_proprietaire_association') && est_proprietaire_association();
+
 $onglet = $_GET['onglet'] ?? 'etablissement';
 if (!in_array($onglet, ['etablissement', 'annees', 'evaluations', 'apparence', 'couleurs'], true)) $onglet = 'etablissement';
 
@@ -110,7 +120,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         rediriger('pages/parametres/index.php?onglet=etablissement');
     }
 
-    // ── Années scolaires ───────────────────────────────────────
+    // ── Années scolaires — réservé au propriétaire (voir garde plus haut) ──
+    if (in_array($action, ['annee_creer', 'annee_activer', 'annee_desactiver', 'annee_supprimer'], true) && !$est_proprietaire) {
+        flash_set('erreur', "Seul le propriétaire peut créer, activer, désactiver ou supprimer une année scolaire.");
+        rediriger('pages/parametres/index.php?onglet=annees');
+    }
     if ($action === 'annee_creer') {
         $lib = post('libelle_annee');
         if ($lib && preg_match('#^\d{4}/\d{4}$#', $lib)) {
@@ -515,13 +529,22 @@ if (!$es_partiel) {
 <!-- ══════════════════════════════════════════════
      ONGLET 2 — Années scolaires
 ══════════════════════════════════════════════ -->
+<?php if ($est_proprietaire): ?>
 <div class="alert alert-light border py-2 mb-3" style="font-size:.8rem">
   <i class="bi bi-info-circle me-1"></i>
   Créer une année provisionne automatiquement sa structure standard (3 trimestres, 6 évaluations UA1-UA6) —
   la même que celle utilisée pour la saisie de notes des années existantes.
 </div>
+<?php else: ?>
+<div class="alert alert-warning border py-2 mb-3" style="font-size:.8rem">
+  <i class="bi bi-lock me-1"></i>
+  Création, activation, désactivation et suppression d'une année scolaire sont réservées au <strong>propriétaire</strong>
+  — aucun compte de l'école (Directeur, Fondateur…) ne peut y toucher. Liste en lecture seule ci-dessous.
+</div>
+<?php endif; ?>
 
 <div class="row g-3">
+  <?php if ($est_proprietaire): ?>
   <div class="col-md-5">
     <div class="card">
       <div class="card-header py-2" style="background:#f8faff">
@@ -540,7 +563,8 @@ if (!$es_partiel) {
       </div>
     </div>
   </div>
-  <div class="col-md-7">
+  <?php endif; ?>
+  <div class="<?= $est_proprietaire ? 'col-md-7' : 'col-12' ?>">
     <div class="card">
       <div class="card-header py-2" style="background:#f8faff">
         <span class="fw-semibold" style="font-size:.82rem">
@@ -553,7 +577,7 @@ if (!$es_partiel) {
             <tr>
               <th>Année</th>
               <th style="width:80px;text-align:center">Statut</th>
-              <th style="width:110px;text-align:center">Actions</th>
+              <?php if ($est_proprietaire): ?><th style="width:110px;text-align:center">Actions</th><?php endif; ?>
             </tr>
           </thead>
           <tbody>
@@ -567,6 +591,7 @@ if (!$es_partiel) {
                   <span class="badge" style="background:#f3f4f6;color:#6b7280;font-size:.7rem">Inactive</span>
                 <?php endif; ?>
               </td>
+              <?php if ($est_proprietaire): ?>
               <td class="text-center">
                 <div class="d-flex gap-1 justify-content-center">
                   <?php if (!$a['Etat_annee_scolaire']): ?>
@@ -602,10 +627,11 @@ if (!$es_partiel) {
                   <?php endif; ?>
                 </div>
               </td>
+              <?php endif; ?>
             </tr>
             <?php endforeach; ?>
             <?php if (!$annees): ?>
-              <tr><td colspan="3" class="text-center text-muted py-3">Aucune année scolaire.</td></tr>
+              <tr><td colspan="<?= $est_proprietaire ? 3 : 2 ?>" class="text-center text-muted py-3">Aucune année scolaire.</td></tr>
             <?php endif; ?>
           </tbody>
         </table>
