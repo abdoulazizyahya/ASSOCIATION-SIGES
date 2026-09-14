@@ -76,22 +76,34 @@ function audit_vue_action(string $a): string
 
 /**
  * Badge « Évènement » (+ action si evenement='action', + cible en dessous).
- * Connexion / déconnexion RÉUSSIES : silencieuses ici (demande explicite
- * du 15/09/2026 — routine, un login/logout par ligne, aucune information
- * utile en plus de la date/l'acteur/l'appareil déjà dans les autres
- * colonnes). Échec de connexion reste affiché : signal de sécurité
- * (tentative ratée), pas du bruit.
+ * Connexion / déconnexion RÉUSSIES, et simple visite d'école (visite_ecole /
+ * visite_ecole_ecriture, association/entrer_ecole.php) : silencieuses ici
+ * (demande explicite du 15/09/2026 — pure navigation/consultation, aucune
+ * information utile en plus de la date/l'acteur/l'appareil déjà dans les
+ * autres colonnes). Échec de connexion reste affiché AVEC sa raison sur la
+ * même ligne (« Échec de connexion – mot de passe incorrect ») : signal de
+ * sécurité, pas du bruit — voir login.php / association/login.php qui
+ * distinguent désormais identifiant/mot de passe incorrect dans `cible`
+ * (le message affiché À L'UTILISATEUR, lui, reste volontairement vague :
+ * anti-énumération de comptes, le journal n'est visible que des rôles
+ * autorisés).
  */
 function audit_vue_evenement_badge(array $l): string
 {
     $e = $l['evenement'] ?? '';
     if ($e === 'action') {
+        if (in_array($l['action'] ?? '', ['visite_ecole', 'visite_ecole_ecriture'], true)) {
+            return '<span class="text-muted2">—</span>';
+        }
         $out = '<span class="badge badge-soft">' . h(audit_vue_action((string) ($l['action'] ?? ''))) . '</span>';
     } elseif ($e === 'connexion' || $e === 'deconnexion') {
-        $out = '<span class="text-muted2">—</span>';
+        return '<span class="text-muted2">—</span>';
+    } elseif ($e === 'connexion_echec') {
+        $out = '<span class="text-danger">' . h(audit_vue_evenement($e))
+             . (!empty($l['cible']) ? ' – ' . h($l['cible']) : '') . '</span>';
+        return $out;
     } else {
-        $cls = $e === 'connexion_echec' ? 'text-danger' : '';
-        $out = '<span class="' . $cls . '">' . h(audit_vue_evenement($e)) . '</span>';
+        $out = '<span>' . h(audit_vue_evenement($e)) . '</span>';
     }
     if (!empty($l['cible'])) {
         $out .= '<span class="text-muted2 d-block" style="font-size:.72rem">' . h($l['cible']) . '</span>';

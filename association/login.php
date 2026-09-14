@@ -94,7 +94,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } else {
             assoc_login_echec_noter($login, $ip);
             require_once __DIR__ . '/../bd/lib/audit.php';
-            audit_log('connexion_echec', ['login' => $login]);
+            // Message affiché volontairement générique (anti-énumération) —
+            // le journal d'audit, réservé aux superadmins, peut se permettre
+            // la raison précise (demande explicite du 15/09/2026).
+            audit_log('connexion_echec', ['login' => $login,
+                'cible' => $m ? 'mot de passe incorrect' : 'identifiant incorrect']);
             $erreur = 'Identifiant ou mot de passe incorrect.';
         }
     }

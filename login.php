@@ -92,7 +92,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             audit_log('connexion_echec', ['login' => $login, 'id_etab' => $id_etab_ctx, 'cible' => 'compte désactivé']);
             $erreur = "Ce compte a été désactivé. Contactez l'administration de l'établissement.";
         } else {
-            audit_log('connexion_echec', ['login' => $login, 'id_etab' => $id_etab_ctx]);
+            // Message affiché à l'utilisateur volontairement générique (ne
+            // révèle pas si c'est l'identifiant ou le mot de passe qui
+            // cloche — anti-énumération de comptes). Le journal d'audit,
+            // lui, n'est visible que du Directeur/Fondateur/propriétaire :
+            // la raison précise y est utile (demande explicite du
+            // 15/09/2026) sans affaiblir la sécurité côté formulaire.
+            audit_log('connexion_echec', ['login' => $login, 'id_etab' => $id_etab_ctx,
+                'cible' => $u ? 'mot de passe incorrect' : 'identifiant incorrect']);
             $erreur = 'Identifiant ou mot de passe incorrect.';
         }
     }
