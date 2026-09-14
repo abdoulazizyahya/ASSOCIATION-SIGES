@@ -195,6 +195,36 @@ if (!col_existe('etablissement', 'type_enseignement')) {
     $fait[] = "etablissement.type_enseignement ajoutée (toutes les écoles existantes restent 'primaire')";
 }
 
+// ── Appareils connus (nommés par l'utilisateur) ──────────────────────
+//  journal_audit.device_id relie chaque ligne à un cookie durable côté
+//  navigateur (bd/lib/audit.php::appareil_device_id()) ; appareil_connu
+//  porte le nom que le compte donne lui-même à son appareil (« Mon compte »,
+//  profil.php) — jamais le nom système, inaccessible à un site web.
+if (!col_existe('journal_audit', 'device_id')) {
+    mysqli_query($link_assoc, "ALTER TABLE `journal_audit` ADD COLUMN `device_id` varchar(40) DEFAULT NULL AFTER `geo_operateur`");
+    mysqli_query($link_assoc, "ALTER TABLE `journal_audit` ADD KEY `k_appareil` (`device_id`,`acteur_type`,`acteur_id`)");
+    $fait[] = "journal_audit.device_id ajoutée";
+}
+if (!table_existe('appareil_connu')) {
+    mysqli_query($link_assoc,
+        "CREATE TABLE `appareil_connu` (
+           `id`                 bigint       NOT NULL AUTO_INCREMENT,
+           `device_id`          varchar(40)  NOT NULL,
+           `acteur_type`        enum('membre','user') NOT NULL,
+           `acteur_id`          int          NOT NULL,
+           `nom`                varchar(60)  DEFAULT NULL,
+           `ua_appareil`        varchar(12)  DEFAULT NULL,
+           `ua_navigateur`      varchar(60)  DEFAULT NULL,
+           `ua_os`              varchar(60)  DEFAULT NULL,
+           `premiere_connexion` datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+           `derniere_connexion` datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+           PRIMARY KEY (`id`),
+           UNIQUE KEY `u_appareil` (`device_id`,`acteur_type`,`acteur_id`),
+           KEY `k_acteur` (`acteur_type`,`acteur_id`)
+         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+    $fait[] = "table appareil_connu créée";
+}
+
 // ── Module « Privilèges » : règles d'accès par école ─────────────────
 if (!table_existe('acces_regle')) {
     mysqli_query($link_assoc,

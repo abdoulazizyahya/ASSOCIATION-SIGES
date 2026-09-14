@@ -211,10 +211,37 @@ CREATE TABLE IF NOT EXISTS `journal_audit` (
   `geo_region`       varchar(80)  DEFAULT NULL,
   `geo_ville`        varchar(80)  DEFAULT NULL,
   `geo_operateur`    varchar(120) DEFAULT NULL,
+  `device_id`        varchar(40)  DEFAULT NULL,           -- cookie durable (appareil_device_id()) — lie la ligne à appareil_connu
   PRIMARY KEY (`id`),
   KEY `k_date`   (`date`),
   KEY `k_etab`   (`id_etablissement`,`date`),
-  KEY `k_acteur` (`acteur_type`,`acteur_login`)
+  KEY `k_acteur` (`acteur_type`,`acteur_login`),
+  KEY `k_appareil` (`device_id`,`acteur_type`,`acteur_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ── Appareils connus (nommés par l'utilisateur lui-même) ────────────
+--  Reconnaît un navigateur/appareil d'une connexion à l'autre via un cookie
+--  durable (2 ans, bd/lib/audit.php::appareil_device_id()) — JAMAIS le nom
+--  système de la machine (un site web n'y a jamais accès, quelle que soit
+--  la techno) : c'est le compte lui-même qui nomme ses appareils depuis
+--  « Mon compte » (profil.php), comme les « appareils connus » de Google/
+--  GitHub. Le journal d'audit affiche ensuite ce nom à la place du type
+--  générique (« Ordinateur ») dès qu'il existe — y compris rétroactivement
+--  sur les lignes déjà écrites (jointure sur device_id, pas de copie figée).
+CREATE TABLE IF NOT EXISTS `appareil_connu` (
+  `id`                 bigint       NOT NULL AUTO_INCREMENT,
+  `device_id`          varchar(40)  NOT NULL,
+  `acteur_type`        enum('membre','user') NOT NULL,
+  `acteur_id`          int          NOT NULL,
+  `nom`                varchar(60)  DEFAULT NULL,          -- NULL tant que le compte ne l'a pas nommé
+  `ua_appareil`        varchar(12)  DEFAULT NULL,           -- dernier type vu (ordinateur|tablette|mobile|bot)
+  `ua_navigateur`      varchar(60)  DEFAULT NULL,
+  `ua_os`              varchar(60)  DEFAULT NULL,
+  `premiere_connexion` datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `derniere_connexion` datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `u_appareil` (`device_id`,`acteur_type`,`acteur_id`),
+  KEY `k_acteur` (`acteur_type`,`acteur_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ── Cache de géolocalisation IP (ip-api.com) ────────────────────────

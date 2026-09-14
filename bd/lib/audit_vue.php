@@ -92,13 +92,18 @@ function audit_vue_evenement_badge(array $l): string
     return $out;
 }
 
-/** Icône + navigateur / OS. */
+/** Icône + navigateur / OS — nom donné par le compte (appareil_connu) si disponible. */
 function audit_vue_appareil(array $l): string
 {
-    $t   = $l['ua_appareil'] ?? '';
-    $ico = ['ordinateur' => 'bi-laptop', 'tablette' => 'bi-tablet', 'mobile' => 'bi-phone', 'bot' => 'bi-robot'][$t] ?? 'bi-question-circle';
-    $lib = ['ordinateur' => 'Ordinateur', 'tablette' => 'Tablette', 'mobile' => 'Téléphone', 'bot' => 'Robot / outil'][$t] ?? '—';
-    $detail = trim(implode(' · ', array_filter([$l['ua_navigateur'] ?? null, $l['ua_os'] ?? null])));
+    $t    = $l['ua_appareil'] ?? '';
+    $ico  = ['ordinateur' => 'bi-laptop', 'tablette' => 'bi-tablet', 'mobile' => 'bi-phone', 'bot' => 'bi-robot'][$t] ?? 'bi-question-circle';
+    $type = ['ordinateur' => 'Ordinateur', 'tablette' => 'Tablette', 'mobile' => 'Téléphone', 'bot' => 'Robot / outil'][$t] ?? '—';
+    $nom  = trim((string) ($l['appareil_nom'] ?? ''));
+    // Nommé par le compte : le nom devient le libellé principal, le type
+    // générique (Ordinateur/Téléphone) redescend dans le détail secondaire.
+    $lib      = $nom !== '' ? $nom : $type;
+    $detail   = trim(implode(' · ', array_filter($nom !== '' ? [$type, $l['ua_navigateur'] ?? null, $l['ua_os'] ?? null]
+                                                              : [$l['ua_navigateur'] ?? null, $l['ua_os'] ?? null])));
     $out = '<span class="text-nowrap"><i class="bi ' . $ico . ' me-1"></i>' . h($lib) . '</span>';
     if ($detail !== '') {
         $out .= '<span class="text-muted2 d-block" style="font-size:.72rem" title="' . h((string) ($l['ua_brut'] ?? '')) . '">' . h($detail) . '</span>';

@@ -167,6 +167,33 @@ function _audit_http_get(string $url): ?string
 }
 
 // ─────────────────────────────────────────────────────────────────────
+//  Identification d'appareil (cookie durable, 2 ans) — PAS le nom système
+//  de la machine (jamais transmis par un navigateur à un site, quelle que
+//  soit la techno : vie privée). Sert uniquement à RECONNAÎTRE le même
+//  navigateur d'une connexion à l'autre, pour que le compte puisse lui
+//  donner un nom depuis « Mon compte » (profil.php > Mes appareils) — voir
+//  appareil_connu (connexion_assoc.php).
+// ─────────────────────────────────────────────────────────────────────
+function appareil_device_id(): string
+{
+    $id = $_COOKIE['siges_appareil'] ?? '';
+    if (preg_match('/^[a-f0-9]{32}$/', $id)) return $id;
+
+    $id = bin2hex(random_bytes(16));
+    if (!headers_sent()) {
+        @setcookie('siges_appareil', $id, [
+            'expires'  => time() + 2 * 365 * 86400,
+            'path'     => '/',
+            'secure'   => !empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off',
+            'httponly' => true,
+            'samesite' => 'Lax',
+        ]);
+        $_COOKIE['siges_appareil'] = $id; // dispo immédiatement pour cette requête
+    }
+    return $id;
+}
+
+// ─────────────────────────────────────────────────────────────────────
 //  Écriture d'une ligne de journal
 //    $evenement : 'connexion' | 'connexion_echec' | 'deconnexion' | 'action'
 //    $ctx : ['action'=>slug, 'cible'=>texte, 'id_etab'=>int, 'role'=>str, 'login'=>str]
@@ -208,17 +235,18 @@ function audit_log(string $evenement, array $ctx = []): void
     $id_etab = $id_etab !== null ? (int) $id_etab : null;
 
     // ── Contexte technique ──
-    $ip  = $_SERVER['REMOTE_ADDR'] ?? null;
-    $ua  = audit_ua();
-    $geo = audit_geo($ip);
+    $ip     = $_SERVER['REMOTE_ADDR'] ?? null;
+    $ua     = audit_ua();
+    $geo    = audit_geo($ip);
+    $device = appareil_device_id();
 
     try {
         assoc_exec(
             "INSERT INTO journal_audit
                (evenement, action, cible, acteur_type, acteur_id, acteur_login, acteur_nom, role,
                 id_etablissement, ip, ua_navigateur, ua_os, ua_appareil, ua_brut,
-                geo_pays, geo_region, geo_ville, geo_operateur)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                geo_pays, geo_region, geo_ville, geo_operateur, device_id)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             [
                 $evenement,
                 $ctx['action'] ?? null,
@@ -227,9 +255,29 @@ function audit_log(string $evenement, array $ctx = []): void
                 $id_etab, $ip,
                 $ua['navigateur'], $ua['os'], $ua['appareil'], $ua['brut'],
                 $geo['pays'], $geo['region'], $geo['ville'], $geo['operateur'],
+                $device,
             ]
         );
     } catch (\Throwable $e) {
         // Le journal ne doit jamais interrompre la navigation.
+    }
+
+    // Reconnaissance d'appareil (appareil_connu) : seulement pour un acteur
+    // identifié (membre ou user) — jamais pour une tentative échouée sans
+    // compte reconnu. N'écrase JAMAIS `nom` (le compte le donne lui-même
+    // depuis « Mon compte ») : seule la dernière vue + le dernier UA bougent.
+    if ($type === 'membre' || $type === 'user') {
+        try {
+            assoc_exec(
+                "INSERT INTO appareil_connu
+                   (device_id, acteur_type, acteur_id, ua_appareil, ua_navigateur, ua_os, premiere_connexion, derniere_connexion)
+                 VALUES (?, ?, ?, ?, ?, ?, NOW(), NOW())
+                 ON DUPLICATE KEY UPDATE
+                   ua_appareil = VALUES(ua_appareil), ua_navigateur = VALUES(ua_navigateur),
+                   ua_os = VALUES(ua_os), derniere_connexion = NOW()",
+                [$device, $type, $aid, $ua['appareil'], $ua['navigateur'], $ua['os']]
+            );
+        } catch (\Throwable $e) {
+        }
     }
 }

@@ -961,9 +961,11 @@ function audit_journal(array $f, int $page = 1, int $par_page = 50, ?int $id_eta
     $off   = ($page - 1) * $par_page;
 
     $lignes = assoc_all(
-        "SELECT j.*, e.code AS etab_code, e.nom AS etab_nom
+        "SELECT j.*, e.code AS etab_code, e.nom AS etab_nom, a.nom AS appareil_nom
          FROM journal_audit j
          LEFT JOIN etablissement e ON e.id = j.id_etablissement
+         LEFT JOIN appareil_connu a
+           ON a.device_id = j.device_id AND a.acteur_type = j.acteur_type AND a.acteur_id = j.acteur_id
          $sql_w
          ORDER BY j.date DESC, j.id DESC
          LIMIT $par_page OFFSET $off",
@@ -976,6 +978,41 @@ function audit_journal(array $f, int $page = 1, int $par_page = 50, ?int $id_eta
 /** Purge les entrées plus vieilles que $mois mois. */
 function audit_journal_purger(int $mois = 12): int {
     return assoc_exec("DELETE FROM journal_audit WHERE date < (NOW() - INTERVAL ? MONTH)", [$mois]);
+}
+
+// =====================================================================
+//  APPAREILS CONNUS — un compte nomme lui-même les appareils reconnus par
+//  cookie durable (bd/lib/audit.php::appareil_device_id()), affiché ensuite
+//  dans le journal à la place du type générique. Voir profil.php.
+// =====================================================================
+
+/** Appareils de CE compte (membre ou user), plus récemment vus d'abord. */
+function appareil_connu_lister(string $acteur_type, int $acteur_id): array {
+    if (!annuaire_dispo()) return [];
+    try {
+        return assoc_all(
+            "SELECT id, device_id, nom, ua_appareil, ua_navigateur, ua_os, premiere_connexion, derniere_connexion
+             FROM appareil_connu WHERE acteur_type=? AND acteur_id=? ORDER BY derniere_connexion DESC",
+            [$acteur_type, $acteur_id]
+        );
+    } catch (\Throwable $e) {
+        return [];   // table pas encore créée (maj_assoc.php pas encore lancé)
+    }
+}
+
+/** Renomme un appareil — vérifie qu'il appartient bien à CE compte avant d'écrire. */
+function appareil_connu_renommer(int $id_appareil, string $acteur_type, int $acteur_id, string $nom): bool {
+    if (!annuaire_dispo()) return false;
+    $nom = trim($nom);
+    try {
+        $n = assoc_exec(
+            "UPDATE appareil_connu SET nom=? WHERE id=? AND acteur_type=? AND acteur_id=?",
+            [$nom !== '' ? $nom : null, $id_appareil, $acteur_type, $acteur_id]
+        );
+        return $n > 0;
+    } catch (\Throwable $e) {
+        return false;
+    }
 }
 
 // =====================================================================

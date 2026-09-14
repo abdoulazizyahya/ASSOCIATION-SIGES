@@ -47,6 +47,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     rediriger('profil.php');
 }
 
+// ── Mes appareils (renommage) ─────────────────────────────────────────
+//  bd/lib/audit.php n'est chargé qu'à la demande ailleurs (ecole_contexte.
+//  php::journaliser_action()) — on le charge ici explicitement pour
+//  appareil_device_id() (function_exists() serait sinon faux tant
+//  qu'aucune action n'a encore été journalisée dans CETTE requête).
+require_once __DIR__ . '/bd/lib/audit.php';
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && post('action') === 'appareil_renommer') {
+    csrf_verifier();
+    $ok = appareil_connu_renommer((int) post('id_appareil'), 'user', $user_id, (string) post('nom_appareil'));
+    flash_set($ok ? 'succes' : 'erreur', $ok ? 'Appareil renommé.' : 'Appareil introuvable.');
+    rediriger('profil.php');
+}
+$mes_appareils     = appareil_connu_lister('user', $user_id);
+$mon_appareil_actu = appareil_device_id();
+
 $titre_page = 'Mon compte';
 require_once __DIR__ . '/layout/header.php';
 
@@ -157,6 +172,48 @@ $rc = $role_colors[$compte['id_fonction'] ?? ''] ?? ['bg' => '#f3f4f6', 'txt' =>
             </button>
           </div>
         </form>
+      </div>
+    </div>
+
+    <!-- Mes appareils -->
+    <div class="card mt-3">
+      <div class="card-header py-2 d-flex align-items-center gap-2" style="background:#f8faff">
+        <i class="bi bi-laptop text-primary"></i>
+        <span class="fw-semibold" style="font-size:.82rem">Mes appareils</span>
+      </div>
+      <div class="card-body">
+        <p class="text-muted" style="font-size:.75rem;margin-top:-4px">
+          Donne un nom à un appareil pour le reconnaître facilement dans le
+          <a href="<?= APP_URL ?>/pages/utilisateurs/journal.php">journal d'audit</a> (ex. « PC du bureau »,
+          « Mon téléphone ») — à la place du type générique.
+        </p>
+        <?php if (!$mes_appareils): ?>
+          <div class="text-muted" style="font-size:.78rem">Aucun appareil reconnu pour l'instant.</div>
+        <?php else: foreach ($mes_appareils as $ap):
+          $ico = ['ordinateur' => 'bi-laptop', 'tablette' => 'bi-tablet', 'mobile' => 'bi-phone'][$ap['ua_appareil'] ?? ''] ?? 'bi-question-circle';
+          $type = ['ordinateur' => 'Ordinateur', 'tablette' => 'Tablette', 'mobile' => 'Téléphone'][$ap['ua_appareil'] ?? ''] ?? '—';
+          $detail = trim(implode(' · ', array_filter([$ap['ua_navigateur'] ?? null, $ap['ua_os'] ?? null])));
+          $ici = $ap['device_id'] === $mon_appareil_actu;
+        ?>
+        <form method="post" class="d-flex align-items-center gap-2 py-2 border-bottom flex-wrap">
+          <?= csrf_champ() ?>
+          <input type="hidden" name="action" value="appareil_renommer">
+          <input type="hidden" name="id_appareil" value="<?= (int) $ap['id'] ?>">
+          <i class="bi <?= $ico ?>" style="font-size:1.1rem;color:#9ca3af"></i>
+          <div style="min-width:160px">
+            <input type="text" name="nom_appareil" class="form-control form-control-sm" placeholder="<?= h($type) ?>"
+                   value="<?= h($ap['nom'] ?? '') ?>" maxlength="60">
+          </div>
+          <span class="text-muted" style="font-size:.72rem"><?= h($type) ?><?= $detail !== '' ? ' · ' . h($detail) : '' ?></span>
+          <?php if ($ici): ?><span class="badge bg-success" style="font-size:.65rem">Cet appareil</span><?php endif; ?>
+          <span class="text-muted ms-auto" style="font-size:.7rem">
+            Vu le <?= h(date('d/m/Y', strtotime((string) $ap['derniere_connexion']))) ?>
+          </span>
+          <button class="btn btn-light btn-sm" style="font-size:.72rem" title="Enregistrer le nom">
+            <i class="bi bi-check-lg"></i>
+          </button>
+        </form>
+        <?php endforeach; endif; ?>
       </div>
     </div>
   </div>
