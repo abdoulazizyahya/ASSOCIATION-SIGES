@@ -1378,9 +1378,17 @@ function assoc_migrations_etat(): array {
     $dispo = assoc_migrations_disponibles();
     $vmax  = $dispo ? max(array_keys($dispo)) : 0;
     $out = [];
-    foreach (assoc_all("SELECT id, code, nom, db_name, actif FROM etablissement ORDER BY actif DESC, nom") as $e) {
+    foreach (assoc_all("SELECT id, code, nom, db_name, actif, type_enseignement FROM etablissement ORDER BY actif DESC, nom") as $e) {
         $ver = (int) (assoc_val("SELECT version FROM schema_version_etab WHERE id_etablissement=?", [$e['id']]) ?? 0);
-        $retard = array_values(array_filter(array_keys($dispo), fn($v) => $v > $ver));
+        // bd/migration_v*.sql est la série PRIMAIRE uniquement (pas encore
+        // de série secondaire propre — voir plan « Intégration du
+        // secondaire ») : comparer une école secondaire à $dispo la
+        // ferait apparaître à tort en retard de ~toutes les migrations
+        // primaires. Toujours « à jour » côté secondaire tant que cette
+        // série n'existe pas.
+        $retard = $e['type_enseignement'] === 'secondaire'
+            ? []
+            : array_values(array_filter(array_keys($dispo), fn($v) => $v > $ver));
         $out[] = $e + ['version' => $ver, 'retard' => $retard, 'a_jour' => !$retard];
     }
     return ['ecoles' => $out, 'vmax' => $vmax, 'nb_migrations' => count($dispo)];
@@ -1404,6 +1412,14 @@ function assoc_migrations_en_retard(): array {
 function assoc_migrer_ecole(int $id, bool $backup = true): array {
     $e = assoc_one("SELECT * FROM etablissement WHERE id=?", [$id]);
     if (!$e) return ['ok' => false, 'message' => "École introuvable.", 'appliquees' => [], 'backup' => null];
+
+    if (($e['type_enseignement'] ?? 'primaire') === 'secondaire') {
+        // bd/migration_v*.sql est la série PRIMAIRE — l'appliquer telle
+        // quelle à une base secondaire (schéma LAM_ABZ) tenterait des ALTER
+        // TABLE sur des tables/colonnes qui n'existent pas dans ce schéma.
+        // Pas encore de série de migrations secondaire (voir plan).
+        return ['ok' => false, 'message' => "École secondaire : pas encore de série de migrations dédiée.", 'appliquees' => [], 'backup' => null];
+    }
 
     require_once __DIR__ . '/bd/lib/ecole_maintenance.php';
     $etat = ecole_base_etat($e['db_name']);

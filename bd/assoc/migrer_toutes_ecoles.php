@@ -35,9 +35,16 @@ echo "=== Migration multi-ecoles ===\n";
 echo $dry ? "MODE DRY-RUN\n" : "MODE APPLICATION\n";
 echo "Derniere migration disponible : v$vmax\n\n";
 
-foreach (assoc_all("SELECT id, code, nom, db_name FROM etablissement WHERE actif=1 ORDER BY id") as $e) {
+foreach (assoc_all("SELECT id, code, nom, db_name, type_enseignement FROM etablissement WHERE actif=1 ORDER BY id") as $e) {
     $ver = (int) (assoc_val("SELECT version FROM schema_version_etab WHERE id_etablissement=?", [$e['id']]) ?? 0);
     echo str_pad($e['code'], 8) . " {$e['nom']}  (v$ver)";
+
+    if (($e['type_enseignement'] ?? 'primaire') === 'secondaire') {
+        // Série de migrations ci-dessus = PRIMAIRE uniquement — pas encore
+        // de série secondaire (voir plan « Intégration du secondaire »).
+        echo "  — secondaire, pas de série de migrations dédiée pour l'instant\n";
+        continue;
+    }
 
     $a_faire = array_filter(array_keys($dispo), fn($v) => $v > $ver);
     if (!$a_faire) { echo "  — a jour\n"; continue; }
