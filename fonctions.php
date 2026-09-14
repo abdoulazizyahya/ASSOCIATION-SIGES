@@ -1567,6 +1567,12 @@ function gen_matricule(string $val_annee, string $niveau): string {
     $suffixe = $resoudre($apres);
 
     // Regex REGEXP : jetons -> classes selon le périmètre de séquence.
+    // {SEQ} accepte AU MOINS $lseq chiffres (jamais un nombre exact) : une
+    // fois l'espace à $lseq chiffres saturé (ex. 999 élèves sur 3 chiffres),
+    // la séquence continue naturellement sur 4 chiffres — sinon MAX() ne
+    // verrait plus jamais ces matricules « débordés » et régénérerait sans
+    // fin le même candidat déjà pris (bug réel constaté : école à 942/999
+    // matricules 3 chiffres utilisés, écriture bloquée en boucle).
     $an_wild  = $cfg['sequence_par'] === 'globale';
     $niv_wild = in_array($cfg['sequence_par'], ['annee', 'globale'], true);
     $regex = '^';
@@ -1575,22 +1581,39 @@ function gen_matricule(string $val_annee, string $niveau): string {
             '{AAAA}' => $an_wild ? '[0-9]{4}' : preg_quote($an),
             '{AA}'   => $an_wild ? '[0-9]{2}' : preg_quote($aa),
             '{NIV}'  => $niv_wild ? '[MP]' : $niv,
-            '{SEQ}'  => '[0-9]{' . $lseq . '}',
+            '{SEQ}'  => '[0-9]{' . $lseq . ',}',
             default  => preg_quote($p),
         };
     }
     $regex .= '$';
 
+    // Extraction de la séquence : jusqu'à la fin du préfixe SEULEMENT (pas de
+    // longueur fixe) — un matricule débordé (4+ chiffres) doit être lu en
+    // entier, pas tronqué à $lseq chiffres.
     $max = (int) db_val(
-        "SELECT MAX(CAST(SUBSTRING(Mat_elv, ?, ?) AS UNSIGNED)) FROM eleve WHERE Mat_elv REGEXP ?",
-        [strlen($prefixe) + 1, $lseq, $regex]
+        "SELECT MAX(CAST(SUBSTRING(Mat_elv, ?) AS UNSIGNED)) FROM eleve WHERE Mat_elv REGEXP ?",
+        [strlen($prefixe) + 1, $regex]
     );
-    $matricule = $prefixe . str_pad((string) ($max + 1), $lseq, '0', STR_PAD_LEFT) . $suffixe;
 
-    if (db_val("SELECT COUNT(*) FROM eleve WHERE Mat_elv=?", [$matricule])) {
-        $alea = random_int(1, (10 ** $lseq) - 1);
-        $matricule = $prefixe . str_pad((string) $alea, $lseq, '0', STR_PAD_LEFT) . $suffixe;
+    // Incrément séquentiel avec re-vérification À CHAQUE tentative (jamais un
+    // repli aléatoire à l'aveugle : dans un espace presque saturé, un tirage
+    // aléatoire unique a de fortes chances de retomber sur un matricule déjà
+    // pris, et l'INSERT échoue alors sans filet — plus aucun élève ne peut
+    // être créé tant que le hasard ne tombe pas juste). Le pas au-delà de
+    // $lseq chiffres n'est plus re-formaté à largeur fixe (str_pad ne
+    // tronque pas — 1000 reste "1000", pas "000").
+    for ($tentative = 0; $tentative < 200; $tentative++) {
+        $n = $max + 1 + $tentative;
+        $candidat = $prefixe . str_pad((string) $n, $lseq, '0', STR_PAD_LEFT) . $suffixe;
+        if (!db_val("SELECT COUNT(*) FROM eleve WHERE Mat_elv=?", [$candidat])) {
+            return $candidat;
+        }
     }
+    // Improbable après 200 tentatives consécutives : dernier repli, mais
+    // toujours vérifié plutôt que renvoyé aveuglément.
+    do {
+        $matricule = $prefixe . ($max + 1 + random_int(1, 999999)) . $suffixe;
+    } while (db_val("SELECT COUNT(*) FROM eleve WHERE Mat_elv=?", [$matricule]));
     return $matricule;
 }
 
