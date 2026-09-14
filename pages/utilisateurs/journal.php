@@ -18,7 +18,14 @@ $id_etab = $id_etab !== null ? (int) $id_etab : null;
 
 $dispo = (function_exists('annuaire_dispo') && annuaire_dispo()) && $id_etab !== null;
 
-$f = [
+// Nommée $crit (et non $f) : layout/header.php, inclus plus bas en
+// require_once DANS CETTE MÊME PORTÉE (pas une fonction), utilise déjà $f
+// comme variable de boucle interne (nom de fichier de menu) — un $f ici
+// aurait été écrasé par une simple chaîne après le require, provoquant
+// plus loin un `$f['role']` = "accès à un offset de type string sur une
+// string" (TypeError fatal, bug réel constaté le 15/09/2026 : le select
+// Rôle plantait toute la page).
+$crit = [
     'acteur'    => trim($_GET['acteur'] ?? '') ?: null,
     'role'      => trim($_GET['role'] ?? '') ?: null,
     'evenement' => trim($_GET['evenement'] ?? '') ?: null,
@@ -28,7 +35,7 @@ $f = [
     'jusqua'    => preg_match('/^\d{4}-\d{2}-\d{2}$/', $_GET['jusqua'] ?? '') ? $_GET['jusqua'] : null,
 ];
 $page = max(1, (int) ($_GET['page'] ?? 1));
-$j    = $dispo ? audit_journal($f, $page, 60, $id_etab)
+$j    = $dispo ? audit_journal($crit, $page, 60, $id_etab)
               : ['lignes' => [], 'total' => 0, 'page' => 1, 'pages' => 1];
 
 // Valeurs de filtre restreintes à cette école.
@@ -44,8 +51,8 @@ if ($dispo) {
 }
 
 $qs = fn(array $extra) => http_build_query(array_filter(array_merge([
-    'acteur' => $f['acteur'], 'role' => $f['role'], 'evenement' => $f['evenement'],
-    'action' => $f['action'], 'appareil' => $f['appareil'], 'depuis' => $f['depuis'], 'jusqua' => $f['jusqua'],
+    'acteur' => $crit['acteur'], 'role' => $crit['role'], 'evenement' => $crit['evenement'],
+    'action' => $crit['action'], 'appareil' => $crit['appareil'], 'depuis' => $crit['depuis'], 'jusqua' => $crit['jusqua'],
 ], $extra), fn($v) => $v !== null && $v !== ''));
 
 $titre_page = 'Journal d\'audit';
@@ -66,14 +73,14 @@ require_once __DIR__ . '/../../layout/header.php';
     <form method="get" class="row g-2 align-items-end">
       <div class="col-6 col-md-3">
         <label class="form-label">Acteur (login ou nom)</label>
-        <input type="text" name="acteur" value="<?= h($f['acteur'] ?? '') ?>" class="form-control form-control-sm">
+        <input type="text" name="acteur" value="<?= h($crit['acteur'] ?? '') ?>" class="form-control form-control-sm">
       </div>
       <div class="col-6 col-md-2">
         <label class="form-label">Rôle</label>
         <select name="role" class="form-select form-select-sm">
           <option value="">— tous —</option>
           <?php foreach ($filtres['role'] as $r): ?>
-            <option value="<?= h($r) ?>" <?= $f['role'] === $r ? 'selected' : '' ?>><?= h(audit_vue_role($r)) ?></option>
+            <option value="<?= h($r) ?>" <?= $crit['role'] === $r ? 'selected' : '' ?>><?= h(audit_vue_role($r)) ?></option>
           <?php endforeach; ?>
         </select>
       </div>
@@ -82,7 +89,7 @@ require_once __DIR__ . '/../../layout/header.php';
         <select name="evenement" class="form-select form-select-sm">
           <option value="">— tous —</option>
           <?php foreach (['connexion', 'connexion_echec', 'deconnexion', 'action'] as $e): ?>
-            <option value="<?= $e ?>" <?= $f['evenement'] === $e ? 'selected' : '' ?>><?= h(audit_vue_evenement($e)) ?></option>
+            <option value="<?= $e ?>" <?= $crit['evenement'] === $e ? 'selected' : '' ?>><?= h(audit_vue_evenement($e)) ?></option>
           <?php endforeach; ?>
         </select>
       </div>
@@ -91,7 +98,7 @@ require_once __DIR__ . '/../../layout/header.php';
         <select name="action" class="form-select form-select-sm">
           <option value="">— toutes —</option>
           <?php foreach ($filtres['action'] as $a): ?>
-            <option value="<?= h($a) ?>" <?= $f['action'] === $a ? 'selected' : '' ?>><?= h(audit_vue_action($a)) ?></option>
+            <option value="<?= h($a) ?>" <?= $crit['action'] === $a ? 'selected' : '' ?>><?= h(audit_vue_action($a)) ?></option>
           <?php endforeach; ?>
         </select>
       </div>
@@ -100,17 +107,17 @@ require_once __DIR__ . '/../../layout/header.php';
         <select name="appareil" class="form-select form-select-sm">
           <option value="">— tous —</option>
           <?php foreach ($filtres['appareil'] as $a): ?>
-            <option value="<?= h($a) ?>" <?= $f['appareil'] === $a ? 'selected' : '' ?>><?= h(ucfirst($a)) ?></option>
+            <option value="<?= h($a) ?>" <?= $crit['appareil'] === $a ? 'selected' : '' ?>><?= h(ucfirst($a)) ?></option>
           <?php endforeach; ?>
         </select>
       </div>
       <div class="col-3 col-md-2">
         <label class="form-label">Du</label>
-        <input type="date" name="depuis" value="<?= h($f['depuis'] ?? '') ?>" class="form-control form-control-sm">
+        <input type="date" name="depuis" value="<?= h($crit['depuis'] ?? '') ?>" class="form-control form-control-sm">
       </div>
       <div class="col-3 col-md-2">
         <label class="form-label">Au</label>
-        <input type="date" name="jusqua" value="<?= h($f['jusqua'] ?? '') ?>" class="form-control form-control-sm">
+        <input type="date" name="jusqua" value="<?= h($crit['jusqua'] ?? '') ?>" class="form-control form-control-sm">
       </div>
       <div class="col-12">
         <button class="btn btn-primary btn-sm"><i class="bi bi-funnel me-1"></i>Filtrer</button>
