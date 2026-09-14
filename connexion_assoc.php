@@ -391,7 +391,10 @@ function _liberer_pool(string $db): void {
 //     consomme une base VIDE pré-créée et enregistrée dans `bd_pool`.
 //   - sinon (LAN / serveur dédié) : CREATE DATABASE `promeducam_<slug du nom>`.
 //
-//  $in : ['code','nom','nom_en'?,'sigle'?,'ville'?,'sous_domaine'?,'par'?]
+//  $in : ['code','nom','nom_en'?,'sigle'?,'ville'?,'sous_domaine'?,'type_enseignement'?,'par'?]
+//  'type_enseignement' : 'primaire' (défaut) ou 'secondaire' — figé à la
+//  création, voir bd/assoc/schema_ref_ecole_secondaire.sql et le dossier
+//  secondaire/.
 //  Retour : ['ok'=>bool, 'message'=>string, 'id'=>?int, 'db_name'=>?string]
 function creer_etablissement(array $in): array {
     $code = strtoupper(trim($in['code'] ?? ''));
@@ -400,6 +403,8 @@ function creer_etablissement(array $in): array {
     $sigle = trim($in['sigle'] ?? '') ?: null;
     $ville = trim($in['ville'] ?? '') ?: null;
     $sous  = trim($in['sous_domaine'] ?? '') ?: null;
+    $type  = in_array($in['type_enseignement'] ?? '', ['primaire', 'secondaire'], true)
+           ? $in['type_enseignement'] : 'primaire';
 
     if (!preg_match('/^[A-Z0-9]{2,10}$/', $code)) {
         return ['ok' => false, 'message' => 'Code invalide : 2 à 10 caractères A–Z ou 0–9.', 'id' => null, 'db_name' => null];
@@ -476,7 +481,7 @@ function creer_etablissement(array $in): array {
                 _liberer_pool($db);
                 return ['ok' => false, 'message' => "La base du pool « $db » n'est pas vide — abandon. Nettoyez-la ou retirez-la du pool.", 'id' => null, 'db_name' => null];
             }
-            charger_schema_ecole($l, $seed);
+            charger_schema_ecole($l, $seed, $type);
             mysqli_close($l);
         } else {
             // Serveur dédié / LAN : on crée la base.
@@ -492,7 +497,7 @@ function creer_etablissement(array $in): array {
 
             mysqli_query($srv, "CREATE DATABASE `$db` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci");
             mysqli_select_db($srv, $db);
-            charger_schema_ecole($srv, $seed);
+            charger_schema_ecole($srv, $seed, $type);
             mysqli_close($srv);
         }
     } catch (\Throwable $e) {
@@ -510,17 +515,23 @@ function creer_etablissement(array $in): array {
         return ['ok' => false, 'message' => 'Erreur lors de la création de la base : ' . $e->getMessage(), 'id' => null, 'db_name' => null];
     }
 
-    // Version de schéma = dernière migration connue
+    // Version de schéma = dernière migration connue. Séries de migrations
+    // disjointes primaire (bd/migration_v*.sql) / secondaire (pas encore de
+    // série propre — voir plan : bd/secondaire/migration_v*.sql à créer
+    // quand le module secondaire/ existera) : une école secondaire démarre
+    // donc à v0, jamais mélangée avec la numérotation primaire.
     $vmax = 0;
-    foreach (glob(__DIR__ . '/bd/migration_v*.sql') as $f) {
-        if (preg_match('/migration_v(\d+)\.sql$/', $f, $m)) $vmax = max($vmax, (int) $m[1]);
+    if ($type === 'primaire') {
+        foreach (glob(__DIR__ . '/bd/migration_v*.sql') as $f) {
+            if (preg_match('/migration_v(\d+)\.sql$/', $f, $m)) $vmax = max($vmax, (int) $m[1]);
+        }
     }
 
     // Ligne annuaire
     assoc_exec(
-        "INSERT INTO etablissement (code, sous_domaine, db_name, nom, sigle, ville, actif)
-         VALUES (?, ?, ?, ?, ?, ?, 1)",
-        [$code, $sous, $db, $nom, $sigle, $ville]
+        "INSERT INTO etablissement (code, sous_domaine, db_name, nom, sigle, ville, actif, type_enseignement)
+         VALUES (?, ?, ?, ?, ?, ?, 1, ?)",
+        [$code, $sous, $db, $nom, $sigle, $ville, $type]
     );
     $id = (int) assoc_val("SELECT id FROM etablissement WHERE code=?", [$code]);
 
@@ -537,10 +548,12 @@ function creer_etablissement(array $in): array {
 
     regenerer_portail_accueil_best_effort();   // rafraîchit promeducamsiges.html
 
+    $suite = $type === 'secondaire'
+        ? "Module secondaire en cours de portage — pages et gestion des comptes pas encore disponibles."
+        : "Créez maintenant un compte DIRECTEUR via Personnel → Affecter.";
     return [
         'ok'      => true,
-        'message' => "Établissement « $nom » créé (base $db, schéma v$vmax). "
-                   . "Créez maintenant un compte DIRECTEUR via Personnel → Affecter.",
+        'message' => "Établissement « $nom » créé (base $db, type $type, schéma v$vmax). $suite",
         'id'      => $id,
         'db_name' => $db,
     ];

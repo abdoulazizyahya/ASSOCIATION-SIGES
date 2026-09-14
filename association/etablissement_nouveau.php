@@ -8,20 +8,21 @@ require_once __DIR__ . '/_layout.php';
 exiger_superadmin_association();
 
 $msg = ''; $err = ''; $ok = false;
-$val = ['code' => '', 'nom' => '', 'nom_en' => '', 'sigle' => '', 'ville' => '', 'sous_domaine' => ''];
+$val = ['code' => '', 'nom' => '', 'nom_en' => '', 'sigle' => '', 'ville' => '', 'sous_domaine' => '', 'type_enseignement' => 'primaire'];
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     csrf_verifier();
     foreach ($val as $k => $_) $val[$k] = trim($_POST[$k] ?? '');
     $val['code'] = strtoupper($val['code']);
     $val['sous_domaine'] = strtolower($val['sous_domaine']);
+    if (!in_array($val['type_enseignement'], ['primaire', 'secondaire'], true)) $val['type_enseignement'] = 'primaire';
 
     $r = creer_etablissement($val + ['par' => membre_connecte()['login'] ?? '?']);
     if ($r['ok']) {
         journaliser_action('etablissement_creation', $r['id'], $val['code'] . ' — ' . $val['nom']);
         $ok = true;
         $msg = $r['message'];
-        $val = ['code' => '', 'nom' => '', 'nom_en' => '', 'sigle' => '', 'ville' => '', 'sous_domaine' => ''];
+        $val = ['code' => '', 'nom' => '', 'nom_en' => '', 'sigle' => '', 'ville' => '', 'sous_domaine' => '', 'type_enseignement' => 'primaire'];
     } else {
         $err = $r['message'];
     }
@@ -53,6 +54,24 @@ asso_haut('Nouvel établissement');
   </p>
   <form method="post" class="row g-2">
     <input type="hidden" name="csrf" value="<?= h(csrf_generer()) ?>">
+
+    <div class="col-12">
+      <label class="form-label small d-block">Type d'enseignement *</label>
+      <div class="btn-group w-100" role="group">
+        <input type="radio" class="btn-check" name="type_enseignement" id="type_primaire" value="primaire"
+               <?= $val['type_enseignement'] !== 'secondaire' ? 'checked' : '' ?>>
+        <label class="btn btn-outline-primary btn-sm" for="type_primaire"><i class="bi bi-mortarboard me-1"></i>Primaire</label>
+
+        <input type="radio" class="btn-check" name="type_enseignement" id="type_secondaire" value="secondaire"
+               <?= $val['type_enseignement'] === 'secondaire' ? 'checked' : '' ?>>
+        <label class="btn btn-outline-primary btn-sm" for="type_secondaire"><i class="bi bi-mortarboard-fill me-1"></i>Secondaire</label>
+      </div>
+      <div class="form-text small text-warning">
+        Secondaire : module en cours de portage (compétences/bulletins/notes pas encore
+        disponibles) — utile pour l'instant uniquement pour préparer/tester la base.
+      </div>
+      <div class="form-text small text-muted2">Figé définitivement après création.</div>
+    </div>
 
     <div class="col-4">
       <label class="form-label small">Code *</label>
