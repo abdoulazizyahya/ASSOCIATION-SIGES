@@ -74,16 +74,23 @@ function audit_vue_action(string $a): string
     return $L[$a] ?? $a;
 }
 
-/** Badge « Évènement » (+ action si evenement='action', + cible en dessous). */
+/**
+ * Badge « Évènement » (+ action si evenement='action', + cible en dessous).
+ * Connexion / déconnexion RÉUSSIES : silencieuses ici (demande explicite
+ * du 15/09/2026 — routine, un login/logout par ligne, aucune information
+ * utile en plus de la date/l'acteur/l'appareil déjà dans les autres
+ * colonnes). Échec de connexion reste affiché : signal de sécurité
+ * (tentative ratée), pas du bruit.
+ */
 function audit_vue_evenement_badge(array $l): string
 {
     $e = $l['evenement'] ?? '';
     if ($e === 'action') {
         $out = '<span class="badge badge-soft">' . h(audit_vue_action((string) ($l['action'] ?? ''))) . '</span>';
+    } elseif ($e === 'connexion' || $e === 'deconnexion') {
+        $out = '<span class="text-muted2">—</span>';
     } else {
-        $cls = $e === 'connexion' ? 'text-success'
-             : ($e === 'connexion_echec' ? 'text-danger'
-             : ($e === 'deconnexion' ? 'text-muted2' : ''));
+        $cls = $e === 'connexion_echec' ? 'text-danger' : '';
         $out = '<span class="' . $cls . '">' . h(audit_vue_evenement($e)) . '</span>';
     }
     if (!empty($l['cible'])) {
