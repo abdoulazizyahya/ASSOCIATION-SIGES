@@ -183,6 +183,18 @@ if (!table_existe('geo_ip_cache')) {
     $fait[] = "table geo_ip_cache créée";
 }
 
+// ── Secondaire : etablissement.type_enseignement (primaire/secondaire) ──
+//  Figé à la création de l'établissement — détermine le schéma école
+//  chargé (bd/assoc/schema_ref_ecole.sql vs schema_ref_ecole_secondaire.sql)
+//  et le module de pages utilisé (pages/ vs secondaire/). Toutes les écoles
+//  existantes restent 'primaire' (comportement inchangé).
+if (!col_existe('etablissement', 'type_enseignement')) {
+    mysqli_query($link_assoc,
+        "ALTER TABLE `etablissement`
+         ADD COLUMN `type_enseignement` enum('primaire','secondaire') NOT NULL DEFAULT 'primaire' AFTER `nom`");
+    $fait[] = "etablissement.type_enseignement ajoutée (toutes les écoles existantes restent 'primaire')";
+}
+
 // ── Module « Privilèges » : règles d'accès par école ─────────────────
 if (!table_existe('acces_regle')) {
     mysqli_query($link_assoc,

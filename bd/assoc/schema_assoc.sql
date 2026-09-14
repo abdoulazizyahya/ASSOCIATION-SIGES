@@ -28,6 +28,7 @@ CREATE TABLE IF NOT EXISTS `etablissement` (
   `sous_domaine`         varchar(63)  DEFAULT NULL,             -- ex. « ecole1 » (ecole1.assoc.cm) — NULL en LAN
   `db_name`              varchar(64)  NOT NULL,                 -- nom de la base MySQL de l'école
   `nom`                  varchar(150) NOT NULL,
+  `type_enseignement`    enum('primaire','secondaire') NOT NULL DEFAULT 'primaire', -- figé à la création, détermine le schéma école + le module de pages (pages/ vs secondaire/)
   `sigle`                varchar(50)  DEFAULT NULL,
   `niu_sigle`            varchar(3)   DEFAULT NULL,             -- code 3 lettres de l'école dans le NIU (défaut : 3 premières lettres du sigle)
   `ville`                varchar(100) DEFAULT NULL,

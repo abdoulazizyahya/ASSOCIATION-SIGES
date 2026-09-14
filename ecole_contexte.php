@@ -377,6 +377,14 @@ function ecole_courante(): ?array {
     return $ETAB_COURANT ?: null;
 }
 
+// Type pédagogique de l'école courante : 'primaire' (défaut, y compris hors
+// contexte multi-établissement — mono-école historique) ou 'secondaire'.
+// Détermine quel module de pages/menu/dashboard/schéma s'applique — voir
+// bd/assoc/schema_ref_ecole_secondaire.sql et le dossier secondaire/.
+function type_enseignement_courant(): string {
+    return ecole_courante()['type_enseignement'] ?? 'primaire';
+}
+
 // ── Bascule de la base « école courante » ───────────────────────────
 //  Pose $_SESSION['ecole'], met à jour $ETAB_COURANT et RE-sélectionne la
 //  base sur $link (connexion.php a déjà tourné à l'inclusion de la page —
