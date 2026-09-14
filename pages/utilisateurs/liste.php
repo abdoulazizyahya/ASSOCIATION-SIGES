@@ -4,17 +4,6 @@ require_once __DIR__ . '/../../connexion.php';
 require_once __DIR__ . '/../../fonctions.php';
 exiger_role(['DIRECTEUR']);
 
-// Deux onglets (demande explicite du 15/09/2026) — même page, même table de
-// comptes, juste deux découpages des mêmes actions :
-//  - « Comptes utilisateurs » : identité (identifiant, mot de passe, création,
-//    suppression).
-//  - « Rôles et privilèges » : fonction (rôle système) + privilèges d'accès
-//    par menu/sous-menu (pages/utilisateurs/acces.php, inchangée — toujours
-//    une page à part, la liste des groupes/entrées du menu y est trop
-//    volumineuse pour tenir dans cet onglet).
-$onglet = $_GET['onglet'] ?? 'comptes';
-if (!in_array($onglet, ['comptes', 'privileges'], true)) $onglet = 'comptes';
-
 // Changement de rôle (privilège système) — demande explicite du 22/08/2026 :
 // avant ce chantier, le SEUL moyen de changer le "rôle" d'un compte était de
 // modifier le champ "Fonction" de sa fiche personnel (Ressources humaines >
@@ -23,6 +12,12 @@ if (!in_array($onglet, ['comptes', 'privileges'], true)) $onglet = 'comptes';
 // rôle reste porté par enseignant.id_fonction (un compte = une fiche liée,
 // voir user.matricule_ens NOT NULL) : ce formulaire modifie donc CETTE
 // colonne pour la fiche liée au compte, pas une colonne séparée sur `user`.
+//
+// Onglets « Comptes »/« Rôles et privilèges » essayés le 15/09/2026 puis
+// abandonnés le jour même (demande explicite : pas assez de contenu propre
+// à l'onglet privilèges pour justifier la séparation — les actions étaient
+// de toute façon liées au même compte, sur la même ligne) : retour à une
+// page unique, toutes les actions par compte sur la même ligne.
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && post('action') === 'changer_role') {
     csrf_verifier();
     $id_user   = (int) post('id_user');
@@ -42,7 +37,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && post('action') === 'changer_role') 
     } else {
         flash_set('erreur', 'Rôle invalide.');
     }
-    rediriger('pages/utilisateurs/liste.php?onglet=privileges');
+    rediriger('pages/utilisateurs/liste.php');
 }
 
 $roles_disponibles = fonctions_assignables();
@@ -59,36 +54,16 @@ require_once __DIR__ . '/../../layout/header.php';
 
 <div class="page-titre d-flex justify-content-between align-items-center">
   <div>
-    <h4><i class="bi bi-person-gear me-1 text-primary"></i>Utilisateurs</h4>
-    <div class="sub"><?= count($utilisateurs) ?> compte(s)</div>
+    <h4><i class="bi bi-person-gear me-1 text-primary"></i>Comptes utilisateurs</h4>
+    <div class="sub"><?= count($utilisateurs) ?> compte(s) — identifiant, mot de passe, rôle et privilèges d'accès (menus)</div>
   </div>
-  <?php if ($onglet === 'comptes'): ?>
   <a href="<?= APP_URL ?>/pages/utilisateurs/form.php" class="btn btn-primary btn-sm">
     <i class="bi bi-plus-lg me-1"></i>Nouveau compte
   </a>
-  <?php endif; ?>
 </div>
-
-<ul class="nav nav-tabs mb-3" style="border-bottom:2px solid #e5e7eb">
-  <?php foreach ([
-      'comptes'    => ['bi-person-vcard', 'Comptes utilisateurs'],
-      'privileges' => ['bi-shield-lock',  'Rôles et privilèges'],
-  ] as $key => [$ico, $label]): ?>
-  <li class="nav-item">
-    <a class="nav-link <?= $onglet === $key ? 'active' : '' ?>"
-       href="<?= APP_URL ?>/pages/utilisateurs/liste.php?onglet=<?= $key ?>">
-      <i class="bi <?= $ico ?> me-1"></i><?= $label ?>
-    </a>
-  </li>
-  <?php endforeach; ?>
-</ul>
 
 <?= flash_html() ?>
 
-<?php if ($onglet === 'comptes'): ?>
-<!-- ══════════════════════════════════════════════
-     ONGLET 1 — Comptes utilisateurs (identité)
-══════════════════════════════════════════════ -->
 <div class="card">
   <div class="table-responsive">
     <table class="table table-abz table-hover align-middle mb-0">
@@ -104,6 +79,14 @@ require_once __DIR__ . '/../../layout/header.php';
             <td><?= h(mb_strtoupper($u['nom_ens'])) ?> <?= h($u['prenom_ens'] ?? '') ?></td>
             <td><span class="badge-code"><?= h(libelle_role($u['id_fonction'] ?? '')) ?></span></td>
             <td class="text-end">
+              <button type="button" class="btn btn-sm btn-light" style="padding:3px 7px" title="Modifier le rôle (privilèges)"
+                      onclick='ouvrirRole(<?= (int) $u['id_user'] ?>, <?= json_encode($u['id_fonction']) ?>, <?= json_encode(mb_strtoupper($u['nom_ens']) . ' ' . ($u['prenom_ens'] ?? '')) ?>)'>
+                <i class="bi bi-shield-lock" style="font-size:.78rem"></i>
+              </button>
+              <a href="<?= APP_URL ?>/pages/utilisateurs/acces.php?id=<?= (int)$u['id_user'] ?>"
+                 class="btn btn-sm btn-light" style="padding:3px 7px" title="Privilèges — menus et sous-menus visibles">
+                <i class="bi bi-sliders" style="font-size:.78rem"></i>
+              </a>
               <a href="<?= APP_URL ?>/pages/utilisateurs/form.php?id=<?= (int)$u['id_user'] ?>"
                  class="btn btn-sm btn-light" style="padding:3px 7px" title="Réinitialiser le mot de passe">
                 <i class="bi bi-key" style="font-size:.78rem"></i>
@@ -115,47 +98,6 @@ require_once __DIR__ . '/../../layout/header.php';
                 <i class="bi bi-trash" style="font-size:.78rem"></i>
               </a>
               <?php endif; ?>
-            </td>
-          </tr>
-        <?php endforeach; endif; ?>
-      </tbody>
-    </table>
-  </div>
-</div>
-
-<?php else: ?>
-<!-- ══════════════════════════════════════════════
-     ONGLET 2 — Rôles et privilèges (menus/sous-menus)
-══════════════════════════════════════════════ -->
-<div class="alert alert-light border py-2 mb-3" style="font-size:.8rem">
-  <i class="bi bi-info-circle me-1"></i>
-  Le <strong>rôle</strong> fixe les privilèges par défaut. Les <strong>privilèges d'accès</strong> retirent, compte
-  par compte, des menus/sous-menus précis à ce que le rôle autorise déjà (le menu reste visible en lecture, seuls
-  les boutons Enregistrer/Modifier disparaissent).
-</div>
-<div class="card">
-  <div class="table-responsive">
-    <table class="table table-abz table-hover align-middle mb-0">
-      <thead>
-        <tr><th>Identifiant</th><th>Personne</th><th>Rôle</th><th class="text-end">Actions</th></tr>
-      </thead>
-      <tbody>
-        <?php if (empty($utilisateurs)): ?>
-          <tr><td colspan="4" class="text-center text-muted py-4">Aucun compte trouvé.</td></tr>
-        <?php else: foreach ($utilisateurs as $u): ?>
-          <tr>
-            <td class="fw-semibold"><?= h($u['login_user']) ?></td>
-            <td><?= h(mb_strtoupper($u['nom_ens'])) ?> <?= h($u['prenom_ens'] ?? '') ?></td>
-            <td><span class="badge-code"><?= h(libelle_role($u['id_fonction'] ?? '')) ?></span></td>
-            <td class="text-end">
-              <button type="button" class="btn btn-sm btn-light" style="padding:3px 7px" title="Modifier le rôle"
-                      onclick='ouvrirRole(<?= (int) $u['id_user'] ?>, <?= json_encode($u['id_fonction']) ?>, <?= json_encode(mb_strtoupper($u['nom_ens']) . ' ' . ($u['prenom_ens'] ?? '')) ?>)'>
-                <i class="bi bi-shield-lock" style="font-size:.78rem"></i>
-              </button>
-              <a href="<?= APP_URL ?>/pages/utilisateurs/acces.php?id=<?= (int)$u['id_user'] ?>"
-                 class="btn btn-sm btn-light" style="padding:3px 7px" title="Privilèges — menus et sous-menus visibles">
-                <i class="bi bi-sliders" style="font-size:.78rem"></i>
-              </a>
             </td>
           </tr>
         <?php endforeach; endif; ?>
@@ -206,6 +148,5 @@ function ouvrirRole(idUser, roleActuel, nomAffiche) {
     new bootstrap.Modal(document.getElementById('modalRole')).show();
 }
 </script>
-<?php endif; ?>
 
 <?php require_once __DIR__ . '/../../layout/footer.php'; ?>
