@@ -114,9 +114,13 @@ return [
     // Configuration : le paramétrage que DIRECTEUR / FONDATEUR peuvent
     // enregistrer (structure de facturation) sans avoir accès au menu
     // Finances lui-même (séparation des pouvoirs, 11/09/2026).
+    // « Années & séquences » retirée le 15/09/2026 : la page
+    // (pages/parametres/index.php?onglet=annees) est désormais réservée au
+    // propriétaire (voir pages/parametres/index.php) — plus rien
+    // d'actionnable ici pour Directeur/Fondateur, l'entrée n'avait donc
+    // plus lieu d'être dans ce menu de raccourcis.
     'Configuration' => [
         ['Frais & obligations',    'pages/finances/obligations.php', 'card-checklist', ['DIRECTEUR','FONDATEUR','SECRETAIRE','COMPTABLE']],
         ['Catégories de dépenses', 'pages/depenses/categories.php',  'tags',           ['DIRECTEUR','FONDATEUR','SECRETAIRE','COMPTABLE']],
-        ['Années & séquences',     'pages/parametres/index.php?onglet=annees', 'calendar-range', ['DIRECTEUR','FONDATEUR']],
     ],
 ];
