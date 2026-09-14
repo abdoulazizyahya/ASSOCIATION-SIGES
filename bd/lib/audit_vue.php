@@ -98,7 +98,12 @@ function audit_vue_evenement_badge(array $l): string
  *   2) modèle commercial transmis par le navigateur (Android seulement,
  *      ex. « TECNO L34 » — iPhone/iPad/ordinateur ne le transmettent jamais)
  *   3) type générique (Ordinateur / Tablette / Téléphone)
- * Navigateur/OS redescendent toujours en détail secondaire.
+ * Détail secondaire : type (si le libellé principal l'a remplacé) + OS —
+ * PAS le navigateur (demande explicite du 15/09/2026, jugé pas utile ici).
+ * Adresse MAC délibérément absente : AUCUNE techno web n'y donne accès,
+ * même en JavaScript — un navigateur ne la transmet jamais à un site,
+ * quel que soit le réseau (contrairement au modèle Android, ce n'est pas
+ * une limite qu'on pourrait lever plus tard).
  */
 function audit_vue_appareil(array $l): string
 {
@@ -109,10 +114,8 @@ function audit_vue_appareil(array $l): string
     $modele = trim((string) ($l['ua_modele'] ?? ''));
 
     $lib = $nom !== '' ? $nom : ($modele !== '' ? $modele : $type);
-    // Détail secondaire : tout ce qui n'est pas déjà le libellé principal.
     $reste = array_filter([
         $nom !== '' && $modele !== '' ? $modele : ($nom !== '' ? $type : null),
-        $l['ua_navigateur'] ?? null,
         $l['ua_os'] ?? null,
     ]);
     $detail = trim(implode(' · ', $reste));

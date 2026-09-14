@@ -197,7 +197,7 @@ $rc = $role_colors[$compte['id_fonction'] ?? ''] ?? ['bg' => '#f3f4f6', 'txt' =>
           // existe — sinon le type générique. Toujours suggéré, jamais
           // enregistré tant que le compte ne valide pas lui-même.
           $suggestion = $modele !== '' ? $modele : $type;
-          $detail = trim(implode(' · ', array_filter([$modele !== '' ? $type : null, $ap['ua_navigateur'] ?? null, $ap['ua_os'] ?? null])));
+          $detail = trim(implode(' · ', array_filter([$modele !== '' ? $type : null, $ap['ua_os'] ?? null])));
           $ici = $ap['device_id'] === $mon_appareil_actu;
         ?>
         <form method="post" class="d-flex align-items-center gap-2 py-2 border-bottom flex-wrap">
