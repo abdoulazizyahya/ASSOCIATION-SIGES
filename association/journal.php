@@ -146,10 +146,7 @@ asso_haut('Journal d\'audit');
       <?php foreach ($j['lignes'] as $l): ?>
         <tr>
           <td class="text-nowrap text-muted2"><?= h(date('d/m/Y H:i', strtotime($l['date']))) ?></td>
-          <td>
-            <?= h($l['acteur_login'] ?? '—') ?>
-            <?php if (!empty($l['acteur_nom'])): ?><span class="text-muted2 d-block" style="font-size:.72rem"><?= h($l['acteur_nom']) ?></span><?php endif; ?>
-          </td>
+          <td><?= h($l['acteur_login'] ?? '—') ?></td>
           <td><?= h(audit_vue_role($l['role'] ?? '')) ?></td>
           <td><?= $l['etab_code'] ? '<span class="font-monospace">' . h($l['etab_code']) . '</span>' : '<span class="text-muted2">—</span>' ?></td>
           <td><?= audit_vue_evenement_badge($l) ?></td>

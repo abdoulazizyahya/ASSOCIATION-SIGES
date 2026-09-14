@@ -138,10 +138,7 @@ require_once __DIR__ . '/../../layout/header.php';
       <?php foreach ($j['lignes'] as $l): ?>
         <tr>
           <td class="text-nowrap text-muted"><?= h(date('d/m/Y H:i', strtotime($l['date']))) ?></td>
-          <td>
-            <?= h($l['acteur_login'] ?? '—') ?>
-            <?php if (!empty($l['acteur_nom'])): ?><span class="text-muted d-block" style="font-size:.75rem"><?= h($l['acteur_nom']) ?></span><?php endif; ?>
-          </td>
+          <td><?= h($l['acteur_login'] ?? '—') ?></td>
           <td><?= h(audit_vue_role($l['role'] ?? '')) ?></td>
           <td><?= audit_vue_evenement_badge($l) ?></td>
           <td><?= audit_vue_appareil($l) ?></td>
