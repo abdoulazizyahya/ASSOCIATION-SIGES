@@ -165,11 +165,18 @@ function ecole_exec(mysqli $l, string $sql, array $params = []): int {
 //  $seed : ['nom','nom_en','sigle','ville'] pour amorcer la ligne
 //  `etablissement` locale (IDEtablissement=1) — sans elle : dashboard,
 //  en-têtes PDF et page Configurations en erreur « colonne indéfinie ».
+//  $type : 'primaire' (schema_ref_ecole.sql, comportement historique
+//  inchangé) ou 'secondaire' (schema_ref_ecole_secondaire.sql, porté de
+//  LAM_ABZ — voir plan « Intégration du secondaire »). Doit correspondre à
+//  etablissement.type_enseignement (annuaire) pour cette école.
 //  Retourne le nombre de tables créées. Lève une RuntimeException sur échec.
-function charger_schema_ecole(mysqli $l, array $seed): int {
-    $schema = @file_get_contents(__DIR__ . '/bd/assoc/schema_ref_ecole.sql');
+function charger_schema_ecole(mysqli $l, array $seed, string $type = 'primaire'): int {
+    $fichier = $type === 'secondaire'
+        ? __DIR__ . '/bd/assoc/schema_ref_ecole_secondaire.sql'
+        : __DIR__ . '/bd/assoc/schema_ref_ecole.sql';
+    $schema = @file_get_contents($fichier);
     if ($schema === false || trim($schema) === '') {
-        throw new RuntimeException('Schéma de référence introuvable (bd/assoc/schema_ref_ecole.sql).');
+        throw new RuntimeException('Schéma de référence introuvable (' . basename($fichier) . ').');
     }
     if (mysqli_multi_query($l, $schema)) {
         do { /* consommer tous les jeux de résultats */ } while (mysqli_next_result($l));
@@ -183,15 +190,11 @@ function charger_schema_ecole(mysqli $l, array $seed): int {
         throw new RuntimeException("Schéma incomplet ($nbTables tables).");
     }
 
-    // Données de référence communes (niveaux, compétences Fr/An, disciplines
-    // arabes, géographie, grades, barème APC par niveau…) — voir
-    // bd/assoc/seed_ref_ecole.sql. Absence tolérée (rétro-compat).
-    charger_seed_ref_ecole($l);
-
-    // Licence (bd/lib/licence.php, migration v56) : période d'ESSAI de 60
-    // jours par défaut — sans ça, une école toute neuve serait IMMÉDIATEMENT
-    // bloquée en écriture (licence_etat() fail-closed : aucune ligne =
-    // 'expiree'), avant même que le propriétaire ait pu générer une clé.
+    // Licence (bd/lib/licence.php, migration v56/v57) : période d'ESSAI de
+    // 60 jours par défaut — sans ça, une école toute neuve serait
+    // IMMÉDIATEMENT bloquée en écriture (licence_etat() fail-closed :
+    // aucune ligne = 'expiree'), avant même que le propriétaire ait pu
+    // générer une clé. Commun aux deux schémas (table `licence` identique).
     // Le propriétaire renouvelle/génère une clé ensuite normalement.
     if (function_exists('licence_signature')) {
         $lic_debut = date('Y-m-d');
@@ -204,6 +207,28 @@ function charger_schema_ecole(mysqli $l, array $seed): int {
         mysqli_stmt_execute($stl);
         mysqli_stmt_close($stl);
     }
+
+    if ($type === 'secondaire') {
+        // Amorce la ligne `etablissement` locale au format LAM_ABZ (colonnes
+        // nom_fr/nom_en/sigle/ville, pas IDEtablissement/Nom_Etab_Fr comme
+        // en primaire). Pas de provisionnement classes/trimestres/barème
+        // pour l'instant (schéma pédagogique secondaire pas encore branché
+        // à aucune page — voir étapes suivantes du plan).
+        $st = mysqli_prepare($l,
+            "INSERT INTO etablissement (id, nom_fr, nom_en, sigle, ville)
+             VALUES (1, ?, ?, ?, ?)
+             ON DUPLICATE KEY UPDATE nom_fr=VALUES(nom_fr), nom_en=VALUES(nom_en),
+                                     sigle=VALUES(sigle), ville=VALUES(ville)");
+        mysqli_stmt_bind_param($st, 'ssss', $seed['nom'], $seed['nom_en'], $seed['sigle'], $seed['ville']);
+        mysqli_stmt_execute($st);
+        mysqli_stmt_close($st);
+        return $nbTables;
+    }
+
+    // Données de référence communes (niveaux, compétences Fr/An, disciplines
+    // arabes, géographie, grades, barème APC par niveau…) — voir
+    // bd/assoc/seed_ref_ecole.sql. Absence tolérée (rétro-compat).
+    charger_seed_ref_ecole($l);
 
     $st = mysqli_prepare($l,
         "INSERT INTO etablissement (IDEtablissement, Nom_Etab_Fr, Nom_Etab_An, Initial_Etab, ville_etab)
