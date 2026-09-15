@@ -91,23 +91,28 @@ if (!$_db_ok) {
     exit;
 }
 
-// ── École secondaire : module pages/menu/dashboard pas encore construit ──
+// ── École secondaire : pages pas encore construites → page d'attente ────
 //  (schema_ref_ecole_secondaire.sql, porté de LAM_ABZ — noms de tables/
 //  colonnes différents du schéma primaire partout, ex. annee_scolaire.
-//  active au lieu de Etat_annee_scolaire) : TOUTE page « primaire » plante
-//  dès son premier appel (même layout/header.php, dès get_annee_active()).
-//  Interception ICI, avant que quoi que ce soit de primaire-spécifique ne
-//  s'exécute, plutôt que de laisser un Fatal error s'afficher — bug réel
-//  constaté le 15/09/2026 en créant une vraie école secondaire (CE) et en
-//  cliquant dessus. logout.php et login.php exemptés (jamais concernés :
-//  logout.php ne touche à aucune donnée école, login.php n'affiche que le
-//  formulaire avant toute authentification).
-if ($ETAB_COURANT
-    && (($ETAB_COURANT['type_enseignement'] ?? 'primaire') === 'secondaire')
-    && !in_array(basename($_SERVER['SCRIPT_NAME'] ?? ''), ['login.php', 'logout.php'], true)
-) {
-    require __DIR__ . '/secondaire_en_construction.php';
-    exit;
+//  active au lieu de Etat_annee_scolaire) : toute page « primaire » non
+//  encore rendue compatible plante dès son premier appel (get_annee_active(),
+//  menu_definition()…). Interception ICI, avant que quoi que ce soit de
+//  primaire-spécifique ne s'exécute — bug réel constaté le 15/09/2026.
+//  Laissés passer (déjà rendus compatibles, voir fonctions.php : get_annee_
+//  active()/get_sequence_active()/get_etablissement()/menu_definition()
+//  type-aware) : login.php, logout.php, dashboard.php (racine, type-aware
+//  lui aussi) et tout ce qui vit sous secondaire/ (module dédié). Tout le
+//  reste (pages/**) affiche la page d'attente plutôt qu'un Fatal error.
+if ($ETAB_COURANT && (($ETAB_COURANT['type_enseignement'] ?? 'primaire') === 'secondaire')) {
+    $_rel = str_replace('\\', '/', $_SERVER['SCRIPT_NAME'] ?? '');
+    $_app = rtrim((string) parse_url(APP_URL, PHP_URL_PATH), '/');
+    if ($_app !== '' && strpos($_rel, $_app . '/') === 0) $_rel = substr($_rel, strlen($_app) + 1);
+    $_rel = ltrim($_rel, '/');
+    $_ok  = in_array($_rel, ['login.php', 'logout.php', 'dashboard.php'], true) || str_starts_with($_rel, 'secondaire/');
+    if (!$_ok) {
+        require __DIR__ . '/secondaire_en_construction.php';
+        exit;
+    }
 }
 
 // ── Helper interne : prépare, lie les paramètres, exécute ────────────

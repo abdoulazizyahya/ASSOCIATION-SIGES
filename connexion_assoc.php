@@ -2096,6 +2096,14 @@ function assoc_comptes_systeme(array $f, int $page = 1, int $par_page = 40): arr
     $stats = ['total' => 0, 'actifs' => 0, 'inactifs' => 0, 'dormants' => 0];
 
     foreach ($ecoles as $e) {
+        // École secondaire (schema_ref_ecole_secondaire.sql) : comptes dans
+        // `utilisateur` (self-contained), pas `user`⋈`enseignant` — la
+        // requête ci-dessous planterait (bug réel constaté le 15/09/2026,
+        // même famille que le fix migrations du commit 5632d52). Pas encore
+        // listée ici ; à ajouter quand le module secondaire aura son propre
+        // écran de comptes.
+        if (($e['type_enseignement'] ?? 'primaire') === 'secondaire') continue;
+
         try {
             $l = mysqli_connect(DB_HOST, DB_USER, DB_PASS, $e['db_name']);
             mysqli_set_charset($l, 'utf8mb4');

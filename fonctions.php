@@ -196,8 +196,15 @@ function exiger_connexion(): void {
         header('Location: ' . APP_URL . '/login.php?bloque=1');
         exit;
     }
+    // Questions secrètes (récupération de mot de passe) : repose sur
+    // user_question_secrete, table absente du schéma secondaire — ce
+    // parcours de configuration obligatoire n'est pas encore porté (comme
+    // configurer_securite.php lui-même). Sans cette exemption, le tout
+    // premier compte d'une école secondaire ne pouvait même pas atteindre
+    // le tableau de bord (Fatal error, bug réel constaté le 15/09/2026).
+    $secondaire = function_exists('type_enseignement_courant') && type_enseignement_courant() === 'secondaire';
     $exemptes = ['configurer_securite.php', 'logout.php'];
-    if (!in_array($script_courant, $exemptes, true) && !utilisateur_a_questions((int) ($_SESSION['user_id'] ?? 0))) {
+    if (!$secondaire && !in_array($script_courant, $exemptes, true) && !utilisateur_a_questions((int) ($_SESSION['user_id'] ?? 0))) {
         header('Location: ' . APP_URL . '/configurer_securite.php');
         exit;
     }
@@ -219,7 +226,10 @@ function exiger_connexion(): void {
 /** Définition unique du menu latéral (layout/menu.php), avec cache statique. */
 function menu_definition(): array {
     static $m = null;
-    if ($m === null) $m = require __DIR__ . '/layout/menu.php';
+    if ($m === null) {
+        $secondaire = function_exists('type_enseignement_courant') && type_enseignement_courant() === 'secondaire';
+        $m = require __DIR__ . ($secondaire ? '/layout/menu_secondaire.php' : '/layout/menu.php');
+    }
     return $m;
 }
 
@@ -382,6 +392,9 @@ function matricule_ens_courant(): ?string {
 // enseignat_classe/enseignat_classe_arabe pour l'année active — pas un 2e
 // rôle qui n'existe pas dans ce modèle de données.
 function agent_est_aussi_enseignant(): bool {
+    // Rôle COMPTABLE (et la double-casquette qu'il décrit) n'existe pas
+    // dans le schéma secondaire — enseignat_classe non plus. No-op.
+    if (function_exists('type_enseignement_courant') && type_enseignement_courant() === 'secondaire') return false;
     $mat = matricule_ens_courant();
     if (!$mat) return false;
     $val_annee = get_annee_active()['val_annee'] ?? '';
@@ -693,6 +706,33 @@ function date_fr(?string $d): string {
 // ── Données globales souvent utilisées ───────────────────────
 
 function get_annee_active(): array {
+    // École secondaire : annee_scolaire.active/.libelle (pas Etat_annee_
+    // scolaire/val_annee) — mêmes clés val_annee/Etat_annee_scolaire
+    // rajoutées en alias pour que TOUT le reste de l'appli (header.php,
+    // dashboard.php, etc.) continue de lire les mêmes clés sans distinguo.
+    if (function_exists('type_enseignement_courant') && type_enseignement_courant() === 'secondaire') {
+        $a = db_one("SELECT * FROM annee_scolaire WHERE active=1 LIMIT 1")
+            ?? db_one("SELECT * FROM annee_scolaire ORDER BY libelle DESC LIMIT 1");
+        if (!$a) {
+            // Aucune année scolaire : rien ne provisionne encore ce
+            // schéma à la création d'une école secondaire (voir commit
+            // fb21462). Sans repli, get_annee_active()['id'] reste NULL
+            // pour toujours -> aucune inscription possible nulle part
+            // (bug réel constaté le 15/09/2026 : élève créé, mais jamais
+            // inscrit, faute d'année). Auto-amorçage à l'usage plutôt
+            // qu'un écran dédié (hors scope de cette étape) : convention
+            // août->juillet, comme le seed primaire (bd/assoc/
+            // provisionner_ecole_neuve()).
+            $an = (int) date('n') >= 8 ? (int) date('Y') : (int) date('Y') - 1;
+            $libelle = $an . '-' . ($an + 1);
+            db_exec("INSERT IGNORE INTO annee_scolaire (libelle, active) VALUES (?, 1)", [$libelle]);
+            $a = db_one("SELECT * FROM annee_scolaire WHERE libelle=?", [$libelle]);
+        }
+        if (!$a) return ['val_annee' => '—', 'Etat_annee_scolaire' => 0, 'id' => null];
+        $a['val_annee'] = $a['libelle'];
+        $a['Etat_annee_scolaire'] = $a['active'];
+        return $a;
+    }
     return db_one("SELECT * FROM annee_scolaire WHERE Etat_annee_scolaire=1 LIMIT 1")
         ?? db_one("SELECT * FROM annee_scolaire ORDER BY val_annee DESC LIMIT 1")
         ?? ['val_annee' => '—', 'Etat_annee_scolaire' => 0];
@@ -702,7 +742,16 @@ function get_etablissement(): array {
     // Contexte neutre (multi-école, aucune choisie) : aucune identité d'école
     // — la page appelante doit afficher un habillage générique (login.php).
     if (function_exists('est_contexte_neutre') && est_contexte_neutre()) return [];
-    return db_one("SELECT * FROM etablissement LIMIT 1") ?? [];
+    $e = db_one("SELECT * FROM etablissement LIMIT 1") ?? [];
+    // École secondaire (schema_ref_ecole_secondaire.sql, porté de LAM_ABZ) :
+    // colonnes nom_fr/sigle au lieu de Nom_Etab_Fr/Initial_Etab — alias
+    // ajoutés ICI plutôt que de réécrire chaque lecture éparpillée dans
+    // layout/header.php etc. (logo est déjà le même nom des deux côtés).
+    if ($e && function_exists('type_enseignement_courant') && type_enseignement_courant() === 'secondaire') {
+        $e['Nom_Etab_Fr'] = $e['nom_fr'] ?? '';
+        $e['Initial_Etab'] = $e['sigle'] ?? '';
+    }
+    return $e;
 }
 
 // ── Isolation des fichiers uploadés par école (multi-établissement) ──────
@@ -757,6 +806,18 @@ function pdf_fill($pdf, string $cle): void {
 }
 
 function get_sequence_active(): array {
+    // École secondaire : sequence.active/.libelle + trimestre.id/.libelle
+    // (pas etat/libelle_seq/id_trim/libelle_trim) — alias libelle_seq
+    // rajouté (lu par header.php) comme pour get_annee_active() ci-dessus.
+    if (function_exists('type_enseignement_courant') && type_enseignement_courant() === 'secondaire') {
+        $s = db_one(
+            "SELECT s.*, t.libelle AS libelle_trim
+             FROM sequence s JOIN trimestre t ON t.id = s.id_trim
+             WHERE s.active = 1 LIMIT 1"
+        ) ?? [];
+        if ($s) $s['libelle_seq'] = $s['libelle'];
+        return $s;
+    }
     return db_one(
         "SELECT s.*, t.libelle_trim
          FROM sequence s JOIN trimestre t ON t.id_trim = s.id_trim
@@ -1282,6 +1343,13 @@ function libelle_role(string $role): string {
         'SECRETAIRE' => 'Secrétaire',
         'COMPTABLE'  => 'Agent financier / Comptable',
         'MEMBRE_ASSOCIATION' => 'Membre de l\'association',
+        // Rôles école SECONDAIRE (utilisateur.role, schema_ref_ecole_secondaire.sql
+        // — vocabulaire LAM_ABZ, distinct des rôles primaire ci-dessus).
+        'ADMIN'      => 'Administrateur',
+        'PROVISEUR'  => 'Proviseur(e)',
+        'CENSEUR'    => 'Censeur(e)',
+        'SG'         => 'Surveillant(e) Général(e)',
+        'INTENDANT'  => 'Intendant(e)',
         default      => $role,
     };
 }
@@ -1304,6 +1372,26 @@ function fonctions_assignables(): array {
         array_column(db_all("SELECT id_fonction FROM fonction ORDER BY id_fonction"), 'id_fonction'),
         $exclues
     ));
+}
+
+// ── Matricule élève — école SECONDAIRE (schema_ref_ecole_secondaire.sql,
+//    porté de LAM_ABZ) ─────────────────────────────────────────────────
+// Format simple <SIGLE><AA><4 chiffres>, ex. « CE260001 » — porté tel quel
+// de LAM_ABZ::gen_matricule(). Nom distinct de gen_matricule() (primaire,
+// plus haut dans ce fichier — format/périmètre configurables, table
+// matricule_config) : deux systèmes de matricule différents, jamais
+// interchangeables, une confusion de nom aurait été dangereuse ici.
+function gen_matricule_secondaire(): string {
+    $etab  = db_one("SELECT sigle FROM etablissement LIMIT 1");
+    $sigle = preg_replace('/[^A-Z0-9]/', '', strtoupper($etab['sigle'] ?? 'SEC'));
+    $annee = date('y');
+    $next  = (int) db_val("SELECT COALESCE(MAX(id), 0) + 1 FROM eleve");
+    do {
+        $mat    = $sigle . $annee . str_pad((string) $next, 4, '0', STR_PAD_LEFT);
+        $existe = db_val("SELECT COUNT(*) FROM eleve WHERE matricule = ?", [$mat]);
+        $next++;
+    } while ($existe);
+    return $mat;
 }
 
 // ── Finances : numéro de reçu ───────────────────────────────

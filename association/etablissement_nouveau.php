@@ -49,8 +49,10 @@ asso_haut('Nouvel établissement');
       Crée une base de données dédiée <span class="font-monospace">promeducam_&lt;nom simplifié&gt;</span>,
       y installe le schéma de référence à jour, puis inscrit l'école à l'annuaire.
     <?php endif; ?>
-    Ensuite : créer un compte <strong>DIRECTEUR</strong> via
-    <a href="<?= APP_URL ?>/association/personnel/affecter.php">Personnel → Affecter</a>.
+    Ensuite : pour une école <strong>primaire</strong>, créer un compte <strong>DIRECTEUR</strong> via
+    <a href="<?= APP_URL ?>/association/personnel/affecter.php">Personnel → Affecter</a> ; pour une école
+    <strong>secondaire</strong>, créer le premier compte via
+    <a href="<?= APP_URL ?>/association/personnel/compte_secondaire.php">Personnel → Nouveau compte (secondaire)</a>.
   </p>
   <form method="post" class="row g-2">
     <input type="hidden" name="csrf" value="<?= h(csrf_generer()) ?>">

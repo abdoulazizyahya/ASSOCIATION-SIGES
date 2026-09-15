@@ -15,6 +15,15 @@ require_once __DIR__ . '/notes_apc.php';
 require_once __DIR__ . '/paie_fonctions.php'; // solde_avance()
 exiger_connexion();
 
+// École secondaire : tout le reste de ce fichier interroge des tables
+// primaire (eleve.statut, paiement_frais, enseignat_classe…) absentes du
+// schéma secondaire — bloc dédié, séparé tôt, avant la moindre requête
+// primaire (même principe que secondaire_en_construction.php/connexion.php).
+if (function_exists('type_enseignement_courant') && type_enseignement_courant() === 'secondaire') {
+    require __DIR__ . '/secondaire/dashboard_contenu.php';
+    exit;
+}
+
 $role      = role_connecte();
 // Visibilité par rôle. Séparation des pouvoirs (11/09/2026) : le DIRECTEUR
 // ne voit plus aucune donnée financière (capacite_finances() = false pour

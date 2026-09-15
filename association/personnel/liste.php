@@ -121,6 +121,9 @@ $ong_url = fn(string $o) => APP_URL . '/association/personnel/liste.php?onglet='
   <a href="<?= APP_URL ?>/association/personnel/affecter.php" class="btn btn-primary btn-sm">
     <i class="bi bi-arrow-left-right me-1"></i>Affecter un agent à une école
   </a>
+  <a href="<?= APP_URL ?>/association/personnel/compte_secondaire.php" class="btn btn-outline-primary btn-sm">
+    <i class="bi bi-person-plus me-1"></i>Nouveau compte (école secondaire)
+  </a>
   <?php endif; ?>
 </p>
 

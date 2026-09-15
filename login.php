@@ -45,18 +45,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } elseif ($login === '' || $mdp === '') {
         $erreur = 'Veuillez remplir tous les champs.';
     } else {
-        // user.actif (migration_v54) : compte désactivé => connexion refusée,
-        // sans révéler si c'est l'identifiant ou le statut qui bloque.
-        $a_statut = db_colonne_existe('user', 'actif');
-        $col_actif = $a_statut ? ', u.actif' : '';
-        $u = db_one(
-            "SELECT u.id_user, u.login_user, u.pwd_user, u.matricule_ens $col_actif,
-                    e.nom_ens, e.prenom_ens, e.id_fonction
-             FROM user u
-             JOIN enseignant e ON e.matricule_ens = u.matricule_ens
-             WHERE u.login_user = ? LIMIT 1",
-            [$login]
-        );
+        // École secondaire (schema_ref_ecole_secondaire.sql) : comptes dans
+        // `utilisateur` (self-contained — nom/prenom/login/mot_de_passe/
+        // role/actif directement dessus), pas user⋈enseignant comme en
+        // primaire. $ec n'est posé que si $choix_ecole (multi-établissement) ;
+        // une installation mono-école reste toujours primaire.
+        $secondaire = ($ec['type_enseignement'] ?? 'primaire') === 'secondaire';
+
+        if ($secondaire) {
+            $u = db_one("SELECT id, login, mot_de_passe, role, actif, nom, prenom FROM utilisateur WHERE login = ? LIMIT 1", [$login]);
+            $u_id = $u['id'] ?? null; $u_pwd_hash = $u['mot_de_passe'] ?? ''; $u_actif = (int) ($u['actif'] ?? 0);
+        } else {
+            // user.actif (migration_v54) : compte désactivé => connexion refusée,
+            // sans révéler si c'est l'identifiant ou le statut qui bloque.
+            $a_statut = db_colonne_existe('user', 'actif');
+            $col_actif = $a_statut ? ', u.actif' : '';
+            $u = db_one(
+                "SELECT u.id_user, u.login_user, u.pwd_user, u.matricule_ens $col_actif,
+                        e.nom_ens, e.prenom_ens, e.id_fonction
+                 FROM user u
+                 JOIN enseignant e ON e.matricule_ens = u.matricule_ens
+                 WHERE u.login_user = ? LIMIT 1",
+                [$login]
+            );
+            $u_id = $u['id_user'] ?? null; $u_pwd_hash = $u['pwd_user'] ?? ''; $u_actif = $a_statut ? (int) ($u['actif'] ?? 0) : 1;
+        }
         $id_etab_ctx = $ec['id'] ?? (function_exists('ecole_courante') ? (ecole_courante()['id'] ?? null) : null);
         require_once __DIR__ . '/bd/lib/audit.php';
         // Licence (bd/lib/licence.php) : blocage anti-brute-force sur la
@@ -66,19 +79,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (function_exists('licence_bloque') && licence_bloque()) {
             audit_log('connexion_echec', ['login' => $login, 'id_etab' => $id_etab_ctx, 'cible' => 'licence bloquée']);
             $erreur = "Accès bloqué : trop de tentatives de clé de licence invalides. Contactez le propriétaire de l'association.";
-        } elseif ($u && password_verify($mdp, $u['pwd_user']) && (!$a_statut || (int) $u['actif'] === 1)) {
-            if (db_colonne_existe('user', 'derniere_connexion')) {
+        } elseif ($u && password_verify($mdp, $u_pwd_hash) && $u_actif === 1) {
+            if (!$secondaire && db_colonne_existe('user', 'derniere_connexion')) {
                 // Écriture best-effort : bug réel trouvé en test le
                 // 13/09/2026 — sans ce try/catch, une licence expirée
                 // (bd/lib/licence.php) bloquait CETTE écriture non
                 // essentielle et empêchait TOUTE connexion (y compris pour
                 // atteindre la page Licence et corriger la situation).
-                try { db_exec("UPDATE user SET derniere_connexion = NOW() WHERE id_user = ?", [$u['id_user']]); }
+                try { db_exec("UPDATE user SET derniere_connexion = NOW() WHERE id_user = ?", [$u_id]); }
                 catch (\Throwable $e) { /* jamais bloquant — simple horodatage */ }
             }
-            $_SESSION['user_id'] = $u['id_user'];
-            $_SESSION['user']    = [
-                'id'            => $u['id_user'],
+            $_SESSION['user_id'] = $u_id;
+            $_SESSION['user']    = $secondaire ? [
+                'id'     => $u_id,
+                'nom'    => $u['nom'],
+                'prenom' => $u['prenom'],
+                'role'   => $u['role'],
+                'login'  => $u['login'],
+            ] : [
+                'id'            => $u_id,
                 'matricule_ens' => $u['matricule_ens'],
                 'nom'           => $u['nom_ens'],
                 'prenom'        => $u['prenom_ens'],
@@ -86,9 +105,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'login'         => $u['login_user'],
             ];
             session_regenerate_id(true);
-            audit_log('connexion', ['id_etab' => $id_etab_ctx, 'role' => $u['id_fonction']]);
+            audit_log('connexion', ['id_etab' => $id_etab_ctx, 'role' => $_SESSION['user']['role']]);
             header('Location: ' . APP_URL . '/dashboard.php'); exit;
-        } elseif ($u && password_verify($mdp, $u['pwd_user']) && $a_statut && (int) $u['actif'] !== 1) {
+        } elseif ($u && password_verify($mdp, $u_pwd_hash) && $u_actif !== 1) {
             audit_log('connexion_echec', ['login' => $login, 'id_etab' => $id_etab_ctx, 'cible' => 'compte désactivé']);
             $erreur = "Ce compte a été désactivé. Contactez l'administration de l'établissement.";
         } else {
