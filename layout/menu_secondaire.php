@@ -25,4 +25,7 @@ return [
         ['Élèves',  'secondaire/pages/eleves/liste.php',  'people',    ['ADMIN','PROVISEUR','CENSEUR','SG','SECRETAIRE']],
         ['Classes', 'secondaire/pages/classes/liste.php', 'door-open', ['ADMIN','PROVISEUR','CENSEUR']],
     ],
+    'Ressources humaines' => [
+        ['Enseignants', 'secondaire/pages/enseignants/liste.php', 'person-badge', ['ADMIN','PROVISEUR','CENSEUR']],
+    ],
 ];
