@@ -91,6 +91,25 @@ if (!$_db_ok) {
     exit;
 }
 
+// ── École secondaire : module pages/menu/dashboard pas encore construit ──
+//  (schema_ref_ecole_secondaire.sql, porté de LAM_ABZ — noms de tables/
+//  colonnes différents du schéma primaire partout, ex. annee_scolaire.
+//  active au lieu de Etat_annee_scolaire) : TOUTE page « primaire » plante
+//  dès son premier appel (même layout/header.php, dès get_annee_active()).
+//  Interception ICI, avant que quoi que ce soit de primaire-spécifique ne
+//  s'exécute, plutôt que de laisser un Fatal error s'afficher — bug réel
+//  constaté le 15/09/2026 en créant une vraie école secondaire (CE) et en
+//  cliquant dessus. logout.php et login.php exemptés (jamais concernés :
+//  logout.php ne touche à aucune donnée école, login.php n'affiche que le
+//  formulaire avant toute authentification).
+if ($ETAB_COURANT
+    && (($ETAB_COURANT['type_enseignement'] ?? 'primaire') === 'secondaire')
+    && !in_array(basename($_SERVER['SCRIPT_NAME'] ?? ''), ['login.php', 'logout.php'], true)
+) {
+    require __DIR__ . '/secondaire_en_construction.php';
+    exit;
+}
+
 // ── Helper interne : prépare, lie les paramètres, exécute ────────────
 //  Tous les paramètres sont liés en type « s » (chaîne) : MySQL applique
 //  la conversion implicite pour les entiers/dates, et une valeur PHP null
