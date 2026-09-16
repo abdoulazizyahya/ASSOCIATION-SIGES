@@ -898,7 +898,12 @@ function get_sequence_active(): array {
 function get_trimestre_actif(): array {
     $annee = get_annee_active();
     if (empty($annee['id'])) return [];
-    $t = db_one("SELECT * FROM trimestre WHERE id_annee=? AND active=1 LIMIT 1", [$annee['id']]);
+    $t = db_one(
+        "SELECT t.*, a.libelle AS annee_lib FROM trimestre t
+         JOIN annee_scolaire a ON a.id=t.id_annee
+         WHERE t.id_annee=? AND t.active=1 LIMIT 1",
+        [$annee['id']]
+    );
     if (!$t) {
         $existe = db_val("SELECT COUNT(*) FROM trimestre WHERE id_annee=?", [$annee['id']]);
         if (!$existe) {
@@ -907,9 +912,86 @@ function get_trimestre_actif(): array {
                         [$lib, $i + 1, $annee['id'], $i === 0 ? 1 : 0]);
             }
         }
-        $t = db_one("SELECT * FROM trimestre WHERE id_annee=? AND active=1 LIMIT 1", [$annee['id']]);
+        $t = db_one(
+            "SELECT t.*, a.libelle AS annee_lib FROM trimestre t
+             JOIN annee_scolaire a ON a.id=t.id_annee
+             WHERE t.id_annee=? AND t.active=1 LIMIT 1",
+            [$annee['id']]
+        );
+    }
+    // Chaque trimestre est subdivisé en 2 séquences — système d'évaluation
+    // historique de LAM_ABZ (table `sequence`), toujours utilisé par
+    // secondaire/pages/notes/ (onglets élève/copie/non saisies,
+    // get_sequence_active() déjà type-aware dans ce fichier) alors même que
+    // l'onglet « par classe » est déjà passé aux compétences par trimestre.
+    // Amorçage DÉCOUPLÉ de celui des trimestres ci-dessus (bug réel constaté
+    // le 16/09/2026, étape 9/Notes : une école dont les trimestres avaient
+    // déjà été créés par un appel antérieur de cette fonction — étape 8 —
+    // n'obtenait jamais aucune séquence, le bloc d'amorçage n'étant imbriqué
+    // que dans la branche « trimestre absent »). Vérifié à CHAQUE appel,
+    // indépendamment de l'existence des trimestres. La 1ʳᵉ séquence du 1ᵉʳ
+    // trimestre est active par défaut, comme le trimestre lui-même.
+    if (!db_val("SELECT COUNT(*) FROM sequence s JOIN trimestre t ON t.id=s.id_trim WHERE t.id_annee=?", [$annee['id']])) {
+        $trims = db_all("SELECT id, ordre FROM trimestre WHERE id_annee=? ORDER BY ordre", [$annee['id']]);
+        foreach ($trims as $i => $tr) {
+            foreach (['Séquence 1', 'Séquence 2'] as $j => $lib_s) {
+                db_exec("INSERT INTO sequence (libelle, ordre, active, id_trim) VALUES (?, ?, ?, ?)",
+                        [$lib_s, $j + 1, ($i === 0 && $j === 0) ? 1 : 0, $tr['id']]);
+            }
+        }
     }
     return $t ?: [];
+}
+
+// Désactive toute séquence dont la date de fin est passée, puis active
+// celle couvrant aujourd'hui s'il n'y en a plus aucune d'active — porté de
+// LAM_ABZ/fonctions.php. No-op tant que date_debut/date_fin ne sont pas
+// renseignées (pas encore d'écran Paramètres secondaire pour ça) : la
+// séquence choisie par le bootstrap de get_trimestre_actif() reste active.
+function auto_activer_sequences(): void {
+    db_exec("UPDATE sequence SET active=0 WHERE date_fin IS NOT NULL AND date_fin < CURDATE()");
+    $nb_active = (int) db_val("SELECT COUNT(*) FROM sequence WHERE active=1");
+    if ($nb_active === 0) {
+        $a = db_one(
+            "SELECT id FROM sequence
+             WHERE date_debut IS NOT NULL AND date_fin IS NOT NULL
+               AND date_debut <= CURDATE() AND date_fin >= CURDATE()
+             ORDER BY date_debut DESC LIMIT 1"
+        );
+        if ($a) db_exec("UPDATE sequence SET active=1 WHERE id=?", [$a['id']]);
+    }
+}
+
+// ── Cote/appréciation sur 20 (secondaire, système APC de LAM_ABZ) ──────
+// Portées telles quelles depuis LAM_ABZ/fonctions.php — utilisées par
+// secondaire/pages/notes/ (saisie par classe/élève).
+function appreciation($note): array {
+    $n = ($note === null || $note === '') ? -1 : (float) $note;
+    if ($n < 0)  return ['COTE' => '',   'APPR1_FR' => '',                          'APPR2_FR' => ''];
+    if ($n < 10) return ['COTE' => 'D',  'APPR1_FR' => 'Compétences non acquises',  'APPR2_FR' => 'CNA'];
+    if ($n < 12) return ['COTE' => 'C',  'APPR1_FR' => 'Compétences moy. acquises', 'APPR2_FR' => 'CMA'];
+    if ($n < 14) return ['COTE' => 'C+', 'APPR1_FR' => 'Compétences acquises',      'APPR2_FR' => 'CA'];
+    if ($n < 15) return ['COTE' => 'B',  'APPR1_FR' => 'Compétences bien acquises', 'APPR2_FR' => 'CBA'];
+    if ($n < 16) return ['COTE' => 'B+', 'APPR1_FR' => 'Compétences bien acquises', 'APPR2_FR' => 'CBA'];
+    if ($n < 18) return ['COTE' => 'A',  'APPR1_FR' => 'Compétences TB acquises',   'APPR2_FR' => 'CTBA'];
+    return            ['COTE' => 'A+', 'APPR1_FR' => 'Compétences TB acquises',   'APPR2_FR' => 'CTBA'];
+}
+
+function appr_color(string $cote): string {
+    if ($cote === 'A+' || $cote === 'A') return '#15803d';
+    if ($cote === 'B+' || $cote === 'B') return '#1d4ed8';
+    if ($cote === 'C+')                   return '#ca8a04';
+    if ($cote === 'C')                    return '#d97706';
+    if ($cote === 'D')                    return '#dc2626';
+    return '#374151';
+}
+
+function appr_badge(array $a): string {
+    if ($a['COTE'] === '') return '';
+    $col = appr_color($a['COTE']);
+    return '<span style="color:' . $col . ';font-weight:700">' . h($a['COTE']) . '</span>'
+         . ' <span style="color:#374151">' . h($a['APPR1_FR']) . '</span>'
+         . ' <span style="color:#9ca3af;font-size:.7rem">(' . h($a['APPR2_FR']) . ')</span>';
 }
 
 // ── Passage en classe supérieure automatique (migration_v36) ───────────

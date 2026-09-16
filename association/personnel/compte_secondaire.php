@@ -24,13 +24,23 @@ $ROLES  = ['ADMIN', 'PROVISEUR', 'CENSEUR', 'SG', 'SECRETAIRE', 'ENSEIGNANT', 'I
 $id_cible = (int) ($_GET['etab'] ?? $_POST['id_cible'] ?? 0);
 $msg = ''; $err = '';
 
+// Enseignants de l'école ciblée, pour lier (optionnel) le compte créé à une
+// fiche RH existante — utilisateur.matricule_ens (FK -> enseignant), lu par
+// login.php pour peupler $_SESSION['user']['matricule_ens'] : sans ce lien,
+// un compte ENSEIGNANT ne peut jamais être restreint à ses propres classes
+// dans secondaire/pages/notes/ (matricule_ens_courant() resterait null).
+$enseignants = $id_cible
+    ? avec_ecole($id_cible, fn($l) => ecole_all($l, "SELECT matricule_ens, nom_ens, prenom_ens FROM enseignant ORDER BY nom_ens, prenom_ens"))
+    : [];
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     csrf_verifier();
-    $nom    = trim($_POST['nom'] ?? '');
-    $prenom = trim($_POST['prenom'] ?? '');
-    $login  = trim($_POST['login'] ?? '');
-    $pwd    = (string) ($_POST['pwd'] ?? '');
-    $role   = in_array($_POST['role'] ?? '', $ROLES, true) ? $_POST['role'] : 'SECRETAIRE';
+    $nom       = trim($_POST['nom'] ?? '');
+    $prenom    = trim($_POST['prenom'] ?? '');
+    $login     = trim($_POST['login'] ?? '');
+    $pwd       = (string) ($_POST['pwd'] ?? '');
+    $role      = in_array($_POST['role'] ?? '', $ROLES, true) ? $_POST['role'] : 'SECRETAIRE';
+    $mat_ens_p = (int) ($_POST['matricule_ens'] ?? 0) ?: null;
 
     if (!$id_cible) {
         $err = 'Choisissez un établissement.';
@@ -48,8 +58,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             } else {
                 avec_ecole($id_cible, fn($l) => ecole_exec(
                     $l,
-                    "INSERT INTO utilisateur (nom, prenom, login, mot_de_passe, role, actif) VALUES (?, ?, ?, ?, ?, 1)",
-                    [$nom, $prenom ?: null, $login, password_hash($pwd, PASSWORD_DEFAULT), $role]
+                    "INSERT INTO utilisateur (nom, prenom, login, mot_de_passe, role, actif, matricule_ens) VALUES (?, ?, ?, ?, ?, 1, ?)",
+                    [$nom, $prenom ?: null, $login, password_hash($pwd, PASSWORD_DEFAULT), $role, $mat_ens_p]
                 ));
                 journaliser_action('compte_ecole_creer_secondaire', $id_cible, $login . ' (' . $role . ')');
                 $msg = "Compte « $login » créé (" . libelle_role($role) . ").";
@@ -75,7 +85,8 @@ asso_haut('Créer un compte — école secondaire');
 
     <div class="col-12">
       <label class="form-label small fw-bold">Établissement</label>
-      <select name="id_cible" class="form-select form-select-sm" required>
+      <select name="id_cible" class="form-select form-select-sm" required
+              onchange="if(this.value) location.href='?etab='+this.value">
         <option value="">— Choisir —</option>
         <?php foreach ($ecoles as $e): ?>
           <option value="<?= (int) $e['id'] ?>" <?= $id_cible === (int) $e['id'] ? 'selected' : '' ?>><?= h($e['nom']) ?></option>
@@ -106,6 +117,23 @@ asso_haut('Créer un compte — école secondaire');
         <?php endforeach; ?>
       </select>
     </div>
+
+    <?php if ($enseignants): ?>
+    <div class="col-12">
+      <label class="form-label small">
+        Lier à un enseignant (optionnel)
+        <i class="bi bi-info-circle text-muted" title="Nécessaire pour qu'un compte Enseignant ne voie que ses propres classes dans Notes."></i>
+      </label>
+      <select name="matricule_ens" class="form-select form-select-sm">
+        <option value="">— Aucun —</option>
+        <?php foreach ($enseignants as $ens): ?>
+          <option value="<?= (int) $ens['matricule_ens'] ?>">
+            <?= h(trim($ens['nom_ens'] . ' ' . ($ens['prenom_ens'] ?? ''))) ?>
+          </option>
+        <?php endforeach; ?>
+      </select>
+    </div>
+    <?php endif; ?>
 
     <div class="col-12">
       <button class="btn btn-primary btn-sm"><i class="bi bi-check-lg me-1"></i>Créer le compte</button>

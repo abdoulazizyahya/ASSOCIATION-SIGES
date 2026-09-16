@@ -53,7 +53,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $secondaire = ($ec['type_enseignement'] ?? 'primaire') === 'secondaire';
 
         if ($secondaire) {
-            $u = db_one("SELECT id, login, mot_de_passe, role, actif, nom, prenom FROM utilisateur WHERE login = ? LIMIT 1", [$login]);
+            $u = db_one("SELECT id, login, mot_de_passe, role, actif, nom, prenom, matricule_ens FROM utilisateur WHERE login = ? LIMIT 1", [$login]);
             $u_id = $u['id'] ?? null; $u_pwd_hash = $u['mot_de_passe'] ?? ''; $u_actif = (int) ($u['actif'] ?? 0);
         } else {
             // user.actif (migration_v54) : compte désactivé => connexion refusée,
@@ -91,11 +91,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
             $_SESSION['user_id'] = $u_id;
             $_SESSION['user']    = $secondaire ? [
-                'id'     => $u_id,
-                'nom'    => $u['nom'],
-                'prenom' => $u['prenom'],
-                'role'   => $u['role'],
-                'login'  => $u['login'],
+                'id'            => $u_id,
+                'nom'           => $u['nom'],
+                'prenom'        => $u['prenom'],
+                'role'          => $u['role'],
+                'login'         => $u['login'],
+                'matricule_ens' => $u['matricule_ens'],
             ] : [
                 'id'            => $u_id,
                 'matricule_ens' => $u['matricule_ens'],

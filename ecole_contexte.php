@@ -75,6 +75,22 @@ function est_fondateur(): bool {
 // est permise sur la page courante pour ce profil.
 function ecriture_module_permise(?string $role = null): bool {
     $role   = $role ?? (function_exists('role_connecte') ? role_connecte() : '');
+    // École secondaire : rôles (ADMIN/PROVISEUR/CENSEUR/SG/SECRETAIRE/
+    // ENSEIGNANT/INTENDANT) et pages (secondaire/pages/...) sans rapport avec
+    // la matrice primaire ci-dessous (DIRECTEUR/FONDATEUR/COMPTABLE/
+    // ENSEIGNANT/SECRETAIRE). Bug réel constaté le 16/09/2026 (étape 9,
+    // Notes) : les préfixes de chemin plus bas (ex. '/pages/notes/') matchent
+    // AUSSI secondaire/pages/notes/... par simple sous-chaîne — ADMIN n'étant
+    // dans aucune des listes de rôles primaire, l'écriture des notes était
+    // bloquée pour tout rôle secondaire sauf ENSEIGNANT/SECRETAIRE (mêmes
+    // noms que côté primaire, par coïncidence). Chaque page secondaire gère
+    // déjà ses propres restrictions (exiger_role() + logique interne
+    // is_admin/is_ens dans secondaire/pages/notes/, etc.) — pas de
+    // restriction supplémentaire ici, comme pour la « structure » primaire
+    // (retour true en bas de fonction).
+    if (function_exists('type_enseignement_courant') && type_enseignement_courant() === 'secondaire') {
+        return true;
+    }
     $script = str_replace('\\', '/', $_SERVER['SCRIPT_NAME'] ?? '');
     $base   = basename($script);
 
