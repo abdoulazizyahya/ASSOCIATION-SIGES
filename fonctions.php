@@ -777,6 +777,67 @@ function upload_dir_etab(string $base): string {
     return $dir;
 }
 
+// ── Filigrane généré depuis le logo de l'école (association/index.php) ──
+// Chemin relatif (sous assets/uploads/) du filigrane dérivé d'un logo :
+// même dossier, même nom, suffixe _filigrane.png (toujours PNG — canal
+// alpha nécessaire, indépendamment du format d'origine du logo).
+function chemin_filigrane_logo(string $chemin_logo): string {
+    $dir  = pathinfo($chemin_logo, PATHINFO_DIRNAME);
+    $nom  = pathinfo($chemin_logo, PATHINFO_FILENAME);
+    $pref = ($dir !== '' && $dir !== '.') ? $dir . '/' : '';
+    return $pref . $nom . '_filigrane.png';
+}
+
+// Génère (si absent ou périmé) une version « filigrane » d'un logo école :
+// niveau de gris + transparence, taille plafonnée. Utilisée en fond de
+// case sur association/index.php (une par école, dérivée de SON logo).
+// Idempotent et best-effort (jamais fatal — un logo illisible ne doit pas
+// casser la page) : retourne true si le fichier de destination existe à la
+// fin de l'appel, qu'il vienne d'être généré ou qu'il soit déjà à jour.
+function generer_filigrane_logo(string $source_abs, string $dest_abs): bool {
+    if (!is_file($source_abs)) return false;
+    if (is_file($dest_abs) && filemtime($dest_abs) >= filemtime($source_abs)) return true;
+    if (!extension_loaded('gd')) return false;
+
+    $ext = strtolower(pathinfo($source_abs, PATHINFO_EXTENSION));
+    $src = match ($ext) {
+        'png'         => @imagecreatefrompng($source_abs),
+        'jpg', 'jpeg' => @imagecreatefromjpeg($source_abs),
+        default       => null,
+    };
+    if (!$src) return false;
+
+    // Taille plafonnée : le filigrane n'a pas besoin d'être plus grand que
+    // ce qu'affiche la case école, pas la peine d'alourdir assets/uploads/.
+    $max = 500;
+    $w = imagesx($src);
+    $h = imagesy($src);
+    $ratio = min(1, $max / max($w, $h));
+    $nw = max(1, (int) round($w * $ratio));
+    $nh = max(1, (int) round($h * $ratio));
+
+    $dst = imagecreatetruecolor($nw, $nh);
+    imagealphablending($dst, true);
+    imagesavealpha($dst, true);
+    imagefill($dst, 0, 0, imagecolorallocatealpha($dst, 0, 0, 0, 127));
+    imagecopyresampled($dst, $src, 0, 0, 0, 0, $nw, $nh, $w, $h);
+    imagedestroy($src);
+
+    // Niveaux de gris + alpha réduit (~18% d'opacité) directement dans le
+    // fichier généré : le fond de case n'a besoin d'aucun style CSS
+    // d'opacité, l'image est DÉJÀ un filigrane.
+    imagealphablending($dst, false);
+    imagesavealpha($dst, true);
+    imagefilter($dst, IMG_FILTER_GRAYSCALE);
+    imagefilter($dst, IMG_FILTER_COLORIZE, 0, 0, 0, 105);
+
+    $dir = dirname($dest_abs);
+    if (!is_dir($dir)) @mkdir($dir, 0775, true);
+    $ok = imagepng($dst, $dest_abs);
+    imagedestroy($dst);
+    return $ok;
+}
+
 // ── Couleurs personnalisables du bulletin PDF (table pdf_couleur) ───
 // Mémoïsé (une seule requête par génération de PDF, même en mode lot —
 // pas 1 requête par appel SetFillColor() ni par élève imprimé). Clé

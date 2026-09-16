@@ -67,8 +67,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 // Préfixe par école (multi-établissement) : sinon l'upload
                 // d'une école écrase le logo d'une autre — voir upload_prefixe_etab().
                 $logo = upload_prefixe_etab() . 'logo_etab.' . $ext;
-                move_uploaded_file($_FILES['logo']['tmp_name'],
-                    upload_dir_etab(__DIR__ . '/../../assets/uploads') . 'logo_etab.' . $ext);
+                $logo_abs = upload_dir_etab(__DIR__ . '/../../assets/uploads') . 'logo_etab.' . $ext;
+                move_uploaded_file($_FILES['logo']['tmp_name'], $logo_abs);
+                // Filigrane pour la case école (association/index.php) —
+                // best-effort, ne bloque jamais l'enregistrement du reste.
+                generer_filigrane_logo($logo_abs, __DIR__ . '/../../assets/uploads/' . chemin_filigrane_logo($logo));
             }
         }
 

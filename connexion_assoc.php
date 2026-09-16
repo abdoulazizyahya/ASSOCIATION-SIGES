@@ -1862,6 +1862,27 @@ function assoc_ecole_logo_url(?string $logo): ?string {
 }
 
 /**
+ * URL du filigrane dérivé du logo d'une école (fond de case, association/
+ * index.php) — null si l'école n'a pas de logo. Génère le filigrane à la
+ * volée s'il manque encore (écoles dont le logo a été mis en ligne avant
+ * l'introduction de cette fonctionnalité) : mêmes chemins/nommage que
+ * chemin_filigrane_logo()/generer_filigrane_logo() (fonctions.php),
+ * réutilisés ici pour rester auto-réparant sans script de rattrapage.
+ */
+function assoc_ecole_filigrane_url(?string $logo): ?string {
+    $logo = trim((string) $logo);
+    if ($logo === '' || strpos($logo, '..') !== false) return null;
+    $logo_abs = __DIR__ . '/assets/uploads/' . $logo;
+    if (!is_file($logo_abs)) return null;
+    if (!function_exists('chemin_filigrane_logo') || !function_exists('generer_filigrane_logo')) return null;
+    $rel_fil = chemin_filigrane_logo($logo);
+    $fil_abs = __DIR__ . '/assets/uploads/' . $rel_fil;
+    generer_filigrane_logo($logo_abs, $fil_abs);
+    if (!is_file($fil_abs)) return null;
+    return APP_URL . '/assets/uploads/' . $rel_fil . '?v=' . filemtime($fil_abs);
+}
+
+/**
  * Rafraîchit `etablissement.logo` (annuaire) depuis la base d'une école —
  * best-effort, sans lever d'exception. À appeler quand on a déjà une
  * connexion ouverte sur la base école ($l), pour garder l'annuaire à jour

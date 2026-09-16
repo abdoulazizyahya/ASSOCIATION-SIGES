@@ -269,8 +269,18 @@ body.asso-nav-open .asso-backdrop { opacity: 1; visibility: visible; }
   box-shadow: var(--card-shadow-lg);
 }
 
-/* Filigrane « PRIMAIRE »/« SECONDAIRE » en fond de chaque case école
-   (association/index.php) — grand, majuscule, oblique, comme un tampon. */
+/* Zone du filigrane « PRIMAIRE »/« SECONDAIRE » (association/index.php) :
+   ne couvre QUE le bloc nom+logo de la case, jamais la rangée de boutons
+   Fiche/Ouvrir en dessous — sinon les boutons (opaques) coupent le mot en
+   plein milieu et le rendent illisible. Le filigrane reste donc toujours
+   entièrement visible, sans jamais passer derrière un bouton. */
+.ecole-filigrane-zone {
+  position: relative;
+  overflow: hidden;
+  border-radius: calc(var(--radius) - 4px);
+}
+
+/* « PRIMAIRE »/« SECONDAIRE » — grand, majuscule, oblique, comme un tampon. */
 .ecole-filigrane {
   position: absolute;
   inset: 0;
@@ -278,14 +288,29 @@ body.asso-nav-open .asso-backdrop { opacity: 1; visibility: visible; }
   align-items: center;
   justify-content: center;
   font-family: var(--font-heading);
-  font-size: clamp(1.8rem, 7vw, 2.6rem);
+  font-size: clamp(1.4rem, 6vw, 2rem);
   font-weight: 800;
-  letter-spacing: .08em;
+  letter-spacing: .06em;
   text-transform: uppercase;
   color: #dc2626;
-  opacity: .16;
-  transform: rotate(-22deg) scale(1.15);
+  opacity: .28;
+  transform: rotate(-18deg) scale(1.05);
   white-space: nowrap;
+  pointer-events: none;
+  user-select: none;
+  z-index: 0;
+}
+
+/* Variante image : filigrane généré depuis le logo de l'école (fonctions.php
+   ::generer_filigrane_logo(), déjà en niveaux de gris + alpha réduit dans
+   le fichier — la case n'a besoin que du gabarit/de l'inclinaison ici). */
+.ecole-filigrane-img {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 60%;
+  max-width: 220px;
+  transform: translate(-50%, -50%) rotate(-18deg);
   pointer-events: none;
   user-select: none;
   z-index: 0;
