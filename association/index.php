@@ -7,7 +7,8 @@ require_once __DIR__ . '/_layout.php';
 exiger_membre_association();
 
 $ecoles = assoc_all("SELECT * FROM etablissement ORDER BY actif DESC, nom");
-$superadmin = est_superadmin_association();
+$superadmin   = est_superadmin_association();
+$proprietaire = est_proprietaire_association();
 
 asso_haut('Établissements de l\'association');
 ?>
@@ -35,7 +36,12 @@ asso_haut('Établissements de l\'association');
               <?= h($e['ville'] ?? '') ?>
               <?php if (!$e['actif']): ?><span class="text-warning ms-1">(inactive)</span><?php endif; ?>
             </div>
-            <div class="small text-muted2 mt-1"><i class="bi bi-database me-1"></i><?= h($e['db_name']) ?></div>
+            <?php if ($proprietaire): ?>
+              <div class="small text-muted2 mt-1"><i class="bi bi-database me-1"></i><?= h($e['db_name']) ?></div>
+            <?php endif; ?>
+            <div class="small mt-1 fst-italic" style="color:#dc2626">
+              <?= $e['type_enseignement'] === 'secondaire' ? 'Secondaire' : 'Primaire' ?>
+            </div>
           </div>
           <div class="flex-shrink-0 d-flex align-items-center justify-content-center"
                style="width:96px;height:96px;border-radius:12px;overflow:hidden;background:#fff;border:1px solid var(--border)">
