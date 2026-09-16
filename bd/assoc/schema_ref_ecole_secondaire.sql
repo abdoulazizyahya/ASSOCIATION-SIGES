@@ -738,6 +738,24 @@ CREATE TABLE `trimestre` (
   CONSTRAINT `trimestre_ibfk_1` FOREIGN KEY (`id_annee`) REFERENCES `annee_scolaire` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB AUTO_INCREMENT=4 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
+DROP TABLE IF EXISTS `trimestre_annulation`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `trimestre_annulation` (
+  `id` int unsigned NOT NULL AUTO_INCREMENT,
+  `id_eleve` int unsigned NOT NULL,
+  `id_trim` int unsigned NOT NULL,
+  `motif` varchar(255) DEFAULT NULL,
+  `id_utilisateur` int unsigned DEFAULT NULL COMMENT 'Qui a annulé (traçabilité)',
+  `date_creation` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT 'Quand a été annulé',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_trimannul_eleve_trim` (`id_eleve`,`id_trim`),
+  KEY `idx_trimannul_trim` (`id_trim`),
+  CONSTRAINT `fk_trimannul_eleve` FOREIGN KEY (`id_eleve`) REFERENCES `eleve` (`id`) ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT `fk_trimannul_trim` FOREIGN KEY (`id_trim`) REFERENCES `trimestre` (`id`) ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT `fk_trimannul_util` FOREIGN KEY (`id_utilisateur`) REFERENCES `utilisateur` (`id`) ON DELETE SET NULL ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
 DROP TABLE IF EXISTS `tuteur`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;

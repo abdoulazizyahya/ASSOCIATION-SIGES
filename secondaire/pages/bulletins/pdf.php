@@ -6,7 +6,7 @@
 require_once __DIR__ . '/../../../config.php';
 require_once __DIR__ . '/../../../connexion.php';
 require_once __DIR__ . '/../../../fonctions.php';
-require_once __DIR__ . '../../pdf/verif_lib.php';
+require_once __DIR__ . '/../../pdf/verif_lib.php';
 
 // Accès public via le QR code du bulletin (jeton "vh" = hash de vérification
 // déjà calculé pour CE bulletin précis) : la personne qui scanne n'a pas de
@@ -26,8 +26,8 @@ if ($vh_verif !== '' && (int)($_GET['eleve'] ?? 0) > 0) {
 if (!$acces_public) {
     exiger_connexion();
 }
-require_once __DIR__ . '../../pdf/fpdf.php';
-require_once __DIR__ . '../../pdf/header_pdf.php';
+require_once __DIR__ . '/../../pdf/fpdf.php';
+require_once __DIR__ . '/../../pdf/header_pdf.php';
 
 //function u(string $s): string { return utf8_decode($s); }
 function u(string $s): string {
@@ -1146,8 +1146,8 @@ if ($h_rempli > 0.01) {
 // (le niveau de correction d'erreur qr-h tolère ~30% de perte, une photo
 // centrée sur ~20% de la surface reste donc scannable). Plus de légende
 // "Scannez..." sous le QR (supprimée, demande explicite).
-require_once __DIR__ . '../../pdf/verif_lib.php';
-require_once __DIR__ . '../../pdf/qrcode.php';
+require_once __DIR__ . '/../../pdf/verif_lib.php';
+require_once __DIR__ . '/../../pdf/qrcode.php';
 
 if ($h_rempli > 15) {
     $verif_url = bulletin_verif_url(

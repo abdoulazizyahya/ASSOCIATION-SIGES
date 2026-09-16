@@ -42,3 +42,22 @@ INSERT IGNORE INTO `serie` (`id`, `libelle`, `id_filiere`) VALUES
 (6, 'D', NULL),
 (7, 'Espagnol', NULL),
 (8, 'Italien', NULL);
+
+-- Opérateurs de paiement — 'CASH' (espèces) est un ID sentinelle en dur
+-- dans secondaire/pages/paiements/save.php (paiement en espèces = pas de
+-- canal électronique) ; paiement_frais.id_operateur a une FK NOT NULL vers
+-- cette table, donc toute école secondaire sans cette ligne ne peut
+-- enregistrer AUCUN paiement, même en espèces (bug réel constaté le
+-- 16/09/2026, étape 10 — vérification module Paiements). Logos copiés dans
+-- assets/uploads/operateurs/ (identiques à LAM_ABZ).
+-- logo = simple nom de fichier (les pages préfixent déjà elles-mêmes
+-- assets/uploads/operateurs/, ex. secondaire/pages/paiements/index.php).
+INSERT IGNORE INTO `operateur_paiement` (`id`, `libelle`, `logo`) VALUES
+('CASH', 'Espèces', 'cash.png'),
+('OM', 'Orange Money', 'om.png'),
+('MOMO', 'MTN Mobile Money', 'momo.jpg'),
+('AFRILAND', 'Afriland First Bank', 'afriland.png'),
+('CAMPOST', 'CAMPOST', 'campost.png'),
+('ECOBANK', 'Ecobank', 'ecobank.png'),
+('EU', 'Express Union', 'eu.png'),
+('UBA', 'UBA', 'uba.jpg');

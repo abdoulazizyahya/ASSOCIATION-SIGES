@@ -8,9 +8,9 @@ require_once __DIR__ . '/../../../config.php';
 require_once __DIR__ . '/../../../connexion.php';
 require_once __DIR__ . '/../../../fonctions.php';
 exiger_role(['ADMIN', 'PROVISEUR', 'CENSEUR', 'INTENDANT']);
-require_once __DIR__ . '../../pdf/fpdf.php';
-require_once __DIR__ . '../../pdf/header_pdf.php';
-require_once __DIR__ . '../../pdf/recu_paiement_render.php';
+require_once __DIR__ . '/../../pdf/fpdf.php';
+require_once __DIR__ . '/../../pdf/header_pdf.php';
+require_once __DIR__ . '/../../pdf/recu_paiement_render.php';
 
 // Dessine le bloc "FICHE DE PREINSCRIPTION" dans le cadre [$xi,$y0,$wi,$h0] —
 // extrait en fonction pour être appelé soit à sa vraie position (bas de
@@ -236,9 +236,9 @@ if ($apercu_frame === 'recu_fiche_bas') {
 }
 
 $id_paiement_repere = (int) min(array_column($versements, 'id'));
-require_once __DIR__ . '../../pdf/verif_paiement_lib.php';
+require_once __DIR__ . '/../../pdf/verif_paiement_lib.php';
 $qr_url = paiement_verif_url($id_paiement_repere, $numero_recu);
-require_once __DIR__ . '../../pdf/qrcode.php';
+require_once __DIR__ . '/../../pdf/qrcode.php';
 $qr_tmp = tempnam(sys_get_temp_dir(), 'abzqr_') . '.png';
 $qr_gen = new QRCode($qr_url, ['s' => 'qr-m']);
 $qr_img = $qr_gen->render_image();

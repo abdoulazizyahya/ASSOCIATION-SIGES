@@ -15,7 +15,7 @@
 require_once __DIR__ . '/../../../config.php';
 require_once __DIR__ . '/../../../connexion.php';
 require_once __DIR__ . '/../../../fonctions.php';
-require_once __DIR__ . '../../pdf/verif_honneur_lib.php';
+require_once __DIR__ . '/../../pdf/verif_honneur_lib.php';
 
 function u(string $s): string {
     return mb_convert_encoding($s, 'Windows-1252', 'UTF-8');
@@ -148,9 +148,9 @@ usort($qualifies, fn($a, $b) => $b['moy'] <=> $a['moy']);
 
 $titre_periode_full = ($is_annee_mode || $is_seq_mode) ? $periode_libelle : ('le compte du ' . $periode_libelle);
 
-require_once __DIR__ . '../../pdf/fpdf.php';
-require_once __DIR__ . '../../pdf/header_pdf.php'; // pour pdf_filigrane()
-require_once __DIR__ . '../../pdf/qrcode.php';
+require_once __DIR__ . '/../../pdf/fpdf.php';
+require_once __DIR__ . '/../../pdf/header_pdf.php'; // pour pdf_filigrane()
+require_once __DIR__ . '/../../pdf/qrcode.php';
 
 class PDF_TH extends FPDF {
     function RoundedRect($x, $y, $w, $h, $r, $style = '') {

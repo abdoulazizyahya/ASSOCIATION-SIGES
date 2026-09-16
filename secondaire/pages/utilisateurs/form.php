@@ -75,8 +75,14 @@ require_once __DIR__ . '/../../../layout/header.php';
       <div class="col-md-4">
         <label class="form-label">Rôle *</label>
         <select name="role" class="form-select" required>
-          <?php foreach (['ADMIN','PROVISEUR','CENSEUR','PROF','SECRETAIRE'] as $r): ?>
-            <option value="<?= $r ?>" <?= ($user['role'] ?? '') === $r ? 'selected' : '' ?>><?= $r ?></option>
+          <?php
+          // Valeurs alignées sur l'ENUM réel utilisateur.role (schema_ref_ecole_
+          // secondaire.sql) — le dropdown LAM_ABZ d'origine listait 'PROF'
+          // (inexistant dans l'ENUM, provoquerait une erreur SQL) et omettait
+          // SG/ENSEIGNANT/INTENDANT ; corrigé ici (bug source, pas un choix
+          // de conception à reproduire).
+          foreach (['ADMIN','PROVISEUR','CENSEUR','SG','SECRETAIRE','ENSEIGNANT','INTENDANT'] as $r): ?>
+            <option value="<?= $r ?>" <?= ($user['role'] ?? '') === $r ? 'selected' : '' ?>><?= h(libelle_role($r)) ?></option>
           <?php endforeach; ?>
         </select>
       </div>

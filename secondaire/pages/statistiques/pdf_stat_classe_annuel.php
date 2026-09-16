@@ -171,8 +171,8 @@ function fmt2(?float $v): string {
 }
 
 // ── Génération PDF ──────────────────────────────────────────────────────
-require_once __DIR__ . '../../pdf/fpdf.php';
-require_once __DIR__ . '../../pdf/header_pdf.php'; // pour pdf_filigrane()
+require_once __DIR__ . '/../../pdf/fpdf.php';
+require_once __DIR__ . '/../../pdf/header_pdf.php'; // pour pdf_filigrane()
 
 $pdf = new FPDF('P', 'mm', 'A4');
 $pdf->SetMargins(8, 8, 8);

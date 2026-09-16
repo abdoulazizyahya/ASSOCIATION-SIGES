@@ -9,7 +9,7 @@
 require_once __DIR__ . '/../../../config.php';
 require_once __DIR__ . '/../../../connexion.php';
 require_once __DIR__ . '/../../../fonctions.php';
-require_once __DIR__ . '../../pdf/verif_lib.php';
+require_once __DIR__ . '/../../pdf/verif_lib.php';
 
 // Accès public via le QR code du bulletin (jeton "vh") — voir pdf.php pour
 // l'explication ; ici la "période" est toujours l'année scolaire elle-même.
@@ -24,8 +24,8 @@ if ($vh_verif !== '' && (int)($_GET['eleve'] ?? 0) > 0 && (int)($_GET['annee'] ?
 if (!$acces_public) {
     exiger_connexion();
 }
-require_once __DIR__ . '../../pdf/fpdf.php';
-require_once __DIR__ . '../../pdf/header_pdf.php';
+require_once __DIR__ . '/../../pdf/fpdf.php';
+require_once __DIR__ . '/../../pdf/header_pdf.php';
 
 //function u(string $s): string { return utf8_decode($s); }
 function u(string $s): string {
@@ -1280,8 +1280,8 @@ if (($_GET['signature'] ?? '0') === '1') {
 // page, tout en bas, à 2-3mm au-dessus du copyright (demande explicite,
 // déplacé hors du cadre OBSERVATIONS), avec la photo de l'élève incrustée
 // au centre.
-require_once __DIR__ . '../../pdf/verif_lib.php';
-require_once __DIR__ . '../../pdf/qrcode.php';
+require_once __DIR__ . '/../../pdf/verif_lib.php';
+require_once __DIR__ . '/../../pdf/qrcode.php';
 
 $verif_url = bulletin_verif_url($id_eleve, 'annee', $id_annee, id_affichage_eleve($eleve));
 $qr_tmp = tempnam(sys_get_temp_dir(), 'abzqr_') . '.png';

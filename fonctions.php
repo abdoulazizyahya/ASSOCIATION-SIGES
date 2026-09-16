@@ -383,6 +383,18 @@ function matricule_ens_courant(): ?string {
     return $mat !== null && $mat !== '' ? (string) $mat : null;
 }
 
+// Alias de compatibilité LAM_ABZ (même nom/signature que fonctions.php côté
+// source, ?int) — utilisé par les modules secondaire copiés en masse le
+// 16/09/2026 (absences, bulletins, conseil_classe, discipline, statistiques,
+// tableau_honneur…). Évite de retoucher 24 fichiers un par un juste pour un
+// renommage ; garde le typage int de LAM_ABZ plutôt que le ?string de
+// matricule_ens_courant() (primaire) pour ne pas fausser une comparaison
+// stricte côté appelant.
+function get_matricule_ens_connecte(): ?int {
+    $mat = matricule_ens_courant();
+    return $mat !== null ? (int) $mat : null;
+}
+
 // Un compte non-ENSEIGNANT (ex. COMPTABLE) est-il par ailleurs affecté à
 // enseigner une classe cette année ? (demande explicite du 22/08/2026 : les
 // menus Discipline/Pédagogie ne s'affichent pour un Agent financier QUE
@@ -967,14 +979,14 @@ function auto_activer_sequences(): void {
 // secondaire/pages/notes/ (saisie par classe/élève).
 function appreciation($note): array {
     $n = ($note === null || $note === '') ? -1 : (float) $note;
-    if ($n < 0)  return ['COTE' => '',   'APPR1_FR' => '',                          'APPR2_FR' => ''];
-    if ($n < 10) return ['COTE' => 'D',  'APPR1_FR' => 'Compétences non acquises',  'APPR2_FR' => 'CNA'];
-    if ($n < 12) return ['COTE' => 'C',  'APPR1_FR' => 'Compétences moy. acquises', 'APPR2_FR' => 'CMA'];
-    if ($n < 14) return ['COTE' => 'C+', 'APPR1_FR' => 'Compétences acquises',      'APPR2_FR' => 'CA'];
-    if ($n < 15) return ['COTE' => 'B',  'APPR1_FR' => 'Compétences bien acquises', 'APPR2_FR' => 'CBA'];
-    if ($n < 16) return ['COTE' => 'B+', 'APPR1_FR' => 'Compétences bien acquises', 'APPR2_FR' => 'CBA'];
-    if ($n < 18) return ['COTE' => 'A',  'APPR1_FR' => 'Compétences TB acquises',   'APPR2_FR' => 'CTBA'];
-    return            ['COTE' => 'A+', 'APPR1_FR' => 'Compétences TB acquises',   'APPR2_FR' => 'CTBA'];
+    if ($n < 0)  return ['COTE' => '',   'APPR1_FR' => '',                          'APPR2_FR' => '',    'APPR1_EN' => '',                             'APPR2_EN' => ''];
+    if ($n < 10) return ['COTE' => 'D',  'APPR1_FR' => 'Compétences non acquises',  'APPR2_FR' => 'CNA', 'APPR1_EN' => 'Competences Not Acquired',      'APPR2_EN' => 'CNA'];
+    if ($n < 12) return ['COTE' => 'C',  'APPR1_FR' => 'Compétences moy. acquises', 'APPR2_FR' => 'CMA', 'APPR1_EN' => 'Competences Avg Acquired',      'APPR2_EN' => 'CAA'];
+    if ($n < 14) return ['COTE' => 'C+', 'APPR1_FR' => 'Compétences acquises',      'APPR2_FR' => 'CA',  'APPR1_EN' => 'Competences Acquired',          'APPR2_EN' => 'CA'];
+    if ($n < 15) return ['COTE' => 'B',  'APPR1_FR' => 'Compétences bien acquises', 'APPR2_FR' => 'CBA', 'APPR1_EN' => 'Competences Well Acquired',     'APPR2_EN' => 'CWA'];
+    if ($n < 16) return ['COTE' => 'B+', 'APPR1_FR' => 'Compétences bien acquises', 'APPR2_FR' => 'CBA', 'APPR1_EN' => 'Competences Well Acquired',     'APPR2_EN' => 'CWA'];
+    if ($n < 18) return ['COTE' => 'A',  'APPR1_FR' => 'Compétences TB acquises',   'APPR2_FR' => 'CTBA','APPR1_EN' => 'Competences Very Well Acquired','APPR2_EN' => 'CVWA'];
+    return            ['COTE' => 'A+', 'APPR1_FR' => 'Compétences TB acquises',   'APPR2_FR' => 'CTBA','APPR1_EN' => 'Competences Very Well Acquired','APPR2_EN' => 'CVWA'];
 }
 
 function appr_color(string $cote): string {
@@ -1784,11 +1796,15 @@ function finances_du_par_eleve(string $val_annee, ?int $id_classe = null, ?strin
 // même après une ou plusieurs suppressions. Repli sur un nombre aléatoire à
 // 3 chiffres si malgré tout ce matricule existe déjà (ex. deux
 // enregistrements simultanés), même filet de sécurité qu'avant.
-// ── Configuration du matricule (par école, migration v52) ────────────
+// ── Configuration du matricule (par école, migration v52 ; mode
+//    'aleatoire' migration v58) ─────────────────────────────────────
 //  Table `matricule_config` à ligne unique (id=1). Renvoie des valeurs par
 //  défaut si la table/la ligne est absente (base pas encore migrée) : le
 //  défaut '{AA}{NIV}{SEQ}' / longueur_seq=3 reproduit EXACTEMENT l'ancien
-//  gen_matricule() (« 25P001 »).
+//  gen_matricule() (« 25P001 »). Trois modes : 'auto' (séquentiel), 'manuel'
+//  (saisie libre), 'aleatoire' (même format que 'auto', mais {SEQ} tiré au
+//  hasard plutôt qu'incrémenté — configurable par le DIRECTEUR/SECRETAIRE/
+//  FONDATEUR de l'école, ou l'association en visite écriture).
 function matricule_config(): array {
     static $c = null;
     if ($c === null) {
@@ -1797,7 +1813,7 @@ function matricule_config(): array {
             $row = db_one("SELECT mode, format, longueur_seq, sequence_par FROM matricule_config WHERE id=1");
         } catch (\Throwable $e) { $row = null; }
         $c = $row ? array_merge($def, array_filter($row, fn($v) => $v !== null && $v !== '')) : $def;
-        $c['mode']         = $c['mode'] === 'manuel' ? 'manuel' : 'auto';
+        $c['mode']         = in_array($c['mode'], ['manuel', 'aleatoire'], true) ? $c['mode'] : 'auto';
         $c['longueur_seq'] = max(1, min(8, (int) $c['longueur_seq']));
         // {SEQ} obligatoire en mode auto (sinon numéro impossible à placer).
         if (strpos($c['format'], '{SEQ}') === false) $c['format'] = '{AA}{NIV}{SEQ}';
@@ -1871,6 +1887,24 @@ function gen_matricule(string $val_annee, string $niveau): string {
         "SELECT MAX(CAST(SUBSTRING(Mat_elv, ?) AS UNSIGNED)) FROM eleve WHERE Mat_elv REGEXP ?",
         [strlen($prefixe) + 1, $regex]
     );
+
+    // Mode 'aleatoire' : {SEQ} est tiré au hasard dans l'espace à $lseq
+    // chiffres (jamais deux matricules consécutifs devinables), avec
+    // re-vérification à chaque tentative — même logique anti-collision que
+    // le mode 'auto' ci-dessous, juste un tirage au lieu d'un incrément. Si
+    // l'espace aléatoire est presque saturé (300 tirages sans succès), on
+    // retombe sur le filet séquentiel du mode 'auto' juste en dessous plutôt
+    // que de boucler indéfiniment.
+    if ($cfg['mode'] === 'aleatoire') {
+        $borne = (10 ** $lseq) - 1;
+        for ($tentative = 0; $tentative < 300; $tentative++) {
+            $n = random_int(0, $borne);
+            $candidat = $prefixe . str_pad((string) $n, $lseq, '0', STR_PAD_LEFT) . $suffixe;
+            if (!db_val("SELECT COUNT(*) FROM eleve WHERE Mat_elv=?", [$candidat])) {
+                return $candidat;
+            }
+        }
+    }
 
     // Incrément séquentiel avec re-vérification À CHAQUE tentative (jamais un
     // repli aléatoire à l'aveugle : dans un espace presque saturé, un tirage
@@ -2121,3 +2155,1286 @@ function url_photo_eleve(int $id_eleve, bool $a_photo, string $sexe): string {
     $avatar = (stripos($sexe, 'F') === 0) ? 'fille.png' : 'garcon.png';
     return APP_URL . '/assets/img/avatars/' . $avatar;
 }
+
+// ══════════════════════════════════════════════════════════════════
+// Moteur de calcul secondaire (moyennes/mentions/résultats/signatures/
+// paiements/notifications/demandes) — porté depuis LAM_ABZ/fonctions.php
+// le 16/09/2026 (étape 10, vérification module par module de la copie en
+// masse). Fonctions purement secondaire, aucun branchement primaire/
+// secondaire nécessaire (LAM_ABZ EST déjà le schéma secondaire).
+// ══════════════════════════════════════════════════════════════════
+// ==== eleve_solde_obligation ====
+// Solde restant dû pour un élève sur une obligation donnée, pour une année.
+function eleve_solde_obligation(int $id_eleve, int $id_obligation, int $id_annee): float {
+    $montant = (float) db_val("SELECT montant FROM obligation_frais WHERE id = ?", [$id_obligation]);
+    $paye    = (float) db_val(
+        "SELECT COALESCE(SUM(montant),0) FROM paiement_frais WHERE id_eleve=? AND id_obligation=? AND id_annee=?",
+        [$id_eleve, $id_obligation, $id_annee]
+    );
+    return round($montant - $paye, 2);
+}
+
+// ==== eleve_obligations_annee ====
+// cycle de son niveau, ou son niveau précis), avec solde calculé par ligne.
+function eleve_obligations_annee(int $id_eleve, string $code_niveau, int $id_annee): array {
+    $id_cycle = db_val("SELECT id_cycle FROM niveau WHERE code_niveau = ?", [$code_niveau]);
+    $obligations = db_all(
+        "SELECT * FROM obligation_frais
+         WHERE id_annee=? AND actif=1
+           AND (portee='etablissement' OR (portee='cycle' AND id_cycle=?) OR (portee='niveau' AND code_niveau=?))
+         ORDER BY libelle",
+        [$id_annee, $id_cycle, $code_niveau]
+    );
+    foreach ($obligations as &$o) {
+        $paye = (float) db_val(
+            "SELECT COALESCE(SUM(montant),0) FROM paiement_frais WHERE id_eleve=? AND id_obligation=? AND id_annee=?",
+            [$id_eleve, $o['id'], $id_annee]
+        );
+        $o['paye']  = $paye;
+        $o['solde'] = round((float)$o['montant'] - $paye, 2);
+    }
+    unset($o);
+    return $obligations;
+}
+
+// ==== generer_numero_recu ====
+// (jamais recalculé à l'impression — voir prompt_continuite pour le bug MANWI évité).
+function generer_numero_recu(int $id_annee): string {
+    $libelle = db_val("SELECT libelle FROM annee_scolaire WHERE id = ?", [$id_annee]) ?: date('Y');
+    preg_match('/(\d{4})\D*(\d{4})?$/', (string)$libelle, $m);
+    $aa   = substr($m[2] ?? ($m[1] ?? date('Y')), -2);
+    $next = (int) db_val("SELECT COUNT(*) + 1 FROM paiement_frais WHERE id_annee = ?", [$id_annee]);
+    do {
+        $numero = str_pad((string)$next, 4, '0', STR_PAD_LEFT) . '/' . $aa;
+        $existe = db_val("SELECT COUNT(*) FROM paiement_frais WHERE numero_recu = ?", [$numero]);
+        $next++;
+    } while ($existe);
+    return $numero;
+}
+
+// ==== get_reglage_paiement ====
+// get_reglage_mention_bulletin() (jamais de casse avant configuration).
+function get_reglage_paiement(int $id_annee): array {
+    $defaut = [
+        'montant_frais_operateur' => 200.0,
+        'couleur_fond_1' => '#FFF6C8', 'couleur_fond_2' => '#FFCDD2', 'couleur_fond_3' => '#CDE8CD',
+    ];
+    $r = db_one("SELECT * FROM reglage_paiement WHERE id_annee = ?", [$id_annee]);
+    return $r ? array_merge($defaut, array_intersect_key($r, $defaut)) : $defaut;
+}
+
+// ==== hex_vers_rgb ====
+// valeur stockée est invalide (ne casse jamais l'affichage du reçu).
+function hex_vers_rgb(string $hex): array {
+    $hex = ltrim($hex, '#');
+    if (!preg_match('/^[0-9a-fA-F]{6}$/', $hex)) return [255, 255, 255];
+    return [hexdec(substr($hex, 0, 2)), hexdec(substr($hex, 2, 2)), hexdec(substr($hex, 4, 2))];
+}
+
+// ==== nombre_en_lettres_fcfa ====
+// dizaines irrégulières (soixante-dix, quatre-vingt(s), quatre-vingt-dix).
+function nombre_en_lettres_fcfa(float $montant): string {
+    $n = (int) round($montant);
+    if ($n === 0) return 'zéro';
+    $negatif = $n < 0;
+    $n = abs($n);
+
+    $unites = ['', 'un', 'deux', 'trois', 'quatre', 'cinq', 'six', 'sept', 'huit', 'neuf',
+               'dix', 'onze', 'douze', 'treize', 'quatorze', 'quinze', 'seize',
+               'dix-sept', 'dix-huit', 'dix-neuf'];
+    $dizaines = ['', '', 'vingt', 'trente', 'quarante', 'cinquante', 'soixante', '', 'quatre-vingt', ''];
+
+    // 0-99
+    $lettres_deux_chiffres = function (int $x) use ($unites, $dizaines): string {
+        if ($x < 20) return $unites[$x];
+        $d = intdiv($x, 10);
+        $u = $x % 10;
+        if ($d === 7 || $d === 9) { // soixante-dix / quatre-vingt-dix (60-79, 90-99 basés sur 60/80 + 10-19)
+            $base = $d === 7 ? 'soixante' : 'quatre-vingt';
+            return $u === 0 ? $base . '-dix' : $base . '-' . $unites[10 + $u];
+        }
+        if ($u === 0) return $dizaines[$d] . ($d === 8 ? 's' : '');
+        if ($u === 1 && $d !== 8) return $dizaines[$d] . '-et-un';
+        return $dizaines[$d] . '-' . $unites[$u];
+    };
+
+    // 0-999 — "cent" reste ici toujours invariable (jamais "deux cents"),
+    // conforme à l'orthographe déjà utilisée par les documents MANWI repris
+    // à l'identique (ex. "7700" → "sept mille sept cent", pas "...cents").
+    $lettres_trois_chiffres = function (int $x) use ($lettres_deux_chiffres): string {
+        $c = intdiv($x, 100);
+        $reste = $x % 100;
+        if ($c === 0) return $lettres_deux_chiffres($reste);
+        $mot_cent = $c === 1 ? 'cent' : $lettres_deux_chiffres($c) . ' cent';
+        return $reste === 0 ? $mot_cent : $mot_cent . ' ' . $lettres_deux_chiffres($reste);
+    };
+
+    $groupes = [
+        [1_000_000_000, 'milliard'],
+        [1_000_000,     'million'],
+        [1_000,         'mille'],
+    ];
+
+    $parties = [];
+    foreach ($groupes as [$valeur, $mot]) {
+        $q = intdiv($n, $valeur);
+        $n %= $valeur;
+        if ($q === 0) continue;
+        if ($mot === 'mille') {
+            $parties[] = $q === 1 ? 'mille' : $lettres_trois_chiffres($q) . ' mille';
+        } else {
+            $parties[] = ($q === 1 ? 'un' : $lettres_trois_chiffres($q)) . ' ' . $mot . ($q > 1 ? 's' : '');
+        }
+    }
+    if ($n > 0 || !$parties) $parties[] = $lettres_trois_chiffres($n);
+
+    return ucfirst(trim(($negatif ? 'moins ' : '') . implode(' ', $parties)));
+}
+
+// ==== get_reglage_mention_bulletin ====
+// pour l'année, pour que le bulletin ne casse jamais avant paramétrage.
+function get_reglage_mention_bulletin(int $id_annee): array {
+    $defaut = [
+        'moy_tableau_honneur'        => 12.0,
+        'heures_max_tableau_honneur' => 8,
+        'moy_encouragement'          => 14.0,
+        'moy_felicitation'           => 15.0,
+        'moy_avert_travail_min'      => 5.0,
+        'moy_avert_travail_max'      => 7.3,
+        'moy_blame_travail_max'      => 5.0,
+        'heures_avert_conduite_min'  => 5,
+        'heures_avert_conduite_max'  => 10,
+        'heures_blame_conduite_min'  => 10,
+    ];
+    $r = db_one("SELECT * FROM reglage_mention_bulletin WHERE id_annee = ?", [$id_annee]);
+    return $r ? array_merge($defaut, array_intersect_key($r, $defaut)) : $defaut;
+}
+
+// ==== bulletin_tableau_honneur ====
+function bulletin_tableau_honneur(float $moy, float $heur, array $r): string {
+    if ($moy >= $r['moy_tableau_honneur'] && $heur <= $r['heures_max_tableau_honneur']) return 'Oui';
+    if ($moy >= $r['moy_tableau_honneur']) return 'Refuse';
+    return '---';
+}
+
+// ==== bulletin_encouragement ====
+function bulletin_encouragement(float $moy, float $heur, array $r): string {
+    return (bulletin_tableau_honneur($moy, $heur, $r) === 'Oui' && $moy >= $r['moy_encouragement']) ? 'Oui' : '---';
+}
+
+// ==== bulletin_felicitation ====
+function bulletin_felicitation(float $moy, float $heur, array $r): string {
+    return (bulletin_tableau_honneur($moy, $heur, $r) === 'Oui' && $moy >= $r['moy_felicitation']) ? 'Oui' : '---';
+}
+
+// ==== bulletin_avert_travail ====
+function bulletin_avert_travail(float $moy, array $r): string {
+    return ($moy >= $r['moy_avert_travail_min'] && $moy <= $r['moy_avert_travail_max']) ? 'Oui' : '---';
+}
+
+// ==== bulletin_blame_travail ====
+function bulletin_blame_travail(float $moy, array $r): string {
+    return ($moy < $r['moy_blame_travail_max']) ? 'Oui' : '---';
+}
+
+// ==== bulletin_avert_conduite ====
+function bulletin_avert_conduite(float $heur, array $r): string {
+    return ($heur >= $r['heures_avert_conduite_min'] && $heur < $r['heures_avert_conduite_max']) ? 'OUI' : '---';
+}
+
+// ==== bulletin_blame_conduite ====
+function bulletin_blame_conduite(float $heur, array $r): string {
+    return ($heur >= $r['heures_blame_conduite_min']) ? 'OUI' : '---';
+}
+
+// ==== eleve_absence_trimestre ====
+// donné, lues dans la table `absence` (alimentée par pages/discipline/index.php).
+function eleve_absence_trimestre(string $matricule, int $id_trim, int $id_classe, string $val_annee): array {
+    $r = db_one(
+        "SELECT SUM(nbre_heure_jus) AS jus, SUM(nbre_heure_non_jus) AS non_jus
+         FROM absence WHERE mat_elv=? AND id_trim=? AND IDClasses=? AND val_annee=?",
+        [$matricule, $id_trim, $id_classe, $val_annee]
+    );
+    $jus     = (float)($r['jus']     ?? 0);
+    $non_jus = (float)($r['non_jus'] ?? 0);
+    return ['jus' => $jus, 'non_jus' => $non_jus, 'total' => $jus + $non_jus];
+}
+
+// ==== eleve_absence_annuelle ====
+// pour un futur bulletin/rapport annuel — non branché ailleurs pour l'instant).
+function eleve_absence_annuelle(string $matricule, int $id_classe, int $id_annee): array {
+    $val_annee  = (string) db_val("SELECT libelle FROM annee_scolaire WHERE id = ?", [$id_annee]);
+    $trimestres = db_all("SELECT id FROM trimestre WHERE id_annee = ? ORDER BY ordre", [$id_annee]);
+    $par_trim = []; $tot_jus = 0; $tot_non_jus = 0;
+    foreach ($trimestres as $t) {
+        $a = eleve_absence_trimestre($matricule, (int)$t['id'], $id_classe, $val_annee);
+        $par_trim[(int)$t['id']] = $a;
+        $tot_jus += $a['jus']; $tot_non_jus += $a['non_jus'];
+    }
+    return ['par_trimestre' => $par_trim, 'jus' => $tot_jus, 'non_jus' => $tot_non_jus, 'total' => $tot_jus + $tot_non_jus];
+}
+
+// ==== sauver_photo ====
+// Retourne le nom du fichier ou null
+function sauver_photo(?string $photo_b64): ?string {
+    // Base64 (depuis Cropper.js)
+    if (!empty($photo_b64) && str_starts_with($photo_b64, 'data:image/')) {
+        if (preg_match('/data:image\/(\w+);base64,(.+)/s', $photo_b64, $m)) {
+            $ext  = strtolower($m[1]) === 'png' ? 'png' : 'jpg';
+            $data = base64_decode($m[2]);
+            if ($data && strlen($data) <= 2 * 1024 * 1024) {
+                $nom = 'elv_' . bin2hex(random_bytes(8)) . '.' . $ext;
+                file_put_contents(UPLOAD_DIR . $nom, $data);
+                return $nom;
+            }
+        }
+        return null;
+    }
+    // Upload classique
+    if (!empty($_FILES['photo']['tmp_name']) && $_FILES['photo']['error'] === UPLOAD_ERR_OK) {
+        $ext_ok = ['jpg' => 'image/jpeg', 'jpeg' => 'image/jpeg', 'png' => 'image/png', 'webp' => 'image/webp'];
+        $ext    = strtolower(pathinfo($_FILES['photo']['name'], PATHINFO_EXTENSION));
+        $fi     = finfo_open(FILEINFO_MIME_TYPE);
+        $mime   = finfo_file($fi, $_FILES['photo']['tmp_name']);
+        finfo_close($fi);
+        if (isset($ext_ok[$ext]) && $ext_ok[$ext] === $mime && $_FILES['photo']['size'] <= 2 * 1024 * 1024) {
+            $nom = 'elv_' . bin2hex(random_bytes(8)) . '.' . $ext;
+            move_uploaded_file($_FILES['photo']['tmp_name'], UPLOAD_DIR . $nom);
+            return $nom;
+        }
+    }
+    return null;
+}
+
+// ==== get_signature_titulaires ====
+// (INTENDANT) — voir pdf/header_pdf.php::pdf_signature_appliquer().
+function get_signature_titulaires(): array {
+    $rows = db_all("SELECT * FROM signature_titulaire");
+    $out = [];
+    foreach ($rows as $r) $out[$r['code']] = $r;
+    return $out;
+}
+
+// ==== signature_chemin ====
+function signature_chemin(string $code): ?string {
+    $fichier = db_val("SELECT fichier FROM signature_titulaire WHERE code=?", [$code]);
+    if (empty($fichier)) return null;
+    $chemin = __DIR__ . '/assets/uploads/' . $fichier;
+    return is_file($chemin) ? $chemin : null;
+}
+
+// ==== signature_configuree ====
+function signature_configuree(string $code): bool {
+    return signature_chemin($code) !== null;
+}
+
+// ==== signature_role_autorisee ====
+// role_gestion (superviseur de dernier recours).
+function signature_role_autorisee(string $code, string $role): bool {
+    if ($role === 'ADMIN') return true;
+    return (get_signature_titulaires()[$code]['role_gestion'] ?? null) === $role;
+}
+
+// ==== signature_chemin_enseignant ====
+// signature, pas un rôle fixe unique).
+function signature_chemin_enseignant(string $matricule_ens): ?string {
+    $fichier = db_val("SELECT signature FROM enseignant WHERE matricule_ens=?", [$matricule_ens]);
+    if (empty($fichier)) return null;
+    $chemin = __DIR__ . '/assets/uploads/' . $fichier;
+    return is_file($chemin) ? $chemin : null;
+}
+
+// ==== signature_chemin_pp_classe ====
+// convention que enseignat_principal.val_annee ailleurs dans le projet).
+function signature_chemin_pp_classe(int $id_classe, string $val_annee): ?string {
+    $mat = db_val("SELECT matricule_ens FROM enseignat_principal WHERE IDClasses=? AND val_annee=?", [$id_classe, $val_annee]);
+    return $mat ? signature_chemin_enseignant($mat) : null;
+}
+
+// ==== signature_traiter_transparence ====
+// et rendu opaque, d'où un fond noir au lieu de transparent à l'affichage.
+function signature_traiter_transparence(string $chemin_source, string $chemin_dest, int $seuil_haut = 245, int $seuil_bas = 200): bool {
+    $src = @imagecreatefromstring(file_get_contents($chemin_source));
+    if (!$src) return false;
+    imagealphablending($src, false);
+    imagesavealpha($src, true);
+    $w = imagesx($src); $h = imagesy($src);
+    $dst = imagecreatetruecolor($w, $h);
+    imagesavealpha($dst, true);
+    imagealphablending($dst, false);
+    $vide = imagecolorallocatealpha($dst, 255, 255, 255, 127);
+    imagefill($dst, 0, 0, $vide);
+    for ($y = 0; $y < $h; $y++) {
+        for ($x = 0; $x < $w; $x++) {
+            $rgba = imagecolorat($src, $x, $y);
+            $alpha_src = ($rgba >> 24) & 0x7F;
+            $r = ($rgba >> 16) & 0xFF; $g = ($rgba >> 8) & 0xFF; $b = $rgba & 0xFF;
+            $luminosite = ($r + $g + $b) / 3;
+            if ($luminosite >= $seuil_haut) {
+                $alpha_blanc = 127;
+            } elseif ($luminosite <= $seuil_bas) {
+                $alpha_blanc = 0;
+            } else {
+                $alpha_blanc = (int) round(127 * ($luminosite - $seuil_bas) / ($seuil_haut - $seuil_bas));
+            }
+            $alpha = max($alpha_src, $alpha_blanc);
+            imagesetpixel($dst, $x, $y, imagecolorallocatealpha($dst, $r, $g, $b, $alpha));
+        }
+    }
+    // PNG_FILTER_NONE (pas de filtrage adaptatif par ligne) : le lecteur PNG
+    // de pdf/fpdf.php (bibliothèque à ne pas modifier) ne décode pas les
+    // filtres de scanline PNG (Sub/Up/Average/Paeth) — avec le filtrage
+    // adaptatif par défaut de GD, la majorité des lignes d'une image
+    // détaillée (signature scannée) sont filtrées autrement que "None" et le
+    // canal alpha/couleur ressort corrompu (fond noir au lieu de transparent).
+    // Forcer "None" partout élimine le problème à la source, fichier plus
+    // gros mais toujours largement raisonnable pour une signature.
+    $ok = imagepng($dst, $chemin_dest, -1, PNG_FILTER_NONE);
+    imagedestroy($src); imagedestroy($dst);
+    return $ok;
+}
+
+// ==== get_signature_position ====
+// n'a encore été enregistrée pour ce document précis.
+function get_signature_position(string $type_document, string $code, array $defaut): array {
+    $pos = db_one(
+        "SELECT x_pct, y_pct, w_pct, h_pct FROM signature_position WHERE type_document=? AND code_signature=?",
+        [$type_document, $code]
+    );
+    return $pos ?? $defaut;
+}
+
+// ==== notifier ====
+/** Crée une notification pour un utilisateur donné. */
+function notifier(int $id_utilisateur, string $message, string $lien = ''): void {
+    if (!$id_utilisateur) return;
+    db_exec("INSERT INTO notification (id_utilisateur, message, lien) VALUES (?,?,?)",
+            [$id_utilisateur, $message, $lien ?: null]);
+}
+
+// ==== notifier_role ====
+/** Crée la même notification pour tous les utilisateurs actifs d'un rôle donné. */
+function notifier_role(string $role, string $message, string $lien = ''): void {
+    $users = db_all("SELECT id FROM utilisateur WHERE role=? AND actif=1", [$role]);
+    foreach ($users as $u) {
+        notifier((int)$u['id'], $message, $lien);
+    }
+}
+
+// ==== notifications_non_lues_count ====
+/** Nombre de notifications non lues pour un utilisateur. */
+function notifications_non_lues_count(int $id_utilisateur): int {
+    if (!$id_utilisateur) return 0;
+    return (int)db_val("SELECT COUNT(*) FROM notification WHERE id_utilisateur=? AND lue=0", [$id_utilisateur]);
+}
+
+// ==== notifications_utilisateur ====
+/** Dernières notifications d'un utilisateur (les plus récentes en premier). */
+function notifications_utilisateur(int $id_utilisateur, int $limite = 8): array {
+    if (!$id_utilisateur) return [];
+    $limite = max(1, min(50, $limite));
+    return db_all("SELECT * FROM notification WHERE id_utilisateur=? ORDER BY date_creation DESC LIMIT $limite",
+                  [$id_utilisateur]);
+}
+
+// ==== notifications_tout_marquer_lu ====
+/** Marque toutes les notifications d'un utilisateur comme lues. */
+function notifications_tout_marquer_lu(int $id_utilisateur): void {
+    if (!$id_utilisateur) return;
+    db_exec("UPDATE notification SET lue=1 WHERE id_utilisateur=?", [$id_utilisateur]);
+}
+
+// ==== libelle_type_demande ====
+/** Libellé lisible d'un type de document de demande. */
+function libelle_type_demande(string $type): string {
+    return match ($type) {
+        'attestation' => 'Attestation de présence effective',
+        'prise'       => 'Certificat de prise de service',
+        'reprise'     => 'Certificat de reprise de service',
+        default       => $type,
+    };
+}
+
+// ==== libelle_statut_demande ====
+/** [libellé, classe badge Bootstrap, icône Bootstrap Icons] pour un statut de demande. */
+function libelle_statut_demande(string $statut): array {
+    return match ($statut) {
+        'en_attente_censeur'   => ['En attente du Censeur',   'warning',  'hourglass-split'],
+        'en_attente_proviseur' => ['En attente du Proviseur', 'info',     'hourglass-split'],
+        'rejetee_censeur'      => ['Rejetée par le Censeur',  'danger',   'x-circle'],
+        'rejetee_proviseur'    => ['Rejetée par le Proviseur','danger',   'x-circle'],
+        'validee'               => ['Validée — disponible',   'success',  'check-circle'],
+        default                 => [$statut, 'secondary', 'question-circle'],
+    };
+}
+
+// ==== demande_validee_existe ====
+/**
+ * Vérifie qu'une demande de document VALIDÉE existe pour cet enseignant et ce type.
+ * Utilisé pour n'autoriser un enseignant à consulter/imprimer que les documents
+ * effectivement validés par le circuit Censeur → Proviseur.
+ */
+function demande_validee_existe(string $mat, string $type_document): bool {
+    if (!$mat) return false;
+    return (bool)db_val(
+        "SELECT COUNT(*) FROM demande_document WHERE matricule_ens=? AND type_document=? AND statut='validee'",
+        [$mat, $type_document]
+    );
+}
+
+// ==== identite_ens_manquants ====
+function identite_ens_manquants(array $e): array {
+    $requis = [
+        'civilite_ens' => 'Civilité', 'sexe_ens' => 'Sexe',
+        'date_naiss' => 'Date de naissance', 'lieu_naiss' => 'Lieu de naissance',
+        'region_origine' => "Région d'origine", 'departement_origine' => 'Département d\'origine',
+        'tel_ens' => 'Téléphone',
+    ];
+    $manquants = [];
+    foreach ($requis as $champ => $label) {
+        if (empty($e[$champ])) $manquants[] = $label;
+    }
+    return $manquants;
+}
+
+// ==== pv_note_effective ====
+/**
+ * Note "effective" d'un élève dans une matière pour une séquence donnée :
+ * - note saisie -> [valeur, false]
+ * - absence justifiée -> [null, true]  (exclue du calcul de moyenne)
+ * - absent non justifié (assez d'élèves notés pour le déduire) -> [0.0, false]
+ * - sinon (donnée manquante) -> [null, false]
+ */
+function pv_note_effective(int $eid, int $id_mat, int $sid, array $notes_idx, array $abs_just, array $notes_count, int $nb_inscrits): array {
+    if (isset($notes_idx[$eid][$id_mat][$sid])) return [$notes_idx[$eid][$id_mat][$sid], false];
+    if (isset($abs_just[$eid][$id_mat][$sid])) return [null, true];
+    $cnt = $notes_count[$id_mat][$sid] ?? 0;
+    if ($nb_inscrits > 0 && $cnt >= ceil($nb_inscrits / 2)) return [0.0, false];
+    return [null, false];
+}
+
+// ==== pv_moy_matiere ====
+/** Moyenne d'un élève dans une matière, sur un ensemble de séquences donné (trimestre ou année). */
+function pv_moy_matiere(int $eid, int $id_mat, array $seq_ids, array $notes_idx, array $abs_just, array $notes_count, int $nb_inscrits): ?float {
+    $tot = 0; $cnt = 0;
+    foreach ($seq_ids as $sid) {
+        [$v, $exclu] = pv_note_effective($eid, $id_mat, $sid, $notes_idx, $abs_just, $notes_count, $nb_inscrits);
+        if ($exclu) continue;
+        if ($v !== null) { $tot += $v; $cnt++; }
+    }
+    return $cnt > 0 ? $tot / $cnt : null;
+}
+
+// ==== pv_moy_generale ====
+/**
+ * Moyenne générale pondérée par coefficient d'un élève, sur un ensemble de
+ * séquences (trimestre ou année complète).
+ * @return array [moyenne|null, classable(bool), coefficient_total]
+ */
+function pv_moy_generale(int $eid, array $disciplines, array $seq_ids, array $notes_idx, array $abs_just, array $notes_count, int $nb_inscrits, array $mats_avec_notes, int $nb_mats_avec_notes): array {
+    $tot = 0; $coef = 0; $nb_data = 0;
+    foreach ($disciplines as $d) {
+        if (!in_array($d['id_mat'], $mats_avec_notes)) continue;
+        $avg = pv_moy_matiere($eid, $d['id_mat'], $seq_ids, $notes_idx, $abs_just, $notes_count, $nb_inscrits);
+        if ($avg !== null) { $tot += $avg * $d['coef']; $coef += $d['coef']; $nb_data++; }
+    }
+    $moy = $coef > 0 ? $tot / $coef : null;
+    $classable = $nb_mats_avec_notes > 0 && $nb_data >= ceil($nb_mats_avec_notes / 2);
+    return [$moy, $classable, $coef];
+}
+
+// ==== pv_tableau_honneur ====
+/** Mentions/appréciations du conseil, à partir de la moyenne et des heures d'absence non justifiées. */
+function pv_tableau_honneur(?float $moy, int $abs_nj): string {
+    if ($moy === null) return '—';
+    if ($moy >= 12 && $abs_nj <= 8) return 'Oui';
+    if ($moy >= 12 && $abs_nj > 8)  return 'Refusé (absences)';
+    return '—';
+}
+
+// ==== pv_encouragement ====
+function pv_encouragement(?float $moy, int $abs_nj): string {
+    return (pv_tableau_honneur($moy, $abs_nj) === 'Oui' && $moy >= 14) ? 'Oui' : '—';
+}
+
+// ==== pv_felicitation ====
+function pv_felicitation(?float $moy, int $abs_nj): string {
+    return (pv_tableau_honneur($moy, $abs_nj) === 'Oui' && $moy >= 15) ? 'Oui' : '—';
+}
+
+// ==== pv_avertissement_travail ====
+function pv_avertissement_travail(?float $moy): string {
+    return ($moy !== null && $moy >= 5 && $moy <= 7.30) ? 'Oui' : '—';
+}
+
+// ==== pv_blame_travail ====
+function pv_blame_travail(?float $moy): string {
+    return ($moy !== null && $moy < 5) ? 'Oui' : '—';
+}
+
+// ==== pv_mention_trimestre ====
+/** Mention synthétique unique à afficher pour un trimestre (la plus "forte" applicable). */
+function pv_mention_trimestre(?float $moy, int $abs_nj): string {
+    if (pv_felicitation($moy, $abs_nj) === 'Oui')   return 'Félicitations';
+    if (pv_encouragement($moy, $abs_nj) === 'Oui')  return 'Encouragements';
+    if (pv_tableau_honneur($moy, $abs_nj) === 'Oui') return "Tableau d'honneur";
+    if (pv_blame_travail($moy) === 'Oui')            return 'Blâme (travail)';
+    if (pv_avertissement_travail($moy) === 'Oui')    return 'Avertissement (travail)';
+    return 'RAS';
+}
+
+// ==== pv_annules_trimestre ====
+/**
+ * Trimestres annulés pour une classe donnée — Règle 4 : un élève dont le
+ * trimestre est annulé n'est JAMAIS concerné par le zéro automatique
+ * (Règle 1), n'est JAMAIS "non classé" (Règle 2) et n'a AUCUNE moyenne
+ * calculée pour ce trimestre (exclu du diviseur annuel, Règle 3). Source de
+ * vérité unique : la table `trimestre_annulation` (aucun état mis en cache
+ * en mémoire entre deux appels — chaque calcul relit la base) ; annuler_
+ * trimestre_eleves()/retablir_trimestre_eleves() écrivent directement dans
+ * cette même table, donc un recalcul juste après une (dés)annulation, même
+ * dans la même requête, voit toujours l'état à jour.
+ * @return array eid => true
+ */
+function pv_annules_trimestre(int $id_classe, int $id_annee, int $id_trim): array {
+    if (!$id_trim) return [];
+    $rows = db_all(
+        "SELECT ta.id_eleve FROM trimestre_annulation ta
+         JOIN inscription i ON i.id_eleve=ta.id_eleve AND i.id_classe=? AND i.id_annee=?
+         WHERE ta.id_trim=?",
+        [$id_classe, $id_annee, $id_trim]
+    );
+    $out = [];
+    foreach ($rows as $r) { $out[(int)$r['id_eleve']] = true; }
+    return $out;
+}
+
+// ==== annuler_trimestre_eleves ====
+/** Annule le trimestre $id_trim pour les élèves $eleve_ids (motif optionnel,
+ *  traçabilité qui/quand via id_utilisateur+date_creation). Idempotent —
+ *  un élève déjà annulé voit juste son motif/auteur/date mis à jour. */
+function annuler_trimestre_eleves(array $eleve_ids, int $id_trim, ?string $motif, int $id_utilisateur): int {
+    $n = 0;
+    foreach ($eleve_ids as $eid) {
+        db_exec(
+            "INSERT INTO trimestre_annulation (id_eleve, id_trim, motif, id_utilisateur, date_creation)
+             VALUES (?,?,?,?,NOW())
+             ON DUPLICATE KEY UPDATE motif=VALUES(motif), id_utilisateur=VALUES(id_utilisateur), date_creation=VALUES(date_creation)",
+            [(int)$eid, $id_trim, $motif !== '' ? $motif : null, $id_utilisateur ?: null]
+        );
+        $n++;
+    }
+    return $n;
+}
+
+// ==== retablir_trimestre_eleves ====
+/** Rétablit (supprime l'annulation de) $id_trim pour les élèves $eleve_ids. */
+function retablir_trimestre_eleves(array $eleve_ids, int $id_trim): int {
+    if (empty($eleve_ids)) return 0;
+    $in = implode(',', array_fill(0, count($eleve_ids), '?'));
+    db_exec("DELETE FROM trimestre_annulation WHERE id_trim=? AND id_eleve IN ($in)", array_merge([$id_trim], array_map('intval', $eleve_ids)));
+    return count($eleve_ids);
+}
+
+// ==== pv_note_effective_comp ====
+/** Note "effective" d'un élève pour une compétence donnée (pas de notion
+ *  d'absence justifiée par compétence pour l'instant, voir Phase 6).
+ *  Règle 1 : taux de participation de la classe sur CETTE compétence
+ *  (élèves actifs notés / effectif actif total) — si ≥50%, note manquante
+ *  = 0 (barème compté) ; sinon la compétence est ignorée pour cet élève
+ *  (ni barème ni points). */
+function pv_note_effective_comp(int $eid, int $id_comp, array $notes_idx, array $notes_count, int $nb_inscrits): ?float {
+    if (isset($notes_idx[$eid][$id_comp])) return $notes_idx[$eid][$id_comp];
+    $cnt = $notes_count[$id_comp] ?? 0;
+    if ($nb_inscrits > 0 && $cnt >= ceil($nb_inscrits / 2)) return 0.0; // absent majoritaire = 0
+    return null;
+}
+
+// ==== pv_moy_matiere_comp ====
+/** Moyenne d'un élève dans une matière (groupe de compétence), sur les
+ *  compétences d'un trimestre donné — équivalent compétences de pv_moy_matiere().
+ *  Signature ?float inchangée (nombreux appelants existants) — voir
+ *  pv_matiere_vraie_note_comp() pour le signal Règle 2 séparé. */
+function pv_moy_matiere_comp(int $eid, array $competences, array $notes_idx, array $notes_count, int $nb_inscrits): ?float {
+    $tot = 0; $cnt = 0;
+    foreach ($competences as $c) {
+        $v = pv_note_effective_comp($eid, (int)$c['id'], $notes_idx, $notes_count, $nb_inscrits);
+        if ($v !== null) { $tot += $v; $cnt++; }
+    }
+    return $cnt > 0 ? $tot / $cnt : null;
+}
+
+// ==== pv_matiere_vraie_note_comp ====
+/** Règle 2 : l'élève a-t-il personnellement composé (vraie note saisie,
+ *  pas un zéro automatique Règle 1) au moins une compétence de cette
+ *  matière ce trimestre ? Utilisé par pv_moy_generale_comp() pour le seuil
+ *  de classement — fonction séparée plutôt qu'un changement de signature
+ *  de pv_moy_matiere_comp() (appelée telle quelle par les bulletins/relevés
+ *  pour l'affichage des moyennes par matière). */
+function pv_matiere_vraie_note_comp(int $eid, array $competences, array $notes_idx): bool {
+    foreach ($competences as $c) {
+        if (isset($notes_idx[$eid][(int)$c['id']])) return true;
+    }
+    return false;
+}
+
+// ==== pv_moy_generale_comp ====
+/**
+ * Moyenne générale pondérée par coefficient d'un élève, sur les
+ * compétences d'un trimestre — équivalent compétences de pv_moy_generale().
+ * @param array $competences_par_mat [id_mat => [{id,...}, ...]]
+ * @param array $annules eid => true (Règle 4, voir pv_annules_trimestre())
+ * @return array [moyenne|null, classable(bool) — Règle 2, coefficient_total, annule(bool) — Règle 4]
+ */
+function pv_moy_generale_comp(int $eid, array $disciplines, array $competences_par_mat, array $notes_idx, array $notes_count, int $nb_inscrits, array $mats_avec_notes, int $nb_mats_avec_notes, array $annules = []): array {
+    if (!empty($annules[$eid])) return [null, false, 0.0, true]; // Règle 4 : jamais de moyenne, jamais "non classé"
+    $tot = 0; $coef = 0; $nb_reelles = 0;
+    foreach ($disciplines as $d) {
+        if (!in_array($d['id_mat'], $mats_avec_notes)) continue;
+        $comps = $competences_par_mat[$d['id_mat']] ?? [];
+        $avg = pv_moy_matiere_comp($eid, $comps, $notes_idx, $notes_count, $nb_inscrits);
+        if ($avg !== null) { $tot += $avg * $d['coef']; $coef += $d['coef']; }
+        if (pv_matiere_vraie_note_comp($eid, $comps, $notes_idx)) $nb_reelles++;
+    }
+    $moy = $coef > 0 ? $tot / $coef : null;
+    // Règle 2 : classé seulement si l'élève a personnellement composé (vraie
+    // note, pas un zéro auto) au moins 50% des matières notées de la classe.
+    $classable = $nb_mats_avec_notes > 0 && $nb_reelles >= ceil($nb_mats_avec_notes / 2);
+    return [$moy, $classable, $coef, false];
+}
+
+// ==== pv_charger_donnees_comp ====
+/**
+ * Charge en un bloc tout ce qu'il faut (disciplines actives, compétences
+ * du trimestre par matière, notes indexées, compteurs, matières notées)
+ * pour calculer les moyennes d'une classe sur UN trimestre compétences —
+ * factorise la requête déjà dupliquée dans bull_moys_classe_comp()
+ * (pages/bulletins/index.php) et évite de la retripler dans chaque module
+ * Cluster A/B du chantier Phase 6.
+ * @return array{disciplines:array, competences_par_mat:array, notes_idx:array, notes_count:array, mats_avec_notes:array, nb_mats_avec_notes:int, nb_inscrits:int, annules:array}
+ */
+function pv_charger_donnees_comp(int $id_classe, int $id_trim, int $id_annee): array {
+    $disciplines = db_all(
+        "SELECT d.id_mat, d.coef FROM discipline d
+         JOIN matiere m ON m.id=d.id_mat AND m.actif=1
+         WHERE d.IDClasses=?", [$id_classe]
+    );
+    $nb_inscrits = (int) db_val(
+        "SELECT COUNT(*) FROM eleve e
+         JOIN inscription i ON i.id_eleve=e.id AND i.id_classe=? AND i.id_annee=?
+         WHERE e.statut='actif'",
+        [$id_classe, $id_annee]
+    );
+    $annules = pv_annules_trimestre($id_classe, $id_annee, $id_trim);
+    $vide = [
+        'disciplines' => $disciplines, 'competences_par_mat' => [], 'notes_idx' => [],
+        'notes_count' => [], 'mats_avec_notes' => [], 'nb_mats_avec_notes' => 0,
+        'nb_inscrits' => $nb_inscrits, 'annules' => $annules,
+    ];
+    if (empty($disciplines) || !$id_trim) return $vide;
+
+    $code_niveau = db_val("SELECT code_niveau FROM classe WHERE id=?", [$id_classe]);
+    $competences_par_mat = [];
+    foreach ($disciplines as $d) {
+        $competences_par_mat[$d['id_mat']] = db_all(
+            "SELECT id FROM competence WHERE id_matiere=? AND code_niveau=? AND id_trim=? ORDER BY ordre",
+            [$d['id_mat'], $code_niveau, $id_trim]
+        );
+    }
+    $all_comp_ids = [];
+    foreach ($competences_par_mat as $comps) { foreach ($comps as $c) { $all_comp_ids[] = (int)$c['id']; } }
+    if (empty($all_comp_ids)) return $vide + ['competences_par_mat' => $competences_par_mat];
+
+    $in_c = implode(',', array_fill(0, count($all_comp_ids), '?'));
+    $all_notes = db_all(
+        "SELECT n.id_eleve, n.id_competence, n.valeur FROM note n
+         JOIN inscription i ON i.id_eleve=n.id_eleve AND i.id_annee=? AND i.id_classe=?
+         JOIN eleve el ON el.id=n.id_eleve AND el.statut='actif'
+         WHERE n.id_competence IN ($in_c)",
+        array_merge([$id_annee, $id_classe], $all_comp_ids)
+    );
+    $notes_idx = []; $notes_count = [];
+    foreach ($all_notes as $row) {
+        $notes_idx[(int)$row['id_eleve']][(int)$row['id_competence']] = (float)$row['valeur'];
+        $c = (int)$row['id_competence'];
+        $notes_count[$c] = ($notes_count[$c] ?? 0) + 1;
+    }
+    $mats_avec_notes = [];
+    foreach ($disciplines as $d) {
+        foreach ($competences_par_mat[$d['id_mat']] ?? [] as $c) {
+            if (($notes_count[(int)$c['id']] ?? 0) > 0) { $mats_avec_notes[] = $d['id_mat']; break; }
+        }
+    }
+    return [
+        'disciplines' => $disciplines, 'competences_par_mat' => $competences_par_mat,
+        'notes_idx' => $notes_idx, 'notes_count' => $notes_count,
+        'mats_avec_notes' => $mats_avec_notes, 'nb_mats_avec_notes' => count($mats_avec_notes),
+        'nb_inscrits' => $nb_inscrits, 'annules' => $annules,
+    ];
+}
+
+// ==== pv_moy_annuelle_comp ====
+/**
+ * Moyenne annuelle d'un élève (Règle 3) — somme des moyennes trimestrielles
+ * (0 pour un trimestre où l'élève est "non classé") divisée par le nombre de
+ * trimestres RÉELLEMENT ÉVALUÉS pour la classe (au moins une note saisie ce
+ * trimestre-là), PAS par le nombre de trimestres ayant une moyenne pour cet
+ * élève. Un trimestre pas encore commencé pour toute la classe (aucune note
+ * nulle part) ne compte pas encore dans le diviseur ; un trimestre annulé
+ * pour cet élève (Règle 4) n'y compte JAMAIS, même si la classe a été
+ * évaluée dessus.
+ * @param array $par_trim liste indexée par trimestre, dans l'ordre de
+ *        l'année, de ['moy'=>?float,'classable'=>bool,'annule'=>bool,'evalue'=>bool]
+ *        ('evalue' = la classe a au moins une note ce trimestre, indépendamment de cet élève)
+ * @return array{moy: ?float, nb_evalues: int}
+ */
+function pv_moy_annuelle_comp(array $par_trim): array {
+    $somme = 0.0; $diviseur = 0;
+    foreach ($par_trim as $t) {
+        if (!empty($t['annule']) || empty($t['evalue'])) continue;
+        $diviseur++;
+        if (!empty($t['classable']) && $t['moy'] !== null) $somme += $t['moy'];
+        // sinon (non classé mais évalué, pas annulé) : compte 0 dans la somme — Règle 3.
+    }
+    return ['moy' => $diviseur > 0 ? $somme / $diviseur : null, 'nb_evalues' => $diviseur];
+}
+
+// ==== calc_moys_classe_periode_comp ====
+/**
+ * eid => moyenne pour une période (un trimestre ou l'année entière),
+ * Règles 1/2/3/4 appliquées — factorise le bloc jusqu'ici dupliqué
+ * (annuel : trimestres chargés un par un + pv_moy_annuelle_comp() ; sinon :
+ * un seul pv_charger_donnees_comp()) dans tous les modules qui n'ont besoin
+ * QUE de la moyenne par élève, pas du détail M/F/T de
+ * calc_bilan_classe_genre_comp() (tableau d'honneur, statistiques,
+ * conseil de classe, résultat annuel — 16/08/2026).
+ * @param string $vue 'annee' ou 'trimestre'
+ * @param array $eleve_ids ids des élèves actifs de la classe (déjà chargés par l'appelant)
+ * @return array eid => moyenne
+ */
+function calc_moys_classe_periode_comp(int $id_classe, int $id_annee, string $vue, int $id_trim, array $eleve_ids): array {
+    if (empty($eleve_ids)) return [];
+
+    if ($vue === 'annee') {
+        $trimestres = db_all("SELECT id FROM trimestre WHERE id_annee=? ORDER BY ordre", [$id_annee]);
+        $d_par_trim = [];
+        foreach ($trimestres as $t) { $d_par_trim[] = pv_charger_donnees_comp($id_classe, (int)$t['id'], $id_annee); }
+
+        $moys = [];
+        foreach ($eleve_ids as $eid) {
+            $eid = (int)$eid;
+            $par_trim = [];
+            foreach ($d_par_trim as $d) {
+                [$m, $classable, , $annule] = pv_moy_generale_comp(
+                    $eid, $d['disciplines'], $d['competences_par_mat'], $d['notes_idx'], $d['notes_count'],
+                    $d['nb_inscrits'], $d['mats_avec_notes'], $d['nb_mats_avec_notes'], $d['annules']
+                );
+                $par_trim[] = ['moy' => $m, 'classable' => $classable, 'annule' => $annule, 'evalue' => $d['nb_mats_avec_notes'] > 0];
+            }
+            $r = pv_moy_annuelle_comp($par_trim);
+            if ($r['moy'] !== null) $moys[$eid] = $r['moy'];
+        }
+        return $moys;
+    }
+
+    if (!$id_trim) return [];
+    $d = pv_charger_donnees_comp($id_classe, $id_trim, $id_annee);
+    if (empty($d['competences_par_mat'])) return [];
+    $moys = [];
+    foreach ($eleve_ids as $eid) {
+        $eid = (int)$eid;
+        [$m, $classable] = pv_moy_generale_comp(
+            $eid, $d['disciplines'], $d['competences_par_mat'], $d['notes_idx'], $d['notes_count'],
+            $d['nb_inscrits'], $d['mats_avec_notes'], $d['nb_mats_avec_notes'], $d['annules']
+        );
+        if ($classable && $m !== null) $moys[$eid] = $m;
+    }
+    return $moys;
+}
+
+// ==== calc_bilan_classe_genre_comp ====
+/**
+ * Bilan M/F/T d'une classe pour un trimestre compétences donné —
+ * équivalent compétences de calc_bilan_classe_genre() (voir sa docblock
+ * pour le détail des colonnes retournées).
+ */
+function calc_bilan_classe_genre_comp(int $id_classe, int $id_annee, string $val_annee, string $vue, int $id_trim): array {
+    $zero = ['M' => 0, 'F' => 0, 'T' => 0];
+    $vide = [
+        'classes' => $zero, 'moy_lt10' => $zero, 'moy_ge10' => $zero,
+        'felicit' => $zero, 'encourag' => $zero, 'tab' => $zero,
+        'avert_trav' => $zero, 'blame_trav' => $zero,
+    ];
+    $eleves = db_all(
+        "SELECT e.id, e.sexe, e.matricule FROM eleve e
+         JOIN inscription i ON i.id_eleve=e.id AND i.id_classe=? AND i.id_annee=?
+         WHERE e.statut='actif'",
+        [$id_classe, $id_annee]
+    );
+    if (empty($eleves)) return $vide;
+    if ($vue !== 'annee' && !$id_trim) return $vide;
+
+    // Règles 1/2/3/4 appliquées via le moteur commun (voir sa docblock).
+    $moys = calc_moys_classe_periode_comp($id_classe, $id_annee, $vue, $id_trim, array_column($eleves, 'id'));
+
+    $bilan = $vide;
+    foreach ($eleves as $el) {
+        $eid = (int)$el['id'];
+        if (!isset($moys[$eid])) continue;
+        $moy = $moys[$eid];
+        $sx  = (strtoupper($el['sexe'] ?? '') === 'F') ? 'F' : 'M';
+
+        $bilan['classes'][$sx]++; $bilan['classes']['T']++;
+        if ($moy >= 10) { $bilan['moy_ge10'][$sx]++; $bilan['moy_ge10']['T']++; }
+        else            { $bilan['moy_lt10'][$sx]++; $bilan['moy_lt10']['T']++; }
+
+        $abs_nj = $vue === 'annee'
+            ? (int) eleve_absence_annuelle($el['matricule'] ?? '', $id_classe, $id_annee)['non_jus']
+            : (int) eleve_absence_trimestre($el['matricule'] ?? '', $id_trim, $id_classe, $val_annee)['non_jus'];
+        if (pv_felicitation($moy, $abs_nj) === 'Oui')    { $bilan['felicit'][$sx]++; $bilan['felicit']['T']++; }
+        if (pv_encouragement($moy, $abs_nj) === 'Oui')   { $bilan['encourag'][$sx]++; $bilan['encourag']['T']++; }
+        if (pv_tableau_honneur($moy, $abs_nj) === 'Oui') { $bilan['tab'][$sx]++; $bilan['tab']['T']++; }
+        if (pv_avertissement_travail($moy) === 'Oui')    { $bilan['avert_trav'][$sx]++; $bilan['avert_trav']['T']++; }
+        if (pv_blame_travail($moy) === 'Oui')            { $bilan['blame_trav'][$sx]++; $bilan['blame_trav']['T']++; }
+    }
+    return $bilan;
+}
+
+// ==== calc_bilan_classe_genre ====
+/**
+ * Bilan M/F/T d'une classe pour une période donnée (une ou plusieurs
+ * séquences) — mêmes colonnes que le tableau "par section" fourni par
+ * l'utilisateur (fichier TEST_PV_CALCUL.xlsx, onglet INDUSTRIELLE) :
+ * classés, moyenne<10, moyenne>=10, félicitations, encouragements, tableau
+ * d'honneur, avertissement travail, blâme travail — chacun décliné en
+ * Masculin/Féminin/Total. Réutilisé tel quel par la vue HTML (onglets
+ * Section/Niveau/Classe de pages/statistiques/index.php) et par les
+ * exports PDF/Excel, pour ne pas tripler cette logique déjà éprouvée dans
+ * pages/statistiques/pdf_stat_classe.php.
+ *
+ * @return array{classes: array, moy_lt10: array, moy_ge10: array, felicit: array, encourag: array, tab: array, avert_trav: array, blame_trav: array}
+ *         chaque valeur est ['M'=>int,'F'=>int,'T'=>int].
+ */
+function calc_bilan_classe_genre(int $id_classe, int $id_annee, string $val_annee, int $id_trim, array $seq_ids): array {
+    $zero = ['M' => 0, 'F' => 0, 'T' => 0];
+    $vide = [
+        'classes' => $zero, 'moy_lt10' => $zero, 'moy_ge10' => $zero,
+        'felicit' => $zero, 'encourag' => $zero, 'tab' => $zero,
+        'avert_trav' => $zero, 'blame_trav' => $zero,
+    ];
+    $eleves = db_all(
+        "SELECT e.id, e.sexe, e.matricule FROM eleve e
+         JOIN inscription i ON i.id_eleve=e.id AND i.id_classe=? AND i.id_annee=?
+         WHERE e.statut='actif'",
+        [$id_classe, $id_annee]
+    );
+    $nb_inscrits = count($eleves);
+    if ($nb_inscrits === 0 || empty($seq_ids)) return $vide;
+
+    $disciplines = db_all("SELECT id_mat, coef FROM discipline WHERE IDClasses=?", [$id_classe]);
+    $in_ph = implode(',', array_fill(0, count($seq_ids), '?'));
+    $notes_idx = []; $abs_just = []; $notes_count = [];
+    $all_notes = db_all(
+        "SELECT n.id_eleve, n.id_matiere, n.id_seq, n.valeur FROM note n
+         JOIN inscription i ON i.id_eleve=n.id_eleve AND i.id_annee=? AND i.id_classe=?
+         WHERE n.id_seq IN ($in_ph)",
+        array_merge([$id_annee, $id_classe], $seq_ids)
+    );
+    foreach ($all_notes as $row) {
+        $notes_idx[(int)$row['id_eleve']][(int)$row['id_matiere']][(int)$row['id_seq']] = (float)$row['valeur'];
+        $notes_count[(int)$row['id_matiere']][(int)$row['id_seq']] = ($notes_count[(int)$row['id_matiere']][(int)$row['id_seq']] ?? 0) + 1;
+    }
+    $all_abs = db_all("SELECT id_eleve, id_matiere, id_seq FROM absence_justifiee WHERE id_seq IN ($in_ph) AND justifie=1", $seq_ids);
+    foreach ($all_abs as $row) {
+        $abs_just[(int)$row['id_eleve']][(int)$row['id_matiere']][(int)$row['id_seq']] = 1;
+    }
+    $mats_avec_notes = [];
+    foreach ($disciplines as $d) {
+        foreach ($seq_ids as $sid) {
+            if (($notes_count[$d['id_mat']][$sid] ?? 0) > 0) { $mats_avec_notes[] = $d['id_mat']; break; }
+        }
+    }
+    $nb_man = count($mats_avec_notes);
+
+    $bilan = $vide;
+    foreach ($eleves as $el) {
+        $eid = (int)$el['id'];
+        $sx  = (strtoupper($el['sexe'] ?? '') === 'F') ? 'F' : 'M';
+        [$moy, $classable] = pv_moy_generale($eid, $disciplines, $seq_ids, $notes_idx, $abs_just, $notes_count, $nb_inscrits, $mats_avec_notes, $nb_man);
+        if (!$classable || $moy === null) continue;
+
+        $bilan['classes'][$sx]++; $bilan['classes']['T']++;
+        if ($moy >= 10) { $bilan['moy_ge10'][$sx]++; $bilan['moy_ge10']['T']++; }
+        else            { $bilan['moy_lt10'][$sx]++; $bilan['moy_lt10']['T']++; }
+
+        $abs_nj = (int) eleve_absence_trimestre($el['matricule'] ?? '', $id_trim, $id_classe, $val_annee)['non_jus'];
+        if (pv_felicitation($moy, $abs_nj) === 'Oui')    { $bilan['felicit'][$sx]++; $bilan['felicit']['T']++; }
+        if (pv_encouragement($moy, $abs_nj) === 'Oui')   { $bilan['encourag'][$sx]++; $bilan['encourag']['T']++; }
+        if (pv_tableau_honneur($moy, $abs_nj) === 'Oui') { $bilan['tab'][$sx]++; $bilan['tab']['T']++; }
+        if (pv_avertissement_travail($moy) === 'Oui')    { $bilan['avert_trav'][$sx]++; $bilan['avert_trav']['T']++; }
+        if (pv_blame_travail($moy) === 'Oui')            { $bilan['blame_trav'][$sx]++; $bilan['blame_trav']['T']++; }
+    }
+    return $bilan;
+}
+
+// ==== libelle_annee_suivante ====
+/**
+ * Dérive textuellement le libellé de l'année scolaire SUIVANTE à partir du
+ * libellé de l'année active (ex. "2025/2026" -> "2026/2027"), sans dépendre
+ * d'une ligne annee_scolaire "suivante" qui n'existe généralement pas
+ * encore en base à ce stade. Repose sur les 2 premiers nombres à 4
+ * chiffres du libellé (peu importe le séparateur) ; si le format ne
+ * correspond pas, le libellé d'origine est retourné tel quel.
+ */
+function libelle_annee_suivante(string $libelle): string {
+    if (!preg_match('/(\d{4})(\D+)(\d{4})/', $libelle, $m, PREG_OFFSET_CAPTURE)) {
+        return $libelle;
+    }
+    [$n1, $pos1] = $m[1];
+    $sep = $m[2][0];
+    [$n2, $pos2] = $m[3];
+    $avant = substr($libelle, 0, $pos1);
+    $apres = substr($libelle, $pos2 + strlen($n2));
+    return $avant . ((int)$n1 + 1) . $sep . ((int)$n2 + 1) . $apres;
+}
+
+// ==== colonnes_resultat_classe ====
+/**
+ * Catalogue des colonnes disponibles pour les onglets "Résultat par
+ * classe" et "Meilleurs élèves" du module Résultat annuel — 'classe'
+ * n'est incluse que pour "Meilleurs élèves" (toute l'école), inutile sur
+ * une liste déjà filtrée à une seule classe.
+ */
+function colonnes_resultat_classe(bool $avec_classe = false): array {
+    $cols = [
+        'no'   => 'N°',
+        'niu'  => 'NIU',
+        'nom'  => 'Nom et Prénoms',
+        'date' => 'Date naiss.',
+        'lieu' => 'Lieu naiss.',
+        'sexe' => 'Sexe',
+    ];
+    if ($avec_classe) $cols['classe'] = 'Classe';
+    return $cols + [
+        't1'          => 'Moy. 1er trim.',
+        't2'          => 'Moy. 2e trim.',
+        't3'          => 'Moy. 3e trim.',
+        'abs'         => "Heures d'absence (non just.)",
+        'moy_an'      => 'Moyenne annuelle',
+        'rang'        => 'Rang',
+        'decision'    => 'Décision',
+        'classe_suiv' => 'Classe suivante',
+        'obs'         => 'Notes',
+    ];
+}
+
+// ==== colonnes_liste_provisoire ====
+/** Catalogue des colonnes de l'onglet "Liste provisoire" — jeu réduit et
+ *  indépendant de colonnes_resultat_classe(). */
+function colonnes_liste_provisoire(): array {
+    return [
+        'no'     => 'N°',
+        'niu'    => 'NIU',
+        'nom'    => 'Nom et Prénoms',
+        'date'   => 'Date naiss.',
+        'lieu'   => 'Lieu naiss.',
+        'sexe'   => 'Sexe',
+        'statut' => 'Statut',
+    ];
+}
+
+// ==== libelle_moy_trim ====
+/** Libellé d'une moyenne trimestrielle dans les tableaux "Résultat annuel"
+ *  (colonnes t1/t2/t3 de calc_resultat_annuel_comp()) — distingue "Annulé"
+ *  (Règle 4), "Non classé" (Règle 2) et "—" (trimestre pas encore évalué)
+ *  d'une vraie moyenne chiffrée. */
+function libelle_moy_trim(array $row, int $i): string {
+    $statut = $row['moy_t_statut'][$i] ?? null;
+    if ($statut === 'annule')     return 'Annulé';
+    if ($statut === 'non_classe') return 'N.C.';
+    $v = $row['moy_t'][$i] ?? null;
+    return $v !== null ? number_format($v, 2) : '—';
+}
+
+// ==== valeur_colonne_resultat ====
+/** Valeur affichable d'une colonne pour une ligne de calc_resultat_annuel_comp(). */
+function valeur_colonne_resultat(string $col, array $row, int $no): string {
+    switch ($col) {
+        case 'no':          return (string)$no;
+        case 'niu':         return id_affichage_eleve($row);
+        case 'nom':         return strtoupper($row['nom']) . ' ' . ($row['prenom'] ?? '');
+        case 'date':        return $row['date_naiss'] ? date('d/m/Y', strtotime($row['date_naiss'])) : '—';
+        case 'lieu':        return $row['lieu_naiss'] ?: '—';
+        case 'sexe':        return $row['sexe'] ?? '—';
+        case 'classe':      return $row['classe_designation'] ?? '—';
+        case 't1':          return libelle_moy_trim($row, 0);
+        case 't2':          return libelle_moy_trim($row, 1);
+        case 't3':          return libelle_moy_trim($row, 2);
+        case 'abs':         return $row['abs_non_just'] !== null ? number_format($row['abs_non_just'], 1) : '—';
+        case 'moy_an':      return $row['moy_annuelle'] !== null ? number_format($row['moy_annuelle'], 2) : '—';
+        case 'rang':        return $row['rang'] !== null ? ($row['rang'] . 'e') : '—';
+        case 'decision':    return $row['decision'] ?: '—';
+        case 'classe_suiv': return $row['classe_suivante_designation'] ?? '—';
+        case 'obs':         return $row['observation'] ?: '';
+        default:            return '—';
+    }
+}
+
+// ==== valeur_colonne_provisoire ====
+/** Valeur affichable d'une colonne pour une ligne de calc_liste_provisoire_comp(). */
+function valeur_colonne_provisoire(string $col, array $row, int $no): string {
+    switch ($col) {
+        case 'no':     return (string)$no;
+        case 'niu':    return id_affichage_eleve($row);
+        case 'nom':    return strtoupper($row['nom']) . ' ' . ($row['prenom'] ?? '');
+        case 'date':   return $row['date_naiss'] ? date('d/m/Y', strtotime($row['date_naiss'])) : '—';
+        case 'lieu':   return $row['lieu_naiss'] ?: '—';
+        case 'sexe':   return $row['sexe'] ?? '—';
+        case 'statut': return $row['statut'] ?? '—';
+        default:       return '—';
+    }
+}
+
+// ==== trier_resultat_affichage ====
+/**
+ * Trie une COPIE de $rows pour l'AFFICHAGE seulement (alpha ou mérite) —
+ * ne touche jamais au champ 'rang', déjà figé au mérite par
+ * calc_resultat_annuel_comp() : seul l'ORDRE D'ITÉRATION change, jamais le
+ * rang lui-même. $rows est déjà en ordre mérite en entrée (voir
+ * calc_resultat_annuel_comp()), donc $tri==='merite' ne fait rien.
+ */
+function trier_resultat_affichage(array $rows, string $tri): array {
+    if ($tri === 'alpha') {
+        usort($rows, fn($a, $b) => strcmp(
+            trim(($a['nom'] ?? '') . ' ' . ($a['prenom'] ?? '')),
+            trim(($b['nom'] ?? '') . ' ' . ($b['prenom'] ?? ''))
+        ));
+    }
+    return $rows;
+}
+
+// ==== calc_resultat_annuel_comp ====
+/**
+ * Calcule, pour chaque élève actif d'UNE classe ($id_classe>0) ou de TOUTES
+ * les classes actives de l'année ($id_classe=0 — palmarès établissement) :
+ * sa moyenne par trimestre, sa moyenne annuelle (moyenne des moyennes
+ * trimestrielles existantes — jamais une pondération par coefficient
+ * global), ses heures d'absence annuelles NON JUSTIFIÉES, sa décision de
+ * fin d'année et sa classe suivante :
+ *
+ *  - Décision : si le conseil de classe a enregistré une décision annuelle
+ *    (decision_conseil, type='annee') pour cet élève, elle fait foi telle
+ *    quelle (decision_source='enregistree') ; sinon, valeur par défaut
+ *    (decision_source='auto') : moyenne annuelle >= 10 => Admis, sinon
+ *    Redoublement — jamais Exclu/Abandon par défaut (décisions
+ *    disciplinaires/administratives, saisie humaine explicite obligatoire) ;
+ *    si la moyenne annuelle est null et aucune décision enregistrée =>
+ *    "Non classé".
+ *  - Classe suivante : Redoublement => la classe actuelle elle-même ;
+ *    Admis avec next_classe enregistrée => cette classe ; Admis sans
+ *    next_classe enregistrée (y compris un Admis auto-calculé) =>
+ *    littéralement "(à définir)", jamais une classe devinée ; Exclu/
+ *    Abandon/Non classé => "—".
+ *
+ * Retourne un tableau à plat, TOUJOURS trié par moyenne annuelle
+ * décroissante avec le rang déjà calculé DANS LE PÉRIMÈTRE DEMANDÉ (une
+ * classe, ou l'école entière) — le tri d'affichage alpha/mérite est une
+ * affaire de l'appelant (trier_resultat_affichage()), jamais de cette
+ * fonction : le rang lui-même ne bouge jamais avec l'ordre d'affichage.
+ */
+function calc_resultat_annuel_comp(int $id_annee, int $id_classe = 0): array {
+    $classes = $id_classe
+        ? db_all("SELECT * FROM classe WHERE id=?", [$id_classe])
+        : db_all(
+            "SELECT c.* FROM classe c
+             JOIN inscription i ON i.id_classe=c.id AND i.id_annee=?
+             WHERE c.archivee=0 GROUP BY c.id ORDER BY c.ordre, c.designation",
+            [$id_annee]
+          );
+    if (empty($classes)) return [];
+
+    // Désignations de toutes les classes — résout next_classe sans requête
+    // répétée par élève.
+    $designations = [];
+    foreach (db_all("SELECT id, designation FROM classe") as $c) { $designations[(int)$c['id']] = $c['designation']; }
+
+    $trimestres = db_all("SELECT id FROM trimestre WHERE id_annee=? ORDER BY ordre", [$id_annee]);
+
+    $out = [];
+    foreach ($classes as $c) {
+        $cid = (int)$c['id'];
+        $eleves = db_all(
+            "SELECT e.* FROM eleve e
+             JOIN inscription i ON i.id_eleve=e.id AND i.id_classe=? AND i.id_annee=?
+             WHERE e.statut='actif'",
+            [$cid, $id_annee]
+        );
+        if (empty($eleves)) continue;
+
+        $dcomp_par_trim = [];
+        foreach ($trimestres as $t) {
+            $dcomp_par_trim[] = pv_charger_donnees_comp($cid, (int)$t['id'], $id_annee);
+        }
+
+        // [i][eid] => ['moy'=>?float,'classable'=>bool,'annule'=>bool,'evalue'=>bool] — Règles 1/2/4 par trimestre.
+        $par_trim_par_eleve = [];
+        foreach ($dcomp_par_trim as $i => $d) {
+            foreach ($eleves as $el) {
+                $eid = (int)$el['id'];
+                [$m, $classable, , $annule] = empty($d['competences_par_mat']) ? [null, false, 0.0, !empty($d['annules'][$eid])] : pv_moy_generale_comp(
+                    $eid, $d['disciplines'], $d['competences_par_mat'], $d['notes_idx'], $d['notes_count'],
+                    $d['nb_inscrits'], $d['mats_avec_notes'], $d['nb_mats_avec_notes'], $d['annules']
+                );
+                $par_trim_par_eleve[$i][$eid] = ['moy' => $m, 'classable' => $classable, 'annule' => $annule, 'evalue' => $d['nb_mats_avec_notes'] > 0];
+            }
+        }
+
+        $decisions_idx = [];
+        foreach (db_all("SELECT * FROM decision_conseil WHERE id_classe=? AND id_annee=? AND type='annee'", [$cid, $id_annee]) as $r) {
+            $decisions_idx[(int)$r['id_eleve']] = $r;
+        }
+
+        foreach ($eleves as $el) {
+            $eid   = (int)$el['id'];
+            $trims_eleve = [
+                $par_trim_par_eleve[0][$eid] ?? ['moy' => null, 'classable' => false, 'annule' => false, 'evalue' => false],
+                $par_trim_par_eleve[1][$eid] ?? ['moy' => null, 'classable' => false, 'annule' => false, 'evalue' => false],
+                $par_trim_par_eleve[2][$eid] ?? ['moy' => null, 'classable' => false, 'annule' => false, 'evalue' => false],
+            ];
+            // moy_t : affichage par trimestre (moyenne si classé, null sinon —
+            // le statut détaillé, pour distinguer "Annulé"/"Non classé"/"—",
+            // est dans moy_t_statut).
+            $moy_t = array_map(fn($t) => ($t['classable'] && $t['moy'] !== null) ? $t['moy'] : null, $trims_eleve);
+            $moy_t_statut = array_map(function ($t) {
+                if ($t['annule']) return 'annule';
+                if ($t['classable'] && $t['moy'] !== null) return 'classe';
+                if (!$t['evalue']) return 'vide';
+                return 'non_classe';
+            }, $trims_eleve);
+            // Règle 3 : moyenne annuelle = somme / nb de trimestres réellement
+            // évalués pour la classe (pas le nb de trimestres ayant une
+            // moyenne pour CET élève) — voir pv_moy_annuelle_comp().
+            $r3 = pv_moy_annuelle_comp($trims_eleve);
+            $moy_annuelle = $r3['moy'];
+
+            $abs_non_just = (float) eleve_absence_annuelle($el['matricule'] ?? '', $cid, $id_annee)['non_jus'];
+
+            $dec = $decisions_idx[$eid] ?? null;
+            if ($dec) {
+                $decision        = $dec['decision'];
+                $observation     = $dec['observation'];
+                $decision_source = 'enregistree';
+                $next_classe_id  = $dec['next_classe'] !== null ? (int)$dec['next_classe'] : null;
+            } elseif ($moy_annuelle !== null) {
+                $decision        = $moy_annuelle >= 10 ? 'Admis' : 'Redoublement';
+                $observation     = null;
+                $decision_source = 'auto';
+                $next_classe_id  = null;
+            } else {
+                $decision        = 'Non classé';
+                $observation     = null;
+                $decision_source = 'auto';
+                $next_classe_id  = null;
+            }
+
+            if ($decision === 'Redoublement') {
+                $classe_suivante_designation = $c['designation'];
+            } elseif ($decision === 'Admis') {
+                $classe_suivante_designation = $next_classe_id !== null
+                    ? ($designations[$next_classe_id] ?? '(à définir)')
+                    : '(à définir)';
+            } else {
+                $classe_suivante_designation = '—';
+            }
+
+            $out[] = [
+                'id' => $eid, 'matricule' => $el['matricule'], 'niu' => $el['niu'] ?? null,
+                'nom' => $el['nom'], 'prenom' => $el['prenom'] ?? null, 'sexe' => $el['sexe'] ?? null,
+                'date_naiss' => $el['date_naiss'] ?? null, 'lieu_naiss' => $el['lieu_naiss'] ?? null,
+                'id_classe' => $cid, 'classe_designation' => $c['designation'],
+                'moy_t' => $moy_t, 'moy_t_statut' => $moy_t_statut, 'abs_non_just' => $abs_non_just,
+                'moy_annuelle' => $moy_annuelle, 'nb_trim_evalues' => $r3['nb_evalues'], 'rang' => null,
+                'decision' => $decision, 'decision_source' => $decision_source,
+                'observation' => $observation,
+                'next_classe_id' => $next_classe_id,
+                'classe_suivante_designation' => $classe_suivante_designation,
+            ];
+        }
+    }
+
+    usort($out, function ($a, $b) {
+        if ($a['moy_annuelle'] === null && $b['moy_annuelle'] === null) return 0;
+        if ($a['moy_annuelle'] === null) return 1;
+        if ($b['moy_annuelle'] === null) return -1;
+        return $b['moy_annuelle'] <=> $a['moy_annuelle'];
+    });
+    $r = 1;
+    foreach ($out as &$row) {
+        if ($row['moy_annuelle'] !== null) { $row['rang'] = $r++; }
+    }
+    unset($row);
+
+    return $out;
+}
+
+// ==== calc_liste_provisoire_comp ====
+/**
+ * Construit l'effectif prévisionnel d'une classe pour l'année SUIVANTE :
+ * les redoublants de cette classe (statut 'RED') + les élèves admis
+ * d'AUTRES classes dont la décision déjà enregistrée précise cette classe
+ * comme classe suivante (statut 'NV'). Repose EXCLUSIVEMENT sur des
+ * décisions du conseil déjà enregistrées (decision_conseil, type='annee')
+ * — un élève encore seulement auto-calculé (jamais examiné par le
+ * conseil) n'apparaît jamais ici puisque sa destination réelle est
+ * inconnue.
+ * La moyenne annuelle (uniquement pour le tri "Mérite" — jamais affichée,
+ * absente du jeu de colonnes réduit de cet onglet) est recalculée à la
+ * volée via calc_resultat_annuel_comp(), mais SEULEMENT pour les classes
+ * D'ORIGINE réellement concernées (jamais un balayage de tout
+ * l'établissement).
+ */
+function calc_liste_provisoire_comp(int $id_annee, int $id_classe_cible): array {
+    $classe_cible = db_one("SELECT * FROM classe WHERE id=?", [$id_classe_cible]);
+    if (!$classe_cible) return [];
+
+    $decisions_red = db_all(
+        "SELECT * FROM decision_conseil WHERE id_classe=? AND id_annee=? AND type='annee' AND decision='Redoublement'",
+        [$id_classe_cible, $id_annee]
+    );
+    $decisions_nv = db_all(
+        "SELECT * FROM decision_conseil WHERE id_annee=? AND type='annee' AND decision='Admis' AND next_classe=?",
+        [$id_annee, $id_classe_cible]
+    );
+    if (empty($decisions_red) && empty($decisions_nv)) return [];
+
+    // Regroupe les élèves à récupérer par classe D'ORIGINE (id_classe de la
+    // décision) — calc_resultat_annuel_comp() n'est appelée qu'une fois par
+    // classe d'origine réellement concernée, jamais pour tout l'établissement.
+    $eleves_par_classe_origine = [];
+    foreach ($decisions_red as $d) { $eleves_par_classe_origine[(int)$d['id_classe']]['RED'][] = (int)$d['id_eleve']; }
+    foreach ($decisions_nv  as $d) { $eleves_par_classe_origine[(int)$d['id_classe']]['NV'][]  = (int)$d['id_eleve']; }
+
+    $out = [];
+    foreach ($eleves_par_classe_origine as $id_classe_origine => $groupes) {
+        $par_eleve = [];
+        foreach (calc_resultat_annuel_comp($id_annee, $id_classe_origine) as $r) { $par_eleve[$r['id']] = $r; }
+
+        foreach (['RED', 'NV'] as $statut) {
+            foreach ($groupes[$statut] ?? [] as $eid) {
+                $r = $par_eleve[$eid] ?? null;
+                if (!$r) continue; // élève plus inscrit/actif cette année : ignoré
+                $out[] = [
+                    'id' => $r['id'], 'matricule' => $r['matricule'], 'niu' => $r['niu'],
+                    'nom' => $r['nom'], 'prenom' => $r['prenom'], 'sexe' => $r['sexe'],
+                    'date_naiss' => $r['date_naiss'], 'lieu_naiss' => $r['lieu_naiss'],
+                    'statut' => $statut, 'moy_annuelle_origine' => $r['moy_annuelle'],
+                ];
+            }
+        }
+    }
+
+    usort($out, fn($a, $b) => strcmp(trim($a['nom'] . ' ' . ($a['prenom'] ?? '')), trim($b['nom'] . ' ' . ($b['prenom'] ?? ''))));
+
+    return $out;
+}
+

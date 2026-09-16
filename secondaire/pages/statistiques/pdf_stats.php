@@ -59,8 +59,8 @@ if ($is_admin) {
 }
 if ($id_classe) $classes = array_filter($classes, fn($c) => (int)$c['id'] === $id_classe);
 
-require_once __DIR__ . '../../pdf/fpdf.php';
-require_once __DIR__ . '../../pdf/header_pdf.php';
+require_once __DIR__ . '/../../pdf/fpdf.php';
+require_once __DIR__ . '/../../pdf/header_pdf.php';
 
 function uc(string $s): string {
 	return mb_convert_encoding($s, 'Windows-1252', 'UTF-8');

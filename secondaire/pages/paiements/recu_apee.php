@@ -7,8 +7,8 @@ require_once __DIR__ . '/../../../config.php';
 require_once __DIR__ . '/../../../connexion.php';
 require_once __DIR__ . '/../../../fonctions.php';
 exiger_role(['ADMIN', 'PROVISEUR', 'CENSEUR', 'INTENDANT']);
-require_once __DIR__ . '../../pdf/fpdf.php';
-require_once __DIR__ . '../../pdf/header_pdf.php';
+require_once __DIR__ . '/../../pdf/fpdf.php';
+require_once __DIR__ . '/../../pdf/header_pdf.php';
 
 $id_eleve = (int)($_GET['eleve'] ?? 0);
 $id_annee = (int)($_GET['annee'] ?? 0);

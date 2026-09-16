@@ -228,8 +228,8 @@ $trim_info  = db_one("SELECT * FROM trimestre WHERE id=?", [$id_trim]);
 if (!$trim_info) die('Trimestre introuvable.');
 $titre_bull = strtoupper($trim_info['libelle'] ?? '');
 
-require_once __DIR__ . '../../pdf/fpdf.php';
-require_once __DIR__ . '../../pdf/header_pdf.php'; // pour pdf_filigrane()
+require_once __DIR__ . '/../../pdf/fpdf.php';
+require_once __DIR__ . '/../../pdf/header_pdf.php'; // pour pdf_filigrane()
 
 // Sous-classe FPDF ajoutant les rectangles à coins arrondis (cadre de page,
 // bandeau du titre) — voir secondaire/pages/bulletins/pdf.php pour le jumeau (même
@@ -901,8 +901,8 @@ foreach ($eleves as $el) {
     // QR code de vérification d'authenticité — dans la dernière cellule de
     // DECISION, aligné à droite, avec la photo de l'élève incrustée au
     // centre. Plus de légende "Scannez..." sous le QR (supprimée, demande explicite).
-    require_once __DIR__ . '../../pdf/verif_lib.php';
-    require_once __DIR__ . '../../pdf/qrcode.php';
+    require_once __DIR__ . '/../../pdf/verif_lib.php';
+    require_once __DIR__ . '/../../pdf/qrcode.php';
 
     if ($h_rempli_c > 15) {
         $verif_url_c = bulletin_verif_url(

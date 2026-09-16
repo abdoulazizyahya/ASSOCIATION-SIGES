@@ -149,8 +149,8 @@ if ($type === 'annee') {
 }
 
 // ── PDF ────────────────────────────────────────────────────────────
-require_once __DIR__ . '../../pdf/fpdf.php';
-require_once __DIR__ . '../../pdf/header_pdf.php';
+require_once __DIR__ . '/../../pdf/fpdf.php';
+require_once __DIR__ . '/../../pdf/header_pdf.php';
 
 function pvpdf_u(string $s): string {
     return mb_convert_encoding($s, 'ISO-8859-1', 'UTF-8');

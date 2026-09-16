@@ -36,10 +36,13 @@ require_once __DIR__ . '/../../../layout/header.php';
             <td><?= h($u['login']) ?></td>
             <td>
               <?php
-              $badges = ['ADMIN'=>'bg-danger','PROVISEUR'=>'bg-primary','CENSEUR'=>'bg-info','PROF'=>'bg-secondary','SECRETAIRE'=>'bg-warning text-dark'];
+              // Voir form.php : 'PROF' (LAM_ABZ d'origine) n'existe pas dans
+              // l'ENUM utilisateur.role, remplacé par les 7 rôles réels.
+              $badges = ['ADMIN'=>'bg-danger','PROVISEUR'=>'bg-primary','CENSEUR'=>'bg-info','SG'=>'bg-dark',
+                         'SECRETAIRE'=>'bg-warning text-dark','ENSEIGNANT'=>'bg-secondary','INTENDANT'=>'bg-success'];
               $bg = $badges[$u['role']] ?? 'bg-secondary';
               ?>
-              <span class="badge <?= $bg ?>"><?= h($u['role']) ?></span>
+              <span class="badge <?= $bg ?>"><?= h(libelle_role($u['role'])) ?></span>
             </td>
             <td>
               <?php if ($u['actif']): ?>

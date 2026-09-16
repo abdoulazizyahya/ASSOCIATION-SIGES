@@ -173,8 +173,8 @@ function cell_rang_releve(FPDF $pdf, float $w, float $h, ?int $rang, string $suf
 }
 
 // ── Génération PDF (paysage) ────────────────────────────────────────────
-require_once __DIR__ . '../../pdf/fpdf.php';
-require_once __DIR__ . '../../pdf/header_pdf.php'; // pour pdf_filigrane()
+require_once __DIR__ . '/../../pdf/fpdf.php';
+require_once __DIR__ . '/../../pdf/header_pdf.php'; // pour pdf_filigrane()
 
 $pdf = new FPDF('L', 'mm', 'A4');
 $pdf->SetMargins(8, 8, 8);

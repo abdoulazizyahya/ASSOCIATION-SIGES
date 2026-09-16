@@ -256,8 +256,8 @@ $trimestres = array_pad(array_slice($trimestres, 0, 3), 3, null);
 
 $titre_bull = 'BILAN ANNUEL';
 
-require_once __DIR__ . '../../pdf/fpdf.php';
-require_once __DIR__ . '../../pdf/header_pdf.php'; // pour pdf_filigrane()
+require_once __DIR__ . '/../../pdf/fpdf.php';
+require_once __DIR__ . '/../../pdf/header_pdf.php'; // pour pdf_filigrane()
 
 // Sous-classe FPDF ajoutant les rectangles à coins arrondis (cadre de page,
 // bandeau du titre) — voir secondaire/pages/bulletins/pdf.php pour le jumeau (même
@@ -1174,8 +1174,8 @@ foreach ($eleves as $el) {
     // page, tout en bas, à 2-3mm au-dessus du copyright (demande explicite,
     // déplacé hors du cadre OBSERVATIONS), avec la photo de l'élève incrustée
     // au centre.
-    require_once __DIR__ . '../../pdf/verif_lib.php';
-    require_once __DIR__ . '../../pdf/qrcode.php';
+    require_once __DIR__ . '/../../pdf/verif_lib.php';
+    require_once __DIR__ . '/../../pdf/qrcode.php';
 
     $verif_url_c = bulletin_verif_url($id_eleve, 'annee', $id_annee, id_affichage_eleve($eleve));
     $qr_tmp_c = tempnam(sys_get_temp_dir(), 'abzqr_') . '.png';
