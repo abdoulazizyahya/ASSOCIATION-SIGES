@@ -24,7 +24,10 @@ asso_haut('Établissements de l\'association');
   <?php foreach ($ecoles as $e): ?>
     <div class="col-12 col-md-6">
       <?php $logo_url = assoc_ecole_logo_url($e['logo'] ?? null); ?>
-      <div class="ecole-card h-100 position-relative <?= $e['actif'] ? '' : 'opacity-50' ?>">
+      <div class="ecole-card h-100 position-relative <?= $e['actif'] ? '' : 'opacity-50' ?>" style="overflow:hidden">
+        <div class="ecole-filigrane" aria-hidden="true">
+          <?= $e['type_enseignement'] === 'secondaire' ? 'SECONDAIRE' : 'PRIMAIRE' ?>
+        </div>
         <div class="d-flex align-items-start gap-3">
           <div class="flex-grow-1">
             <a href="<?= APP_URL ?>/association/etablissement.php?id=<?= (int) $e['id'] ?>"
@@ -39,9 +42,6 @@ asso_haut('Établissements de l\'association');
             <?php if ($proprietaire): ?>
               <div class="small text-muted2 mt-1"><i class="bi bi-database me-1"></i><?= h($e['db_name']) ?></div>
             <?php endif; ?>
-            <div class="small mt-1 fst-italic" style="color:#dc2626">
-              <?= $e['type_enseignement'] === 'secondaire' ? 'Secondaire' : 'Primaire' ?>
-            </div>
           </div>
           <div class="flex-shrink-0 d-flex align-items-center justify-content-center"
                style="width:96px;height:96px;border-radius:12px;overflow:hidden;background:#fff;border:1px solid var(--border)">

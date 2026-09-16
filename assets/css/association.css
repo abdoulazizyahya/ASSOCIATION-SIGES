@@ -269,6 +269,28 @@ body.asso-nav-open .asso-backdrop { opacity: 1; visibility: visible; }
   box-shadow: var(--card-shadow-lg);
 }
 
+/* Filigrane « PRIMAIRE »/« SECONDAIRE » en fond de chaque case école
+   (association/index.php) — grand, majuscule, oblique, comme un tampon. */
+.ecole-filigrane {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-heading);
+  font-size: clamp(1.8rem, 7vw, 2.6rem);
+  font-weight: 800;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: #dc2626;
+  opacity: .16;
+  transform: rotate(-22deg) scale(1.15);
+  white-space: nowrap;
+  pointer-events: none;
+  user-select: none;
+  z-index: 0;
+}
+
 .section-titre {
   font-family: var(--font-heading);
   font-weight: 700; font-size: .84rem; color: var(--primary);
