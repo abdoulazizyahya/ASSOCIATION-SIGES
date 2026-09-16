@@ -190,6 +190,19 @@ function charger_schema_ecole(mysqli $l, array $seed, string $type = 'primaire')
         throw new RuntimeException("Schéma incomplet ($nbTables tables).");
     }
 
+    // FLUSH TABLES après un chargement en masse par mysqli_multi_query() :
+    // sans ça, sur ce serveur (MySQL 9.1 constaté), TOUTE requête préparée
+    // avec paramètre lié (UPDATE/DELETE, même l'INSERT de licence juste en
+    // dessous) sur une table fraîchement créée échoue de façon PERMANENTE
+    // avec "Prepared statement needs to be re-prepared" (errno 1615) —
+    // reproduit sur connexion neuve, DB jetable, sans rapport avec le code
+    // appelant (bug réel constaté le 16/09/2026 en vérifiant l'étape 8
+    // secondaire/Matières : classe/matiere/competence, toutes auto_increment,
+    // inutilisables en écriture dès la création de l'école tant que rien ne
+    // force un FLUSH TABLES). Un simple `FLUSH TABLES;` juste après le
+    // chargement résout le problème de façon définitive pour la connexion.
+    mysqli_query($l, 'FLUSH TABLES');
+
     // Licence (bd/lib/licence.php, migration v56/v57) : période d'ESSAI de
     // 60 jours par défaut — sans ça, une école toute neuve serait
     // IMMÉDIATEMENT bloquée en écriture (licence_etat() fail-closed :
@@ -222,6 +235,12 @@ function charger_schema_ecole(mysqli $l, array $seed, string $type = 'primaire')
         mysqli_stmt_bind_param($st, 'ssss', $seed['nom'], $seed['nom_en'], $seed['sigle'], $seed['ville']);
         mysqli_stmt_execute($st);
         mysqli_stmt_close($st);
+
+        // Données de référence pédagogiques (niveaux, sections Fr/An, groupes
+        // de compétence, séries) — voir bd/assoc/seed_ref_ecole_secondaire.sql.
+        // Sans elles, discipline.id_groupe (NOT NULL, FK -> groupe) rend le
+        // module Matières inutilisable dès la première affectation.
+        charger_seed_ref_ecole_secondaire($l);
         return $nbTables;
     }
 
@@ -271,6 +290,28 @@ function charger_seed_ref_ecole(mysqli $l): int {
     }
     $n = 0;
     foreach (['niveau', 'competence', 'groupe_competence_niveau', 'arrondissement', 'bareme_reference'] as $t) {
+        $r = mysqli_query($l, "SELECT COUNT(*) FROM `$t`");
+        if ($r) $n += (int) mysqli_fetch_row($r)[0];
+    }
+    return $n;
+}
+
+// École secondaire (schema_ref_ecole_secondaire.sql) : équivalent de
+// charger_seed_ref_ecole() ci-dessus pour les tables niveau/section_classe/
+// groupe/serie — voir bd/assoc/seed_ref_ecole_secondaire.sql.
+function charger_seed_ref_ecole_secondaire(mysqli $l): int {
+    $f = __DIR__ . '/bd/assoc/seed_ref_ecole_secondaire.sql';
+    $sql = @file_get_contents($f);
+    if ($sql === false || trim($sql) === '') return 0;
+    if (mysqli_multi_query($l, $sql)) {
+        do { /* consommer */ } while (mysqli_next_result($l));
+    }
+    if (mysqli_errno($l)) {
+        error_log('charger_seed_ref_ecole_secondaire: ' . mysqli_error($l));
+        return 0;
+    }
+    $n = 0;
+    foreach (['niveau', 'section_classe', 'groupe', 'serie'] as $t) {
         $r = mysqli_query($l, "SELECT COUNT(*) FROM `$t`");
         if ($r) $n += (int) mysqli_fetch_row($r)[0];
     }

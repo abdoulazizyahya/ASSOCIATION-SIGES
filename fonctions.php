@@ -825,6 +825,32 @@ function get_sequence_active(): array {
     ) ?? [];
 }
 
+// École secondaire uniquement (schema_ref_ecole_secondaire.sql) : le
+// trimestre actif de l'année active, utilisé par le module Matières (onglet
+// « Compétences par trimestre », porté de LAM_ABZ). Sans repli, une école
+// neuve n'a aucun trimestre (table `trimestre` jamais provisionnée par
+// charger_schema_ecole()) -> onglet vide et inutilisable, comme le bug
+// constaté le 15/09/2026 sur get_annee_active() sans année scolaire : même
+// auto-amorçage à l'usage plutôt qu'un écran dédié (hors scope de cette
+// étape). Nom volontairement distinct de sequences_trimestre_actif() (même
+// fichier, système du PRIMAIRE) — deux systèmes non interchangeables.
+function get_trimestre_actif(): array {
+    $annee = get_annee_active();
+    if (empty($annee['id'])) return [];
+    $t = db_one("SELECT * FROM trimestre WHERE id_annee=? AND active=1 LIMIT 1", [$annee['id']]);
+    if (!$t) {
+        $existe = db_val("SELECT COUNT(*) FROM trimestre WHERE id_annee=?", [$annee['id']]);
+        if (!$existe) {
+            foreach (['Trimestre 1', 'Trimestre 2', 'Trimestre 3'] as $i => $lib) {
+                db_exec("INSERT INTO trimestre (libelle, ordre, id_annee, active) VALUES (?, ?, ?, ?)",
+                        [$lib, $i + 1, $annee['id'], $i === 0 ? 1 : 0]);
+            }
+        }
+        $t = db_one("SELECT * FROM trimestre WHERE id_annee=? AND active=1 LIMIT 1", [$annee['id']]);
+    }
+    return $t ?: [];
+}
+
 // ── Passage en classe supérieure automatique (migration_v36) ───────────
 // Appelée depuis pages/parametres/index.php (onglet=annees, actions
 // annee_creer ET annee_activer — l'utilisateur a dit « après avoir créé OU

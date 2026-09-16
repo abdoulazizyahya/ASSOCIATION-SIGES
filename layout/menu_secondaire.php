@@ -22,8 +22,9 @@ return [
         ['Tableau de bord', 'dashboard.php', 'speedometer2', []],
     ],
     'Scolarité' => [
-        ['Élèves',  'secondaire/pages/eleves/liste.php',  'people',    ['ADMIN','PROVISEUR','CENSEUR','SG','SECRETAIRE']],
-        ['Classes', 'secondaire/pages/classes/liste.php', 'door-open', ['ADMIN','PROVISEUR','CENSEUR']],
+        ['Élèves',   'secondaire/pages/eleves/liste.php',   'people',            ['ADMIN','PROVISEUR','CENSEUR','SG','SECRETAIRE']],
+        ['Classes',  'secondaire/pages/classes/liste.php',  'door-open',         ['ADMIN','PROVISEUR','CENSEUR']],
+        ['Matières', 'secondaire/pages/matieres/liste.php', 'journal-bookmark',  ['ADMIN','PROVISEUR','CENSEUR']],
     ],
     'Ressources humaines' => [
         ['Enseignants', 'secondaire/pages/enseignants/liste.php', 'person-badge', ['ADMIN','PROVISEUR','CENSEUR']],
