@@ -898,6 +898,67 @@ function get_sequence_active(): array {
     ) ?? [];
 }
 
+// Crée (si absentes) les 3 trimestres et leurs 2 séquences chacun d'une
+// année scolaire secondaire donnée — structure seulement, AUCUN active=1
+// décidé ici (voir activer_trimestre()/activer_sequence() ci-dessous) :
+// appelée aussi bien pour l'année ACTIVE (bootstrap paresseux au fil de
+// get_trimestre_actif()) que pour une année tout juste CRÉÉE et pas encore
+// active (secondaire/pages/parametres/index.php::annee_creer — demande
+// explicite du 17/09/2026 : « les trimestres et leurs séquences doivent
+// être créés comme ce modèle existant » dès la création de l'année, pas
+// seulement à son activation). Idempotent (vérifie l'existant avant
+// d'insérer), rejouable sans dupliquer.
+function provisionner_trimestres_annee(int $id_annee): void {
+    if (!$id_annee) return;
+    if (!db_val("SELECT COUNT(*) FROM trimestre WHERE id_annee=?", [$id_annee])) {
+        foreach (['Trimestre 1', 'Trimestre 2', 'Trimestre 3'] as $i => $lib) {
+            db_exec("INSERT INTO trimestre (libelle, ordre, id_annee, active) VALUES (?, ?, ?, 0)",
+                    [$lib, $i + 1, $id_annee]);
+        }
+    }
+    // Chaque trimestre est subdivisé en 2 séquences — système d'évaluation
+    // historique de LAM_ABZ (table `sequence`), toujours utilisé par
+    // secondaire/pages/notes/ (onglets élève/copie/non saisies) alors même
+    // que l'onglet « par classe » est déjà passé aux compétences par
+    // trimestre. Vérifié indépendamment de l'existence des trimestres —
+    // une année dont les trimestres existaient déjà (créés par un appel
+    // antérieur) doit quand même obtenir ses séquences (bug réel constaté
+    // le 16/09/2026, étape 9/Notes, quand ce contrôle était imbriqué dans
+    // la seule branche « trimestre absent »).
+    if (!db_val("SELECT COUNT(*) FROM sequence s JOIN trimestre t ON t.id=s.id_trim WHERE t.id_annee=?", [$id_annee])) {
+        $trims = db_all("SELECT id FROM trimestre WHERE id_annee=? ORDER BY ordre", [$id_annee]);
+        foreach ($trims as $tr) {
+            foreach (['Séquence 1', 'Séquence 2'] as $j => $lib_s) {
+                db_exec("INSERT INTO sequence (libelle, ordre, active, id_trim) VALUES (?, ?, 0, ?)",
+                        [$lib_s, $j + 1, $tr['id']]);
+            }
+        }
+    }
+}
+
+// Bascule le trimestre ACTIF, GLOBALEMENT (une seule année scolaire est
+// active à la fois — annee_scolaire.active — donc un seul trimestre doit
+// l'être aussi dans toute la base) : désactive systématiquement tous les
+// autres avant d'activer celui-ci. Sans ce nettoyage global, changer
+// d'année active (secondaire/pages/parametres/index.php::annee_activer)
+// laissait le trimestre actif de l'ANCIENNE année marqué actif pour
+// toujours (bug latent, corrigé au passage de ce même correctif).
+function activer_trimestre(int $id_trimestre): void {
+    db_exec("UPDATE trimestre SET active=0");
+    db_exec("UPDATE trimestre SET active=1 WHERE id=?", [$id_trimestre]);
+}
+
+// Idem pour la séquence active — get_sequence_active() (fonctions.php) fait
+// une requête GLOBALE (WHERE sequence.active=1, jamais filtrée par année) :
+// il ne doit donc jamais y avoir plus d'une séquence active à la fois dans
+// toute la base, sous peine de résultat ambigu (LIMIT 1 sans ORDER BY sur
+// plusieurs lignes actives = ligne arbitraire, potentiellement celle d'une
+// année qui n'est plus active).
+function activer_sequence(int $id_sequence): void {
+    db_exec("UPDATE sequence SET active=0");
+    db_exec("UPDATE sequence SET active=1 WHERE id=?", [$id_sequence]);
+}
+
 // École secondaire uniquement (schema_ref_ecole_secondaire.sql) : le
 // trimestre actif de l'année active, utilisé par le module Matières (onglet
 // « Compétences par trimestre », porté de LAM_ABZ). Sans repli, une école
@@ -910,48 +971,47 @@ function get_sequence_active(): array {
 function get_trimestre_actif(): array {
     $annee = get_annee_active();
     if (empty($annee['id'])) return [];
+    $id_annee = (int) $annee['id'];
+    provisionner_trimestres_annee($id_annee);
+
     $t = db_one(
         "SELECT t.*, a.libelle AS annee_lib FROM trimestre t
          JOIN annee_scolaire a ON a.id=t.id_annee
          WHERE t.id_annee=? AND t.active=1 LIMIT 1",
-        [$annee['id']]
+        [$id_annee]
     );
     if (!$t) {
-        $existe = db_val("SELECT COUNT(*) FROM trimestre WHERE id_annee=?", [$annee['id']]);
-        if (!$existe) {
-            foreach (['Trimestre 1', 'Trimestre 2', 'Trimestre 3'] as $i => $lib) {
-                db_exec("INSERT INTO trimestre (libelle, ordre, id_annee, active) VALUES (?, ?, ?, ?)",
-                        [$lib, $i + 1, $annee['id'], $i === 0 ? 1 : 0]);
-            }
+        // Les trimestres existent déjà (provisionnés ici ou dès la création
+        // de l'année — annee_creer) mais aucun n'est actif pour CETTE
+        // année (ex. année tout juste activée) — bascule vers le 1er par
+        // ordre. activer_trimestre() nettoie aussi l'actif d'une AUTRE
+        // année au passage (voir sa docstring).
+        $premier_id = db_val("SELECT id FROM trimestre WHERE id_annee=? ORDER BY ordre LIMIT 1", [$id_annee]);
+        if ($premier_id) {
+            activer_trimestre((int) $premier_id);
+            $t = db_one(
+                "SELECT t.*, a.libelle AS annee_lib FROM trimestre t
+                 JOIN annee_scolaire a ON a.id=t.id_annee
+                 WHERE t.id=?",
+                [$premier_id]
+            );
         }
-        $t = db_one(
-            "SELECT t.*, a.libelle AS annee_lib FROM trimestre t
-             JOIN annee_scolaire a ON a.id=t.id_annee
-             WHERE t.id_annee=? AND t.active=1 LIMIT 1",
-            [$annee['id']]
+    }
+
+    // Même bascule pour la séquence active — voir activer_sequence().
+    $seq_active_ok = db_val(
+        "SELECT COUNT(*) FROM sequence s JOIN trimestre tr ON tr.id=s.id_trim WHERE tr.id_annee=? AND s.active=1",
+        [$id_annee]
+    );
+    if (!$seq_active_ok) {
+        $premiere_seq_id = db_val(
+            "SELECT s.id FROM sequence s JOIN trimestre tr ON tr.id=s.id_trim
+             WHERE tr.id_annee=? ORDER BY tr.ordre, s.ordre LIMIT 1",
+            [$id_annee]
         );
+        if ($premiere_seq_id) activer_sequence((int) $premiere_seq_id);
     }
-    // Chaque trimestre est subdivisé en 2 séquences — système d'évaluation
-    // historique de LAM_ABZ (table `sequence`), toujours utilisé par
-    // secondaire/pages/notes/ (onglets élève/copie/non saisies,
-    // get_sequence_active() déjà type-aware dans ce fichier) alors même que
-    // l'onglet « par classe » est déjà passé aux compétences par trimestre.
-    // Amorçage DÉCOUPLÉ de celui des trimestres ci-dessus (bug réel constaté
-    // le 16/09/2026, étape 9/Notes : une école dont les trimestres avaient
-    // déjà été créés par un appel antérieur de cette fonction — étape 8 —
-    // n'obtenait jamais aucune séquence, le bloc d'amorçage n'étant imbriqué
-    // que dans la branche « trimestre absent »). Vérifié à CHAQUE appel,
-    // indépendamment de l'existence des trimestres. La 1ʳᵉ séquence du 1ᵉʳ
-    // trimestre est active par défaut, comme le trimestre lui-même.
-    if (!db_val("SELECT COUNT(*) FROM sequence s JOIN trimestre t ON t.id=s.id_trim WHERE t.id_annee=?", [$annee['id']])) {
-        $trims = db_all("SELECT id, ordre FROM trimestre WHERE id_annee=? ORDER BY ordre", [$annee['id']]);
-        foreach ($trims as $i => $tr) {
-            foreach (['Séquence 1', 'Séquence 2'] as $j => $lib_s) {
-                db_exec("INSERT INTO sequence (libelle, ordre, active, id_trim) VALUES (?, ?, ?, ?)",
-                        [$lib_s, $j + 1, ($i === 0 && $j === 0) ? 1 : 0, $tr['id']]);
-            }
-        }
-    }
+
     return $t ?: [];
 }
 

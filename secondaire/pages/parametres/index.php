@@ -9,6 +9,10 @@ auto_activer_sequences();
 $onglet = $_GET['onglet'] ?? 'etablissement';
 $etab   = get_etablissement();
 $sig_chef_etablissement = get_signature_titulaires()['chef_etablissement'] ?? null;
+// Création d'année scolaire réservée au propriétaire/superadmin du système
+// (voir garde POST plus bas) — variable réutilisée par le template pour
+// masquer le formulaire de création aux comptes locaux ADMIN/PROVISEUR.
+$est_superadmin = function_exists('est_superadmin_association') && est_superadmin_association();
 
 // ══════════════════════════════════════════════════
 //  POST — Établissement
@@ -27,8 +31,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $mime   = finfo_file($fi, $_FILES['logo']['tmp_name']);
             finfo_close($fi);
             if (isset($ext_ok[$ext]) && $ext_ok[$ext] === $mime) {
-                $logo = 'logo_etab.'.$ext;
-                move_uploaded_file($_FILES['logo']['tmp_name'], __DIR__.'/../../assets/uploads/'.$logo);
+                // Préfixe par école (multi-établissement) + génération du
+                // filigrane, même logique que pages/parametres/index.php
+                // (primaire) — jusqu'ici absente ici, d'où (1) un risque de
+                // collision entre écoles secondaire sur le même nom de
+                // fichier et (2) un filigrane jamais créé à l'enregistrement
+                // (seulement généré à la volée, en retard, par l'association
+                // au premier affichage de la case école). Chemin CORRIGÉ :
+                // ce fichier est à secondaire/pages/parametres/, donc 3
+                // niveaux (pas 2) séparent __DIR__ de la racine assets/
+                // uploads/ — l'ancien chemin ('../../assets/uploads/', qui
+                // n'existe pas) faisait échouer silencieusement l'upload.
+                // Demande explicite du 17/09/2026.
+                $logo     = upload_prefixe_etab() . 'logo_etab.' . $ext;
+                $logo_abs = upload_dir_etab(__DIR__ . '/../../../assets/uploads') . 'logo_etab.' . $ext;
+                move_uploaded_file($_FILES['logo']['tmp_name'], $logo_abs);
+                generer_filigrane_logo($logo_abs, __DIR__ . '/../../../assets/uploads/' . chemin_filigrane_logo($logo));
             }
         }
         db_exec(
@@ -57,8 +75,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 // Fond blanc nettoyé/rendu transparent (PNG) : le texte du
                 // document reste visible même si la signature est déplacée
                 // par-dessus (voir signature_traiter_transparence()).
-                $fichier_sig = 'signature_chef_etablissement.png';
-                if (signature_traiter_transparence($_FILES['signature']['tmp_name'], __DIR__.'/../../assets/uploads/'.$fichier_sig)) {
+                // Même correctif de profondeur de chemin que le logo
+                // ci-dessus (secondaire/pages/parametres/ est 3 niveaux sous
+                // la racine, pas 2) + préfixe par école pour éviter qu'une
+                // 2e école secondaire n'écrase la signature de la première.
+                $fichier_sig = upload_prefixe_etab() . 'signature_chef_etablissement.png';
+                $sig_abs = upload_dir_etab(__DIR__ . '/../../../assets/uploads') . 'signature_chef_etablissement.png';
+                if (signature_traiter_transparence($_FILES['signature']['tmp_name'], $sig_abs)) {
                     db_exec("UPDATE signature_titulaire SET fichier=? WHERE code='chef_etablissement'", [$fichier_sig]);
                 }
             }
@@ -68,10 +91,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     // ── Année scolaire ────────────────────────────
+    // Création réservée au propriétaire/superadmin du système (même
+    // politique que pages/parametres/index.php côté primaire — demande
+    // explicite du 17/09/2026) : ni ADMIN/PROVISEUR local, ni un membre
+    // association simplement en visite (sans être superadmin), ne doit
+    // pouvoir créer une nouvelle année. Activer/désactiver restent en
+    // revanche ouvertes aux comptes locaux (ADMIN/PROVISEUR), inchangées
+    // ci-dessous.
+    if ($action === 'annee_creer' && !(function_exists('est_superadmin_association') && est_superadmin_association())) {
+        flash_set('erreur', 'Seul le propriétaire ou le superadministrateur du système peut créer une année scolaire.');
+        rediriger('secondaire/pages/parametres/index.php?onglet=annees');
+    }
     if ($action === 'annee_creer') {
         $lib = post('libelle_annee');
         if ($lib) {
             db_exec("INSERT IGNORE INTO annee_scolaire (libelle) VALUES (?)", [$lib]);
+            // Trimestres + séquences créés dès la création de l'année (pas
+            // seulement à son activation) — même modèle que le bootstrap
+            // paresseux de get_trimestre_actif() (fonctions.php), demande
+            // explicite du 17/09/2026. Aucun n'est marqué actif ici (l'année
+            // elle-même ne l'est pas forcément) : get_trimestre_actif()
+            // activera le premier trimestre/la première séquence le jour où
+            // cette année deviendra réellement l'année active.
+            $id_nouvelle = (int) db_val("SELECT id FROM annee_scolaire WHERE libelle=?", [$lib]);
+            if ($id_nouvelle) provisionner_trimestres_annee($id_nouvelle);
             flash_set('succes', "Année $lib créée.");
         }
         rediriger('secondaire/pages/parametres/index.php?onglet=annees');
@@ -391,7 +434,16 @@ require_once __DIR__ . '/../../../layout/header.php';
 <!-- ══════════════════════════════════════════════════
      ONGLET 2 — Années scolaires
 ══════════════════════════════════════════════════ -->
+<?php if (!$est_superadmin): ?>
+<div class="alert alert-warning border py-2 mb-3" style="font-size:.8rem">
+  <i class="bi bi-lock me-1"></i>
+  La création d'une année scolaire est réservée au <strong>propriétaire</strong> ou au
+  <strong>superadministrateur</strong> du système — aucun compte local (ADMIN, PROVISEUR…) ne peut y toucher.
+  L'activation/désactivation d'une année existante reste possible ci-dessous.
+</div>
+<?php endif; ?>
 <div class="row g-3">
+  <?php if ($est_superadmin): ?>
   <div class="col-md-5">
     <div class="card">
       <div class="card-header py-2" style="background:#f8faff">
@@ -412,7 +464,8 @@ require_once __DIR__ . '/../../../layout/header.php';
       </div>
     </div>
   </div>
-  <div class="col-md-7">
+  <?php endif; ?>
+  <div class="<?= $est_superadmin ? 'col-md-7' : 'col-12' ?>">
     <div class="card">
       <div class="card-header py-2" style="background:#f8faff">
         <span class="fw-semibold" style="font-size:.82rem">
