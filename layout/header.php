@@ -87,6 +87,10 @@ $groupe_style = [
     'Pédagogie'            => ['journal-richtext',  '#a78bfa'],
     /*'Disciplines'           => ['shield-exclamation', '#f87171'],*/
     'Finances'             => ['cash-coin',         '#34d399'],
+    // Secondaire (layout/menu_secondaire.php) : ex-« Finances » renommé et
+    // nouveau groupe placeholder — demande explicite du 17/09/2026.
+    'PAIEMENT PUBLIQUE'    => ['cash-coin',         '#34d399'],
+    'PAIEMENT PRIVÉ'       => ['bank',              '#fb923c'],
     'Ressources humaines'  => ['person-badge-fill', '#f472b6'],
     'Paramètres'       => ['gear-fill',         '#94a3b8'],
 	 
@@ -187,10 +191,16 @@ function lien_actif(string $url): string {
             return !function_exists('menu_acces_autorise') || menu_acces_autorise($groupe, $it[1]);
         });
         // Un séparateur seul (tous les liens qui le suivent masqués par les
-        // rôles) ne doit pas afficher une section vide avec juste un titre.
+        // rôles) ne doit pas afficher une section vide avec juste un titre —
+        // MAIS un groupe DÉLIBÉRÉMENT défini vide dès le départ (ex.
+        // « PAIEMENT PRIVÉ », menu_secondaire.php, demande explicite du
+        // 17/09/2026 : groupe-placeholder pour de futurs sous-menus) doit
+        // quand même s'afficher : `!empty($items)` distingue « vidé par le
+        // filtrage rôle/privilèges » (skip) de « vide dès sa définition »
+        // (affiché tel quel, en-tête seul, prêt à accueillir des entrées).
         $a_des_liens = false;
         foreach ($visibles as $it) { if ($it[0] !== '--') { $a_des_liens = true; break; } }
-        if (!$a_des_liens) continue;
+        if (!$a_des_liens && !empty($items)) continue;
         $section_active = false;
         foreach ($visibles as $it) { if ($it[0] !== '--' && lien_actif($it[1]) === 'active') { $section_active = true; break; } }
         [$icone_grp, $couleur_grp] = $groupe_style[$groupe] ?? ['circle-fill', '#94a3b8'];

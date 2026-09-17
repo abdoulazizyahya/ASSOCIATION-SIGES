@@ -40,7 +40,17 @@ return [
     'Discipline' => [
         ['Discipline', 'secondaire/pages/discipline/index.php', 'shield-exclamation', ['ADMIN','CENSEUR','SG','ENSEIGNANT']],
     ],
-    'Finances' => [
+    // « PAIEMENT PRIVÉ » : groupe volontairement vide pour l'instant (aucun
+    // sous-menu) — futur pendant du paiement public ci-dessous, demande
+    // explicite du 17/09/2026. Un groupe sans aucune entrée reste quand
+    // même affiché (voir layout/header.php, condition assouplie pour ce
+    // cas précis — ne pas réintroduire un sous-menu vide par erreur qui,
+    // lui, serait masqué comme n'importe quel groupe filtré à zéro lien).
+    'PAIEMENT PRIVÉ' => [],
+    // Ex-« Finances » — renommé « PAIEMENT PUBLIQUE » (même contenu, même
+    // demande explicite du 17/09/2026) pour le distinguer du nouveau groupe
+    // « PAIEMENT PRIVÉ » ci-dessus.
+    'PAIEMENT PUBLIQUE' => [
         ['Enregistrer un paiement', 'secondaire/pages/paiements/index.php',       'cash-stack',          ['ADMIN','PROVISEUR','CENSEUR','INTENDANT']],
         ['Frais exigibles',         'secondaire/pages/paiements/obligations.php', 'cash-coin',            ['ADMIN','PROVISEUR','CENSEUR']],
         ['Opérateurs de paiement',  'secondaire/pages/paiements/operateurs.php',  'credit-card-2-front',  ['ADMIN','PROVISEUR','CENSEUR']],

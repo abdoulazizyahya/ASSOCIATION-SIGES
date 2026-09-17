@@ -67,9 +67,16 @@ require_once __DIR__ . '/../../../layout/header.php';
     <h4><i class="bi bi-people me-1 text-primary"></i>Élèves</h4>
     <div class="sub"><?= $total ?> élève(s) <?= $statut === 'actif' ? 'actif(s)' : 'désactivé(s)' ?></div>
   </div>
-  <a href="<?= APP_URL ?>/secondaire/pages/eleves/form.php" class="btn btn-primary btn-sm">
-    <i class="bi bi-plus-lg me-1"></i>Nouvel élève
-  </a>
+  <div class="d-flex gap-2">
+    <?php if (in_array(role_connecte(), ['ADMIN', 'PROVISEUR', 'SECRETAIRE'], true)): ?>
+    <a href="<?= APP_URL ?>/secondaire/pages/eleves/import.php" class="btn btn-outline-primary btn-sm" data-ajax-nav>
+      <i class="bi bi-file-earmark-excel me-1"></i>Importer
+    </a>
+    <?php endif; ?>
+    <a href="<?= APP_URL ?>/secondaire/pages/eleves/form.php" class="btn btn-primary btn-sm">
+      <i class="bi bi-plus-lg me-1"></i>Nouvel élève
+    </a>
+  </div>
 </div>
 
 <?= flash_html() ?>
@@ -121,11 +128,48 @@ require_once __DIR__ . '/../../../layout/header.php';
   </div>
 </div>
 
+<!-- Barre d'actions groupées (démasquée par JS dès qu'une case est cochée) -->
+<div class="card mb-2 d-none" id="barreMasse">
+  <div class="card-body py-2 d-flex flex-wrap align-items-center gap-2">
+    <span class="fw-semibold" style="font-size:.82rem"><span id="nbSelection">0</span> sélectionné(s)</span>
+    <?php if ($statut === 'actif'): ?>
+      <button type="button" class="btn btn-sm" style="background:#fff3cd;color:#856404" onclick="masseDesactiver()">
+        <i class="bi bi-toggle-on me-1"></i>Désactiver
+      </button>
+    <?php else: ?>
+      <button type="button" class="btn btn-sm" style="background:#d1fae5;color:#065f46" onclick="masseReactiver()">
+        <i class="bi bi-toggle-off me-1"></i>Réactiver
+      </button>
+    <?php endif; ?>
+    <div class="d-flex align-items-center gap-1">
+      <select id="selClasseCible" class="form-select form-select-sm" style="width:auto;max-width:220px">
+        <option value="">— Transférer vers —</option>
+        <?php foreach ($classes as $c): ?>
+          <option value="<?= (int) $c['id'] ?>"><?= h($c['designation']) ?></option>
+        <?php endforeach; ?>
+      </select>
+      <button type="button" class="btn btn-sm btn-outline-primary" onclick="masseTransferer()">
+        <i class="bi bi-arrow-left-right me-1"></i>Transférer
+      </button>
+    </div>
+    <button type="button" class="btn btn-sm btn-outline-danger ms-auto" onclick="masseSupprimer()">
+      <i class="bi bi-trash me-1"></i>Supprimer définitivement
+    </button>
+  </div>
+</div>
+<form id="formMasseAction" method="post">
+  <?= csrf_champ() ?>
+  <input type="hidden" name="q" value="<?= h($q) ?>">
+  <input type="hidden" name="classe" value="<?= (int) $id_classe ?>">
+  <input type="hidden" name="statut" value="<?= h($statut) ?>">
+</form>
+
 <div class="card">
   <div class="table-responsive">
     <table class="table table-abz table-hover align-middle mb-0">
       <thead>
         <tr>
+          <th style="width:28px"><input type="checkbox" onchange="toggleTous(this)"></th>
           <th style="width:34px">#</th>
           <th>Élève</th>
           <th>Matricule</th>
@@ -137,12 +181,13 @@ require_once __DIR__ . '/../../../layout/header.php';
       </thead>
       <tbody>
         <?php if (empty($eleves)): ?>
-          <tr><td colspan="7" class="text-center text-muted py-4">
+          <tr><td colspan="8" class="text-center text-muted py-4">
             <i class="bi bi-inbox" style="font-size:2rem;opacity:.3;display:block;margin-bottom:.4rem"></i>
             Aucun élève trouvé.
           </td></tr>
         <?php else: $no = $offset + 1; foreach ($eleves as $e): ?>
           <tr>
+            <td><input type="checkbox" class="chk-eleve" value="<?= (int) $e['id'] ?>" onchange="majBarreMasse()"></td>
             <td class="text-muted" style="font-size:.72rem"><?= $no++ ?></td>
             <td>
               <a href="<?= APP_URL ?>/secondaire/pages/eleves/voir.php?id=<?= (int) $e['id'] ?>"
@@ -192,5 +237,61 @@ require_once __DIR__ . '/../../../layout/header.php';
     <?= pagination_html($page, $nb_pages, $base) ?>
   </div>
 <?php endif; ?>
+
+<script>
+// Actions groupées (sélection multiple) — secondaire/pages/eleves/liste.php.
+function getCheckedIds() {
+  return Array.prototype.slice.call(document.querySelectorAll('.chk-eleve:checked')).map(function (c) { return c.value; });
+}
+function majBarreMasse() {
+  var n = getCheckedIds().length;
+  document.getElementById('nbSelection').textContent = n;
+  document.getElementById('barreMasse').classList.toggle('d-none', n === 0);
+}
+function toggleTous(cb) {
+  document.querySelectorAll('.chk-eleve').forEach(function (el) { el.checked = cb.checked; });
+  majBarreMasse();
+}
+function masseSubmit(actionUrl, extra) {
+  var ids = getCheckedIds();
+  if (!ids.length) { alert('Sélectionnez au moins un élève.'); return; }
+  var f = document.getElementById('formMasseAction');
+  f.action = actionUrl;
+  f.querySelectorAll('input[name="ids[]"]').forEach(function (el) { el.remove(); });
+  ids.forEach(function (id) {
+    var inp = document.createElement('input');
+    inp.type = 'hidden'; inp.name = 'ids[]'; inp.value = id;
+    f.appendChild(inp);
+  });
+  Object.keys(extra || {}).forEach(function (k) {
+    var el = f.querySelector('[name="' + k + '"]');
+    if (!el) { el = document.createElement('input'); el.type = 'hidden'; el.name = k; f.appendChild(el); }
+    el.value = extra[k];
+  });
+  f.submit();
+}
+function masseDesactiver() {
+  if (confirm('Désactiver ' + getCheckedIds().length + ' élève(s) sélectionné(s) ?')) {
+    masseSubmit('<?= APP_URL ?>/secondaire/pages/eleves/statut_masse.php', { vers: 'desactive' });
+  }
+}
+function masseReactiver() {
+  if (confirm('Réactiver ' + getCheckedIds().length + ' élève(s) sélectionné(s) ?')) {
+    masseSubmit('<?= APP_URL ?>/secondaire/pages/eleves/statut_masse.php', { vers: 'actif' });
+  }
+}
+function masseSupprimer() {
+  if (confirm('Supprimer DÉFINITIVEMENT ' + getCheckedIds().length + ' élève(s) ? Action IRRÉVERSIBLE : leurs notes, absences, paiements et inscriptions seront aussi effacés définitivement. Préférez « Désactiver » si vous n\'êtes pas certain.')) {
+    masseSubmit('<?= APP_URL ?>/secondaire/pages/eleves/supprimer_masse.php', {});
+  }
+}
+function masseTransferer() {
+  var sel = document.getElementById('selClasseCible');
+  if (!sel.value) { alert('Choisissez une classe de destination.'); return; }
+  if (confirm('Transférer ' + getCheckedIds().length + ' élève(s) vers ' + sel.options[sel.selectedIndex].text.trim() + ' ?')) {
+    masseSubmit('<?= APP_URL ?>/secondaire/pages/eleves/transferer_masse.php', { id_classe_cible: sel.value });
+  }
+}
+</script>
 
 <?php require_once __DIR__ . '/../../../layout/footer.php'; ?>
