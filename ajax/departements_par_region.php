@@ -28,6 +28,25 @@ exiger_connexion();
 $id_region  = (int) ($_GET['id_region'] ?? 0);
 $nom_region = trim($_GET['nom_region'] ?? '');
 
+// École secondaire (schema_ref_ecole_secondaire.sql, porté de LAM_ABZ) :
+// region.id/nom + departement.id/nom/id_region — noms différents du
+// primaire (region.id_region/intitule_region, departement.code_depart/
+// intitule_depart/code_region). Même bug de fond que documenté plus haut,
+// même correctif : brancher sur le type.
+if (function_exists('type_enseignement_courant') && type_enseignement_courant() === 'secondaire') {
+    if (!$id_region && $nom_region !== '') {
+        $r = db_one("SELECT id FROM region WHERE nom = ?", [$nom_region]);
+        $id_region = $r ? (int) $r['id'] : 0;
+    }
+    $deps = $id_region
+        ? db_all("SELECT id, nom FROM departement WHERE id_region = ? ORDER BY nom", [$id_region])
+        : [];
+    ob_end_clean();
+    header('Content-Type: application/json; charset=utf-8');
+    echo json_encode($deps, JSON_UNESCAPED_UNICODE);
+    exit;
+}
+
 if (!$id_region && $nom_region !== '') {
     $r = db_one("SELECT id_region FROM region WHERE intitule_region = ?", [$nom_region]);
     $id_region = $r ? (int) $r['id_region'] : 0;

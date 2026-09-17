@@ -49,8 +49,9 @@ return [
         ['Signatures numériques',   'secondaire/pages/paiements/signatures.php',  'vector-pen',           ['ADMIN','PROVISEUR','CENSEUR','INTENDANT','SG']],
     ],
     'Ressources humaines' => [
-        ['Enseignants',           'secondaire/pages/enseignants/liste.php', 'person-badge',       ['ADMIN','PROVISEUR','CENSEUR']],
-        ['Demandes de documents', 'secondaire/pages/demandes/index.php',    'file-earmark-text',  ['ENSEIGNANT','CENSEUR','PROVISEUR','ADMIN']],
+        ['Enseignants',           'secondaire/pages/enseignants/liste.php',     'person-badge',       ['ADMIN','PROVISEUR','CENSEUR']],
+        ['Mes informations',      'secondaire/pages/enseignants/mon_profil.php','person-vcard',       ['ENSEIGNANT']],
+        ['Demandes de documents', 'secondaire/pages/demandes/index.php',        'file-earmark-text',  ['ENSEIGNANT','CENSEUR','PROVISEUR','ADMIN']],
     ],
     'Administration' => [
         ['Paramètres',   'secondaire/pages/parametres/index.php',   'gear',        ['ADMIN','PROVISEUR']],

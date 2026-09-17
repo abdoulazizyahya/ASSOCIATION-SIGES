@@ -10,7 +10,12 @@ ob_start();
 require_once __DIR__ . '/../config.php';
 require_once __DIR__ . '/../connexion.php';
 require_once __DIR__ . '/../fonctions.php';
-exiger_role(['DIRECTEUR']);
+// DIRECTEUR (primaire) ou ADMIN/PROVISEUR (secondaire, schema_ref_ecole_
+// secondaire.sql) — 'DIRECTEUR' seul refusait TOUJOURS l'accès à un compte
+// secondaire (rôle inexistant côté secondaire).
+exiger_role(function_exists('type_enseignement_courant') && type_enseignement_courant() === 'secondaire'
+    ? ['ADMIN', 'PROVISEUR']
+    : ['DIRECTEUR']);
 
 header('Content-Type: application/json; charset=utf-8');
 

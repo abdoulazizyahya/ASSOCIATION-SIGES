@@ -101,14 +101,24 @@ if (!$_db_ok) {
 //  Laissés passer (déjà rendus compatibles, voir fonctions.php : get_annee_
 //  active()/get_sequence_active()/get_etablissement()/menu_definition()
 //  type-aware) : login.php, logout.php, dashboard.php (racine, type-aware
-//  lui aussi) et tout ce qui vit sous secondaire/ (module dédié). Tout le
-//  reste (pages/**) affiche la page d'attente plutôt qu'un Fatal error.
+//  lui aussi), tout ce qui vit sous secondaire/ (module dédié) et sous
+//  ajax/ (racine, partagé avec le primaire — endpoints JSON appelés en
+//  fetch() par des pages secondaire, ex. secondaire/pages/paiements/
+//  index.php ou secondaire/pages/enseignants/mon_profil.php ; bloqués ici
+//  jusqu'au 17/09/2026, la garde renvoyait la page d'attente en HTML à un
+//  fetch() qui attendait du JSON — cassé silencieusement côté JS, jamais
+//  un Fatal error visible). Chaque fichier ajax/ effectivement utilisé
+//  côté secondaire est rendu type-aware individuellement (voir ses propres
+//  commentaires) — ne PAS supposer qu'un ajax/ non encore vérifié
+//  fonctionne pour autant. Tout le reste (pages/**) affiche la page
+//  d'attente plutôt qu'un Fatal error.
 if ($ETAB_COURANT && (($ETAB_COURANT['type_enseignement'] ?? 'primaire') === 'secondaire')) {
     $_rel = str_replace('\\', '/', $_SERVER['SCRIPT_NAME'] ?? '');
     $_app = rtrim((string) parse_url(APP_URL, PHP_URL_PATH), '/');
     if ($_app !== '' && strpos($_rel, $_app . '/') === 0) $_rel = substr($_rel, strlen($_app) + 1);
     $_rel = ltrim($_rel, '/');
-    $_ok  = in_array($_rel, ['login.php', 'logout.php', 'dashboard.php'], true) || str_starts_with($_rel, 'secondaire/');
+    $_ok  = in_array($_rel, ['login.php', 'logout.php', 'dashboard.php'], true)
+        || str_starts_with($_rel, 'secondaire/') || str_starts_with($_rel, 'ajax/');
     if (!$_ok) {
         require __DIR__ . '/secondaire_en_construction.php';
         exit;

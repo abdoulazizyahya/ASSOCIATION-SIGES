@@ -21,6 +21,32 @@ exiger_connexion();
 
 $id_classe = (int) ($_GET['classe'] ?? 0);
 $annee     = get_annee_active();
+
+// École secondaire (schema_ref_ecole_secondaire.sql, porté de LAM_ABZ) :
+// eleve.id/nom/prenom/matricule + table inscription(id_classe,id_annee) —
+// noms de colonnes différents du primaire (id_eleve/Nom_elv/Prenom_elv/
+// Mat_elv + table inscrire). Même bug de fond que celui documenté plus haut
+// (code non adapté d'ABZ_MBE) — même correctif : brancher sur le type.
+if (function_exists('type_enseignement_courant') && type_enseignement_courant() === 'secondaire') {
+    $id_annee = (int) ($annee['id'] ?? 0);
+    $eleves = ($id_classe && $id_annee)
+        ? db_all(
+            "SELECT e.id, e.nom, e.prenom, e.matricule FROM eleve e
+             JOIN inscription i ON i.id_eleve = e.id AND i.id_classe = ? AND i.id_annee = ?
+             WHERE e.statut = 'actif' ORDER BY e.nom, e.prenom",
+            [$id_classe, $id_annee]
+          )
+        : [];
+    $out = array_map(fn($e) => [
+        'id'    => (int) $e['id'],
+        'label' => trim($e['nom'] . ' ' . ($e['prenom'] ?? '')) . ' (' . $e['matricule'] . ')',
+    ], $eleves);
+    ob_end_clean();
+    header('Content-Type: application/json; charset=utf-8');
+    echo json_encode($out, JSON_UNESCAPED_UNICODE);
+    exit;
+}
+
 $val_annee = $annee['val_annee'] ?? '';
 
 // Cloisonnement enseignant : une classe hors de ses affectations renvoie
