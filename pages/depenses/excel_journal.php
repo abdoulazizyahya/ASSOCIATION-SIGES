@@ -106,10 +106,10 @@ $total = 0.0;
 foreach ($lignes as $l) {
     $sheet->setCellValue("A{$row}", date_fr($l['date_depense']));
     $sheet->setCellValue("B{$row}", finances_numero_bon((int) $l['id_depense']));
-    $sheet->setCellValue("C{$row}", $l['categorie_libelle']);
-    $sheet->setCellValue("D{$row}", $l['libelle']);
-    $sheet->setCellValue("E{$row}", $l['beneficiaire'] ?: '');
-    $sheet->setCellValue("F{$row}", $l['nom_ens'] ? trim($l['prenom_ens'] . ' ' . $l['nom_ens']) : '');
+    $sheet->setCellValue("C{$row}", xl_safe($l['categorie_libelle']));
+    $sheet->setCellValue("D{$row}", xl_safe($l['libelle']));
+    $sheet->setCellValue("E{$row}", xl_safe($l['beneficiaire'] ?: ''));
+    $sheet->setCellValue("F{$row}", xl_safe($l['nom_ens'] ? trim($l['prenom_ens'] . ' ' . $l['nom_ens']) : ''));
     $sheet->setCellValue("G{$row}", (float) $l['montant']);
     $total += (float) $l['montant'];
     $row++;

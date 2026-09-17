@@ -110,9 +110,9 @@ $hdr_row = $row - 1;
 
 foreach ($impayes as $i) {
     $nom = $i['Nom_elv'] . ' ' . ($i['Prenom_elv'] ?? '') . ($i['cas_social'] ? ' (Cas social -' . rtrim(rtrim(number_format($i['pourcentage'], 2, '.', ''), '0'), '.') . '%)' : '');
-    $sheet->setCellValue("A{$row}", $i['Mat_elv']);
-    $sheet->setCellValue("B{$row}", $nom);
-    $sheet->setCellValue("C{$row}", $i['DesignationClasses']);
+    $sheet->setCellValue("A{$row}", xl_safe($i['Mat_elv']));
+    $sheet->setCellValue("B{$row}", xl_safe($nom));
+    $sheet->setCellValue("C{$row}", xl_safe($i['DesignationClasses']));
     $sheet->setCellValue("D{$row}", (float) $i['du']);
     $sheet->setCellValue("E{$row}", (float) $i['paye']);
     $sheet->setCellValue("F{$row}", (float) $i['solde']);

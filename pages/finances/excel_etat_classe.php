@@ -103,8 +103,8 @@ foreach ($eleves as $e) {
     $total_du   += $e['du'];
     $statut = $solde <= 0 ? 'Soldé' : ($paye > 0 ? 'Partiel' : 'Impayé');
     $nom = $e['Nom_elv'] . ' ' . ($e['Prenom_elv'] ?? '') . ($e['cas_social'] ? ' (Cas social -' . rtrim(rtrim(number_format($e['pourcentage'], 2, '.', ''), '0'), '.') . '%)' : '');
-    $sheet->setCellValue("A{$row}", $e['Mat_elv']);
-    $sheet->setCellValue("B{$row}", $nom);
+    $sheet->setCellValue("A{$row}", xl_safe($e['Mat_elv']));
+    $sheet->setCellValue("B{$row}", xl_safe($nom));
     $sheet->setCellValue("C{$row}", (float) $e['du']);
     $sheet->setCellValue("D{$row}", (float) $paye);
     $sheet->setCellValue("E{$row}", (float) $solde);

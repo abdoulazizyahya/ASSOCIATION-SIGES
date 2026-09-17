@@ -118,7 +118,7 @@ function ecrire_feuille_bareme_excel(
     foreach ($donnees['groupes'] as $grp) {
         $sheet->mergeCells("A{$row}:{$lettre($col_total)}{$row}");
         $libelle_grp = $grp['libelle'] . (!$grp['visible'] ? ' — masqué (toutes compétences désactivées)' : '');
-        $sheet->setCellValue("A{$row}", $libelle_grp);
+        $sheet->setCellValue("A{$row}", xl_safe($libelle_grp));
         $sheet->getStyle("A{$row}")->getFont()->setBold(true);
         $sheet->getStyle("A{$row}")->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('D6EAF8');
         $row++;
@@ -131,8 +131,8 @@ function ecrire_feuille_bareme_excel(
 
         foreach ($grp['lignes'] as $ligne) {
             $active = $ligne['actif'] === null || (int) $ligne['actif'] === 1;
-            $sheet->setCellValue("A{$row}", $ligne['code_comp']);
-            $sheet->setCellValue("B{$row}", $ligne['nom_comp_affiche'] ?? $ligne['nom_comp']);
+            $sheet->setCellValue("A{$row}", xl_safe($ligne['code_comp']));
+            $sheet->setCellValue("B{$row}", xl_safe($ligne['nom_comp_affiche'] ?? $ligne['nom_comp']));
             $sheet->setCellValue("C{$row}", $ligne['orale'] !== null ? (float) $ligne['orale'] : 0);
             $sheet->setCellValue("D{$row}", $ligne['ecrite'] !== null ? (float) $ligne['ecrite'] : 0);
             $sheet->setCellValue("E{$row}", $ligne['pratique'] !== null ? (float) $ligne['pratique'] : 0);

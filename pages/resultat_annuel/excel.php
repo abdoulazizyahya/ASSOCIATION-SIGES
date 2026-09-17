@@ -82,7 +82,7 @@ $sheet->setCellValue('A5', 'RÉSULTAT ANNUEL');
 $sheet->getStyle('A5')->getFont()->setBold(true)->setSize(16);
 $sheet->getStyle('A5')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
 $sheet->mergeCells("A6:{$lettre($col_total)}6");
-$sheet->setCellValue('A6', $sous_titre . ' — ' . $val_annee);
+$sheet->setCellValue('A6', xl_safe($sous_titre . ' — ' . $val_annee));
 $sheet->getStyle('A6')->getFont()->setBold(true)->setSize(11);
 $sheet->getStyle('A6')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
 
@@ -96,9 +96,9 @@ foreach ($lignes as $i => $l) {
     $e = $l['eleve'];
     $c = 1;
     $sheet->setCellValue($lettre($c++) . $row, $i + 1);
-    $sheet->setCellValue($lettre($c++) . $row, $e['Mat_elv'] ?? '');
-    $sheet->setCellValue($lettre($c++) . $row, mb_strtoupper($e['Nom_elv']) . ' ' . ($e['Prenom_elv'] ?? ''));
-    if ($avec_classe) $sheet->setCellValue($lettre($c++) . $row, $l['classe'] ?? '—');
+    $sheet->setCellValue($lettre($c++) . $row, xl_safe($e['Mat_elv'] ?? ''));
+    $sheet->setCellValue($lettre($c++) . $row, xl_safe(mb_strtoupper($e['Nom_elv']) . ' ' . ($e['Prenom_elv'] ?? '')));
+    if ($avec_classe) $sheet->setCellValue($lettre($c++) . $row, xl_safe($l['classe'] ?? '—'));
     $sheet->setCellValue($lettre($c++) . $row, stripos($e['Sexe_elv'] ?? '', 'F') === 0 ? 'F' : 'M');
     foreach ([0, 1, 2] as $ti) {
         if ($l['moy_t'][$ti] !== null) $sheet->setCellValue($lettre($c) . $row, (float) fmt2($l['moy_t'][$ti]));
@@ -108,8 +108,8 @@ foreach ($lignes as $i => $l) {
     if ($l['moy_annuelle'] !== null) $sheet->setCellValue($lettre($c) . $row, (float) fmt2($l['moy_annuelle']));
     $c++;
     $sheet->setCellValue($lettre($c++) . $row, $l['rang'] !== null ? $l['rang'] . 'e/' . $l['nb_classes'] : '—');
-    $sheet->setCellValue($lettre($c++) . $row, $l['decision']);
-    $sheet->setCellValue($lettre($c++) . $row, $l['classe_suivante'] ?? '—');
+    $sheet->setCellValue($lettre($c++) . $row, xl_safe($l['decision']));
+    $sheet->setCellValue($lettre($c++) . $row, xl_safe($l['classe_suivante'] ?? '—'));
     $row++;
 }
 $sheet->getStyle("A{$hdr_row}:{$lettre($col_total)}" . ($row - 1))->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_THIN);

@@ -105,9 +105,9 @@ $row++;
 $hdr_row = $row - 1;
 
 foreach ($cas_sociaux as $l) {
-    $sheet->setCellValue("A{$row}", $l['Mat_elv']);
-    $sheet->setCellValue("B{$row}", $l['Nom_elv'] . ' ' . ($l['Prenom_elv'] ?? ''));
-    $sheet->setCellValue("C{$row}", $l['DesignationClasses']);
+    $sheet->setCellValue("A{$row}", xl_safe($l['Mat_elv']));
+    $sheet->setCellValue("B{$row}", xl_safe($l['Nom_elv'] . ' ' . ($l['Prenom_elv'] ?? '')));
+    $sheet->setCellValue("C{$row}", xl_safe($l['DesignationClasses']));
     $sheet->setCellValue("D{$row}", '-' . rtrim(rtrim(number_format($l['pourcentage'], 2, '.', ''), '0'), '.') . '%');
     $sheet->setCellValue("E{$row}", (float) $l['montant_normal']);
     $sheet->setCellValue("F{$row}", (float) $l['du']);

@@ -97,7 +97,7 @@ $row++;
 $hdr_row = $row - 1;
 
 foreach ($lignes as $l) {
-    $sheet->setCellValue("A{$row}", $l['libelle']);
+    $sheet->setCellValue("A{$row}", xl_safe($l['libelle']));
     $sheet->setCellValue("B{$row}", (int) $l['nb']);
     $sheet->setCellValue("C{$row}", $l['total']);
     $sheet->setCellValue("D{$row}", $l['pct'] . '%');

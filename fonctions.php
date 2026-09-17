@@ -2223,6 +2223,22 @@ function get_reglage_paiement(int $id_annee): array {
     return $r ? array_merge($defaut, array_intersect_key($r, $defaut)) : $defaut;
 }
 
+// ==== xl_safe ====
+// Neutralise l'injection de formule Excel/CSV (OWASP) sur une cellule
+// PhpSpreadsheet dont le contenu vient d'un champ texte libre saisi par un
+// utilisateur (observation, motif, raison, nom, adresse, etc.) : si la chaîne
+// commence par =, +, -, @ (ou tabulation/retour chariot), Excel/LibreOffice
+// peut l'interpréter comme une formule à l'ouverture chez un autre membre du
+// personnel. Préfixée d'une apostrophe, elle s'affiche comme texte brut, sans
+// rien changer visuellement (l'apostrophe n'apparaît pas dans la cellule).
+// Ne touche jamais les valeurs non-chaîne (int/float/null/RichText/objets) —
+// utilisée uniquement sur les valeurs qui PEUVENT être du texte libre, jamais
+// sur des libellés fixes écrits en dur dans le code (jamais dangereux).
+function xl_safe($valeur) {
+    if (!is_string($valeur) || $valeur === '') return $valeur;
+    return preg_match('/^[=+\-@\t\r]/', $valeur) ? ("'" . $valeur) : $valeur;
+}
+
 // ==== hex_vers_rgb ====
 // valeur stockée est invalide (ne casse jamais l'affichage du reçu).
 function hex_vers_rgb(string $hex): array {

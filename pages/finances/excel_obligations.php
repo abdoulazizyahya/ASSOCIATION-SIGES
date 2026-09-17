@@ -84,7 +84,7 @@ $hdr_row = $row - 1;
 $total_general = 0.0;
 foreach ($obligations as $o) {
     $sheet->setCellValue("A{$row}", 'Niveau ' . $o['niveau_obligation']);
-    $sheet->setCellValue("B{$row}", $o['nom_obligation']);
+    $sheet->setCellValue("B{$row}", xl_safe($o['nom_obligation']));
     $sheet->setCellValue("C{$row}", (float) $o['montant_obligation']);
     $total_general += (float) $o['montant_obligation'];
     $row++;

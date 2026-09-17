@@ -56,7 +56,7 @@ $sheet->setTitle('Élèves');
 
 // ── En-tête établissement ─────────────────────────────────────
 $sheet->mergeCells('A1:H1');
-$sheet->setCellValue('A1', $etab['Nom_Etab_Fr'] ?? APP_NOM);
+$sheet->setCellValue('A1', xl_safe($etab['Nom_Etab_Fr'] ?? APP_NOM));
 $sheet->getStyle('A1')->getFont()->setBold(true)->setSize(13);
 $sheet->getStyle('A1')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
 
@@ -81,14 +81,14 @@ $r = $ligne_entete + 1;
 $no = 1;
 foreach ($eleves as $e) {
     $sheet->setCellValue([1, $r], $no++);
-    $sheet->setCellValue([2, $r], $e['Mat_elv']);
-    $sheet->setCellValue([3, $r], $e['niu'] ?: '—');
-    $sheet->setCellValue([4, $r], mb_strtoupper($e['Nom_elv']));
-    $sheet->setCellValue([5, $r], $e['Prenom_elv'] ?: '');
+    $sheet->setCellValue([2, $r], xl_safe($e['Mat_elv']));
+    $sheet->setCellValue([3, $r], xl_safe($e['niu'] ?: '—'));
+    $sheet->setCellValue([4, $r], xl_safe(mb_strtoupper($e['Nom_elv'])));
+    $sheet->setCellValue([5, $r], xl_safe($e['Prenom_elv'] ?: ''));
     $sheet->setCellValue([6, $r], stripos($e['Sexe_elv'], 'F') === 0 ? 'F' : 'M');
     $sheet->setCellValue([7, $r], date_fr($e['Date_naiss_elv']));
-    $sheet->setCellValue([8, $r], $e['Lieu_naiss_elv'] ?: '—');
-    $sheet->setCellValue([9, $r], $e['classe'] ?: '—');
+    $sheet->setCellValue([8, $r], xl_safe($e['Lieu_naiss_elv'] ?: '—'));
+    $sheet->setCellValue([9, $r], xl_safe($e['classe'] ?: '—'));
     $sheet->setCellValue([10, $r], libelle_statut_insc($e['Statut_elv']));
     $r++;
 }

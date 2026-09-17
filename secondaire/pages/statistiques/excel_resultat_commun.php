@@ -98,7 +98,7 @@ function genererExcelResultat(array $etab, string $titre_principal, string $sous
         $c = 1;
         foreach ($sel as $k => [$lbl, $al]) {
             $cellRef = "{$lettre($c)}{$row}";
-            $sheet->setCellValue($cellRef, $value_fn($k, $r, $no));
+            $sheet->setCellValue($cellRef, xl_safe($value_fn($k, $r, $no)));
             $sheet->getStyle($cellRef)->getAlignment()->setHorizontal($align_map[$al] ?? Alignment::HORIZONTAL_LEFT);
             $c++;
         }

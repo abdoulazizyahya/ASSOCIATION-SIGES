@@ -112,7 +112,7 @@ $hdr_row = $row - 1;
 
 foreach ($par_categorie as $c) {
     $pct = $total_depense > 0 ? round((float) $c['total'] / $total_depense * 100, 1) : 0;
-    $sheet->setCellValue("A{$row}", $c['libelle']);
+    $sheet->setCellValue("A{$row}", xl_safe($c['libelle']));
     $sheet->setCellValue("B{$row}", (int) $c['nb']);
     $sheet->setCellValue("C{$row}", (float) $c['total']);
     $sheet->setCellValue("D{$row}", $pct . '%');

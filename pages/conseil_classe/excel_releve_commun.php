@@ -196,7 +196,7 @@ function genererExcelReleve(
 
     foreach ($disciplines as $i => $d) {
         $c = $col_premiere_matiere + $i;
-        $sheet->setCellValue("{$lettre($c)}{$row_hdr1}", $d['matiere']);
+        $sheet->setCellValue("{$lettre($c)}{$row_hdr1}", xl_safe($d['matiere']));
         $sheet->getStyle("{$lettre($c)}{$row_hdr1}")->getAlignment()->setTextRotation(90)->setHorizontal(Alignment::HORIZONTAL_CENTER)->setVertical(Alignment::VERTICAL_CENTER)->setWrapText(true);
         $sheet->setCellValue("{$lettre($c)}{$row_hdr2}", (int)$d['coef']);
         $sheet->getStyle("{$lettre($c)}{$row_hdr2}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
@@ -222,8 +222,8 @@ function genererExcelReleve(
     foreach ($eleves as $el) {
         $eid = (int)$el['id'];
         $sheet->setCellValue("{$lettre($col_no)}{$row}", $n);
-        $sheet->setCellValue("{$lettre($col_mat_id)}{$row}", $el['matricule'] ?? '');
-        $sheet->setCellValue("{$lettre($col_nom)}{$row}", strtoupper($el['nom']) . ' ' . ($el['prenom'] ?? ''));
+        $sheet->setCellValue("{$lettre($col_mat_id)}{$row}", xl_safe($el['matricule'] ?? ''));
+        $sheet->setCellValue("{$lettre($col_nom)}{$row}", xl_safe(strtoupper($el['nom']) . ' ' . ($el['prenom'] ?? '')));
         $sheet->getStyle("{$lettre($col_nom)}{$row}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_LEFT);
 
         foreach ($disciplines as $i => $d) {
@@ -250,7 +250,7 @@ function genererExcelReleve(
 
         $deja = $decisions_idx[$eid] ?? null;
         $obs = $deja ? trim((string)($deja['decision'] ?? '') . (!empty($deja['observation']) ? ' - ' . $deja['observation'] : '')) : '';
-        $sheet->setCellValue("{$lettre($col_obs)}{$row}", $obs);
+        $sheet->setCellValue("{$lettre($col_obs)}{$row}", xl_safe($obs));
 
         if ($n % 2 === 0) {
             $sheet->getStyle("{$lettre($col_no)}{$row}:{$lettre($col_total)}{$row}")

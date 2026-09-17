@@ -156,7 +156,7 @@ function excel_stats_tableau_bilan(&$sheet, int &$row, string $titre, array $lig
     $zero = ['M' => 0, 'F' => 0, 'T' => 0];
     $sous_total = array_fill_keys($bilan_cols, $zero);
     foreach ($lignes as $l) {
-        $sheet->setCellValue("A{$row}", $l['classe']);
+        $sheet->setCellValue("A{$row}", xl_safe($l['classe']));
         $c = 2;
         foreach ($bilan_cols as $k) {
             $b = $l['bilan'][$k];
@@ -233,11 +233,11 @@ if ($onglet === 'niveau') {
     $row++;
     $hdr_row = $row - 1;
     foreach ($lignes_ne as $e) {
-        $sheet->setCellValue("A{$row}", $e['classe']);
-        $sheet->setCellValue("B{$row}", $e['Mat_elv']);
-        $sheet->setCellValue("C{$row}", $e['Nom_elv'] . ' ' . ($e['Prenom_elv'] ?? ''));
+        $sheet->setCellValue("A{$row}", xl_safe($e['classe']));
+        $sheet->setCellValue("B{$row}", xl_safe($e['Mat_elv']));
+        $sheet->setCellValue("C{$row}", xl_safe($e['Nom_elv'] . ' ' . ($e['Prenom_elv'] ?? '')));
         $sheet->setCellValue("D{$row}", stripos($e['Sexe_elv'] ?? '', 'F') === 0 ? 'F' : 'M');
-        $sheet->setCellValue("E{$row}", $e['raison']);
+        $sheet->setCellValue("E{$row}", xl_safe($e['raison']));
         $row++;
     }
     if ($lignes_ne) {
@@ -273,7 +273,7 @@ if ($onglet === 'niveau') {
         if (empty($stats)) continue;
 
         $sheet->mergeCells("A{$row}:{$lettre($col_c_total)}{$row}");
-        $sheet->setCellValue("A{$row}", $c2['DesignationClasses']);
+        $sheet->setCellValue("A{$row}", xl_safe($c2['DesignationClasses']));
         $sheet->getStyle("A{$row}")->getFont()->setBold(true)->setSize(11);
         $row++;
 
@@ -299,8 +299,8 @@ if ($onglet === 'niveau') {
         $row = $hdr2 + 1;
 
         foreach ($stats as $s) {
-            $sheet->setCellValue("A{$row}", $s['code'] ?: '—');
-            $sheet->setCellValue("B{$row}", $s['competence']);
+            $sheet->setCellValue("A{$row}", xl_safe($s['code'] ?: '—'));
+            $sheet->setCellValue("B{$row}", xl_safe($s['competence']));
             $sheet->setCellValue("C{$row}", '/' . (int) $s['bareme']);
             if ($s['moy']['T'] !== null) $sheet->setCellValue("D{$row}", (float) fmt2($s['moy']['T']));
             $col = 5;
@@ -363,7 +363,7 @@ if ($onglet === 'niveau') {
         $g_nb += $st['nb']; $g_filles += $st['filles']; $g_garcons += $st['garcons'];
         if ($b['moy_gen']['T'] !== null) $g_moy_somme += $b['moy_gen']['T'] * $b['classes']['T'];
 
-        $sheet->setCellValue("A{$row}", $c2['DesignationClasses']);
+        $sheet->setCellValue("A{$row}", xl_safe($c2['DesignationClasses']));
         $sheet->setCellValue("B{$row}", $st['nb']);
         $sheet->setCellValue("C{$row}", $st['filles']);
         $sheet->setCellValue("D{$row}", $st['garcons']);

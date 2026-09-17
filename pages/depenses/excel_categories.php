@@ -83,8 +83,8 @@ $hdr_row = $row - 1;
 
 $total_general = 0.0;
 foreach ($categories as $c) {
-    $sheet->setCellValue("A{$row}", $c['libelle']);
-    $sheet->setCellValue("B{$row}", $c['description'] ?: '');
+    $sheet->setCellValue("A{$row}", xl_safe($c['libelle']));
+    $sheet->setCellValue("B{$row}", xl_safe($c['description'] ?: ''));
     $sheet->setCellValue("C{$row}", (int) $c['nb_depenses']);
     $sheet->setCellValue("D{$row}", (float) $c['total_depense']);
     $total_general += (float) $c['total_depense'];

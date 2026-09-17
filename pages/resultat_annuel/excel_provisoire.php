@@ -70,7 +70,7 @@ $sheet->setCellValue('A5', 'LISTE PROVISOIRE');
 $sheet->getStyle('A5')->getFont()->setBold(true)->setSize(16);
 $sheet->getStyle('A5')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
 $sheet->mergeCells("A6:{$lettre($col_total)}6");
-$sheet->setCellValue('A6', mb_strtoupper($classe['DesignationClasses']) . ' — Effectif prévisionnel ' . $val_annee_suivante);
+$sheet->setCellValue('A6', xl_safe(mb_strtoupper($classe['DesignationClasses']) . ' — Effectif prévisionnel ' . $val_annee_suivante));
 $sheet->getStyle('A6')->getFont()->setBold(true)->setSize(11);
 $sheet->getStyle('A6')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
 
@@ -83,10 +83,10 @@ $hdr_row = $row; $row++;
 foreach ($lignes as $i => $l) {
     $e = $l['eleve'];
     $sheet->setCellValue("A{$row}", $i + 1);
-    $sheet->setCellValue("B{$row}", $e['Mat_elv'] ?? '');
-    $sheet->setCellValue("C{$row}", mb_strtoupper($e['Nom_elv']) . ' ' . ($e['Prenom_elv'] ?? ''));
+    $sheet->setCellValue("B{$row}", xl_safe($e['Mat_elv'] ?? ''));
+    $sheet->setCellValue("C{$row}", xl_safe(mb_strtoupper($e['Nom_elv']) . ' ' . ($e['Prenom_elv'] ?? '')));
     $sheet->setCellValue("D{$row}", $e['Date_naiss_elv'] ? date('d/m/Y', strtotime($e['Date_naiss_elv'])) : '—');
-    $sheet->setCellValue("E{$row}", $e['Lieu_naiss_elv'] ?: '—');
+    $sheet->setCellValue("E{$row}", xl_safe($e['Lieu_naiss_elv'] ?: '—'));
     $sheet->setCellValue("F{$row}", stripos($e['Sexe_elv'] ?? '', 'F') === 0 ? 'F' : 'M');
     $sheet->setCellValue("G{$row}", $l['statut_code']);
     $row++;

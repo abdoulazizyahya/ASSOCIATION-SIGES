@@ -129,7 +129,7 @@ $row++;
 $hdr_row = $row - 1;
 
 foreach ($lignes as $l) {
-    $sheet->setCellValue("A{$row}", $l['classe']);
+    $sheet->setCellValue("A{$row}", xl_safe($l['classe']));
     $sheet->setCellValue("B{$row}", $l['nb']);
     $sheet->setCellValue("C{$row}", $l['du']);
     $sheet->setCellValue("D{$row}", $l['apport']);

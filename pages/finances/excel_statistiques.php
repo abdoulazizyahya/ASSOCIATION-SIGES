@@ -208,7 +208,7 @@ $sheet->getStyle("A{$hdr}:C{$hdr}")->getFont()->setBold(true)->setColor(new \Php
 $sheet->getStyle("A{$hdr}:C{$hdr}")->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('1A3C6B');
 $row++;
 foreach ($par_type as $nom => $t) {
-    $sheet->setCellValue("A{$row}", $nom);
+    $sheet->setCellValue("A{$row}", xl_safe($nom));
     $sheet->setCellValue("B{$row}", (float) $t['du']);
     $sheet->setCellValue("C{$row}", (float) $t['paye']);
     $row++;

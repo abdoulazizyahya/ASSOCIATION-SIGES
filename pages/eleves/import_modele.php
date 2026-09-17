@@ -77,7 +77,7 @@ $classes = db_all(
      ORDER BY n.OrdreNiveau, c.DesignationClasses"
 );
 $r = 2;
-foreach ($classes as $c) { $sheetListes->setCellValue('A' . $r, $c['DesignationClasses']); $r++; }
+foreach ($classes as $c) { $sheetListes->setCellValue('A' . $r, xl_safe($c['DesignationClasses'])); $r++; }
 $derniere_ligne_classes = max(2, $r - 1);
 
 // Format "Intitulé (Département)" : lève l'ambiguïté entre arrondissements
@@ -168,7 +168,7 @@ foreach ($sections_etab as $titre_section => $champs) {
     foreach ($champs as [$label, $valeur]) {
         $sheetEtab->setCellValue('A' . $r, $label);
         $sheetEtab->getStyle('A' . $r)->getFont()->setBold(true);
-        $sheetEtab->setCellValue('B' . $r, $valeur);
+        $sheetEtab->setCellValue('B' . $r, xl_safe($valeur));
         // Valeurs arabes affichées de droite à gauche, comme dans le
         // formulaire d'origine (dir="rtl" — pages/parametres/index.php).
         if (str_ends_with($label, '(AR)')) {

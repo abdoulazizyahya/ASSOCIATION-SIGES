@@ -141,7 +141,7 @@ function excel_stats_arabe_tableau_bilan(&$sheet, int &$row, string $titre, arra
     $zero = ['M' => 0, 'F' => 0, 'T' => 0];
     $sous_total = array_fill_keys($bilan_cols, $zero);
     foreach ($lignes as $l) {
-        $sheet->setCellValue("A{$row}", $l['classe']);
+        $sheet->setCellValue("A{$row}", xl_safe($l['classe']));
         $c = 2;
         foreach ($bilan_cols as $k) {
             $b = $l['bilan'][$k];
@@ -191,7 +191,7 @@ if ($onglet === 'niveau') {
     $row++;
     $hdr_row = $row - 1;
     foreach ($stats as $s) {
-        $sheet->setCellValue("A{$row}", $s['matiere']);
+        $sheet->setCellValue("A{$row}", xl_safe($s['matiere']));
         $sheet->setCellValue("B{$row}", $s['nb']);
         if ($s['moy'] !== null) $sheet->setCellValue("C{$row}", (float) fmt2($s['moy']));
         if ($s['min'] !== null) $sheet->setCellValue("D{$row}", (float) fmt2($s['min']));
@@ -212,7 +212,7 @@ if ($onglet === 'niveau') {
     foreach ($classes as $c) {
         $st = stats_classe_arabe((int) $c['IDClasses'], $val_annee, $vue, $id_trim);
         $b  = bilan_classe_genre_arabe((int) $c['IDClasses'], $val_annee, $vue, $id_trim);
-        $sheet->setCellValue("A{$row}", $c['DesignationClasses']);
+        $sheet->setCellValue("A{$row}", xl_safe($c['DesignationClasses']));
         $sheet->setCellValue("B{$row}", $st['nb']);
         $sheet->setCellValue("C{$row}", $st['filles']);
         $sheet->setCellValue("D{$row}", $st['garcons']);

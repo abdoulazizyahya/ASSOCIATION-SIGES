@@ -168,7 +168,7 @@ function excel_stats_tableau_bilan(&$sheet, int &$row, string $titre, array $lig
     $zero = ['M' => 0, 'F' => 0, 'T' => 0];
     $sous_total = array_fill_keys($bilan_cols, $zero);
     foreach ($lignes as $l) {
-        $sheet->setCellValue("A{$row}", $l['classe']);
+        $sheet->setCellValue("A{$row}", xl_safe($l['classe']));
         $c = 2;
         foreach ($bilan_cols as $k) {
             $b = $l['bilan'][$k];
@@ -267,7 +267,7 @@ if ($onglet === 'section' || $onglet === 'niveau') {
     $sheet->getStyle("A{$row}:F{$row}")->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('1A3C6B');
     $row++;
     foreach ($mat_stats as $ms) {
-        $sheet->setCellValue("A{$row}", $ms['matiere']);
+        $sheet->setCellValue("A{$row}", xl_safe($ms['matiere']));
         $sheet->setCellValue("B{$row}", $ms['nb']);
         if ($ms['moy'] !== null) $sheet->setCellValue("C{$row}", (float) fmt2($ms['moy']));
         if ($ms['min'] !== null) $sheet->setCellValue("D{$row}", (float) fmt2($ms['min']));
@@ -300,7 +300,7 @@ if ($onglet === 'section' || $onglet === 'niveau') {
         $nb = count($eleves);
         $admis = count(array_filter($moys, fn($m) => $m >= 10));
         $bilan = calc_bilan_classe_genre_comp((int)$c['id'], $id_annee, $val_annee, $vue, $id_trim_comp);
-        $sheet->setCellValue("A{$row}", $c['designation']);
+        $sheet->setCellValue("A{$row}", xl_safe($c['designation']));
         $sheet->setCellValue("B{$row}", $nb);
         $sheet->setCellValue("C{$row}", $filles);
         $sheet->setCellValue("D{$row}", $garcons);

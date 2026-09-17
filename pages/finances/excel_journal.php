@@ -113,9 +113,9 @@ $total = 0.0;
 foreach ($lignes as $l) {
     $sheet->setCellValue("A{$row}", date_fr($l['date_paiement']));
     $sheet->setCellValue("B{$row}", finances_numero_recu((int) $l['id_pay']));
-    $sheet->setCellValue("C{$row}", $l['Nom_elv'] . ' ' . ($l['Prenom_elv'] ?? '') . ' (' . $l['Mat_elv'] . ')');
-    $sheet->setCellValue("D{$row}", $l['DesignationClasses']);
-    $sheet->setCellValue("E{$row}", $l['nom_obligation'] ?: 'Non ventilé');
+    $sheet->setCellValue("C{$row}", xl_safe($l['Nom_elv'] . ' ' . ($l['Prenom_elv'] ?? '') . ' (' . $l['Mat_elv'] . ')'));
+    $sheet->setCellValue("D{$row}", xl_safe($l['DesignationClasses']));
+    $sheet->setCellValue("E{$row}", xl_safe($l['nom_obligation'] ?: 'Non ventilé'));
     $sheet->setCellValue("F{$row}", finances_mode_paiement_libelle($l['mode_paiement'] ?? null));
     $sheet->setCellValue("G{$row}", (float) $l['montant_paiement']);
     $total += (float) $l['montant_paiement'];
