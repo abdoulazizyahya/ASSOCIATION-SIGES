@@ -154,6 +154,28 @@ if ($onglet === 'classe') {
         $id_comp_p = (int)post('id_comp');
         $id_mat_p  = (int)post('id_mat');
         $id_cl_p   = (int)post('id_cl');
+
+        // ── Sécurité : défense en profondeur, même pattern qu'absences/save.php
+        //    et discipline/save.php — la liste déroulante classe/matière côté
+        //    UI n'affiche déjà que les affectations de l'enseignant connecté,
+        //    mais rien ne vérifiait id_mat/id_cl côté serveur : un ENSEIGNANT
+        //    pouvait poster des notes pour une classe/matière non affectée. ──
+        if ($is_ens && $mat_ens) {
+            $ok = db_val(
+                "SELECT 1 FROM dispenser WHERE matricule_ens=? AND val_annee=? AND IDClasses=? AND id_mat=?",
+                [$mat_ens, $val_annee, $id_cl_p, $id_mat_p]
+            );
+            if (!$ok) {
+                if ($is_ajax) {
+                    header('Content-Type: application/json; charset=utf-8');
+                    echo json_encode(['ok' => false, 'error' => 'Accès non autorisé à cette classe/matière.']);
+                    exit;
+                }
+                flash_set('erreur', 'Accès non autorisé à cette classe/matière.');
+                rediriger('secondaire/pages/notes/index.php?onglet=classe');
+            }
+        }
+
         $nb_saved  = 0;
         foreach ($_POST['notes'] ?? [] as $id_eleve => $val) {
             $id_eleve = (int)$id_eleve;
@@ -248,6 +270,19 @@ if ($onglet === 'eleve') {
         $nb_saved_e    = 0;
         foreach ($_POST['notes'] ?? [] as $id_mat => $val) {
             $id_mat = (int)$id_mat;
+            // ── Sécurité : défense en profondeur (voir save_classe ci-dessus) —
+            //    par matière car cet onglet poste plusieurs matières en une
+            //    fois pour un même élève/classe. Matière non affectée à
+            //    l'enseignant connecté = silencieusement ignorée, comme le
+            //    formulaire (généré depuis dispenser) ne l'aurait jamais
+            //    proposée de toute façon. ──
+            if ($is_ens && $mat_ens) {
+                $ok = db_val(
+                    "SELECT 1 FROM dispenser WHERE matricule_ens=? AND val_annee=? AND IDClasses=? AND id_mat=?",
+                    [$mat_ens, $val_annee, $id_cl_p, $id_mat]
+                );
+                if (!$ok) continue;
+            }
             $val    = trim($val);
             if ($val === '') {
                 db_exec("DELETE FROM note WHERE id_eleve=? AND id_matiere=? AND id_seq=?",
