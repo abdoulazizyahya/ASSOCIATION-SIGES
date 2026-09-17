@@ -61,3 +61,20 @@ INSERT IGNORE INTO `operateur_paiement` (`id`, `libelle`, `logo`) VALUES
 ('ECOBANK', 'Ecobank', 'ecobank.png'),
 ('EU', 'Express Union', 'eu.png'),
 ('UBA', 'UBA', 'uba.jpg');
+
+-- Signataires — secondaire/pages/paiements/signatures.php (et le champ
+-- « chef d'établissement » de Paramètres) font un simple UPDATE ... WHERE
+-- code=? (jamais un INSERT), donc sans ces 6 lignes AUCUN upload de
+-- signature ne persiste jamais : la page affiche "Signature mise à jour"
+-- (flash de succès) alors que l'UPDATE touche 0 ligne, échec totalement
+-- silencieux (bug réel constaté le 17/09/2026, audit étape 12). fichier
+-- reste NULL (pas encore de signature) sauf pour les 2 déjà fournies par
+-- LAM_ABZ de base (chef_etablissement, intendant) — copiées dans
+-- assets/uploads/ à l'étape 11.
+INSERT IGNORE INTO `signature_titulaire` (`code`, `libelle`, `fichier`, `role_gestion`) VALUES
+('censeur', 'Censeur', NULL, 'CENSEUR'),
+('chef_etablissement', 'Chef d\'établissement (Proviseur)', 'signature_chef_etablissement.png', 'PROVISEUR'),
+('intendant', 'Intendant', 'signature_intendant.png', 'INTENDANT'),
+('president_apee', 'Président de l\'APEE', NULL, 'INTENDANT'),
+('surveillant_general', 'Surveillant Général', NULL, 'SG'),
+('tresorier_apee', 'Trésorier de l\'APEE', NULL, 'INTENDANT');

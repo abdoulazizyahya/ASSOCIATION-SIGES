@@ -13,12 +13,21 @@ header('Content-Type: application/json; charset=utf-8');
 if (!annuaire_dispo()) { echo json_encode(null); exit; }
 
 $code = strtoupper(trim((string) ($_GET['code'] ?? '')));
-$e = $code !== '' ? assoc_one("SELECT id, nom FROM etablissement WHERE code=? AND actif=1", [$code]) : null;
+$e = $code !== '' ? assoc_one("SELECT id, nom, type_enseignement FROM etablissement WHERE code=? AND actif=1", [$code]) : null;
 if (!$e) { echo json_encode(null); exit; }
 
+// École secondaire (schema_ref_ecole_secondaire.sql, porté de LAM_ABZ) :
+// etablissement.nom_fr/sigle, pas Nom_Etab_Fr/Initial_Etab (primaire) — sans
+// ce branchement la requête échouait (colonne inconnue), rattrapée par le
+// try/catch mais avec pour effet un aperçu SANS logo ni sigle sur login.php
+// pour toute école secondaire (jamais de Fatal error, juste une dégradation
+// silencieuse — même famille de bug que les fichiers ajax/ voisins).
+$secondaire = ($e['type_enseignement'] ?? 'primaire') === 'secondaire';
 try {
     $info = avec_ecole((int) $e['id'], fn($l) => ecole_one(
-        $l, "SELECT Nom_Etab_Fr, Initial_Etab, logo FROM etablissement LIMIT 1"
+        $l, $secondaire
+            ? "SELECT nom_fr AS Nom_Etab_Fr, sigle AS Initial_Etab, logo FROM etablissement LIMIT 1"
+            : "SELECT Nom_Etab_Fr, Initial_Etab, logo FROM etablissement LIMIT 1"
     ));
 } catch (\Throwable $ex) {
     $info = null;
