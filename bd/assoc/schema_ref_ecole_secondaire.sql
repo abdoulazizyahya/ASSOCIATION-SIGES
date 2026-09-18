@@ -563,6 +563,86 @@ CREATE TABLE `paiement_frais` (
   CONSTRAINT `fk_pf_utilisateur` FOREIGN KEY (`id_utilisateur`) REFERENCES `utilisateur` (`id`) ON UPDATE CASCADE
 ) ENGINE=InnoDB AUTO_INCREMENT=4 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
+
+-- ── PAIEMENT PRIVÉ ──────────────────────────────────────────────────
+-- Comptabilité 100% indépendante de PAIEMENT PUBLIQUE ci-dessus
+-- (obligation_frais/paiement_frais/operateur_paiement, porté de LAM_ABZ) —
+-- nouveau module porté du module Finances/Dépenses du PRIMAIRE
+-- (pages/finances/*, pages/depenses/*, bd/assoc/schema_ref_ecole.sql :
+-- obligation/paiement_frais/depense/categorie_depense), adapté au schéma
+-- secondaire (id_annee/id_classe/id_eleve entiers, pas val_annee/IDClasses/
+-- id_eleve texte). Demande explicite du 17/09/2026 : « copié exactement,
+-- adapté au secondaire », tables séparées. Pas de concept « Cas social »
+-- (réduction de frais) côté secondaire pour l'instant — absent de ce schéma,
+-- hors périmètre de cette étape.
+DROP TABLE IF EXISTS `categorie_depense_privee`;
+CREATE TABLE `categorie_depense_privee` (
+  `id` int unsigned NOT NULL AUTO_INCREMENT,
+  `libelle` varchar(150) NOT NULL,
+  `description` varchar(255) DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `libelle` (`libelle`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+DROP TABLE IF EXISTS `depense_privee`;
+CREATE TABLE `depense_privee` (
+  `id` int unsigned NOT NULL AUTO_INCREMENT,
+  `id_categorie` int unsigned NOT NULL,
+  `libelle` varchar(200) NOT NULL,
+  `montant` decimal(12,2) NOT NULL,
+  `date_depense` date NOT NULL,
+  `id_annee` int unsigned NOT NULL,
+  `id_utilisateur` int unsigned DEFAULT NULL,
+  `beneficiaire` varchar(150) DEFAULT NULL,
+  `observation` varchar(255) DEFAULT NULL,
+  `cree_le` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `id_categorie` (`id_categorie`),
+  KEY `id_annee` (`id_annee`),
+  KEY `id_utilisateur` (`id_utilisateur`),
+  CONSTRAINT `fk_depriv_categorie` FOREIGN KEY (`id_categorie`) REFERENCES `categorie_depense_privee` (`id`) ON DELETE RESTRICT ON UPDATE CASCADE,
+  CONSTRAINT `fk_depriv_annee` FOREIGN KEY (`id_annee`) REFERENCES `annee_scolaire` (`id`) ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT `fk_depriv_utilisateur` FOREIGN KEY (`id_utilisateur`) REFERENCES `utilisateur` (`id`) ON DELETE SET NULL ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+DROP TABLE IF EXISTS `obligation_privee`;
+CREATE TABLE `obligation_privee` (
+  `id` int unsigned NOT NULL AUTO_INCREMENT,
+  `nom_obligation` varchar(200) NOT NULL,
+  `montant_obligation` decimal(10,2) NOT NULL,
+  `code_niveau` varchar(25) NOT NULL,
+  PRIMARY KEY (`id`),
+  KEY `code_niveau` (`code_niveau`),
+  CONSTRAINT `fk_oblpriv_niveau` FOREIGN KEY (`code_niveau`) REFERENCES `niveau` (`code_niveau`) ON DELETE CASCADE ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+DROP TABLE IF EXISTS `paiement_prive`;
+CREATE TABLE `paiement_prive` (
+  `id` int unsigned NOT NULL AUTO_INCREMENT,
+  `id_versement` int unsigned DEFAULT NULL,
+  `id_eleve` int unsigned NOT NULL,
+  `id_classe` int unsigned NOT NULL,
+  `id_annee` int unsigned NOT NULL,
+  `id_obligation` int unsigned NOT NULL,
+  `montant_paiement` decimal(10,2) NOT NULL,
+  `date_paiement` date NOT NULL,
+  `ref_paiement` varchar(50) DEFAULT NULL,
+  `mode_paiement` enum('ESPECES','ORANGE_MONEY','MOMO','BANQUE','AUTRE') NOT NULL DEFAULT 'ESPECES',
+  `id_utilisateur` int unsigned DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  KEY `id_eleve` (`id_eleve`),
+  KEY `id_classe` (`id_classe`),
+  KEY `id_annee` (`id_annee`),
+  KEY `id_obligation` (`id_obligation`),
+  KEY `id_versement` (`id_versement`),
+  KEY `id_utilisateur` (`id_utilisateur`),
+  CONSTRAINT `fk_paypriv_eleve` FOREIGN KEY (`id_eleve`) REFERENCES `eleve` (`id`) ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT `fk_paypriv_classe` FOREIGN KEY (`id_classe`) REFERENCES `classe` (`id`) ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT `fk_paypriv_annee` FOREIGN KEY (`id_annee`) REFERENCES `annee_scolaire` (`id`) ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT `fk_paypriv_obligation` FOREIGN KEY (`id_obligation`) REFERENCES `obligation_privee` (`id`) ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT `fk_paypriv_utilisateur` FOREIGN KEY (`id_utilisateur`) REFERENCES `utilisateur` (`id`) ON DELETE SET NULL ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
 DROP TABLE IF EXISTS `parent`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;

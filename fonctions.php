@@ -1839,6 +1839,84 @@ function finances_du_par_eleve(string $val_annee, ?int $id_classe = null, ?strin
     return $eleves;
 }
 
+// ── PAIEMENT PRIVÉ (secondaire) ──────────────────────────────
+// Port du module Finances/Dépenses du PRIMAIRE (pages/finances/*,
+// pages/depenses/*) sous secondaire/pages/paiements_prives/ +
+// secondaire/pages/depenses_privees/, comptabilité 100% indépendante de
+// PAIEMENT PUBLIQUE (obligation_frais/paiement_frais, porté de LAM_ABZ) —
+// tables dédiées obligation_privee/paiement_prive/depense_privee/
+// categorie_depense_privee. Demande explicite du 17/09/2026. Pas de concept
+// "Cas social" ici (absent du schéma secondaire, hors périmètre) : le
+// montant dû n'est jamais réduit, contrairement à finances_du_par_eleve()
+// (primaire) ci-dessus. `finances_numero_recu()`/`finances_id_versement()`/
+// `finances_numero_recu_eleve()`/`finances_numero_bon()`/
+// `finances_modes_paiement()`/`finances_mode_paiement_normalise()`/
+// `finances_mode_paiement_badge()`/`finances_mode_paiement_libelle()`
+// (ci-dessus) sont génériques (ne lisent aucune table précise) — réutilisées
+// telles quelles par le module privé, aucun doublon nécessaire.
+
+// Solde de caisse PRIVÉ (encaissé - dépensé) de l'année scolaire donnée —
+// même principe que solde_caisse() (primaire) mais sur paiement_prive/
+// depense_privee, id_annee entier (pas val_annee texte).
+function prive_solde_caisse(int $id_annee): float {
+    $encaisse = (float) (db_val("SELECT COALESCE(SUM(montant_paiement),0) FROM paiement_prive WHERE id_annee=?", [$id_annee]) ?? 0);
+    $depense  = (float) (db_val("SELECT COALESCE(SUM(montant),0) FROM depense_privee WHERE id_annee=?", [$id_annee]) ?? 0);
+    return $encaisse - $depense;
+}
+
+// Liste des élèves actifs inscrits (année/classe/niveau donnés) avec, pour
+// chacun, le montant dû PRIVÉ (somme des obligation_privee de son niveau,
+// jamais réduit) — source de vérité unique pour état par classe/impayés/
+// statistiques/répartition par classe du module privé.
+function prive_finances_du_par_eleve(int $id_annee, ?int $id_classe = null, ?string $code_niveau = null): array {
+    $where  = ["e.statut='actif'", 'i.id_annee=?'];
+    $params = [$id_annee];
+    if ($id_classe)  { $where[] = 'c.id=?';           $params[] = $id_classe; }
+    if ($code_niveau) { $where[] = 'c.code_niveau=?'; $params[] = $code_niveau; }
+    $eleves = db_all(
+        "SELECT e.id, c.id AS id_classe, c.code_niveau, c.designation, e.matricule, e.nom, e.prenom
+         FROM eleve e
+         JOIN inscription i ON i.id_eleve=e.id
+         JOIN classe c ON c.id=i.id_classe
+         WHERE " . implode(' AND ', $where) . "
+         ORDER BY e.nom, e.prenom",
+        $params
+    );
+
+    $du_par_niveau = [];
+    foreach (db_all("SELECT code_niveau, SUM(montant_obligation) AS total FROM obligation_privee GROUP BY code_niveau") as $r) {
+        $du_par_niveau[$r['code_niveau']] = (float) $r['total'];
+    }
+    foreach ($eleves as &$e) {
+        $e['du'] = $du_par_niveau[$e['code_niveau']] ?? 0.0;
+    }
+    unset($e);
+    return $eleves;
+}
+
+// Élèves ayant effectué au moins un versement PRIVÉ dans [$debut,$fin]
+// (bornes incluses, 'Y-m-d') — même principe que finances_eleves_payes_periode()
+// (primaire) mais sur paiement_prive, id_annee/id_classe entiers.
+function prive_finances_eleves_payes_periode(int $id_annee, string $debut, string $fin, int $id_classe = 0, int $id_eleve = 0): array {
+    $where  = ['i.id_annee=?', 'p.date_paiement BETWEEN ? AND ?'];
+    $params = [$id_annee, $debut, $fin];
+    if ($id_classe) { $where[] = 'i.id_classe=?'; $params[] = $id_classe; }
+    if ($id_eleve)  { $where[] = 'i.id_eleve=?';  $params[] = $id_eleve; }
+
+    return db_all(
+        "SELECT i.id_eleve, i.id_classe, e.nom, e.prenom, e.matricule, c.designation,
+                SUM(p.montant_paiement) AS montant_periode
+         FROM inscription i
+         JOIN eleve e ON e.id = i.id_eleve
+         JOIN classe c ON c.id = i.id_classe
+         JOIN paiement_prive p ON p.id_eleve = i.id_eleve AND p.id_annee = i.id_annee
+         WHERE " . implode(' AND ', $where) . "
+         GROUP BY i.id_eleve, i.id_classe, e.nom, e.prenom, e.matricule, c.designation
+         ORDER BY c.designation, e.nom, e.prenom",
+        $params
+    );
+}
+
 // ── Génération de matricule ─────────────────────────────────
 // Port fidèle de generer_matricule() (jaynitaare/php/mes_fonctions.php:268) :
 // AA + [M|P] + NNN, où AA = 2 derniers chiffres du début de l'année scolaire
@@ -2069,6 +2147,28 @@ function gen_niu(string $initial_etab, string $prefixe = 'PMC', bool $reserver =
 // boite_postal, logo...) — traduit une seule fois ici, réutilisé par tous
 // les futurs générateurs PDF plutôt que de dupliquer le mapping partout.
 function etab_pour_pdf(array $etab): array {
+    // École secondaire : colonnes déjà nommées comme la sortie attendue
+    // (region_fr/departement_fr/arrondissement_fr/nom_fr...) — schéma
+    // secondaire (schema_ref_ecole_secondaire.sql), pas de "lieu" séparé
+    // (repli sur ville) ni de titre de direction bilingue distinct. Ajouté
+    // pour le module PAIEMENT PRIVÉ (secondaire/pdf/prive_*.php, demande
+    // explicite du 17/09/2026) — réutilise les mêmes fonctions de rendu
+    // génériques (pdf_entete()/pdf_bandeau()/pdf_copyright(), pdf/header_pdf.php)
+    // que le module Finances du primaire, aucun doublon de dessin nécessaire.
+    if (function_exists('type_enseignement_courant') && type_enseignement_courant() === 'secondaire') {
+        return [
+            'nom_fr' => $etab['nom_fr'] ?? '', 'nom_en' => $etab['nom_en'] ?? '', 'sigle' => $etab['sigle'] ?? '',
+            'immatriculation' => $etab['immatriculation'] ?? '', 'boite_postale' => $etab['boite_postale'] ?? '',
+            'telephone' => $etab['telephone'] ?? '', 'email' => $etab['email'] ?? '', 'ville' => $etab['ville'] ?? '',
+            'lieu' => $etab['ville'] ?? '',
+            'region_fr' => $etab['region_fr'] ?? '', 'departement_fr' => $etab['departement_fr'] ?? '',
+            'arrondissement_fr' => $etab['arrondissement_fr'] ?? '',
+            'region_en' => $etab['region_en'] ?? '', 'division_en' => $etab['division_en'] ?? '',
+            'subdivision_en' => $etab['subdivision_en'] ?? '',
+            'chef_etablissement' => $etab['chef_etablissement'] ?? '', 'chef_etablissement_en' => $etab['chef_etablissement'] ?? '',
+            'logo' => $etab['logo'] ?? '',
+        ];
+    }
     return [
         'nom_fr'            => $etab['Nom_Etab_Fr'] ?? '',
         'nom_en'            => $etab['Nom_Etab_An'] ?? '',

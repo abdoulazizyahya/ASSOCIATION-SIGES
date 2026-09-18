@@ -285,3 +285,20 @@ function pdf_bandeau(FPDF $pdf, string $titre_fr, string $titre_en, float $page_
     $pdf->SetDrawColor(0);
     $pdf->Ln(1);
 }
+
+// Copyright standard, bas de page — porté de pdf/header_pdf.php (primaire),
+// absent de ce fichier jusqu'ici (jamais utilisé par les PDF secondaire
+// existants). Ajouté pour secondaire/pdf/prive_*.php (module PAIEMENT
+// PRIVÉ, demande explicite du 17/09/2026), qui réutilise cette convention
+// plutôt que de réinventer une mention de bas de page.
+function pdf_copyright(FPDF $pdf, float $page_w, float $page_h, float $marge_bas = 8): void {
+    $pdf->SetFont('Arial', 'I', 6.5);
+    $pdf->SetTextColor(120, 120, 120);
+    $texte = pdf_u('Copyright © SIGES-V2 ABZ');
+    $h = 4;
+    $taille_police_mm = 6.5 / (72 / 25.4);
+    $x = ($page_w - $pdf->GetStringWidth($texte)) / 2;
+    $y = ($page_h - $marge_bas) + .5 * $h + .3 * $taille_police_mm;
+    $pdf->Text($x, $y, $texte);
+    $pdf->SetTextColor(0, 0, 0);
+}

@@ -40,13 +40,32 @@ return [
     'Discipline' => [
         ['Discipline', 'secondaire/pages/discipline/index.php', 'shield-exclamation', ['ADMIN','CENSEUR','SG','ENSEIGNANT']],
     ],
-    // « PAIEMENT PRIVÉ » : groupe volontairement vide pour l'instant (aucun
-    // sous-menu) — futur pendant du paiement public ci-dessous, demande
-    // explicite du 17/09/2026. Un groupe sans aucune entrée reste quand
-    // même affiché (voir layout/header.php, condition assouplie pour ce
-    // cas précis — ne pas réintroduire un sous-menu vide par erreur qui,
-    // lui, serait masqué comme n'importe quel groupe filtré à zéro lien).
-    'PAIEMENT PRIVÉ' => [],
+    // « PAIEMENT PRIVÉ » : porté du module Finances/Dépenses du PRIMAIRE
+    // (pages/finances/*, pages/depenses/*) sous secondaire/pages/
+    // paiements_prives/ + secondaire/pages/depenses_privees/, comptabilité
+    // 100% indépendante de PAIEMENT PUBLIQUE ci-dessous (tables dédiées —
+    // voir fonctions.php, fonctions prive_*). Demande explicite du
+    // 17/09/2026. Pas de « Cas sociaux » ici (absent du schéma secondaire,
+    // contrairement au primaire) — 6 entrées « Gestion des inscriptions »
+    // au lieu de 7 côté primaire. « Frais exigibles »/« Catégories de
+    // dépenses » regroupées ICI (pas dans Administration) pour rester
+    // cohérent avec PAIEMENT PUBLIQUE ci-dessous, qui fait déjà de même.
+    'PAIEMENT PRIVÉ' => [
+        ['--', 'Gestion des inscriptions'],
+        ['Enregistrer un paiement', 'secondaire/pages/paiements_prives/versement.php',            'cash-stack',          ['ADMIN','PROVISEUR','SECRETAIRE','INTENDANT']],
+        ['Frais exigibles',         'secondaire/pages/paiements_prives/obligations.php',           'cash-coin',            ['ADMIN','PROVISEUR','INTENDANT']],
+        ['Journal de caisse',       'secondaire/pages/paiements_prives/journal.php',                'journal-text',        ['ADMIN','PROVISEUR','SECRETAIRE','INTENDANT']],
+        ['État par classe',         'secondaire/pages/paiements_prives/etat_classe.php',            'list-check',          ['ADMIN','PROVISEUR','SECRETAIRE','INTENDANT']],
+        ['Répartition par classe',  'secondaire/pages/paiements_prives/repartition_classes.php',    'pie-chart-fill',      ['ADMIN','PROVISEUR','SECRETAIRE','INTENDANT']],
+        ['Impayés',                 'secondaire/pages/paiements_prives/impayes.php',                'exclamation-triangle',['ADMIN','PROVISEUR','SECRETAIRE','INTENDANT']],
+        ['Statistiques',            'secondaire/pages/paiements_prives/statistiques.php',           'bar-chart-line',      ['ADMIN','PROVISEUR','INTENDANT']],
+        ['--', 'Gestion des dépenses'],
+        ['Nouvelle dépense',        'secondaire/pages/depenses_privees/saisie.php',                 'dash-circle',         ['ADMIN','PROVISEUR','SECRETAIRE','INTENDANT']],
+        ['Catégories de dépenses',  'secondaire/pages/depenses_privees/categories.php',             'tags',                ['ADMIN','PROVISEUR','INTENDANT']],
+        ['Journal des dépenses',    'secondaire/pages/depenses_privees/journal.php',                'journal-minus',       ['ADMIN','PROVISEUR','SECRETAIRE','INTENDANT']],
+        ['Répartition par catégorie', 'secondaire/pages/depenses_privees/repartition_categories.php','pie-chart-fill',    ['ADMIN','PROVISEUR','SECRETAIRE','INTENDANT']],
+        ['Statistiques',            'secondaire/pages/depenses_privees/statistiques.php',           'pie-chart',           ['ADMIN','PROVISEUR','INTENDANT']],
+    ],
     // Ex-« Finances » — renommé « PAIEMENT PUBLIQUE » (même contenu, même
     // demande explicite du 17/09/2026) pour le distinguer du nouveau groupe
     // « PAIEMENT PRIVÉ » ci-dessus.
