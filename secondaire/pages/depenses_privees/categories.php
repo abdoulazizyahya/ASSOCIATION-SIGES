@@ -75,6 +75,9 @@ if (!$es_partiel) {
     <button type="button" class="btn btn-outline-danger btn-sm" onclick="afficherApercu('<?= APP_URL ?>/secondaire/pdf/prive_depenses_categories.php', 'Catégories de dépenses', null, 'portrait')">
       <i class="bi bi-file-earmark-pdf me-1"></i>Aperçu PDF
     </button>
+    <a class="btn btn-outline-success btn-sm" href="<?= APP_URL ?>/secondaire/pages/depenses_privees/excel_categories.php">
+      <i class="bi bi-file-earmark-excel me-1"></i>Excel
+    </a>
   </div>
 </div>
 

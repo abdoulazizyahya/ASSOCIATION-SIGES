@@ -46,6 +46,9 @@ $mois_fr = [1=>'Janvier',2=>'Février',3=>'Mars',4=>'Avril',5=>'Mai',6=>'Juin',7
     <button type="button" class="btn btn-outline-danger btn-sm" onclick="afficherApercu('<?= APP_URL ?>/secondaire/pdf/prive_depenses_statistiques.php', 'Bilan des dépenses', null, 'portrait')">
       <i class="bi bi-file-earmark-pdf me-1"></i>Aperçu PDF
     </button>
+    <a class="btn btn-outline-success btn-sm" href="<?= APP_URL ?>/secondaire/pages/depenses_privees/excel_statistiques.php">
+      <i class="bi bi-file-earmark-excel me-1"></i>Excel
+    </a>
   </div>
 </div>
 

@@ -65,6 +65,9 @@ if (!$es_partiel) {
     <button type="button" class="btn btn-outline-danger btn-sm" onclick="ouvrirEtatClassePrivePdf()">
       <i class="bi bi-file-earmark-pdf me-1"></i>PDF
     </button>
+    <a class="btn btn-outline-success btn-sm" href="<?= APP_URL ?>/secondaire/pages/paiements_prives/excel_etat_classe.php?classe=<?= $id_classe ?>">
+      <i class="bi bi-file-earmark-excel me-1"></i>Excel
+    </a>
   </div>
   <?php endif; ?>
 </div>

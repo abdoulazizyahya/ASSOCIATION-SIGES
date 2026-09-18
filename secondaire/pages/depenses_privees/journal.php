@@ -57,6 +57,9 @@ if (!$es_partiel) {
     <button type="button" class="btn btn-outline-danger btn-sm" onclick="ouvrirJournalDepensesPrivePdf()">
       <i class="bi bi-file-earmark-pdf me-1"></i>Aperçu PDF
     </button>
+    <a class="btn btn-outline-success btn-sm" id="lienExcelJournalDepensesPrive" href="#">
+      <i class="bi bi-file-earmark-excel me-1"></i>Excel
+    </a>
   </div>
 </div>
 
@@ -128,6 +131,7 @@ function urlAvecFiltresDepensesPrive(base) {
 function ouvrirJournalDepensesPrivePdf() {
     afficherApercu(urlAvecFiltresDepensesPrive('<?= APP_URL ?>/secondaire/pdf/prive_depenses_journal.php'), 'Journal des dépenses', null, 'portrait');
 }
+document.getElementById('lienExcelJournalDepensesPrive').href = urlAvecFiltresDepensesPrive('<?= APP_URL ?>/secondaire/pages/depenses_privees/excel_journal.php');
 </script>
 
 </div><!-- /#journal-depenses-privees-zone -->

@@ -82,6 +82,11 @@ if (!$es_partiel) {
     <h4><i class="bi bi-card-checklist me-1 text-primary"></i>Paiement privé — Obligations (frais par niveau)</h4>
     <div class="sub">Le montant dû par un élève = somme de toutes les obligations de son niveau.</div>
   </div>
+  <?php if ($obligations): ?>
+  <a class="btn btn-outline-success btn-sm" href="<?= APP_URL ?>/secondaire/pages/paiements_prives/excel_obligations.php">
+    <i class="bi bi-file-earmark-excel me-1"></i>Excel
+  </a>
+  <?php endif; ?>
 </div>
 
 <div class="row g-2" style="align-items:flex-start">

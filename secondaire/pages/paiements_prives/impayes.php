@@ -61,6 +61,9 @@ if (!$es_partiel) {
     <button type="button" class="btn btn-outline-danger btn-sm" onclick="ouvrirImpayesPrivePdf()">
       <i class="bi bi-file-earmark-pdf me-1"></i>Aperçu PDF
     </button>
+    <a class="btn btn-outline-success btn-sm" id="lienExcelImpayesPrive" href="#">
+      <i class="bi bi-file-earmark-excel me-1"></i>Excel
+    </a>
   </div>
 </div>
 
@@ -146,6 +149,7 @@ function urlAvecFiltresImpayesPrive(base) {
 function ouvrirImpayesPrivePdf() {
     afficherApercu(urlAvecFiltresImpayesPrive('<?= APP_URL ?>/secondaire/pdf/prive_impayes.php'), 'Impayés', null, 'portrait');
 }
+document.getElementById('lienExcelImpayesPrive').href = urlAvecFiltresImpayesPrive('<?= APP_URL ?>/secondaire/pages/paiements_prives/excel_impayes.php');
 </script>
 
 </div><!-- /#impayes-prive-zone -->

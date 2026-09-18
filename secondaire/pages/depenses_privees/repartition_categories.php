@@ -40,6 +40,9 @@ require_once __DIR__ . '/../../../layout/header.php';
     <button type="button" class="btn btn-outline-danger btn-sm" onclick="afficherApercu('<?= APP_URL ?>/secondaire/pdf/prive_depenses_repartition_categories.php', 'Répartition par catégorie', null, 'portrait')">
       <i class="bi bi-file-earmark-pdf me-1"></i>Aperçu PDF
     </button>
+    <a class="btn btn-outline-success btn-sm" href="<?= APP_URL ?>/secondaire/pages/depenses_privees/excel_repartition_categories.php">
+      <i class="bi bi-file-earmark-excel me-1"></i>Excel
+    </a>
   </div>
 </div>
 
