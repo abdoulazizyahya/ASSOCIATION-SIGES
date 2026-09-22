@@ -330,7 +330,7 @@ if (!$es_partiel) {
               [$id_classe, $val_annee]
           ) as $e): ?>
             <option value="<?= (int) $e['id_eleve'] ?>" <?= $id_eleve === (int) $e['id_eleve'] ? 'selected' : '' ?>>
-              <?= h($e['Nom_elv'] . ' ' . ($e['Prenom_elv'] ?? '')) ?> (<?= h($e['Mat_elv']) ?>)
+              <?= h($e['Nom_elv'] . ' ' . ($e['Prenom_elv'] ?? '')) ?>
             </option>
           <?php endforeach; endif; ?>
         </select>

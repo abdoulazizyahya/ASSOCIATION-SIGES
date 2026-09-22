@@ -272,7 +272,7 @@ if (!$es_partiel) {
               [$id_classe, $id_annee]
           ) as $e): ?>
             <option value="<?= (int) $e['id'] ?>" <?= $id_eleve === (int) $e['id'] ? 'selected' : '' ?>>
-              <?= h($e['nom'] . ' ' . ($e['prenom'] ?? '')) ?> (<?= h($e['matricule']) ?>)
+              <?= h($e['nom'] . ' ' . ($e['prenom'] ?? '')) ?>
             </option>
           <?php endforeach; endif; ?>
         </select>
