@@ -41,7 +41,12 @@ $sequence_lbl = [
           <i class="bi bi-hash me-1 text-primary"></i>Format du matricule des élèves
         </div>
         <p class="text-muted mb-2" style="font-size:.8rem">
-          Actuellement : <strong><?= $mc['mode'] === 'manuel' ? 'saisi à la main' : 'généré automatiquement' ?></strong>
+          Actuellement :
+          <strong><?= match ($mc['mode']) {
+              'manuel'    => 'saisi à la main',
+              'aleatoire' => 'généré aléatoirement',
+              default     => 'généré automatiquement (séquentiel)',
+          } ?></strong>
           <?php if ($mc['mode'] !== 'manuel'): ?>
             — exemple : <span class="badge-code font-monospace"><?= h($mc_exemple) ?></span>
           <?php endif; ?>
@@ -53,9 +58,16 @@ $sequence_lbl = [
           <div class="mb-2">
             <div class="form-check">
               <input class="form-check-input" type="radio" name="mode" value="auto" id="mc_auto"
-                     <?= $mc['mode'] !== 'manuel' ? 'checked' : '' ?> onchange="majFormatUI()">
+                     <?= $mc['mode'] === 'auto' ? 'checked' : '' ?> onchange="majFormatUI()">
               <label class="form-check-label small" for="mc_auto">
-                <strong>Automatique</strong> — le matricule est généré à l'enregistrement selon un format.
+                <strong>Automatique</strong> — le matricule est généré à l'enregistrement, numéro d'ordre croissant.
+              </label>
+            </div>
+            <div class="form-check">
+              <input class="form-check-input" type="radio" name="mode" value="aleatoire" id="mc_aleatoire"
+                     <?= $mc['mode'] === 'aleatoire' ? 'checked' : '' ?> onchange="majFormatUI()">
+              <label class="form-check-label small" for="mc_aleatoire">
+                <strong>Aléatoire</strong> — même format, mais le numéro est tiré au hasard (non devinable) plutôt qu'incrémenté.
               </label>
             </div>
             <div class="form-check">
@@ -120,12 +132,13 @@ $sequence_lbl = [
 // Réexécuté à chaque (re)chargement AJAX de #zoneResultats — déclarations
 // `function` uniquement (voir layout/footer.php), jamais de const/let au 1er niveau.
 function majFormatUI() {
-  var auto = document.getElementById('mc_auto') && document.getElementById('mc_auto').checked;
+  var manuel = document.getElementById('mc_manuel') && document.getElementById('mc_manuel').checked;
+  var avecFormat = !manuel; // 'auto' et 'aleatoire' utilisent tous deux le bloc format
   var bloc = document.getElementById('mc_bloc_format');
   var avert = document.getElementById('mc_avert_manuel');
-  if (bloc)  bloc.style.opacity = auto ? '1' : '.45';
-  if (bloc)  bloc.querySelectorAll('input,select').forEach(function (el) { el.disabled = !auto; });
-  if (avert) avert.style.display = auto ? 'none' : '';
+  if (bloc)  bloc.style.opacity = avecFormat ? '1' : '.45';
+  if (bloc)  bloc.querySelectorAll('input,select').forEach(function (el) { el.disabled = !avecFormat; });
+  if (avert) avert.style.display = avecFormat ? 'none' : '';
 }
 function majApercuMatricule() {
   var f = (document.getElementById('mc_format') || {}).value || '';

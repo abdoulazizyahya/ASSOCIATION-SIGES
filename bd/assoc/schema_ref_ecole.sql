@@ -537,11 +537,12 @@ CREATE TABLE `eleve` (
 ) ENGINE=InnoDB AUTO_INCREMENT=245 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
--- Configuration du format de matricule (migration v52) — ligne unique id=1.
+-- Configuration du format de matricule (migration v52 ; mode 'aleatoire'
+-- ajouté migration v58) — ligne unique id=1.
 DROP TABLE IF EXISTS `matricule_config`;
 CREATE TABLE `matricule_config` (
   `id` tinyint(1) NOT NULL DEFAULT '1',
-  `mode` enum('auto','manuel') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'auto',
+  `mode` enum('auto','manuel','aleatoire') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'auto',
   `format` varchar(60) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '{AA}{NIV}{SEQ}',
   `longueur_seq` tinyint(2) NOT NULL DEFAULT '3',
   `sequence_par` enum('annee_niveau','annee','globale') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'annee_niveau',

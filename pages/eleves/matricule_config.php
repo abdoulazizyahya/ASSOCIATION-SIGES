@@ -10,14 +10,15 @@ exiger_role(['DIRECTEUR', 'SECRETAIRE']);
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') rediriger('pages/eleves/liste.php?statut=outils');
 csrf_verifier();
 
-$mode         = post('mode') === 'manuel' ? 'manuel' : 'auto';
+$mode         = in_array(post('mode'), ['manuel', 'aleatoire'], true) ? post('mode') : 'auto';
 $format       = trim(post('format')) ?: '{AA}{NIV}{SEQ}';
 $longueur_seq = max(2, min(6, (int) post('longueur_seq')));
 $sequence_par = in_array(post('sequence_par'), ['annee_niveau', 'annee', 'globale'], true)
               ? post('sequence_par') : 'annee_niveau';
 
-// Garde-fous sur le format (mode auto uniquement) :
-if ($mode === 'auto') {
+// Garde-fous sur le format (modes auto ET aleatoire — tous deux pilotés par
+// le même format à jetons, seule la résolution de {SEQ} diffère) :
+if ($mode !== 'manuel') {
     if (strpos($format, '{SEQ}') === false) {
         flash_set('erreur', 'Le format doit contenir le jeton {SEQ} (le numéro d\'ordre).');
         rediriger('pages/eleves/liste.php?statut=outils');
@@ -49,7 +50,10 @@ db_exec(
     [$mode, $format, $longueur_seq, $sequence_par]
 );
 
-flash_set('succes', $mode === 'manuel'
-    ? 'Matricule en saisie manuelle — il sera un champ libre (éventuellement vide) dans la fiche élève.'
-    : 'Format de matricule enregistré (exemple : ' . matricule_exemple($format, $longueur_seq, get_annee_active()['val_annee'] ?? '') . ').');
+$exemple = matricule_exemple($format, $longueur_seq, get_annee_active()['val_annee'] ?? '');
+flash_set('succes', match ($mode) {
+    'manuel'    => 'Matricule en saisie manuelle — il sera un champ libre (éventuellement vide) dans la fiche élève.',
+    'aleatoire' => "Matricule généré aléatoirement à chaque élève (exemple : $exemple).",
+    default     => "Format de matricule enregistré (exemple : $exemple).",
+});
 rediriger('pages/eleves/liste.php?statut=outils');
