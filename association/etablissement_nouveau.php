@@ -64,7 +64,7 @@ asso_haut('Nouvel établissement');
       Consomme une base vide du <strong>pool</strong> pré-créé (hébergement mutualisé),
       y installe le schéma de référence à jour, puis inscrit l'école à l'annuaire.
     <?php else: ?>
-      Crée une base de données dédiée <span class="font-monospace">promeducam_&lt;nom simplifié&gt;</span>,
+      Crée une base de données dédiée <span class="font-monospace"><?= h(DB_PREFIXE_ECOLE) ?>_&lt;nom simplifié&gt;</span>,
       y installe le schéma de référence à jour, puis inscrit l'école à l'annuaire.
     <?php endif; ?>
     Crée aussi automatiquement les 3 comptes par défaut (FONDATEUR, DIRECTEUR, FINANCIER — affichés

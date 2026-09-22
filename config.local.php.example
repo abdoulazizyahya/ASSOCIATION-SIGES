@@ -25,6 +25,17 @@ define('DB_NAME', 'promeduca_ec1');
 // Base centrale annuaire (écoles, NIU, personnel, comptes membres).
 define('DB_NAME_ASSOC', 'promeduca_assoc');
 
+// Préfixe utilisé pour NOMMER la base d'une NOUVELLE école lors d'une
+// création via /association/etablissement_nouveau.php (CREATE DATABASE
+// <préfixe>_<nom simplifié>). SUR cPanel/hébergement mutualisé, le compte
+// MySQL n'a souvent le droit de créer QUE des bases dont le nom commence
+// par le préfixe imposé par l'hébergeur (visible dans le nom d'utilisateur
+// MySQL, ex. utilisateur « beeroc11073_sig » → préfixe « beeroc11073 »).
+// Mettre IMPÉRATIVEMENT ce préfixe ici, PAS le nom de l'association :
+// sinon la création d'école échoue avec « Access denied ... to database ».
+// (Sans cette ligne, repli sur 'promeducam' — voir connexion_assoc.php.)
+define('DB_PREFIXE_ECOLE', 'beeroc11073');
+
 // ── Multi-établissement : un seul sous-domaine ──────────────────────
 // Pas de résolution par sous-domaine : l'école est choisie au login.
 define('ASSOC_DOMAINE', '');
