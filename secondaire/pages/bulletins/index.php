@@ -6,7 +6,7 @@ require_once __DIR__ . '/../../../fonctions.php';
 exiger_connexion();
 
 $role      = role_connecte();
-$is_admin  = in_array($role, ['ADMIN','PROVISEUR','CENSEUR']);
+$is_admin  = in_array($role, ['ADMIN','PROVISEUR', 'FONDATEUR','CENSEUR']) || $role === 'MEMBRE_ASSOCIATION';
 $is_ens    = ($role === 'ENSEIGNANT');
 $mat_ens   = $is_ens ? get_matricule_ens_connecte() : null;
 
@@ -48,6 +48,7 @@ $vue       = in_array($_GET['vue'] ?? '', ['trim', 'annee'], true) ? $_GET['vue'
 $id_eleve  = (int)($_GET['eleve']  ?? 0);
 $ordre     = in_array($_GET['ordre'] ?? '', ['alpha','merite']) ? $_GET['ordre'] : 'alpha';
 $voir_tous = isset($_GET['voir_tous']);
+$id_serie  = (int)($_GET['serie'] ?? 0);
 
 // Sécurité PP
 if ($is_ens && $id_classe) {
@@ -152,14 +153,34 @@ function bull_moys_classe_comp(int $id_classe, int $id_trim_x, int $id_annee, ar
     return $out;
 }
 
+// Séries (LV2) réellement présentes dans la classe choisie — permet de
+// filtrer une classe mixte (ex. 4ème Allemand/Arabe/Espagnol) aussi bien à
+// l'écran que dans les PDF de classe (pdf_classe.php/pdf_annuel_classe.php).
+$series_dispo = [];
+if ($id_classe) {
+    $series_dispo = db_all(
+        "SELECT DISTINCT s.id, s.libelle FROM inscription i
+         JOIN serie s ON s.id=i.id_serie
+         WHERE i.id_classe=? AND i.id_annee=? ORDER BY s.libelle",
+        [$id_classe, $id_annee]
+    );
+    if ($id_serie && !in_array($id_serie, array_column($series_dispo, 'id'))) $id_serie = 0;
+}
+
 $periode_choisie = ($vue === 'annee') ? ($id_annee > 0) : ($id_trim_comp_actif > 0);
 $eleves = [];
 if ($id_classe && $periode_choisie) {
-    // Charger tous les élèves inscrits
+    // Charger TOUS les élèves inscrits (LV2/série non filtrée ici) : le rang
+    // et la moyenne doivent toujours être calculés sur la classe entière,
+    // même quand ?serie= ne filtre que l'AFFICHAGE d'un sous-groupe (classe
+    // mixte) — sinon un élève filtré verrait un rang "sur son sous-groupe"
+    // au lieu de son vrai rang de classe (incohérent avec pdf_classe.php).
     $eleves_raw = db_all(
-        "SELECT e.id, e.nom, e.prenom, e.matricule, e.niu, e.sexe, e.date_naiss, e.lieu_naiss
+        "SELECT e.id, e.nom, e.prenom, e.matricule, e.niu, e.sexe, e.date_naiss, e.lieu_naiss,
+                i.id_serie, s.libelle AS serie
          FROM eleve e
          JOIN inscription i ON i.id_eleve=e.id AND i.id_classe=? AND i.id_annee=?
+         LEFT JOIN serie s ON s.id=i.id_serie
          WHERE e.statut='actif' ORDER BY e.nom, e.prenom",
         [$id_classe, $id_annee]
     );
@@ -201,7 +222,12 @@ if ($id_classe && $periode_choisie) {
             usort($eleves_raw, fn($a,$b) => ($b['moy'] ?? -1) <=> ($a['moy'] ?? -1));
         }
     }
-    $eleves = $eleves_raw;
+    // Filtre d'AFFICHAGE par série, appliqué après le calcul des rangs
+    // ci-dessus (voir commentaire plus haut) — n'affecte que la liste écran,
+    // pas le classement.
+    $eleves = $id_serie
+        ? array_values(array_filter($eleves_raw, fn($el) => (int)($el['id_serie'] ?? 0) === $id_serie))
+        : $eleves_raw;
 }
 
 $fmt = fn(?float $v): string => $v === null ? '—' : rtrim(rtrim(number_format($v,2,'.',''),'0'),'.');
@@ -217,12 +243,13 @@ function pdf_url_bull(int $id_eleve, string $vue, int $id_trim, int $id_annee, b
     if ($dl) $base .= '&dl=1';
     return $base;
 }
-function url_classe_bull(int $id_classe, string $vue, int $id_trim, int $id_annee, string $ordre, bool $dl=false): string {
+function url_classe_bull(int $id_classe, string $vue, int $id_trim, int $id_annee, string $ordre, bool $dl=false, int $id_serie=0): string {
     if ($vue === 'annee') {
         $base = APP_URL.'/secondaire/pages/bulletins/pdf_annuel_classe.php?classe='.$id_classe.'&annee='.$id_annee.'&ordre='.$ordre;
     } else {
         $base = APP_URL.'/secondaire/pages/bulletins/pdf_classe.php?classe='.$id_classe.'&annee='.$id_annee.'&ordre='.$ordre.'&trim='.$id_trim;
     }
+    if ($id_serie) $base .= '&serie='.$id_serie;
     if ($dl) $base .= '&dl=1';
     return $base;
 }
@@ -300,16 +327,29 @@ require_once __DIR__ . '/../../../layout/header.php';
         <input type="hidden" name="classe" value="<?= $id_classe ?>">
       <?php endif; ?>
 
+      <!-- Série / LV2 (classe mixte) -->
+      <?php if ($id_classe && $series_dispo): ?>
+      <div class="col-md-2">
+        <label class="form-label mb-1" style="font-size:.78rem;font-weight:600;color:#1a3c6b">Série / LV2</label>
+        <select name="serie" class="form-select form-select-sm" onchange="this.form.submit()">
+          <option value="">— Toutes —</option>
+          <?php foreach ($series_dispo as $s): ?>
+            <option value="<?= $s['id'] ?>" <?= $id_serie==$s['id']?'selected':''?>><?= h($s['libelle']) ?></option>
+          <?php endforeach; ?>
+        </select>
+      </div>
+      <?php endif; ?>
+
       <!-- Ordre -->
       <?php if ($id_classe): ?>
       <div class="col-auto">
         <label class="form-label mb-1" style="font-size:.78rem;font-weight:600;color:#1a3c6b">Ordre</label>
         <div class="d-flex gap-1">
-          <a href="?vue=<?= $vue ?>&classe=<?= $id_classe ?>&ordre=alpha<?= $id_eleve?'&eleve='.$id_eleve:'' ?>"
+          <a href="?vue=<?= $vue ?>&classe=<?= $id_classe ?>&ordre=alpha<?= $id_serie?'&serie='.$id_serie:'' ?><?= $id_eleve?'&eleve='.$id_eleve:'' ?>"
              class="ordre-btn <?= $ordre==='alpha'?'active':'' ?>">
             <i class="bi bi-sort-alpha-down me-1"></i>Alphabétique
           </a>
-          <a href="?vue=<?= $vue ?>&classe=<?= $id_classe ?>&ordre=merite<?= $id_eleve?'&eleve='.$id_eleve:'' ?>"
+          <a href="?vue=<?= $vue ?>&classe=<?= $id_classe ?>&ordre=merite<?= $id_serie?'&serie='.$id_serie:'' ?><?= $id_eleve?'&eleve='.$id_eleve:'' ?>"
              class="ordre-btn <?= $ordre==='merite'?'active':'' ?>">
             <i class="bi bi-trophy me-1"></i>Mérite
           </a>
@@ -334,7 +374,7 @@ require_once __DIR__ . '/../../../layout/header.php';
 
 <?php elseif ($voir_tous): ?>
 <!-- ══ VISUALISATION TOUTE LA CLASSE ══ -->
-<?php $url_cl = url_classe_bull($id_classe, $vue, $id_trim, $id_annee, $ordre); ?>
+<?php $url_cl = url_classe_bull($id_classe, $vue, $id_trim, $id_annee, $ordre, false, $id_serie); ?>
 <div class="card" style="border-color:#c7d8f0">
   <div class="card-header py-2 d-flex align-items-center justify-content-between flex-wrap gap-2" style="background:#f0f4ff">
     <span class="fw-semibold" style="color:#1a3c6b">
@@ -353,9 +393,9 @@ require_once __DIR__ . '/../../../layout/header.php';
       </button>
       <?php endif; ?>
       <?php endif; ?>
-      <a href="?vue=<?= $vue ?>&classe=<?= $id_classe ?>&ordre=<?= $ordre ?>"
+      <a href="?vue=<?= $vue ?>&classe=<?= $id_classe ?>&ordre=<?= $ordre ?><?= $id_serie?"&serie=$id_serie":"" ?>"
          class="btn btn-sm btn-abz-outline"><i class="bi bi-list me-1"></i>Retour liste</a>
-      <a id="lienDlCl" href="<?= h(url_classe_bull($id_classe,$vue,$id_trim,$id_annee,$ordre,true)) ?>"
+      <a id="lienDlCl" href="<?= h(url_classe_bull($id_classe,$vue,$id_trim,$id_annee,$ordre,true,$id_serie)) ?>"
          class="btn btn-sm btn-abz-primary"><i class="bi bi-download me-1"></i>Télécharger PDF</a>
       <button onclick="document.getElementById('iframe-cl').contentWindow.print()"
               class="btn btn-sm btn-abz-outline"><i class="bi bi-printer me-1"></i>Imprimer</button>
@@ -369,7 +409,7 @@ require_once __DIR__ . '/../../../layout/header.php';
 <script>
 function appliquerSigCl() {
   const base = <?= json_encode($url_cl) ?>;
-  const baseDl = <?= json_encode(url_classe_bull($id_classe,$vue,$id_trim,$id_annee,$ordre,true)) ?>;
+  const baseDl = <?= json_encode(url_classe_bull($id_classe,$vue,$id_trim,$id_annee,$ordre,true,$id_serie)) ?>;
   const sig = document.getElementById('chkSigCl').checked;
   const sep = base.includes('?') ? '&' : '?';
   const sepDl = baseDl.includes('?') ? '&' : '?';
@@ -442,11 +482,11 @@ function appliquerSigEl() {
       <span class="fw-normal text-muted"><?= h($label_periode) ?></span>
     </span>
     <div class="d-flex gap-2 flex-wrap">
-      <a href="?vue=<?= $vue ?>&classe=<?= $id_classe ?>&ordre=<?= $ordre ?>&voir_tous=1"
+      <a href="?vue=<?= $vue ?>&classe=<?= $id_classe ?>&ordre=<?= $ordre ?><?= $id_serie?"&serie=$id_serie":"" ?>&voir_tous=1"
          class="btn btn-sm btn-abz-outline">
         <i class="bi bi-eye me-1"></i>Visualiser tous les bulletins
       </a>
-      <a href="<?= h(url_classe_bull($id_classe,$vue,$id_trim,$id_annee,$ordre,true)) ?>"
+      <a href="<?= h(url_classe_bull($id_classe,$vue,$id_trim,$id_annee,$ordre,true,$id_serie)) ?>"
          class="btn btn-sm btn-abz-primary">
         <i class="bi bi-download me-1"></i>Télécharger tous
       </a>

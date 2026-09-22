@@ -176,7 +176,7 @@ function cell2l_c(FPDF $pdf, float $w, float $h, string $fr, string $en, string 
 }
 
 $role     = role_connecte();
-$is_admin = in_array($role, ['ADMIN', 'PROVISEUR', 'CENSEUR']);
+$is_admin = in_array($role, ['ADMIN', 'PROVISEUR', 'FONDATEUR', 'CENSEUR']) || $role === 'MEMBRE_ASSOCIATION';
 $is_ens   = ($role === 'ENSEIGNANT');
 $mat_ens  = $is_ens ? get_matricule_ens_connecte() : null;
 
@@ -186,6 +186,7 @@ $id_classe = (int)($_GET['classe'] ?? 0);
 $id_trim   = (int)($_GET['trim']   ?? 0);
 $id_seq    = (int)($_GET['seq']    ?? 0);
 $id_annee  = (int)($_GET['annee']  ?? 0);
+$id_serie  = (int)($_GET['serie']  ?? 0);
 $ordre     = in_array($_GET['ordre'] ?? '', ['alpha', 'merite']) ? $_GET['ordre'] : 'alpha';
 $dl        = ($_GET['dl'] ?? '0') === '1';
 
@@ -204,14 +205,18 @@ if ($is_ens && $mat_ens) {
     if (!$ok) die('Acces refuse.');
 }
 
-// Élèves de la classe
+// Élèves de la classe — ?serie= restreint l'IMPRESSION à une série/LV2 (classe
+// mixte, ex. 4ème Allemand/Arabe/Espagnol) sans jamais toucher au calcul des
+// rangs/moyennes ci-dessous (`$all_moys`), qui reste basé sur $enrolled_ids
+// (TOUTE la classe) : un bulletin filtré affiche donc le vrai rang de classe.
 $eleves = db_all(
     "SELECT e.id, e.nom, e.prenom FROM eleve e
      JOIN inscription i ON i.id_eleve=e.id AND i.id_classe=? AND i.id_annee=?
-     WHERE e.statut='actif' ORDER BY e.nom, e.prenom",
-    [$id_classe, $id_annee]
+     WHERE e.statut='actif'" . ($id_serie ? ' AND i.id_serie=?' : '') . "
+     ORDER BY e.nom, e.prenom",
+    $id_serie ? [$id_classe, $id_annee, $id_serie] : [$id_classe, $id_annee]
 );
-if (empty($eleves)) die('Aucun eleve dans cette classe.');
+if (empty($eleves)) die('Aucun eleve dans cette classe (pour cette série).');
 
 // ── Trimestre à afficher ────────────────────────────────────────────
 // Chantier APC (voir prompt_continuite_ABZ_MBE_1.md) : le bulletin de classe
@@ -949,10 +954,10 @@ foreach ($eleves as $el) {
     $pdf->Ln(2.5);
     $pdf->SetX($ml + $wDec);
     $pdf->SetFont('Arial', 'B', 8.5);
-    $pdf->Cell($wObs, 5.5, 'LE PROVISEUR,', 0, 1, 'C');
+    $pdf->Cell($wObs, 5.5, u(strtoupper($etab['chef_etablissement'] ?? 'LE PROVISEUR') . ','), 0, 1, 'C');
     $pdf->SetX($ml + $wDec);
     $pdf->SetFont('Arial', 'I', 7.5);
-    $pdf->Cell($wObs, 4.5, 'The Principal', 0, 1, 'C');
+    $pdf->Cell($wObs, 4.5, u($etab['chef_etablissement_en'] ?? 'The Principal'), 0, 1, 'C');
 
     // Signature numérique (uniquement si demandée à l'impression — jamais
     // automatique — et si l'admin en a configuré une dans les paramètres).

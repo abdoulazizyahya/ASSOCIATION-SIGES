@@ -17,12 +17,12 @@ require_once __DIR__ . '/../../../fonctions.php';
 // accès direct par URL pour SG/SECRETAIRE/INTENDANT — jamais proposés dans
 // layout/menu_secondaire.php mais pas bloqués par exiger_connexion() seule
 // côté source. N'enlève rien aux rôles qui utilisent réellement Notes.
-exiger_role(['ADMIN', 'PROVISEUR', 'CENSEUR', 'ENSEIGNANT']);
+exiger_role(['ADMIN', 'PROVISEUR', 'FONDATEUR', 'CENSEUR', 'ENSEIGNANT']);
 
 auto_activer_sequences();
 
 $role        = role_connecte();
-$is_admin    = in_array($role, ['ADMIN','PROVISEUR','CENSEUR']);
+$is_admin    = in_array($role, ['ADMIN','PROVISEUR', 'FONDATEUR','CENSEUR']) || $role === 'MEMBRE_ASSOCIATION';
 $is_ens      = ($role === 'ENSEIGNANT');
 $onglet      = $_GET['onglet'] ?? 'classe';
 $annee_act   = get_annee_active();
@@ -92,13 +92,25 @@ $id_cl_c   = (int)($_GET['classe_c'] ?? 0);
 $id_mat_c  = (int)($_GET['mat_c']    ?? 0);
 $id_trim_c = $is_admin ? (int)($_GET['trim_c'] ?? ($trim_actif['id'] ?? 0)) : (int)($trim_actif['id'] ?? 0);
 $id_comp_c = (int)($_GET['comp_c'] ?? 0);
+$id_serie_c = (int)($_GET['serie_c'] ?? 0);
 $eleves_c  = [];
 $mats_c    = [];
 $comps_c   = [];
+$series_c  = [];
 $classe_c_info = $id_cl_c ? db_one("SELECT * FROM classe WHERE id=?", [$id_cl_c]) : null;
 
 if ($onglet === 'classe') {
     if ($id_cl_c) {
+        // Séries (LV2) réellement présentes parmi les élèves inscrits dans
+        // cette classe — permet de filtrer une classe mixte (ex. 4ème :
+        // Allemand/Arabe/Espagnol dans une même classe physique).
+        $series_c = db_all(
+            "SELECT DISTINCT s.id, s.libelle FROM inscription i
+             JOIN serie s ON s.id=i.id_serie
+             WHERE i.id_classe=? AND i.id_annee=? ORDER BY s.libelle",
+            [$id_cl_c, $id_annee]
+        );
+        if ($id_serie_c && !in_array($id_serie_c, array_column($series_c, 'id'))) $id_serie_c = 0;
         // Matieres : filtrées pour enseignant
         if ($is_ens && $mat_ens) {
             $mats_c = db_all(
@@ -128,14 +140,17 @@ if ($onglet === 'classe') {
     }
     if ($id_cl_c && $id_mat_c && $id_comp_c) {
         $eleves_c = db_all(
-            "SELECT e.id, e.nom, e.prenom, e.matricule, e.niu,
+            "SELECT e.id, e.nom, e.prenom, e.matricule, e.niu, s.libelle AS serie,
                     n.valeur AS note, n.id AS id_note
              FROM eleve e
              JOIN inscription i ON i.id_eleve=e.id AND i.id_annee=? AND i.id_classe=?
+             LEFT JOIN serie s ON s.id=i.id_serie
              LEFT JOIN note n ON n.id_eleve=e.id AND n.id_matiere=? AND n.id_competence=?
-             WHERE e.statut='actif'
+             WHERE e.statut='actif'" . ($id_serie_c ? ' AND i.id_serie=?' : '') . "
              ORDER BY e.nom, e.prenom",
-            [$id_annee, $id_cl_c, $id_mat_c, $id_comp_c]
+            $id_serie_c
+                ? [$id_annee, $id_cl_c, $id_mat_c, $id_comp_c, $id_serie_c]
+                : [$id_annee, $id_cl_c, $id_mat_c, $id_comp_c]
         );
     }
 
@@ -619,6 +634,19 @@ async function ajaxSelectReload(selectEl, containerId) {
           <?php endforeach; ?>
         </select>
       </div>
+      <?php if ($id_cl_c && $series_c): ?>
+      <div class="col-md-3">
+        <label class="form-label fw-semibold">Série / LV2</label>
+        <select name="serie_c" class="form-select" onchange="ajaxSelectReload(this,'saisie-classe-dynamic')">
+          <option value="">— Toutes —</option>
+          <?php foreach ($series_c as $s): ?>
+            <option value="<?= $s['id'] ?>" <?= $id_serie_c==$s['id']?'selected':''?>>
+              <?= h($s['libelle']) ?>
+            </option>
+          <?php endforeach; ?>
+        </select>
+      </div>
+      <?php endif; ?>
       <?php if ($id_cl_c && $mats_c): ?>
       <div class="col-md-4">
         <label class="form-label fw-semibold">Matière</label>
@@ -687,6 +715,7 @@ async function ajaxSelectReload(selectEl, containerId) {
             <th style="width:40px">N°</th>
             <th>Nom et Prénom</th>
             <th style="width:100px">NIU</th>
+            <?php if ($series_c): ?><th style="width:100px">Série</th><?php endif; ?>
             <th style="width:120px" class="text-center">Note /20</th>
             <th style="width:60px" class="text-center">Cote</th>
             <th style="width:50px" class="text-center">
@@ -704,6 +733,7 @@ async function ajaxSelectReload(selectEl, containerId) {
             <td class="text-muted"><?= $i+1 ?></td>
             <td class="fw-semibold"><?= h(strtoupper($el['nom']).' '.($el['prenom']??'')) ?></td>
             <td class="text-muted" style="font-size:.78rem"><?= h(id_affichage_eleve($el)) ?></td>
+            <?php if ($series_c): ?><td style="font-size:.75rem"><?= h($el['serie'] ?? '—') ?></td><?php endif; ?>
             <td>
               <input type="number" name="notes[<?= $el['id'] ?>]"
                      class="form-control form-control-sm note-inp text-center"

@@ -210,7 +210,7 @@ function trimestre_court_c(int $position): string {
 }
 
 $role     = role_connecte();
-$is_admin = in_array($role, ['ADMIN', 'PROVISEUR', 'CENSEUR']);
+$is_admin = in_array($role, ['ADMIN', 'PROVISEUR', 'FONDATEUR', 'CENSEUR']) || $role === 'MEMBRE_ASSOCIATION';
 $is_ens   = ($role === 'ENSEIGNANT');
 $mat_ens  = $is_ens ? get_matricule_ens_connecte() : null;
 
@@ -218,6 +218,7 @@ if (!$is_admin && !$is_ens) die('Acces non autorise.');
 
 $id_classe = (int)($_GET['classe'] ?? 0);
 $id_annee  = (int)($_GET['annee']  ?? 0);
+$id_serie  = (int)($_GET['serie']  ?? 0);
 $ordre     = in_array($_GET['ordre'] ?? '', ['alpha', 'merite']) ? $_GET['ordre'] : 'alpha';
 $dl        = ($_GET['dl'] ?? '0') === '1';
 
@@ -235,14 +236,18 @@ if ($is_ens && $mat_ens) {
     if (!$ok) die('Acces refuse.');
 }
 
-// Élèves de la classe
+// Élèves de la classe — ?serie= restreint l'IMPRESSION à une série/LV2 (classe
+// mixte) sans toucher au calcul des rangs/moyennes ci-dessous (`$all_moys`),
+// basé sur $enrolled_ids (TOUTE la classe) : un bulletin filtré affiche donc
+// le vrai rang de classe. Même principe que pdf_classe.php (bulletin trimestriel).
 $eleves = db_all(
     "SELECT e.id, e.nom, e.prenom FROM eleve e
      JOIN inscription i ON i.id_eleve=e.id AND i.id_classe=? AND i.id_annee=?
-     WHERE e.statut='actif' ORDER BY e.nom, e.prenom",
-    [$id_classe, $id_annee]
+     WHERE e.statut='actif'" . ($id_serie ? ' AND i.id_serie=?' : '') . "
+     ORDER BY e.nom, e.prenom",
+    $id_serie ? [$id_classe, $id_annee, $id_serie] : [$id_classe, $id_annee]
 );
-if (empty($eleves)) die('Aucun eleve dans cette classe.');
+if (empty($eleves)) die('Aucun eleve dans cette classe (pour cette série).');
 
 // ── Trimestres de l'année (toujours 3 colonnes) — chantier APC (voir
 // secondaire/pages/bulletins/pdf_annuel.php pour l'explication, même logique) : complété
@@ -1153,10 +1158,10 @@ foreach ($eleves as $el) {
     $pdf->Ln(2.5);
     $pdf->SetX($ml + $wDec);
     $pdf->SetFont('Arial', 'B', 8.5);
-    $pdf->Cell($wObs, 5.5, 'LE PROVISEUR,', 0, 1, 'C');
+    $pdf->Cell($wObs, 5.5, u(strtoupper($etab['chef_etablissement'] ?? 'LE PROVISEUR') . ','), 0, 1, 'C');
     $pdf->SetX($ml + $wDec);
     $pdf->SetFont('Arial', 'I', 7.5);
-    $pdf->Cell($wObs, 4.5, 'The Principal', 0, 1, 'C');
+    $pdf->Cell($wObs, 4.5, u($etab['chef_etablissement_en'] ?? 'The Principal'), 0, 1, 'C');
 
     // Signature numérique (uniquement si demandée à l'impression — jamais
     // automatique — et si l'admin en a configuré une dans les paramètres).
