@@ -13,6 +13,7 @@ $id_annee = (int) ($annee['id'] ?? 0);
 
 $q         = trim($_GET['q'] ?? '');
 $id_classe = (int) ($_GET['classe'] ?? 0);
+$id_serie  = (int) ($_GET['serie'] ?? 0);
 $statut    = ($_GET['statut'] ?? 'actif') === 'desactive' ? 'desactive' : 'actif';
 $page      = max(1, (int) ($_GET['page'] ?? 1));
 $pp        = 25;
@@ -26,6 +27,7 @@ if ($q !== '') {
     $params   = array_merge($params, [$like, $like, $like, $like]);
 }
 if ($id_classe) { $where[] = 'i.id_classe = ?'; $params[] = $id_classe; }
+if ($id_serie)  { $where[] = 'i.id_serie = ?';  $params[] = $id_serie; }
 $sql_where = 'WHERE ' . implode(' AND ', $where);
 
 $total = (int) db_val(
@@ -36,10 +38,11 @@ $total = (int) db_val(
     array_merge([$id_annee], $params)
 );
 $eleves = db_all(
-    "SELECT e.*, c.designation AS classe
+    "SELECT e.*, c.designation AS classe, s.libelle AS serie
      FROM eleve e
      LEFT JOIN inscription i ON i.id_eleve=e.id AND i.id_annee=?
      LEFT JOIN classe c ON c.id=i.id_classe
+     LEFT JOIN serie s ON s.id=i.id_serie
      $sql_where
      ORDER BY e.nom, e.prenom
      LIMIT $pp OFFSET $offset",
@@ -53,9 +56,11 @@ $classes = db_all(
      FROM classe c WHERE c.archivee=0 ORDER BY c.ordre, c.designation",
     [$id_annee]
 );
+$series = db_all("SELECT * FROM serie ORDER BY libelle");
 $nb_pages = max(1, (int) ceil($total / $pp));
 $base = APP_URL . '/secondaire/pages/eleves/liste.php?' . http_build_query(array_filter([
-    'q' => $q, 'classe' => $id_classe ?: null, 'statut' => $statut !== 'actif' ? $statut : null,
+    'q' => $q, 'classe' => $id_classe ?: null, 'serie' => $id_serie ?: null,
+    'statut' => $statut !== 'actif' ? $statut : null,
 ]));
 
 $titre_page = 'Élèves';
@@ -68,7 +73,7 @@ require_once __DIR__ . '/../../../layout/header.php';
     <div class="sub"><?= $total ?> élève(s) <?= $statut === 'actif' ? 'actif(s)' : 'désactivé(s)' ?></div>
   </div>
   <div class="d-flex gap-2">
-    <?php if (in_array(role_connecte(), ['ADMIN', 'PROVISEUR', 'SECRETAIRE'], true)): ?>
+    <?php if (in_array(role_connecte(), ['ADMIN', 'PROVISEUR', 'FONDATEUR', 'SECRETAIRE'], true)): ?>
     <a href="<?= APP_URL ?>/secondaire/pages/eleves/import.php" class="btn btn-outline-primary btn-sm" data-ajax-nav>
       <i class="bi bi-file-earmark-excel me-1"></i>Importer
     </a>
@@ -82,7 +87,7 @@ require_once __DIR__ . '/../../../layout/header.php';
 <?= flash_html() ?>
 
 <ul class="nav nav-tabs mb-2">
-  <?php $qs_tab = array_filter(['q' => $q, 'classe' => $id_classe ?: null]); ?>
+  <?php $qs_tab = array_filter(['q' => $q, 'classe' => $id_classe ?: null, 'serie' => $id_serie ?: null]); ?>
   <li class="nav-item">
     <a class="nav-link <?= $statut === 'actif' ? 'active' : '' ?>" href="?<?= http_build_query($qs_tab) ?>">
       <i class="bi bi-check-circle me-1"></i>Actifs
@@ -106,7 +111,7 @@ require_once __DIR__ . '/../../../layout/header.php';
           <input type="text" name="q" class="form-control" placeholder="Nom, NIU, matricule…" value="<?= h($q) ?>">
         </div>
       </div>
-      <div class="col-md-4">
+      <div class="col-md-3">
         <label class="form-label">Classe</label>
         <select name="classe" class="form-select form-select-sm" onchange="this.form.submit()">
           <option value="">— Toutes les classes —</option>
@@ -117,10 +122,21 @@ require_once __DIR__ . '/../../../layout/header.php';
           <?php endforeach; ?>
         </select>
       </div>
+      <div class="col-md-2">
+        <label class="form-label">Série / LV2</label>
+        <select name="serie" class="form-select form-select-sm" onchange="this.form.submit()">
+          <option value="">— Toutes —</option>
+          <?php foreach ($series as $s): ?>
+            <option value="<?= (int) $s['id'] ?>" <?= $id_serie === (int) $s['id'] ? 'selected' : '' ?>>
+              <?= h($s['libelle']) ?>
+            </option>
+          <?php endforeach; ?>
+        </select>
+      </div>
       <?php if ($statut !== 'actif'): ?><input type="hidden" name="statut" value="<?= h($statut) ?>"><?php endif; ?>
       <div class="col-auto d-flex gap-1">
         <button class="btn btn-primary btn-sm"><i class="bi bi-search"></i></button>
-        <?php if ($q || $id_classe): ?>
+        <?php if ($q || $id_classe || $id_serie): ?>
           <a href="<?= APP_URL ?>/secondaire/pages/eleves/liste.php" class="btn btn-outline-secondary btn-sm"><i class="bi bi-x-lg"></i></a>
         <?php endif; ?>
       </div>
@@ -152,6 +168,17 @@ require_once __DIR__ . '/../../../layout/header.php';
         <i class="bi bi-arrow-left-right me-1"></i>Transférer
       </button>
     </div>
+    <div class="d-flex align-items-center gap-1">
+      <select id="selSerieCible" class="form-select form-select-sm" style="width:auto;max-width:200px">
+        <option value="">— Aucune série —</option>
+        <?php foreach ($series as $s): ?>
+          <option value="<?= (int) $s['id'] ?>"><?= h($s['libelle']) ?></option>
+        <?php endforeach; ?>
+      </select>
+      <button type="button" class="btn btn-sm btn-outline-primary" onclick="masseAffecterSerie()">
+        <i class="bi bi-translate me-1"></i>Affecter série/LV2
+      </button>
+    </div>
     <button type="button" class="btn btn-sm btn-outline-danger ms-auto" onclick="masseSupprimer()">
       <i class="bi bi-trash me-1"></i>Supprimer définitivement
     </button>
@@ -175,13 +202,14 @@ require_once __DIR__ . '/../../../layout/header.php';
           <th>Matricule</th>
           <th>Sexe</th>
           <th>Classe</th>
+          <th>Série/LV2</th>
           <th>Date naiss.</th>
           <th class="text-end">Actions</th>
         </tr>
       </thead>
       <tbody>
         <?php if (empty($eleves)): ?>
-          <tr><td colspan="8" class="text-center text-muted py-4">
+          <tr><td colspan="9" class="text-center text-muted py-4">
             <i class="bi bi-inbox" style="font-size:2rem;opacity:.3;display:block;margin-bottom:.4rem"></i>
             Aucun élève trouvé.
           </td></tr>
@@ -198,6 +226,7 @@ require_once __DIR__ . '/../../../layout/header.php';
             <td><span class="badge-code"><?= h($e['matricule']) ?></span></td>
             <td><?= $e['sexe'] === 'F' ? '<span class="badge-f">F</span>' : '<span class="badge-m">M</span>' ?></td>
             <td style="font-size:.78rem"><?= h($e['classe'] ?? '—') ?></td>
+            <td style="font-size:.78rem"><?= $e['serie'] ? h($e['serie']) : '<span class="text-muted">—</span>' ?></td>
             <td style="font-size:.78rem;color:#6b7280"><?= h(date_fr($e['date_naiss'])) ?></td>
             <td>
               <div class="d-flex justify-content-end gap-1">
@@ -290,6 +319,13 @@ function masseTransferer() {
   if (!sel.value) { alert('Choisissez une classe de destination.'); return; }
   if (confirm('Transférer ' + getCheckedIds().length + ' élève(s) vers ' + sel.options[sel.selectedIndex].text.trim() + ' ?')) {
     masseSubmit('<?= APP_URL ?>/secondaire/pages/eleves/transferer_masse.php', { id_classe_cible: sel.value });
+  }
+}
+function masseAffecterSerie() {
+  var sel = document.getElementById('selSerieCible');
+  var libelle = sel.value ? sel.options[sel.selectedIndex].text.trim() : 'Aucune série';
+  if (confirm('Affecter la série « ' + libelle + ' » à ' + getCheckedIds().length + ' élève(s) ?')) {
+    masseSubmit('<?= APP_URL ?>/secondaire/pages/eleves/affecter_serie_masse.php', { id_serie_cible: sel.value });
   }
 }
 </script>
