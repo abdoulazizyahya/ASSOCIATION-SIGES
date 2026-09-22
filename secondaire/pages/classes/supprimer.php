@@ -5,7 +5,7 @@
 require_once __DIR__ . '/../../../config.php';
 require_once __DIR__ . '/../../../connexion.php';
 require_once __DIR__ . '/../../../fonctions.php';
-exiger_role(['ADMIN', 'PROVISEUR']);
+exiger_role(['ADMIN', 'PROVISEUR', 'FONDATEUR']);
 csrf_verifier();
 
 $id = (int) ($_GET['id'] ?? 0);

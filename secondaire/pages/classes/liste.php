@@ -10,15 +10,21 @@
 require_once __DIR__ . '/../../../config.php';
 require_once __DIR__ . '/../../../connexion.php';
 require_once __DIR__ . '/../../../fonctions.php';
-exiger_role(['ADMIN', 'PROVISEUR', 'CENSEUR']);
+exiger_role(['ADMIN', 'PROVISEUR', 'FONDATEUR', 'CENSEUR']);
 
 $annee    = get_annee_active();
 $id_annee = (int) ($annee['id'] ?? 0);
 
+// Onglet « Classes » (actives, défaut) / « Classes archivées » — même page,
+// juste le filtre archivee qui change (0 ou 1) ; demande explicite du
+// 17/09/2026 (les classes archivées n'étaient visibles nulle part avant).
+$onglet        = ($_GET['onglet'] ?? 'actives') === 'archivees' ? 'archivees' : 'actives';
+$val_archivee  = $onglet === 'archivees' ? 1 : 0;
+
 $f_section = trim($_GET['section'] ?? '');
 $f_niveau  = trim($_GET['niveau'] ?? '');
 
-$where  = ['c.archivee=0'];
+$where  = ["c.archivee=$val_archivee"];
 $params = [$id_annee, $id_annee, $id_annee];
 if ($f_section) { $where[] = 'c.libelle_section=?'; $params[] = $f_section; }
 if ($f_niveau)  { $where[] = 'c.code_niveau=?'; $params[] = $f_niveau; }
@@ -34,7 +40,8 @@ $classes = db_all(
        (SELECT SUM(e2.sexe='M') FROM inscription i2 JOIN eleve e2 ON e2.id=i2.id_eleve
         WHERE i2.id_classe=c.id AND i2.id_annee=? AND e2.statut='actif') AS nb_m,
        (SELECT SUM(e3.sexe='F') FROM inscription i3 JOIN eleve e3 ON e3.id=i3.id_eleve
-        WHERE i3.id_classe=c.id AND i3.id_annee=? AND e3.statut='actif') AS nb_f
+        WHERE i3.id_classe=c.id AND i3.id_annee=? AND e3.statut='actif') AS nb_f,
+       (SELECT COUNT(*) FROM inscription i4 WHERE i4.id_classe=c.id) AS nb_inscrits_total
      FROM classe c
      LEFT JOIN niveau n ON n.code_niveau=c.code_niveau
      LEFT JOIN serie s  ON s.id=c.id_serie
@@ -46,7 +53,7 @@ $classes = db_all(
 
 $sections = db_all("SELECT * FROM section_classe ORDER BY libelle_section");
 $niv_params = [];
-$niv_where  = 'c.archivee=0';
+$niv_where  = "c.archivee=$val_archivee";
 if ($f_section) { $niv_where .= ' AND c.libelle_section=?'; $niv_params[] = $f_section; }
 $niveaux_dispo = db_all(
     "SELECT DISTINCT n.code_niveau, n.libelle_niv
@@ -62,18 +69,34 @@ require_once __DIR__ . '/../../../layout/header.php';
 <div class="page-titre d-flex justify-content-between align-items-center">
   <div>
     <h4><i class="bi bi-door-open me-1 text-primary"></i>Classes</h4>
-    <div class="sub"><?= count($classes) ?> classe(s)</div>
+    <div class="sub"><?= count($classes) ?> classe(s)<?= $onglet === 'archivees' ? ' archivée(s)' : '' ?></div>
   </div>
+  <?php if ($onglet !== 'archivees'): ?>
   <a href="<?= APP_URL ?>/secondaire/pages/classes/form.php" class="btn btn-primary btn-sm">
     <i class="bi bi-plus-lg me-1"></i>Nouvelle classe
   </a>
+  <?php endif; ?>
 </div>
+
+<ul class="nav nav-tabs mb-3" style="font-size:.88rem">
+  <li class="nav-item">
+    <a class="nav-link <?= $onglet === 'actives' ? 'active' : '' ?>" href="<?= APP_URL ?>/secondaire/pages/classes/liste.php">
+      <i class="bi bi-door-open me-1"></i>Classes
+    </a>
+  </li>
+  <li class="nav-item">
+    <a class="nav-link <?= $onglet === 'archivees' ? 'active' : '' ?>" href="<?= APP_URL ?>/secondaire/pages/classes/liste.php?onglet=archivees">
+      <i class="bi bi-archive me-1"></i>Classes archivées
+    </a>
+  </li>
+</ul>
 
 <?= flash_html() ?>
 
 <div class="card mb-2">
   <div class="card-body py-2">
     <form method="get" class="row g-2 align-items-end">
+      <?php if ($onglet === 'archivees'): ?><input type="hidden" name="onglet" value="archivees"><?php endif; ?>
       <div class="col-md-3">
         <label class="form-label">Section</label>
         <select name="section" class="form-select form-select-sm" onchange="this.form.submit()">
@@ -98,7 +121,8 @@ require_once __DIR__ . '/../../../layout/header.php';
       </div>
       <?php if ($f_section || $f_niveau): ?>
         <div class="col-auto">
-          <a href="<?= APP_URL ?>/secondaire/pages/classes/liste.php" class="btn btn-outline-secondary btn-sm"><i class="bi bi-x-lg"></i></a>
+          <a href="<?= APP_URL ?>/secondaire/pages/classes/liste.php<?= $onglet === 'archivees' ? '?onglet=archivees' : '' ?>"
+             class="btn btn-outline-secondary btn-sm"><i class="bi bi-x-lg"></i></a>
         </div>
       <?php endif; ?>
     </form>
@@ -151,6 +175,29 @@ foreach ($classes as $c) {
                  class="btn btn-sm" style="background:#eef2ff;color:#1e4fd8;padding:3px 7px" title="Élèves">
                 <i class="bi bi-people" style="font-size:.78rem"></i>
               </a>
+              <?php if ($onglet === 'archivees'): ?>
+              <a href="<?= APP_URL ?>/secondaire/pages/classes/restaurer.php?id=<?= (int) $c['id'] ?>&csrf=<?= csrf_generer() ?>"
+                 class="btn btn-sm btn-light text-success" style="padding:3px 7px" title="Désarchiver"
+                 onclick="return confirm('Désarchiver cette classe et la rendre à nouveau active ?')">
+                <i class="bi bi-arrow-counterclockwise" style="font-size:.78rem"></i>
+              </a>
+              <?php if ((int) $c['nb_inscrits_total'] > 0): ?>
+              <span class="btn btn-sm btn-light text-muted disabled" style="padding:3px 7px;opacity:.4"
+                    title="Suppression impossible : <?= (int) $c['nb_inscrits_total'] ?> inscription(s) enregistrée(s) dans cette classe">
+                <i class="bi bi-trash" style="font-size:.78rem"></i>
+              </span>
+              <?php else: ?>
+              <a href="<?= APP_URL ?>/secondaire/pages/classes/supprimer_definitif.php?id=<?= (int) $c['id'] ?>&csrf=<?= csrf_generer() ?>"
+                 class="btn btn-sm btn-light text-danger" style="padding:3px 7px" title="Supprimer définitivement"
+                 onclick="return confirm('Supprimer définitivement cette classe ? Action irréversible (aucun élève n\'y a jamais été inscrit).')">
+                <i class="bi bi-trash" style="font-size:.78rem"></i>
+              </a>
+              <?php endif; ?>
+              <?php else: ?>
+              <a href="<?= APP_URL ?>/secondaire/pages/classes/transferer.php?id=<?= (int) $c['id'] ?>"
+                 class="btn btn-sm btn-light" style="padding:3px 7px" title="Transférer les élèves vers une autre classe">
+                <i class="bi bi-arrow-left-right" style="font-size:.78rem"></i>
+              </a>
               <a href="<?= APP_URL ?>/secondaire/pages/classes/form.php?id=<?= (int) $c['id'] ?>"
                  class="btn btn-sm btn-light" style="padding:3px 7px" title="Modifier">
                 <i class="bi bi-pencil" style="font-size:.78rem"></i>
@@ -160,6 +207,7 @@ foreach ($classes as $c) {
                  onclick="return confirm('Archiver cette classe ?')">
                 <i class="bi bi-archive" style="font-size:.78rem"></i>
               </a>
+              <?php endif; ?>
             </td>
           </tr>
           <?php endforeach; ?>
@@ -173,7 +221,7 @@ foreach ($classes as $c) {
 <?php if (empty($classes)): ?>
   <div class="alert alert-light text-muted text-center py-4">
     <i class="bi bi-inbox" style="font-size:2rem;display:block;opacity:.3;margin-bottom:.5rem"></i>
-    Aucune classe trouvée.
+    <?= $onglet === 'archivees' ? 'Aucune classe archivée.' : 'Aucune classe trouvée.' ?>
   </div>
 <?php endif; ?>
 
