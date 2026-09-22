@@ -16,7 +16,7 @@ require_once __DIR__ . '/../../../fonctions.php';
 exiger_connexion();
 
 $role     = role_connecte();
-$is_admin = in_array($role, ['ADMIN', 'PROVISEUR', 'CENSEUR']);
+$is_admin = in_array($role, ['ADMIN', 'PROVISEUR', 'FONDATEUR', 'CENSEUR']) || $role === 'MEMBRE_ASSOCIATION';
 $is_ens   = ($role === 'ENSEIGNANT');
 $mat_ens  = $is_ens ? get_matricule_ens_connecte() : null;
 if (!$is_admin && !$is_ens) { flash_set('erreur', 'Accès non autorisé.'); rediriger('dashboard.php'); }

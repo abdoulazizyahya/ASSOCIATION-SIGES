@@ -27,9 +27,9 @@ if ($role === 'ENSEIGNANT') {
     $demandes = db_all(
         "SELECT * FROM demande_document WHERE matricule_ens=? ORDER BY date_demande DESC", [$mat]
     );
-} elseif (in_array($role, ['CENSEUR','PROVISEUR','ADMIN'])) {
+} elseif (in_array($role, ['CENSEUR','PROVISEUR', 'FONDATEUR','ADMIN'])) {
     // File d'attente pertinente pour ce rôle
-    $statut_attendu = $role === 'PROVISEUR' ? 'en_attente_proviseur' : 'en_attente_censeur';
+    $statut_attendu = in_array($role, ['PROVISEUR', 'FONDATEUR'], true) ? 'en_attente_proviseur' : 'en_attente_censeur';
     if ($role === 'ADMIN') {
         $file_attente = db_all(
             "SELECT d.*, e.nom_ens, e.prenom_ens, e.civilite_ens
@@ -153,8 +153,8 @@ require_once __DIR__ . '/../../../layout/header.php';
           <?php foreach ($file_attente as $d):
             [$lib_statut, $classe, $icone] = libelle_statut_demande($d['statut']);
             $peut_agir = $role === 'ADMIN'
-                || ($role === 'CENSEUR'   && $d['statut'] === 'en_attente_censeur')
-                || ($role === 'PROVISEUR' && $d['statut'] === 'en_attente_proviseur');
+                || ($role === 'CENSEUR' && $d['statut'] === 'en_attente_censeur')
+                || (in_array($role, ['PROVISEUR', 'FONDATEUR'], true) && $d['statut'] === 'en_attente_proviseur');
           ?>
           <tr>
             <td class="fw-semibold"><?= h(($d['civilite_ens']?$d['civilite_ens'].' ':'').strtoupper($d['nom_ens']).' '.($d['prenom_ens']??'')) ?></td>

@@ -7,7 +7,10 @@ exiger_connexion();
 $role = role_connecte();
 $user = utilisateur_connecte();
 
-$full_access = in_array($role, ['ADMIN', 'CENSEUR']);
+// PROVISEUR/FONDATEUR ajoutés le 18/09/2026 — même accès que index.php
+// (voir commentaire là-bas : oubli constaté, le chef d'établissement ne
+// pouvait ni voir ni enregistrer de discipline pour sa propre école).
+$full_access = in_array($role, ['ADMIN', 'CENSEUR', 'PROVISEUR', 'FONDATEUR']);
 $annee_act   = get_annee_active();
 $id_annee    = (int)($annee_act['id'] ?? 0);
 $val_annee   = $annee_act['libelle'] ?? '';

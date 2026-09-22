@@ -17,7 +17,7 @@ function u(string $s): string {
 }
 
 $role     = role_connecte();
-$is_admin = in_array($role, ['ADMIN', 'PROVISEUR', 'CENSEUR']);
+$is_admin = in_array($role, ['ADMIN', 'PROVISEUR', 'FONDATEUR', 'CENSEUR']) || $role === 'MEMBRE_ASSOCIATION';
 $is_ens   = ($role === 'ENSEIGNANT');
 $mat_ens  = $is_ens ? get_matricule_ens_connecte() : null;
 if (!$is_admin && !$is_ens) die('Acces non autorise.');
@@ -395,7 +395,7 @@ $pdf->Ln(2);
 $y_sig = $pdf->GetY();
 $pdf->SetFont('Arial', 'BU', 9);
 $pdf->Cell($uw / 2, 5, u('SIGNATURE DU PROFESSEUR PRINCIPAL,'), 0, 0, 'C');
-$pdf->Cell($uw / 2, 5, u('LE PROVISEUR,'), 0, 1, 'C');
+$pdf->Cell($uw / 2, 5, u(strtoupper($etab['chef_etablissement'] ?? 'LE PROVISEUR') . ','), 0, 1, 'C');
 
 if (($_GET['signature'] ?? '0') === '1') {
     $sig_w = 22;

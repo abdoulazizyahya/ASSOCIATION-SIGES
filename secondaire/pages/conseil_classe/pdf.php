@@ -11,7 +11,7 @@ require_once __DIR__ . '/../../../fonctions.php';
 exiger_connexion();
 
 $role = role_connecte();
-$full_access = in_array($role, ['ADMIN', 'CENSEUR', 'PROVISEUR']);
+$full_access = in_array($role, ['ADMIN', 'CENSEUR', 'PROVISEUR', 'FONDATEUR']) || $role === 'MEMBRE_ASSOCIATION';
 $annee_act   = get_annee_active();
 $id_annee    = (int)($annee_act['id'] ?? 0);
 $val_annee   = $annee_act['libelle'] ?? '';

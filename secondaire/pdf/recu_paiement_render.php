@@ -114,7 +114,7 @@ function recu_paiement_dessiner_copie(
     $pdf->SetXY($xi, $y_signature_ligne);
     $pdf->Cell($wi * 0.4, 4.5, pdf_u("L'INTENDANT"), 0, 0, 'C');
     $pdf->Cell($wi * 0.2, 4.5, '', 0, 0);
-    $pdf->Cell($wi * 0.4, 4.5, pdf_u('LE PROVISEUR'), 0, 1, 'C');
+    $pdf->Cell($wi * 0.4, 4.5, pdf_u(strtoupper($etab['chef_etablissement'] ?? 'LE PROVISEUR')), 0, 1, 'C');
 
     // Signatures positionnées en % du cadre COMPLET ($x0/$y0/$w0/$h0), pas du
     // curseur courant — mémorisation stable indépendante du nombre de lignes

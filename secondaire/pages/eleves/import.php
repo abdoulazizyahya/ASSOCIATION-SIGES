@@ -16,7 +16,7 @@ require_once __DIR__ . '/../../../connexion.php';
 require_once __DIR__ . '/../../../fonctions.php';
 require_once __DIR__ . '/../../../vendor/autoload.php';
 require_once __DIR__ . '/../../../bd/lib/lieux_normalisation.php';
-exiger_role(['ADMIN', 'PROVISEUR', 'SECRETAIRE']);
+exiger_role(['ADMIN', 'PROVISEUR', 'FONDATEUR', 'SECRETAIRE']);
 session_init();
 
 use PhpOffice\PhpSpreadsheet\Cell\Coordinate;

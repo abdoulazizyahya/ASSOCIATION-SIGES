@@ -20,7 +20,7 @@ $role = role_connecte();
 
 // ── Accès : ADMIN/CENSEUR/PROVISEUR (toutes classes), SG (sa classe),
 //    ENSEIGNANT principal (sa classe) — même politique que le module Discipline. ──
-$full_access = in_array($role, ['ADMIN', 'CENSEUR', 'PROVISEUR']);
+$full_access = in_array($role, ['ADMIN', 'CENSEUR', 'PROVISEUR', 'FONDATEUR']) || $role === 'MEMBRE_ASSOCIATION';
 $annee_act   = get_annee_active();
 $id_annee    = (int)($annee_act['id'] ?? 0);
 $val_annee   = $annee_act['libelle'] ?? '';

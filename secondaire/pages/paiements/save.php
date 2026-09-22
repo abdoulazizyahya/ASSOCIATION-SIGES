@@ -2,7 +2,7 @@
 require_once __DIR__ . '/../../../config.php';
 require_once __DIR__ . '/../../../connexion.php';
 require_once __DIR__ . '/../../../fonctions.php';
-exiger_role(['ADMIN','PROVISEUR','CENSEUR','INTENDANT']);
+exiger_role(['ADMIN','PROVISEUR', 'FONDATEUR','CENSEUR','INTENDANT']);
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     rediriger('secondaire/pages/paiements/index.php');
@@ -65,7 +65,7 @@ foreach ($obligations_cochees as $id_obligation) {
     db_exec(
         "INSERT INTO paiement_frais (id_eleve, id_classe, id_annee, id_obligation, id_operateur, montant, ref_paiement, date_paiement, id_utilisateur, numero_recu)
          VALUES (?,?,?,?,?,?,?,?,?,?)",
-        [$id_eleve, $id_classe, $id_annee, $id_obligation, $id_operateur, $solde, $ref_paiement, $date_paiement, (int)$_SESSION['user_id'], $numero_recu]
+        [$id_eleve, $id_classe, $id_annee, $id_obligation, $id_operateur, $solde, $ref_paiement, $date_paiement, $_SESSION['user_id'] ?? null, $numero_recu]
     );
     $nb_ok++;
     $recus[] = $numero_recu;

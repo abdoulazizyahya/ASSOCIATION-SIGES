@@ -6,7 +6,7 @@ require_once __DIR__ . '/../../../fonctions.php';
 exiger_connexion();
 
 $role      = role_connecte();
-$is_admin  = in_array($role, ['ADMIN','PROVISEUR','CENSEUR']);
+$is_admin  = in_array($role, ['ADMIN','PROVISEUR', 'FONDATEUR','CENSEUR']) || $role === 'MEMBRE_ASSOCIATION';
 $is_ens    = ($role === 'ENSEIGNANT');
 $mat_ens   = $is_ens ? get_matricule_ens_connecte() : null;
 
@@ -87,9 +87,10 @@ $eleves = [];
 $nb_inscrits = 0;
 if ($id_classe && $id_matiere && $id_seq) {
     $eleves_raw = db_all(
-        "SELECT e.id, e.nom, e.prenom, e.matricule
+        "SELECT e.id, e.nom, e.prenom, e.matricule, s.libelle AS serie
          FROM eleve e
          JOIN inscription i ON i.id_eleve=e.id AND i.id_classe=? AND i.id_annee=?
+         LEFT JOIN serie s ON s.id=i.id_serie
          WHERE e.statut='actif' ORDER BY e.nom, e.prenom",
         [$id_classe, $id_annee]
     );
@@ -211,6 +212,7 @@ require_once __DIR__ . '/../../../layout/header.php';
           <tr>
             <th>N°</th>
             <th>Nom et Prénom</th>
+            <th style="width:90px">Série</th>
             <th style="width:90px">Note</th>
             <th style="width:120px">Statut</th>
             <th style="width:90px" class="text-center">Justifiée</th>
@@ -226,6 +228,7 @@ require_once __DIR__ . '/../../../layout/header.php';
           <tr class="<?= $tr_class ?>">
             <td class="text-muted"><?= $i+1 ?></td>
             <td class="fw-semibold"><?= h(strtoupper($el['nom']).' '.($el['prenom']??'')) ?></td>
+            <td style="font-size:.78rem"><?= $el['serie'] ? h($el['serie']) : '<span class="text-muted">—</span>' ?></td>
             <td><?= $el['a_note'] ? h(rtrim(rtrim(number_format($el['note'],2,'.',''),'0'),'.')) : '<span class="text-muted">—</span>' ?></td>
             <td>
               <?php if ($el['a_note']): ?>

@@ -9,7 +9,7 @@
 require_once __DIR__ . '/../../../config.php';
 require_once __DIR__ . '/../../../connexion.php';
 require_once __DIR__ . '/../../../fonctions.php';
-exiger_role(['ADMIN', 'PROVISEUR', 'CENSEUR', 'INTENDANT']);
+exiger_role(['ADMIN', 'PROVISEUR', 'FONDATEUR', 'CENSEUR', 'INTENDANT']);
 
 $annee_active = get_annee_active();
 $id_annee     = (int)($annee_active['id'] ?? 0);

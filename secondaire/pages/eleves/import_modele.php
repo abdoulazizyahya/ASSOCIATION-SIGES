@@ -14,7 +14,7 @@ require_once __DIR__ . '/../../../config.php';
 require_once __DIR__ . '/../../../connexion.php';
 require_once __DIR__ . '/../../../fonctions.php';
 require_once __DIR__ . '/../../../vendor/autoload.php';
-exiger_role(['ADMIN', 'PROVISEUR', 'SECRETAIRE']);
+exiger_role(['ADMIN', 'PROVISEUR', 'FONDATEUR', 'SECRETAIRE']);
 
 use PhpOffice\PhpSpreadsheet\Cell\DataValidation;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;

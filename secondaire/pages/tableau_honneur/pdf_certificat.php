@@ -63,7 +63,7 @@ if ($acces_public) {
 } else {
     exiger_connexion();
     $role     = role_connecte();
-    $is_admin = in_array($role, ['ADMIN', 'PROVISEUR', 'CENSEUR']);
+    $is_admin = in_array($role, ['ADMIN', 'PROVISEUR', 'FONDATEUR', 'CENSEUR']) || $role === 'MEMBRE_ASSOCIATION';
     $is_ens   = ($role === 'ENSEIGNANT');
     $mat_ens  = $is_ens ? get_matricule_ens_connecte() : null;
     if (!$is_admin && !$is_ens) die('Acces non autorise.');
@@ -530,7 +530,7 @@ foreach ($qualifies as $q) {
         $pdf->SetTextColor(20, 70, 190);
         $pdf->Cell($w3, 6, u('LE PRINCIPAL,'), 0, 0, 'C');
         $pdf->SetTextColor(200, 0, 0);
-        $pdf->Cell($w3, 6, u('LE PROVISEUR,'), 0, 1, 'R');
+        $pdf->Cell($w3, 6, u(strtoupper($etab['chef_etablissement'] ?? 'LE PROVISEUR') . ','), 0, 1, 'R');
         $pdf->SetTextColor(0, 0, 0);
 
         // Signature numérique (sur demande uniquement, jamais automatique).
@@ -678,7 +678,12 @@ foreach ($qualifies as $q) {
             $pdf->SetFont('Arial', 'B', 9);
             $pdf->SetTextColor($col[0], $col[1], $col[2]);
             $pdf->SetXY($x0, $y_sig + 1.5);
-            $pdf->Cell($w3, 5, u($lbl), 0, 0, 'C');
+            // $lbl reste l'identifiant de comparaison ci-dessous ('LE
+            // PROVISEUR' déclenche la signature) ; seul le texte AFFICHÉ
+            // devient le nom réel du chef d'établissement.
+            $texte_signataire = $lbl === 'LE PROVISEUR'
+                ? strtoupper($etab['chef_etablissement'] ?? 'LE PROVISEUR') : $lbl;
+            $pdf->Cell($w3, 5, u($texte_signataire), 0, 0, 'C');
             if ($lbl === 'LE PROVISEUR' && ($_GET['signature'] ?? '0') === '1') {
                 $sig_w = min(20, $w3 * 0.5);
                 $sx = $x0 + ($w3 - $sig_w) / 2;
@@ -788,7 +793,7 @@ foreach ($qualifies as $q) {
         $pdf->SetXY($ml, $y_sig);
         $pdf->Cell($w3, 5, u('LE RECIPIENDAIRE'), 0, 0, 'C');
         $pdf->Cell($w3, 5, u('LE PRINCIPAL'), 0, 0, 'C');
-        $pdf->Cell($w3, 5, u('LE PROVISEUR'), 0, 1, 'C');
+        $pdf->Cell($w3, 5, u(strtoupper($etab['chef_etablissement'] ?? 'LE PROVISEUR')), 0, 1, 'C');
 
         // Signature numérique (sur demande uniquement, jamais automatique).
         if (($_GET['signature'] ?? '0') === '1') {

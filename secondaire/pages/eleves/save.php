@@ -3,7 +3,7 @@
 require_once __DIR__ . '/../../../config.php';
 require_once __DIR__ . '/../../../connexion.php';
 require_once __DIR__ . '/../../../fonctions.php';
-exiger_role(['ADMIN', 'PROVISEUR', 'CENSEUR', 'SG', 'SECRETAIRE']);
+exiger_role(['ADMIN', 'PROVISEUR', 'FONDATEUR', 'CENSEUR', 'SG', 'SECRETAIRE']);
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') rediriger('secondaire/pages/eleves/liste.php');
 csrf_verifier();
@@ -23,6 +23,7 @@ $telephone = post('telephone') ?: null;
 $adresse   = post('adresse') ?: null;
 $id_classe = (int) post('id_classe');
 $statut_insc = post('statut_insc') ?: 'Nouveau';
+$id_serie  = (int) post('id_serie') ?: null;
 
 if ($nom === '') {
     flash_set('erreur', 'Le nom est obligatoire.');
@@ -55,10 +56,10 @@ if ($id) {
 if ($id_classe && $id_annee) {
     $insc = db_one("SELECT id FROM inscription WHERE id_eleve=? AND id_annee=?", [$id, $id_annee]);
     if ($insc) {
-        db_exec("UPDATE inscription SET id_classe=?, statut=? WHERE id=?", [$id_classe, $statut_insc, $insc['id']]);
+        db_exec("UPDATE inscription SET id_classe=?, statut=?, id_serie=? WHERE id=?", [$id_classe, $statut_insc, $id_serie, $insc['id']]);
     } else {
-        db_exec("INSERT INTO inscription (id_eleve, id_classe, id_annee, statut, date_inscription) VALUES (?, ?, ?, ?, CURDATE())",
-                [$id, $id_classe, $id_annee, $statut_insc]);
+        db_exec("INSERT INTO inscription (id_eleve, id_classe, id_annee, statut, id_serie, date_inscription) VALUES (?, ?, ?, ?, ?, CURDATE())",
+                [$id, $id_classe, $id_annee, $statut_insc, $id_serie]);
     }
 } elseif ($id_annee) {
     db_exec("DELETE FROM inscription WHERE id_eleve=? AND id_annee=?", [$id, $id_annee]);

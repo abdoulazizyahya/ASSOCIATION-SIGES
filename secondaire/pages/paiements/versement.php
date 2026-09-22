@@ -7,7 +7,7 @@
 require_once __DIR__ . '/../../../config.php';
 require_once __DIR__ . '/../../../connexion.php';
 require_once __DIR__ . '/../../../fonctions.php';
-exiger_role(['ADMIN', 'PROVISEUR', 'CENSEUR', 'INTENDANT']);
+exiger_role(['ADMIN', 'PROVISEUR', 'FONDATEUR', 'CENSEUR', 'INTENDANT']);
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     rediriger('secondaire/pages/paiements/index.php');

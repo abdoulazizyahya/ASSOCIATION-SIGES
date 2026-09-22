@@ -17,7 +17,7 @@ function u(string $s): string {
 }
 
 $role     = role_connecte();
-$is_admin = in_array($role, ['ADMIN', 'PROVISEUR', 'CENSEUR']);
+$is_admin = in_array($role, ['ADMIN', 'PROVISEUR', 'FONDATEUR', 'CENSEUR']) || $role === 'MEMBRE_ASSOCIATION';
 $is_ens   = ($role === 'ENSEIGNANT');
 $mat_ens  = $is_ens ? get_matricule_ens_connecte() : null;
 if (!$is_admin && !$is_ens) die('Acces non autorise.');
@@ -326,7 +326,7 @@ $pdf->SetX($x_sign);
 $pdf->Cell($w_sign, 5, u('Fait à ' . ($etab['ville'] ?? '') . ', le ' . date('d/m/Y')), 0, 1, 'R');
 $pdf->SetFont('Arial', 'B', 8.5);
 $pdf->SetX($x_sign);
-$pdf->Cell($w_sign, 5, u('LE PROVISEUR,'), 0, 1, 'R');
+$pdf->Cell($w_sign, 5, u(strtoupper($etab['chef_etablissement'] ?? 'LE PROVISEUR') . ','), 0, 1, 'R');
 
 // Signature numérique (sur demande uniquement, jamais automatique).
 if (($_GET['signature'] ?? '0') === '1') {

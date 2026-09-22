@@ -8,7 +8,7 @@
 require_once __DIR__ . '/../../../config.php';
 require_once __DIR__ . '/../../../connexion.php';
 require_once __DIR__ . '/../../../fonctions.php';
-exiger_role(['ADMIN', 'PROVISEUR', 'CENSEUR', 'SG', 'SECRETAIRE']);
+exiger_role(['ADMIN', 'PROVISEUR', 'FONDATEUR', 'CENSEUR', 'SG', 'SECRETAIRE']);
 
 $id    = (int) ($_GET['id'] ?? 0);
 $eleve = $id ? db_one("SELECT * FROM eleve WHERE id=?", [$id]) : null;
@@ -17,6 +17,7 @@ if ($id && !$eleve) { flash_set('erreur', 'Élève introuvable.'); rediriger('se
 $annee       = get_annee_active();
 $id_annee    = (int) ($annee['id'] ?? 0);
 $classes     = db_all("SELECT * FROM classe WHERE archivee=0 ORDER BY ordre, designation");
+$series      = db_all("SELECT * FROM serie ORDER BY libelle");
 $inscription = $eleve ? db_one("SELECT * FROM inscription WHERE id_eleve=? AND id_annee=?", [$eleve['id'], $id_annee]) : null;
 $ve          = fn(string $k) => h($eleve[$k] ?? '');
 
@@ -116,6 +117,17 @@ require_once __DIR__ . '/../../../layout/header.php';
               <select name="statut_insc" class="form-select">
                 <?php foreach (['Nouveau', 'Ancien', 'Redoublant', 'Transféré'] as $s): ?>
                   <option <?= ($inscription['statut'] ?? '') === $s ? 'selected' : '' ?>><?= $s ?></option>
+                <?php endforeach; ?>
+              </select>
+            </div>
+            <div class="col-md-5">
+              <label class="form-label">Série / LV2 <span class="text-muted" style="font-weight:400">(classe mixte)</span></label>
+              <select name="id_serie" class="form-select">
+                <option value="">— Aucune —</option>
+                <?php foreach ($series as $s): ?>
+                  <option value="<?= (int) $s['id'] ?>" <?= (int) ($inscription['id_serie'] ?? 0) === (int) $s['id'] ? 'selected' : '' ?>>
+                    <?= h($s['libelle']) ?>
+                  </option>
                 <?php endforeach; ?>
               </select>
             </div>

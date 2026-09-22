@@ -115,7 +115,7 @@ $pdf->SetX($x_sign);
 $pdf->Cell($w_sign, 5, pdf_u('Fait à ' . ($etab['ville'] ?? '') . ', le ' . date('d/m/Y')), 0, 1, 'R');
 $pdf->SetFont('Arial', 'B', 9);
 $pdf->SetX($x_sign);
-$pdf->Cell($w_sign, 5, pdf_u('LE PROVISEUR,'), 0, 1, 'R');
+$pdf->Cell($w_sign, 5, pdf_u(strtoupper($etab['chef_etablissement'] ?? 'LE PROVISEUR') . ','), 0, 1, 'R');
 
 // Signature numérique (sur demande uniquement, jamais automatique).
 if (($_GET['signature'] ?? '0') === '1') {

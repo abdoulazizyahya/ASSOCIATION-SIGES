@@ -6,7 +6,7 @@
 require_once __DIR__ . '/../../config.php';
 require_once __DIR__ . '/../../connexion.php';
 require_once __DIR__ . '/../../fonctions.php';
-exiger_role(['ADMIN', 'PROVISEUR', 'CENSEUR']);
+exiger_role(['ADMIN', 'PROVISEUR', 'FONDATEUR', 'CENSEUR']);
 
 require_once __DIR__ . '/fpdf.php';
 require_once __DIR__ . '/header_pdf.php';

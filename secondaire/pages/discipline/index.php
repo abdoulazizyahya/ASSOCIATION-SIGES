@@ -8,9 +8,11 @@ exiger_connexion();
 $role = role_connecte();
 $user = utilisateur_connecte();
 
-// ── Accès : ADMIN/CENSEUR (toutes classes), SG (sa classe d'affectation),
-//    ENSEIGNANT principal (sa classe). Aucun autre rôle. ────────────────
-$full_access = in_array($role, ['ADMIN', 'CENSEUR']);
+// ── Accès : ADMIN/CENSEUR/PROVISEUR/FONDATEUR (toutes classes), SG (sa
+//    classe d'affectation), ENSEIGNANT principal (sa classe). Aucun autre
+//    rôle. PROVISEUR/FONDATEUR ajoutés le 18/09/2026 (oubli constaté : le
+//    chef d'établissement ne voyait pas la discipline de sa propre école). ──
+$full_access = in_array($role, ['ADMIN', 'CENSEUR', 'PROVISEUR', 'FONDATEUR']) || $role === 'MEMBRE_ASSOCIATION';
 $annee_act   = get_annee_active();
 $id_annee    = (int)($annee_act['id'] ?? 0);
 $val_annee   = $annee_act['libelle'] ?? '';

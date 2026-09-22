@@ -9,7 +9,7 @@ require_once __DIR__ . '/../../../fonctions.php';
 exiger_connexion();
 
 $role = role_connecte();
-if (!in_array($role, ['CENSEUR','PROVISEUR','ADMIN'])) { flash_set('erreur','Accès refusé.'); rediriger('dashboard.php'); }
+if (!in_array($role, ['CENSEUR','PROVISEUR', 'FONDATEUR','ADMIN'])) { flash_set('erreur','Accès refusé.'); rediriger('dashboard.php'); }
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') { rediriger('secondaire/pages/demandes/index.php'); }
 
 csrf_verifier();
@@ -31,8 +31,8 @@ $etape_censeur   = $d['statut'] === 'en_attente_censeur';
 $etape_proviseur = $d['statut'] === 'en_attente_proviseur';
 
 $autorise = ($role === 'ADMIN' && ($etape_censeur || $etape_proviseur))
-    || ($role === 'CENSEUR'   && $etape_censeur)
-    || ($role === 'PROVISEUR' && $etape_proviseur);
+    || ($role === 'CENSEUR' && $etape_censeur)
+    || (in_array($role, ['PROVISEUR', 'FONDATEUR'], true) && $etape_proviseur);
 
 if (!$autorise) {
     flash_set('erreur', 'Cette demande n\'est plus (ou pas encore) à traiter à votre niveau — elle a peut-être déjà été traitée entre-temps.');

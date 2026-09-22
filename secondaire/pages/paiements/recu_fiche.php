@@ -7,7 +7,7 @@
 require_once __DIR__ . '/../../../config.php';
 require_once __DIR__ . '/../../../connexion.php';
 require_once __DIR__ . '/../../../fonctions.php';
-exiger_role(['ADMIN', 'PROVISEUR', 'CENSEUR', 'INTENDANT']);
+exiger_role(['ADMIN', 'PROVISEUR', 'FONDATEUR', 'CENSEUR', 'INTENDANT']);
 require_once __DIR__ . '/../../pdf/fpdf.php';
 require_once __DIR__ . '/../../pdf/header_pdf.php';
 require_once __DIR__ . '/../../pdf/recu_paiement_render.php';
@@ -126,7 +126,7 @@ function recu_fiche_dessiner_bloc(
     $pdf->SetXY($xi, $y_sig_fiche);
     $pdf->Cell($wi * 0.4, 5, pdf_u("L'INTENDANT"), 0, 0, 'C');
     $pdf->Cell($wi * 0.2, 5, '', 0, 0);
-    $pdf->Cell($wi * 0.4, 5, pdf_u('LE PROVISEUR'), 0, 1, 'C');
+    $pdf->Cell($wi * 0.4, 5, pdf_u(strtoupper($etab['chef_etablissement'] ?? 'LE PROVISEUR')), 0, 1, 'C');
 
     if ($avec_sig_intendant) {
         pdf_signature_appliquer($pdf, 'recu_fiche_bas', 'intendant', $xi, $y0, $wi, $h0, [

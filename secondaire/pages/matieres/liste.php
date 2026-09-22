@@ -8,7 +8,7 @@
 require_once __DIR__ . '/../../../config.php';
 require_once __DIR__ . '/../../../connexion.php';
 require_once __DIR__ . '/../../../fonctions.php';
-exiger_role(['ADMIN', 'PROVISEUR', 'CENSEUR']);
+exiger_role(['ADMIN', 'PROVISEUR', 'FONDATEUR', 'CENSEUR']);
 
 $onglet     = $_GET['onglet'] ?? 'catalogue';
 $id_cl_aff  = (int)($_GET['classe_aff'] ?? 0);

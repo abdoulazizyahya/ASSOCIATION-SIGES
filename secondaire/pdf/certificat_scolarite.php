@@ -258,10 +258,10 @@ $pdf->Cell($uw * 0.45, 4, 'On', 0, 1, 'C');
 $pdf->Ln(2);
 $pdf->SetX($ml + $uw * 0.55);
 $pdf->SetFont('Arial', 'B', 10);
-$pdf->Cell($uw * 0.45, 6, u('LE PROVISEUR,'), 0, 1, 'C');
+$pdf->Cell($uw * 0.45, 6, u(strtoupper($etab['chef_etablissement'] ?? 'LE PROVISEUR') . ','), 0, 1, 'C');
 $pdf->SetFont('Arial', 'I', 8);
 $pdf->SetX($ml + $uw * 0.55);
-$pdf->Cell($uw * 0.45, 4, 'The Principal', 0, 0, 'C');
+$pdf->Cell($uw * 0.45, 4, ($etab['chef_etablissement_en'] ?? 'The Principal'), 0, 0, 'C');
 
 // Signature numérique (uniquement si demandée à l'impression — jamais
 // automatique — et si l'admin en a configuré une dans les paramètres).

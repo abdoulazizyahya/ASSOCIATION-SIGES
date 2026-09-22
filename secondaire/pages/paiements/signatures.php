@@ -10,7 +10,7 @@
 require_once __DIR__ . '/../../../config.php';
 require_once __DIR__ . '/../../../connexion.php';
 require_once __DIR__ . '/../../../fonctions.php';
-exiger_role(['ADMIN', 'PROVISEUR', 'CENSEUR', 'INTENDANT', 'SG']);
+exiger_role(['ADMIN', 'PROVISEUR', 'FONDATEUR', 'CENSEUR', 'INTENDANT', 'SG']);
 
 $codes_geres = ['censeur', 'surveillant_general', 'intendant', 'president_apee', 'tresorier_apee'];
 $role = role_connecte();
@@ -20,6 +20,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $code = post('code');
     if (!in_array($code, $codes_geres, true) || !signature_role_autorisee($code, $role)) {
         flash_set('erreur', 'Accès refusé pour ce signataire.');
+        rediriger('secondaire/pages/paiements/signatures.php');
+    }
+    if (post('action') === 'supprimer') {
+        $fichier = get_signature_titulaires()[$code]['fichier'] ?? null;
+        if ($fichier) {
+            $abs = __DIR__ . '/../../../assets/uploads/' . $fichier;
+            if (is_file($abs)) @unlink($abs);
+            db_exec("UPDATE signature_titulaire SET fichier=NULL WHERE code=?", [$code]);
+            flash_set('succes', 'Signature supprimée.');
+        }
         rediriger('secondaire/pages/paiements/signatures.php');
     }
     if (empty($_FILES['fichier']['tmp_name']) || $_FILES['fichier']['error'] !== UPLOAD_ERR_OK) {
@@ -91,6 +101,14 @@ require_once __DIR__ . '/../../../layout/header.php';
           </div>
           <button class="btn btn-sm btn-abz-primary"><i class="bi bi-upload me-1"></i>Enregistrer</button>
         </form>
+        <?php if (!empty($t['fichier'])): ?>
+        <form method="post" class="mt-1" onsubmit="return confirm('Supprimer cette signature ?')">
+          <?= csrf_champ() ?>
+          <input type="hidden" name="code" value="<?= h($code) ?>">
+          <input type="hidden" name="action" value="supprimer">
+          <button class="btn btn-sm btn-outline-danger"><i class="bi bi-trash me-1"></i>Supprimer</button>
+        </form>
+        <?php endif; ?>
       </div>
     </div>
   </div>

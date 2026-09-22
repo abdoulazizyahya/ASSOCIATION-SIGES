@@ -249,7 +249,7 @@ function dessiner_carte_1(FPDF $pdf, array $el, array $etab, array $annee,
     $pdf->Cell($cW - 3, 2.6, pdf_u(strtoupper($etab['chef_etablissement'] ?? 'LE PROVISEUR') . ','), 0, 1, 'L');
     $pdf->SetFont('Arial', 'I', max(3.2, $fsLbl - 1.3));
     $pdf->SetX($x + 1.5);
-    $pdf->Cell($cW - 3, 2.2, pdf_u('The Principal'), 0, 0, 'L');
+    $pdf->Cell($cW - 3, 2.2, pdf_u($etab['chef_etablissement_en'] ?? 'The Principal'), 0, 0, 'L');
 
     // Signature numérique (uniquement si demandée à l'impression — jamais
     // automatique), discrète dans le coin bas-droit du pied de carte.

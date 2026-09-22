@@ -2,7 +2,7 @@
 require_once __DIR__ . '/../../../config.php';
 require_once __DIR__ . '/../../../connexion.php';
 require_once __DIR__ . '/../../../fonctions.php';
-exiger_role(['ADMIN','PROVISEUR','CENSEUR']);
+exiger_role(['ADMIN','PROVISEUR', 'FONDATEUR','CENSEUR']);
 
 $logo_dir = __DIR__ . '/../../../assets/uploads/operateurs/';
 if (!is_dir($logo_dir)) @mkdir($logo_dir, 0755, true);

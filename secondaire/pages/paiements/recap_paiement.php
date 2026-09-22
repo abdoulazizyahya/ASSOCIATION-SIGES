@@ -7,7 +7,7 @@
 require_once __DIR__ . '/../../../config.php';
 require_once __DIR__ . '/../../../connexion.php';
 require_once __DIR__ . '/../../../fonctions.php';
-exiger_role(['ADMIN', 'PROVISEUR', 'CENSEUR', 'INTENDANT']);
+exiger_role(['ADMIN', 'PROVISEUR', 'FONDATEUR', 'CENSEUR', 'INTENDANT']);
 require_once __DIR__ . '/../../pdf/fpdf.php';
 require_once __DIR__ . '/../../pdf/header_pdf.php';
 
@@ -175,7 +175,7 @@ foreach ($frames as $i => [$x0, $y0]) {
     $pdf->SetXY($xi, $y_sig_ligne);
     $pdf->Cell($wi * 0.35, 5, pdf_u("L'INTENDANT"), 0, 0, 'C');
     $pdf->Cell($wi * 0.30, 5, '', 0, 0);
-    $pdf->Cell($wi * 0.35, 5, pdf_u('LE PROVISEUR'), 0, 1, 'C');
+    $pdf->Cell($wi * 0.35, 5, pdf_u(strtoupper($etab['chef_etablissement'] ?? 'LE PROVISEUR')), 0, 1, 'C');
 
     if ($avec_sig_intendant) {
         pdf_signature_appliquer($pdf, 'recap_paiement', 'intendant', $x0, $y0, $w0, $h0, [

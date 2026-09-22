@@ -12,7 +12,7 @@ require_once __DIR__ . '/../../../fonctions.php';
 require_once __DIR__ . '/../../../vendor/autoload.php';
 require_once __DIR__ . '/../conseil_classe/excel_releve_commun.php';
 require_once __DIR__ . '/excel_resultat_commun.php';
-exiger_role(['ADMIN', 'PROVISEUR', 'CENSEUR']);
+exiger_role(['ADMIN', 'PROVISEUR', 'FONDATEUR', 'CENSEUR']);
 
 $id_annee = (int)($_GET['annee'] ?? 0);
 $n        = max(1, (int)($_GET['n'] ?? 10));
