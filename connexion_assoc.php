@@ -184,8 +184,15 @@ function charger_schema_ecole(mysqli $l, array $seed, string $type = 'primaire')
     if (mysqli_errno($l)) {
         throw new RuntimeException('Chargement du schéma : ' . mysqli_error($l));
     }
-    $nbTables = (int) mysqli_fetch_row(mysqli_query($l,
-        "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE()"))[0];
+    // Alias explicite obligatoire : information_schema.tables.table_name
+    // revient en TABLE_NAME (majuscules) sans lui sur ce serveur — array_column
+    // sur 'table_name' silencieusement vide sinon (bug trouvé le 22/09/2026).
+    $nomsTables = array_column(
+        mysqli_fetch_all(mysqli_query($l,
+            "SELECT table_name AS nom FROM information_schema.tables WHERE table_schema = DATABASE()"), MYSQLI_ASSOC),
+        'nom'
+    );
+    $nbTables = count($nomsTables);
     if ($nbTables < 10) {
         throw new RuntimeException("Schéma incomplet ($nbTables tables).");
     }
@@ -199,9 +206,17 @@ function charger_schema_ecole(mysqli $l, array $seed, string $type = 'primaire')
     // appelant (bug réel constaté le 16/09/2026 en vérifiant l'étape 8
     // secondaire/Matières : classe/matiere/competence, toutes auto_increment,
     // inutilisables en écriture dès la création de l'école tant que rien ne
-    // force un FLUSH TABLES). Un simple `FLUSH TABLES;` juste après le
-    // chargement résout le problème de façon définitive pour la connexion.
-    mysqli_query($l, 'FLUSH TABLES');
+    // force un FLUSH TABLES).
+    // FLUSH TABLES <liste> (tables nommées), PAS `FLUSH TABLES` seul : la
+    // forme globale exige le privilège RELOAD/FLUSH_TABLES (droit serveur,
+    // jamais accordé sur un compte MySQL mutualisé cPanel) — la forme avec
+    // liste de tables ne demande qu'un privilège SUR CES TABLES, que le
+    // compte a forcément puisqu'il vient de les créer. Sans ce correctif :
+    // "Access denied; you need (at least one of) the RELOAD or
+    // FLUSH_TABLES privilege(s)" sur toute création d'école en pool sur
+    // Camoo (bug réel constaté le 22/09/2026).
+    $listeTables = implode(',', array_map(fn($t) => "`$t`", $nomsTables));
+    mysqli_query($l, "FLUSH TABLES $listeTables");
 
     // Licence (bd/lib/licence.php, migration v56/v57) : période d'ESSAI de
     // 60 jours par défaut — sans ça, une école toute neuve serait
