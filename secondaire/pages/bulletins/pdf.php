@@ -455,8 +455,8 @@ $pdf->Cell($uw, 3.2, u('IMMATRICULATION : ' . ($etab['immatriculation'] ?? '2JH1
 // des compétences).
 $y_titre = $pdf->GetY();
 $h_titre = 6;
-$pdf->SetFillColor(219, 228, 245); // bleu très clair
-$pdf->SetDrawColor(26, 60, 107);   // bleu marine (couleur de marque)
+pdf_fill($pdf, 'bandeau_titre'); // bleu très clair par défaut, personnalisable (Réglages > Couleurs bulletin)
+pdf_draw($pdf, 'bordure_marque'); // bleu marine par défaut, personnalisable
 $pdf->SetLineWidth(0.3);
 $pdf->RoundedRect($ml, $y_titre, $uw, $h_titre, $h_titre / 2, 'FD');
 $pdf->SetXY($ml, $y_titre-1);
@@ -562,9 +562,9 @@ function cell2l_taille_ajustee(FPDF $pdf, string $texte, string $style, float $l
 // $taille_fr/$taille_en sont des MAXIMUMS (demande explicite : polices plus
 // grandes mais sans jamais déborder du cadre) — réduits automatiquement si
 // besoin par cell2l_taille_ajustee(), avec un plancher de lisibilité minimal.
-function cell2l(FPDF $pdf, float $w, float $h, string $fr, string $en, string $align = 'L', bool $fill = false, float $taille_fr = 6, float $taille_en = 4.3, array $fill_color = [216, 210, 248], bool $tight = false): void {
+function cell2l(FPDF $pdf, float $w, float $h, string $fr, string $en, string $align = 'L', bool $fill = false, float $taille_fr = 6, float $taille_en = 4.3, ?array $fill_color = null, bool $tight = false): void {
     $x = $pdf->GetX(); $y = $pdf->GetY();
-    if ($fill) { $pdf->SetFillColor($fill_color[0], $fill_color[1], $fill_color[2]); $pdf->Rect($x, $y, $w, $h, 'F'); }
+    if ($fill) { $fill_color = $fill_color ?? couleur_pdf('bandeau_section'); $pdf->SetFillColor($fill_color[0], $fill_color[1], $fill_color[2]); $pdf->Rect($x, $y, $w, $h, 'F'); }
     $pdf->Rect($x, $y, $w, $h);
     // Marge de sécurité (offset 0.8+0.4 + cMargin interne de Cell()) — même
     // principe que fpdf_texte_ajuste() ailleurs dans ce fichier.
@@ -770,7 +770,10 @@ $footer_fixe = 1 + 6 * $h_ligne + 1 + $h_bas + count($decisions) * $h_dec;
 // déborder ce bloc sur une 2e page presque vide.
 $dispo_table = $bas_dispo - $y_table0 - $hdr_h - $footer_fixe - 8;
 
-$taille_comp = 6.5;
+// Taille de départ relevée à 7.5pt (demande explicite du 17/09/2026) — repli
+// automatique vers un plancher de 7pt (voir plus bas) si une classe a trop
+// de compétences pour tenir sur une page à 7.5pt.
+$taille_comp = 7.5;
 $lignes_par_mat = []; // [id_mat] => [ [id_comp, nb_lignes], ... ]
 $total_lignes = 0;
 $h_unit = 4;
@@ -790,10 +793,10 @@ while (true) {
         }
     }
     $h_unit = $total_lignes > 0 ? $dispo_table / $total_lignes : 4;
-    // Plancher de police à 5.5pt (demande explicite : rester lisible — la
+    // Plancher de police à 7pt (demande explicite : rester lisible — la
     // priorité va à la compression des espacements du bulletin plutôt qu'à
     // la réduction de la police des compétences).
-    if ($h_unit >= $taille_comp * 0.42 || $taille_comp <= 6.5) break;
+    if ($h_unit >= $taille_comp * 0.42 || $taille_comp <= 7.0) break;
     $taille_comp -= 0.25;
 }
 // Filet de sécurité absolu (ne devrait jamais être atteint si la boucle
@@ -809,7 +812,7 @@ $pdf->SetFont('Arial', '', 6.5);
 
 // En-tête tableau
 $pdf->SetFont('Arial', 'B', 6.3);
-$pdf->SetFillColor(26, 60, 107);
+pdf_fill($pdf, 'entete_tableau_individuel');
 $pdf->SetTextColor(255, 255, 255);
 $pdf->SetX($ml);
 $pdf->Cell($cD, $hdr_h, u("COMPÉTENCES ÉVALUÉES / NOM DE L'ENSEIGNANT"), 1, 0, 'C', true);
@@ -833,21 +836,21 @@ foreach ($disciplines as $d) {
     $nxc    = ($avg !== null) ? $avg * $d['coef'] : null;
     $appr   = appreciation($avg);
 
-    $bg = ($avg !== null && $avg < 10) ? [255, 235, 235] : [255, 255, 255];
+    $bg = ($avg !== null && $avg < 10) ? couleur_pdf('ligne_echec') : [255, 255, 255];
 
     // Ligne d'en-tête de la matière : "COMPETENCE N: MATIERE" + enseignant,
     // en pleine largeur, fond lavande (même convention que le reste du
     // bulletin — cell2l()).
     $y_hdr = $pdf->GetY();
     $pdf->SetXY($ml, $y_hdr);
-    $pdf->SetFillColor(216, 210, 248);
+    pdf_fill($pdf, 'bandeau_section');
     [$t_mat, $lib_mat] = fpdf_texte_ajuste($pdf, 'COMPETENCE ' . $num_mat . ': ' . mb_strtoupper($d['matiere']), $cD + $cN, 7.5, 5.5);
     $pdf->SetFont('Arial', 'B', $t_mat);
     $pdf->Cell($cD + $cN, $h_unit, u($lib_mat), 1, 0, 'L', true);
     [$t_ens, $lib_ens] = fpdf_texte_ajuste($pdf, $d['enseignant'] ?? '', $uw - $cD - $cN, 7, 5);
     $pdf->SetFont('Arial', '', $t_ens);
     $pdf->Cell($uw - $cD - $cN, $h_unit, u($lib_ens), 1, 1, 'R', true);
-    $pdf->SetFont('Arial', '', 6.5);
+    $pdf->SetFont('Arial', '', $taille_comp);
 
     $y_grp0 = $pdf->GetY();
 
@@ -862,21 +865,38 @@ foreach ($disciplines as $d) {
         foreach ($lignes_par_mat[$id_mat] as [$id_comp, $nb_lignes]) {
             $comp = null;
             foreach ($comps as $c) { if ((int)$c['id'] === $id_comp) { $comp = $c; break; } }
-            $h_row = $nb_lignes * $h_unit;
-            $h_grp += $h_row;
+            $h_row = $nb_lignes * $h_unit; // budget MAX pour cette compétence
 
             $x0 = $ml; $y0 = $pdf->GetY();
             $pdf->SetFillColor(...$bg);
             $pdf->SetFont('Arial', '', $taille_comp);
-            $pdf->MultiCell($cD, $h_row / $nb_lignes, u($comp['libelle'] ?? ''), 1, 'L', true);
+            if ($nb_lignes > 1) {
+                // Compétence sur 2+ lignes : interligne resserré (proportionnel
+                // à la police, plafonné à $h_unit pour ne jamais dépasser le
+                // budget) au lieu de $h_row/$nb_lignes — sinon chaque ligne
+                // hérite de la part généreuse d'une case pleine ligne et le
+                // texte paraît anormalement aéré. La hauteur RÉELLE de la case
+                // ($h_row_reel) suit ce resserrement — sinon le cadre garde
+                // l'ancienne hauteur budgétée et un espace vide apparaît sous
+                // le texte resserré. Demande explicite du 16/09/2026.
+                $h_texte    = min($h_unit, max(1.6, $taille_comp * 0.42));
+                $h_row_reel = $nb_lignes * $h_texte;
+                $pdf->Rect($x0, $y0, $cD, $h_row_reel, 'DF');
+                $pdf->SetXY($x0, $y0);
+                $pdf->MultiCell($cD, $h_texte, u($comp['libelle'] ?? ''), 0, 'L', false);
+            } else {
+                $h_row_reel = $h_row;
+                $pdf->MultiCell($cD, $h_row, u($comp['libelle'] ?? ''), 1, 'L', true);
+            }
+            $h_grp += $h_row_reel;
             $pdf->SetXY($x0 + $cD, $y0);
 
             $v = note_eff_comp($id_eleve, $id_comp, $notes_idx, $notes_count, $nb_inscrits);
             $pdf->SetFont('Arial', 'B', 7.5);
             if ($v !== null) { if ($v < 10) $pdf->SetTextColor(180, 0, 0); else $pdf->SetTextColor(0, 100, 0); }
-            $pdf->Cell($cN, $h_row, $v !== null ? fmt_note_b($v) : '', 1, 0, 'C', true);
+            $pdf->Cell($cN, $h_row_reel, $v !== null ? fmt_note_b($v) : '', 1, 0, 'C', true);
             $pdf->SetTextColor(0, 0, 0);
-            $pdf->SetXY($x0, $y0 + $h_row);
+            $pdf->SetXY($x0, $y0 + $h_row_reel);
         }
     }
 
@@ -1194,10 +1214,10 @@ $pdf->Cell($w_obs, 4.5, 'On', 0, 1, 'C');
 $pdf->Ln(2.5);
 $pdf->SetX($x_obs);
 $pdf->SetFont('Arial', 'B', 8.5);
-$pdf->Cell($w_obs, 5.5, 'LE PROVISEUR,', 0, 1, 'C');
+$pdf->Cell($w_obs, 5.5, u(strtoupper($etab['chef_etablissement'] ?? 'LE PROVISEUR') . ','), 0, 1, 'C');
 $pdf->SetX($x_obs);
 $pdf->SetFont('Arial', 'I', 7.5);
-$pdf->Cell($w_obs, 4.5, 'The Principal', 0, 1, 'C');
+$pdf->Cell($w_obs, 4.5, u($etab['chef_etablissement_en'] ?? 'The Principal'), 0, 1, 'C');
 
 // Signature numérique (uniquement si demandée à l'impression — jamais
 // automatique — et si l'admin en a configuré une dans les paramètres).
