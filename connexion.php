@@ -91,37 +91,55 @@ if (!$_db_ok) {
     exit;
 }
 
-// ── École secondaire : pages pas encore construites → page d'attente ────
+// ── Séparation primaire / secondaire : URL du mauvais module → bloquée ──
 //  (schema_ref_ecole_secondaire.sql, porté de LAM_ABZ — noms de tables/
 //  colonnes différents du schéma primaire partout, ex. annee_scolaire.
-//  active au lieu de Etat_annee_scolaire) : toute page « primaire » non
-//  encore rendue compatible plante dès son premier appel (get_annee_active(),
-//  menu_definition()…). Interception ICI, avant que quoi que ce soit de
-//  primaire-spécifique ne s'exécute — bug réel constaté le 15/09/2026.
-//  Laissés passer (déjà rendus compatibles, voir fonctions.php : get_annee_
-//  active()/get_sequence_active()/get_etablissement()/menu_definition()
-//  type-aware) : login.php, logout.php, dashboard.php (racine, type-aware
-//  lui aussi), tout ce qui vit sous secondaire/ (module dédié) et sous
-//  ajax/ (racine, partagé avec le primaire — endpoints JSON appelés en
+//  active au lieu de Etat_annee_scolaire, sequence.date_fin qui n'existe
+//  pas côté primaire — id_seq/libelle_seq/etat) : une page du mauvais
+//  module plante dès son premier appel spécifique (get_annee_active(),
+//  menu_definition(), auto_activer_sequences()…). Interception ICI, avant
+//  que quoi que ce soit de spécifique à l'autre module ne s'exécute — bugs
+//  réels constatés le 15/09/2026 (pages/** sur une école secondaire) puis
+//  le 21/09/2026 (secondaire/** sur une école primaire — Fatal error
+//  mysqli_sql_exception "Champ 'date_fin' inconnu", auto_activer_sequences()
+//  appelée par secondaire/pages/parametres/index.php et .../notes/index.php
+//  sur la table `sequence` d'une base primaire).
+//  Laissés passer dans les deux sens (déjà rendus compatibles, voir
+//  fonctions.php : get_annee_active()/get_sequence_active()/
+//  get_etablissement()/menu_definition() type-aware) : login.php,
+//  logout.php, dashboard.php (racine, type-aware lui aussi) et ajax/
+//  (racine, partagé avec les deux modules — endpoints JSON appelés en
 //  fetch() par des pages secondaire, ex. secondaire/pages/paiements/
 //  index.php ou secondaire/pages/enseignants/mon_profil.php ; bloqués ici
-//  jusqu'au 17/09/2026, la garde renvoyait la page d'attente en HTML à un
-//  fetch() qui attendait du JSON — cassé silencieusement côté JS, jamais
-//  un Fatal error visible). Chaque fichier ajax/ effectivement utilisé
-//  côté secondaire est rendu type-aware individuellement (voir ses propres
-//  commentaires) — ne PAS supposer qu'un ajax/ non encore vérifié
-//  fonctionne pour autant. Tout le reste (pages/**) affiche la page
-//  d'attente plutôt qu'un Fatal error.
-if ($ETAB_COURANT && (($ETAB_COURANT['type_enseignement'] ?? 'primaire') === 'secondaire')) {
+//  jusqu'au 17/09/2026, la garde renvoyait alors du HTML à un fetch() qui
+//  attendait du JSON — cassé silencieusement côté JS, jamais un Fatal error
+//  visible). Chaque fichier ajax/ effectivement utilisé côté secondaire est
+//  rendu type-aware individuellement (voir ses propres commentaires) — ne
+//  PAS supposer qu'un ajax/ non encore vérifié fonctionne pour autant.
+//  type_enseignement_courant() (et non $ETAB_COURANT directement) : couvre
+//  aussi le mono-école SANS annuaire (ECOLE_TYPE_SOLO, voir install.php
+//  mode « école unique » et ecole_contexte.php) — sans quoi ce garde-fou ne
+//  se déclenchait jamais pour une telle installation.
+if (function_exists('type_enseignement_courant')) {
     $_rel = str_replace('\\', '/', $_SERVER['SCRIPT_NAME'] ?? '');
     $_app = rtrim((string) parse_url(APP_URL, PHP_URL_PATH), '/');
     if ($_app !== '' && strpos($_rel, $_app . '/') === 0) $_rel = substr($_rel, strlen($_app) + 1);
     $_rel = ltrim($_rel, '/');
-    $_ok  = in_array($_rel, ['login.php', 'logout.php', 'dashboard.php'], true)
-        || str_starts_with($_rel, 'secondaire/') || str_starts_with($_rel, 'ajax/');
-    if (!$_ok) {
-        require __DIR__ . '/secondaire_en_construction.php';
-        exit;
+    $_commun = in_array($_rel, ['login.php', 'logout.php', 'dashboard.php'], true) || str_starts_with($_rel, 'ajax/');
+    if (!$_commun) {
+        $_secondaire = type_enseignement_courant() === 'secondaire';
+        if ($_secondaire && !str_starts_with($_rel, 'secondaire/')) {
+            // École secondaire sur une page pages/** (module primaire, pas
+            // encore rendue compatible) : page d'attente plutôt qu'un Fatal error.
+            require __DIR__ . '/secondaire_en_construction.php';
+            exit;
+        }
+        if (!$_secondaire && str_starts_with($_rel, 'secondaire/')) {
+            // École primaire sur une page secondaire/** : rien à y faire,
+            // retour au tableau de bord (type-aware) plutôt qu'un Fatal error.
+            header('Location: ' . APP_URL . '/dashboard.php');
+            exit;
+        }
     }
 }
 

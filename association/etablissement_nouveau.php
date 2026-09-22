@@ -7,8 +7,8 @@ require_once __DIR__ . '/../fonctions.php';
 require_once __DIR__ . '/_layout.php';
 exiger_superadmin_association();
 
-$msg = ''; $err = ''; $ok = false;
-$val = ['code' => '', 'nom' => '', 'nom_en' => '', 'sigle' => '', 'ville' => '', 'sous_domaine' => '', 'type_enseignement' => 'primaire'];
+$msg = ''; $err = ''; $ok = false; $comptes = [];
+$val = ['code' => '', 'nom' => '', 'nom_en' => '', 'sigle' => '', 'ville' => '', 'sous_domaine' => '', 'type_enseignement' => 'primaire', 'statut' => 'public'];
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     csrf_verifier();
@@ -16,13 +16,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $val['code'] = strtoupper($val['code']);
     $val['sous_domaine'] = strtolower($val['sous_domaine']);
     if (!in_array($val['type_enseignement'], ['primaire', 'secondaire'], true)) $val['type_enseignement'] = 'primaire';
+    if (!in_array($val['statut'], ['public', 'prive'], true)) $val['statut'] = 'public';
 
     $r = creer_etablissement($val + ['par' => membre_connecte()['login'] ?? '?']);
     if ($r['ok']) {
         journaliser_action('etablissement_creation', $r['id'], $val['code'] . ' — ' . $val['nom']);
         $ok = true;
         $msg = $r['message'];
-        $val = ['code' => '', 'nom' => '', 'nom_en' => '', 'sigle' => '', 'ville' => '', 'sous_domaine' => '', 'type_enseignement' => 'primaire'];
+        $comptes = $r['comptes'] ?? [];
+        $val = ['code' => '', 'nom' => '', 'nom_en' => '', 'sigle' => '', 'ville' => '', 'sous_domaine' => '', 'type_enseignement' => 'primaire', 'statut' => 'public'];
     } else {
         $err = $r['message'];
     }
@@ -34,6 +36,22 @@ asso_haut('Nouvel établissement');
 
 <?php if ($msg): ?>
   <div class="alert alert-success py-2 small mt-2"><?= h($msg) ?></div>
+<?php endif; ?>
+<?php if ($comptes): ?>
+  <div class="alert alert-success py-2 small mt-2">
+    <strong>Comptes créés</strong> (mot de passe = identifiant) — à transmettre au personnel puis à changer depuis Sécurité :
+    <table class="table table-sm mb-0 mt-2" style="font-size:.82rem">
+      <thead><tr><th>Rôle</th><th>Identifiant / mot de passe</th></tr></thead>
+      <tbody>
+        <?php foreach ($comptes as $c): ?>
+        <tr>
+          <td><?= h($c['role']) ?></td>
+          <td class="font-monospace"><?= h($c['login']) ?></td>
+        </tr>
+        <?php endforeach; ?>
+      </tbody>
+    </table>
+  </div>
 <?php endif; ?>
 <?php if ($err): ?>
   <div class="alert alert-warning py-2 small mt-2"><?= h($err) ?></div>
@@ -49,10 +67,8 @@ asso_haut('Nouvel établissement');
       Crée une base de données dédiée <span class="font-monospace">promeducam_&lt;nom simplifié&gt;</span>,
       y installe le schéma de référence à jour, puis inscrit l'école à l'annuaire.
     <?php endif; ?>
-    Ensuite : pour une école <strong>primaire</strong>, créer un compte <strong>DIRECTEUR</strong> via
-    <a href="<?= APP_URL ?>/association/personnel/affecter.php">Personnel → Affecter</a> ; pour une école
-    <strong>secondaire</strong>, créer le premier compte via
-    <a href="<?= APP_URL ?>/association/personnel/compte_secondaire.php">Personnel → Nouveau compte (secondaire)</a>.
+    Crée aussi automatiquement les 3 comptes par défaut (FONDATEUR, DIRECTEUR, FINANCIER — affichés
+    ci-dessus une fois l'établissement créé).
   </p>
   <form method="post" class="row g-2">
     <input type="hidden" name="csrf" value="<?= h(csrf_generer()) ?>">
@@ -68,11 +84,24 @@ asso_haut('Nouvel établissement');
                <?= $val['type_enseignement'] === 'secondaire' ? 'checked' : '' ?>>
         <label class="btn btn-outline-primary btn-sm" for="type_secondaire"><i class="bi bi-mortarboard-fill me-1"></i>Secondaire</label>
       </div>
-      <div class="form-text small text-warning">
-        Secondaire : module en cours de portage (compétences/bulletins/notes pas encore
-        disponibles) — utile pour l'instant uniquement pour préparer/tester la base.
-      </div>
       <div class="form-text small text-muted2">Figé définitivement après création.</div>
+    </div>
+
+    <div class="col-12" id="bloc_statut" style="<?= $val['type_enseignement'] === 'secondaire' ? '' : 'display:none' ?>">
+      <label class="form-label small d-block">Statut *</label>
+      <div class="btn-group w-100" role="group">
+        <input type="radio" class="btn-check" name="statut" id="statut_public" value="public"
+               <?= $val['statut'] !== 'prive' ? 'checked' : '' ?>>
+        <label class="btn btn-outline-primary btn-sm" for="statut_public">Public</label>
+
+        <input type="radio" class="btn-check" name="statut" id="statut_prive" value="prive"
+               <?= $val['statut'] === 'prive' ? 'checked' : '' ?>>
+        <label class="btn btn-outline-primary btn-sm" for="statut_prive">Privé</label>
+      </div>
+      <div class="form-text small text-muted2">
+        Détermine le libellé affiché (Proviseur/Principal) et lequel des deux modules Paiements
+        (public ou privé) est visible — jamais les deux à la fois.
+      </div>
     </div>
 
     <div class="col-4">
@@ -119,4 +148,11 @@ asso_haut('Nouvel établissement');
     </div>
   </form>
 </div>
+<script>
+  document.querySelectorAll('input[name="type_enseignement"]').forEach(function (r) {
+    r.addEventListener('change', function () {
+      document.getElementById('bloc_statut').style.display = document.getElementById('type_secondaire').checked ? '' : 'none';
+    });
+  });
+</script>
 <?php asso_bas();

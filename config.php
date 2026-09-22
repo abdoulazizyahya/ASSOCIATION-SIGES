@@ -36,6 +36,12 @@ defined('APP_HOTE') || define('APP_HOTE', '');
 // et connexion_assoc.php::creer_etablissement). false/absent = CREATE DATABASE
 // direct (LAN / serveur dédié).
 defined('ECOLE_POOL_ACTIF') || define('ECOLE_POOL_ACTIF', false);
+// Type pédagogique en installation MONO-ÉCOLE (sans annuaire association) :
+// 'primaire' (historique, défaut) ou 'secondaire'. Sans effet dès qu'un
+// annuaire existe (le type vient alors de etablissement.type_enseignement).
+// Posé automatiquement par install.php en mode « école unique ».
+// Voir ecole_contexte.php::type_enseignement_courant().
+defined('ECOLE_TYPE_SOLO') || define('ECOLE_TYPE_SOLO', 'primaire');
 
 defined('APP_NOM') || define('APP_NOM', 'SIGES · Gestion scolaire');
 

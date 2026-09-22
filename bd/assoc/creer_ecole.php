@@ -40,4 +40,10 @@ if (trim($in['code']) === '' || trim($in['nom']) === '') {
 echo "=== Creation ecole " . strtoupper(trim($in['code'])) . " ===\n";
 $r = creer_etablissement($in);
 echo ($r['ok'] ? 'OK  ' : 'ERREUR : ') . $r['message'] . "\n";
+if ($r['ok'] && !empty($r['comptes'])) {
+    echo "\nComptes crees (mot de passe = identifiant, a changer depuis Securite) :\n";
+    foreach ($r['comptes'] as $c) {
+        echo "  " . str_pad($c['role'], 10) . " login=" . $c['login'] . "\n";
+    }
+}
 exit($r['ok'] ? 0 : 1);

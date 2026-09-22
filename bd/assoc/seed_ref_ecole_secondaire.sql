@@ -17,6 +17,7 @@ INSERT IGNORE INTO `niveau` (`code_niveau`, `libelle_niv`, `id_cycle`, `ordre_ni
 ('FORM 1',    'FORM 1',    '1er Cycle', '1'),
 ('5 eme',     '5 eme',     '1er Cycle', '2'),
 ('FORM 2',    'FORM 2',    '1er Cycle', '2'),
+('4 eme',     '4ème',      '1er Cycle', '3'),
 ('4 eme ALL', '4 eme ALL', '1er Cycle', '3'),
 ('FORM 3',    'FORM 3',    '1er Cycle', '3'),
 ('4 eme ARA', '4 eme ARA', '1er Cycle', '4'),
@@ -24,6 +25,7 @@ INSERT IGNORE INTO `niveau` (`code_niveau`, `libelle_niv`, `id_cycle`, `ordre_ni
 ('4 eme CHI', '4 eme CHI', '1er Cycle', '5'),
 ('4 eme ESP', '4 eme ESP', '1er Cycle', '5'),
 ('FORM 5',    'FORM 5',    '1er Cycle', '5'),
+('3 eme',     '3ème',      '1er Cycle', '6'),
 ('3 eme ARA', '3 eme ARA', '1er Cycle', '6'),
 ('3 eme CHI', '3 eme CHI', '1er Cycle', '6'),
 ('3 eme ESP', '3 eme ESP', '1er Cycle', '7'),
@@ -78,3 +80,31 @@ INSERT IGNORE INTO `signature_titulaire` (`code`, `libelle`, `fichier`, `role_ge
 ('president_apee', 'Président de l\'APEE', NULL, 'INTENDANT'),
 ('surveillant_general', 'Surveillant Général', NULL, 'SG'),
 ('tresorier_apee', 'Trésorier de l\'APEE', NULL, 'INTENDANT');
+
+-- Paie (Ressources humaines) — même contenu de départ que
+-- bd/migration_v34.sql côté primaire : catégorie "Salaires" (nécessaire à
+-- marquer_bulletin_paye(), paie_fonctions.php, pour enregistrer le paiement
+-- d'un bulletin comme une dépense_privee) + grille salariale PLACEHOLDER
+-- (montants jamais vérifiés avec l'établissement — juste un point de
+-- départ, à corriger via Ressources humaines > Grille salariale).
+INSERT IGNORE INTO `categorie_depense_privee` (`libelle`, `description`) VALUES
+('Salaires', 'Salaires et primes du personnel');
+
+INSERT IGNORE INTO `grade_enseignant` (`code_grade`, `libelle_grade`, `salaire_base`, `ordre_affichage`) VALUES
+('VAC',   'Vacataire',              40000,  1),
+('CES1',  'Professeur des CES 2e grade', 80000,  2),
+('CES2',  'Professeur des CES 1er grade', 100000, 3),
+('CEG',   'Professeur des CEG',     70000,  4),
+('DIR',   'Direction',              150000, 5);
+
+-- Couleurs du bulletin PDF (table pdf_couleur, comme côté primaire) — les 5
+-- rôles RÉELLEMENT utilisés par secondaire/pages/bulletins/pdf.php (bulletin
+-- individuel). Mêmes valeurs que les SetFillColor()/SetDrawColor() codés en
+-- dur qu'ils remplacent (21/09/2026) — reprises telles quelles pour ne rien
+-- changer visuellement tant que personne n'y touche depuis les réglages.
+INSERT IGNORE INTO `pdf_couleur` (`cle`, `libelle`, `r`, `g`, `b`) VALUES
+('bandeau_titre', 'Bandeau titre (pilule d\'en-tête)', 219, 228, 245),
+('bordure_marque', 'Bordure / couleur de marque', 26, 60, 107),
+('entete_tableau_individuel', 'En-tête du tableau de compétences', 26, 60, 107),
+('bandeau_section', 'Bandeaux de section (Disciplines/Travail/Profil/Résultats, matière, décision)', 216, 210, 248),
+('ligne_echec', 'Surlignage moyenne insuffisante (< 10/20)', 255, 235, 235);

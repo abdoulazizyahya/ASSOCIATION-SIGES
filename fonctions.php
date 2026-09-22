@@ -878,6 +878,34 @@ function pdf_fill($pdf, string $cle): void {
     $pdf->SetFillColor($r, $g, $b);
 }
 
+// Même principe que pdf_fill(), pour la couleur de trait/bordure
+// (SetDrawColor($r,$g,$b) — ex. cadre de page, bordure de la pilule titre).
+function pdf_draw($pdf, string $cle): void {
+    [$r, $g, $b] = couleur_pdf($cle);
+    $pdf->SetDrawColor($r, $g, $b);
+}
+
+// Palette par défaut — SEULE source de vérité pour les 5 rôles visuels du
+// bulletin secondaire (secondaire/pages/bulletins/pdf.php, bulletin
+// individuel) — reprise par bd/secondaire/migration_v3.sql /
+// bd/assoc/seed_ref_ecole_secondaire.sql pour le remplissage initial, et par
+// secondaire/pages/parametres/index.php (onglet « Couleurs bulletin ») pour
+// la maquette interactive et le bouton « Réinitialiser ». Volontairement
+// distincte des 10 rôles primaire (pdf_couleur, table par école — un même
+// nom `cle` sur des écoles de types différents n'implique pas le même sens
+// visuel) : entete_tableau_classe et ligne_total_groupe (présents côté
+// ABZ_MBE, dont ce bulletin est porté) sont omis tant que pdf_classe.php et
+// le regroupement par matière ne sont pas branchés sur cette table.
+function pdf_couleurs_defaut_secondaire(): array {
+    return [
+        'bandeau_titre'             => ['libelle' => "Bandeau titre (pilule d'en-tête)", 'r' => 219, 'g' => 228, 'b' => 245],
+        'bordure_marque'            => ['libelle' => 'Bordure / couleur de marque', 'r' => 26, 'g' => 60, 'b' => 107],
+        'entete_tableau_individuel' => ['libelle' => 'En-tête du tableau de compétences', 'r' => 26, 'g' => 60, 'b' => 107],
+        'bandeau_section'           => ['libelle' => 'Bandeaux de section (Disciplines/Travail/Profil/Résultats, matière, décision)', 'r' => 216, 'g' => 210, 'b' => 248],
+        'ligne_echec'               => ['libelle' => 'Surlignage moyenne insuffisante (< 10/20)', 'r' => 255, 'g' => 235, 'b' => 235],
+    ];
+}
+
 function get_sequence_active(): array {
     // École secondaire : sequence.active/.libelle + trimestre.id/.libelle
     // (pas etat/libelle_seq/id_trim/libelle_trim) — alias libelle_seq
@@ -1586,8 +1614,15 @@ function libelle_role(string $role): string {
         'MEMBRE_ASSOCIATION' => 'Membre de l\'association',
         // Rôles école SECONDAIRE (utilisateur.role, schema_ref_ecole_secondaire.sql
         // — vocabulaire LAM_ABZ, distinct des rôles primaire ci-dessus).
+        // PROVISEUR reste le rôle réel en base (permissions inchangées) —
+        // "Principal(e)" est juste l'étiquette affichée pour un établissement
+        // secondaire PRIVÉ (etablissement.statut, migration v4 secondaire),
+        // vocabulaire camerounais : Proviseur = public, Principal = privé.
+        // Demande explicite du 22/09/2026.
         'ADMIN'      => 'Administrateur',
-        'PROVISEUR'  => 'Proviseur(e)',
+        'PROVISEUR'  => (function_exists('type_enseignement_courant') && type_enseignement_courant() === 'secondaire'
+                          && (get_etablissement()['statut'] ?? 'public') === 'prive')
+                         ? 'Principal(e)' : 'Proviseur(e)',
         'CENSEUR'    => 'Censeur(e)',
         'SG'         => 'Surveillant(e) Général(e)',
         'INTENDANT'  => 'Intendant(e)',

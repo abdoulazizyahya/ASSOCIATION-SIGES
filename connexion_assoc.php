@@ -227,12 +227,18 @@ function charger_schema_ecole(mysqli $l, array $seed, string $type = 'primaire')
         // en primaire). Pas de provisionnement classes/trimestres/barème
         // pour l'instant (schéma pédagogique secondaire pas encore branché
         // à aucune page — voir étapes suivantes du plan).
+        // statut public/privé (demande explicite du 22/09/2026, migration v4
+        // secondaire) : détermine le libellé "Proviseur"/"Principal" affiché
+        // (libelle_chef_etablissement_defaut()) et quel module Paiements est
+        // visible (layout/menu_secondaire.php) — jamais les deux à la fois.
+        $statut = in_array($seed['statut'] ?? '', ['public', 'prive'], true) ? $seed['statut'] : 'public';
+        $chef_fr = $statut === 'prive' ? 'Le Principal' : 'Le Proviseur';
         $st = mysqli_prepare($l,
-            "INSERT INTO etablissement (id, nom_fr, nom_en, sigle, ville)
-             VALUES (1, ?, ?, ?, ?)
+            "INSERT INTO etablissement (id, nom_fr, nom_en, sigle, ville, chef_etablissement, statut)
+             VALUES (1, ?, ?, ?, ?, ?, ?)
              ON DUPLICATE KEY UPDATE nom_fr=VALUES(nom_fr), nom_en=VALUES(nom_en),
                                      sigle=VALUES(sigle), ville=VALUES(ville)");
-        mysqli_stmt_bind_param($st, 'ssss', $seed['nom'], $seed['nom_en'], $seed['sigle'], $seed['ville']);
+        mysqli_stmt_bind_param($st, 'ssssss', $seed['nom'], $seed['nom_en'], $seed['sigle'], $seed['ville'], $chef_fr, $statut);
         mysqli_stmt_execute($st);
         mysqli_stmt_close($st);
 
@@ -269,6 +275,64 @@ function charger_schema_ecole(mysqli $l, array $seed, string $type = 'primaire')
     }
 
     return $nbTables;
+}
+
+// Crée les 3 comptes par défaut d'une école NEUVE, primaire ou secondaire —
+// FONDATEUR, DIRECTEUR (PROVISEUR côté secondaire) et FINANCIER (COMPTABLE
+// côté primaire, INTENDANT côté secondaire, mêmes rôles déjà autorisés sur
+// capacite_finances()/le module Paiements secondaire). Demande explicite du
+// 21/09/2026 : toute nouvelle école doit repartir avec ces 3 comptes déjà en
+// place — jusqu'ici seul un compte DIRECTEUR (install.php) ou AUCUN compte
+// (creer_etablissement(), association > Nouvel établissement — la page
+// renvoyait vers "Personnel > Affecter" pour le créer à la main après coup)
+// n'existait à la création.
+// Mot de passe = identifiant pour les 3 comptes (demande explicite du
+// 22/09/2026) — plus simple à communiquer au personnel, à changer depuis
+// Sécurité dès la première connexion.
+// $l : connexion mysqli AVEC la base école déjà sélectionnée (schéma chargé).
+// $directeur_login : si fourni (install.php — la personne qui installe a
+// choisi son propre identifiant dans le formulaire), réutilisé tel quel pour
+// le compte DIRECTEUR/PROVISEUR plutôt que le défaut "directeur".
+// Retour : liste de ['role'=>'FONDATEUR'|'DIRECTEUR'|'FINANCIER', 'login'=>string,
+// 'pwd'=>string] (= 'login').
+function creer_comptes_defaut_ecole(mysqli $l, string $type, ?string $directeur_login = null): array {
+    $secondaire = $type === 'secondaire';
+    $comptes = [
+        ['role' => 'FONDATEUR', 'login' => 'fondateur', 'nom' => 'Fondateur', 'prenom' => 'Général',
+            'fonction_primaire' => 'FONDATEUR', 'role_secondaire' => 'FONDATEUR'],
+        ['role' => 'DIRECTEUR', 'login' => $directeur_login ?: 'directeur', 'nom' => 'Directeur', 'prenom' => 'Général',
+            'fonction_primaire' => 'DIRECTEUR', 'role_secondaire' => 'PROVISEUR'],
+        ['role' => 'FINANCIER', 'login' => 'financier', 'nom' => 'Agent', 'prenom' => 'Financier',
+            'fonction_primaire' => 'COMPTABLE', 'role_secondaire' => 'INTENDANT'],
+    ];
+
+    $resultats = [];
+    foreach ($comptes as $c) {
+        $hash = password_hash($c['login'], PASSWORD_DEFAULT);
+
+        if ($secondaire) {
+            $st = mysqli_prepare($l,
+                "INSERT INTO utilisateur (nom, prenom, login, mot_de_passe, role, actif) VALUES (?, ?, ?, ?, ?, 1)");
+            mysqli_stmt_bind_param($st, 'sssss', $c['nom'], $c['prenom'], $c['login'], $hash, $c['role_secondaire']);
+            mysqli_stmt_execute($st);
+            mysqli_stmt_close($st);
+        } else {
+            $st = mysqli_prepare($l,
+                "INSERT INTO enseignant (nom_ens, prenom_ens, id_fonction, statut_ens) VALUES (?, ?, ?, 'actif')");
+            mysqli_stmt_bind_param($st, 'sss', $c['nom'], $c['prenom'], $c['fonction_primaire']);
+            mysqli_stmt_execute($st);
+            $matricule = mysqli_insert_id($l);
+            mysqli_stmt_close($st);
+
+            $st = mysqli_prepare($l, "INSERT INTO user (login_user, pwd_user, matricule_ens) VALUES (?, ?, ?)");
+            mysqli_stmt_bind_param($st, 'ssi', $c['login'], $hash, $matricule);
+            mysqli_stmt_execute($st);
+            mysqli_stmt_close($st);
+        }
+
+        $resultats[] = ['role' => $c['role'], 'login' => $c['login'], 'pwd' => $c['login']];
+    }
+    return $resultats;
 }
 
 // Charge les données de référence (bd/assoc/seed_ref_ecole.sql) dans la base
@@ -446,6 +510,10 @@ function creer_etablissement(array $in): array {
     $sous  = trim($in['sous_domaine'] ?? '') ?: null;
     $type  = in_array($in['type_enseignement'] ?? '', ['primaire', 'secondaire'], true)
            ? $in['type_enseignement'] : 'primaire';
+    // Statut public/privé — secondaire uniquement (détermine le libellé
+    // "Proviseur"/"Principal" et quel module Paiements est visible, voir
+    // libelle_role()/layout/menu_secondaire.php). Sans effet en primaire.
+    $statut = in_array($in['statut'] ?? '', ['public', 'prive'], true) ? $in['statut'] : 'public';
 
     if (!preg_match('/^[A-Z0-9]{2,10}$/', $code)) {
         return ['ok' => false, 'message' => 'Code invalide : 2 à 10 caractères A–Z ou 0–9.', 'id' => null, 'db_name' => null];
@@ -508,7 +576,8 @@ function creer_etablissement(array $in): array {
         return ['ok' => false, 'message' => "La base « $db » est déjà référencée.", 'id' => null, 'db_name' => null];
     }
 
-    $seed = ['nom' => $nom, 'nom_en' => $nomEn, 'sigle' => $sigle, 'ville' => $ville];
+    $seed = ['nom' => $nom, 'nom_en' => $nomEn, 'sigle' => $sigle, 'ville' => $ville, 'statut' => $statut];
+    $comptes = [];
 
     try {
         if ($pool_mode) {
@@ -523,6 +592,7 @@ function creer_etablissement(array $in): array {
                 return ['ok' => false, 'message' => "La base du pool « $db » n'est pas vide — abandon. Nettoyez-la ou retirez-la du pool.", 'id' => null, 'db_name' => null];
             }
             charger_schema_ecole($l, $seed, $type);
+            $comptes = creer_comptes_defaut_ecole($l, $type);
             mysqli_close($l);
         } else {
             // Serveur dédié / LAN : on crée la base.
@@ -539,6 +609,7 @@ function creer_etablissement(array $in): array {
             mysqli_query($srv, "CREATE DATABASE `$db` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci");
             mysqli_select_db($srv, $db);
             charger_schema_ecole($srv, $seed, $type);
+            $comptes = creer_comptes_defaut_ecole($srv, $type);
             mysqli_close($srv);
         }
     } catch (\Throwable $e) {
@@ -557,16 +628,15 @@ function creer_etablissement(array $in): array {
     }
 
     // Version de schéma = dernière migration connue. Séries de migrations
-    // disjointes primaire (bd/migration_v*.sql) / secondaire (pas encore de
-    // série propre — voir plan : bd/secondaire/migration_v*.sql à créer
-    // quand le module secondaire/ existera) : une école secondaire démarre
-    // donc à v0, jamais mélangée avec la numérotation primaire.
+    // disjointes primaire (bd/migration_v*.sql) / secondaire
+    // (bd/secondaire/migration_v*.sql, depuis migration v1 secondaire du
+    // 18/09/2026) : jamais mélangées, une école ne compare sa version qu'à
+    // la série de son propre type_enseignement (assoc_migrations_disponibles()).
+    // Une école neuve reçoit déjà tout via schema_ref_ecole(_secondaire).sql
+    // à jour -> $vmax = dernière migration dispo de son type, jamais "en retard"
+    // dès sa création.
     $vmax = 0;
-    if ($type === 'primaire') {
-        foreach (glob(__DIR__ . '/bd/migration_v*.sql') as $f) {
-            if (preg_match('/migration_v(\d+)\.sql$/', $f, $m)) $vmax = max($vmax, (int) $m[1]);
-        }
-    }
+    foreach (assoc_migrations_disponibles($type) as $v => $f) { $vmax = max($vmax, $v); }
 
     // Ligne annuaire
     assoc_exec(
@@ -589,14 +659,12 @@ function creer_etablissement(array $in): array {
 
     regenerer_portail_accueil_best_effort();   // rafraîchit promeducamsiges.html
 
-    $suite = $type === 'secondaire'
-        ? "Module secondaire en cours de portage — pages et gestion des comptes pas encore disponibles."
-        : "Créez maintenant un compte DIRECTEUR via Personnel → Affecter.";
     return [
         'ok'      => true,
-        'message' => "Établissement « $nom » créé (base $db, type $type, schéma v$vmax). $suite",
+        'message' => "Établissement « $nom » créé (base $db, type $type, schéma v$vmax). Comptes FONDATEUR/DIRECTEUR/FINANCIER créés — voir ci-dessous.",
         'id'      => $id,
         'db_name' => $db,
+        'comptes' => $comptes,
     ];
 }
 
@@ -1441,35 +1509,41 @@ function etablissement_checklist(int $id): array {
 //  avec une sauvegarde de sécurité AVANT d'appliquer.
 // =====================================================================
 
-/** Migrations disponibles sur le disque : [version => chemin], triées. */
-function assoc_migrations_disponibles(): array {
+/**
+ * Migrations disponibles sur le disque pour un type d'école : [version =>
+ * chemin], triées. Deux séries INDÉPENDANTES et jamais comparées entre
+ * elles : bd/migration_v*.sql (primaire, historique) et
+ * bd/secondaire/migration_v*.sql (secondaire, depuis le 18/09/2026).
+ */
+function assoc_migrations_disponibles(string $type = 'primaire'): array {
+    $dossier = $type === 'secondaire' ? __DIR__ . '/bd/secondaire' : __DIR__ . '/bd';
     $d = [];
-    foreach (glob(__DIR__ . '/bd/migration_v*.sql') ?: [] as $f) {
+    foreach (glob($dossier . '/migration_v*.sql') ?: [] as $f) {
         if (preg_match('/migration_v(\d+)\.sql$/', $f, $m)) $d[(int) $m[1]] = $f;
     }
     ksort($d);
     return $d;
 }
 
-/** État des migrations par école : version courante + versions en retard. */
+/**
+ * État des migrations par école : version courante + versions en retard,
+ * chaque école comparée à la série de SON PROPRE type_enseignement (primaire
+ * bd/migration_v*.sql, ou secondaire bd/secondaire/migration_v*.sql — jamais
+ * l'une contre l'autre). $vmax/$nb_migrations restent ceux de la série
+ * primaire (utilisés tels quels par le bandeau d'association/migrations.php).
+ */
 function assoc_migrations_etat(): array {
-    $dispo = assoc_migrations_disponibles();
-    $vmax  = $dispo ? max(array_keys($dispo)) : 0;
+    $dispo_primaire   = assoc_migrations_disponibles('primaire');
+    $dispo_secondaire = assoc_migrations_disponibles('secondaire');
+    $vmax  = $dispo_primaire ? max(array_keys($dispo_primaire)) : 0;
     $out = [];
     foreach (assoc_all("SELECT id, code, nom, db_name, actif, type_enseignement FROM etablissement ORDER BY actif DESC, nom") as $e) {
-        $ver = (int) (assoc_val("SELECT version FROM schema_version_etab WHERE id_etablissement=?", [$e['id']]) ?? 0);
-        // bd/migration_v*.sql est la série PRIMAIRE uniquement (pas encore
-        // de série secondaire propre — voir plan « Intégration du
-        // secondaire ») : comparer une école secondaire à $dispo la
-        // ferait apparaître à tort en retard de ~toutes les migrations
-        // primaires. Toujours « à jour » côté secondaire tant que cette
-        // série n'existe pas.
-        $retard = $e['type_enseignement'] === 'secondaire'
-            ? []
-            : array_values(array_filter(array_keys($dispo), fn($v) => $v > $ver));
+        $ver   = (int) (assoc_val("SELECT version FROM schema_version_etab WHERE id_etablissement=?", [$e['id']]) ?? 0);
+        $dispo = $e['type_enseignement'] === 'secondaire' ? $dispo_secondaire : $dispo_primaire;
+        $retard = array_values(array_filter(array_keys($dispo), fn($v) => $v > $ver));
         $out[] = $e + ['version' => $ver, 'retard' => $retard, 'a_jour' => !$retard];
     }
-    return ['ecoles' => $out, 'vmax' => $vmax, 'nb_migrations' => count($dispo)];
+    return ['ecoles' => $out, 'vmax' => $vmax, 'nb_migrations' => count($dispo_primaire)];
 }
 
 // Écoles ACTIVES dont le schéma a du retard — résumé léger pour le bandeau
@@ -1491,13 +1565,10 @@ function assoc_migrer_ecole(int $id, bool $backup = true): array {
     $e = assoc_one("SELECT * FROM etablissement WHERE id=?", [$id]);
     if (!$e) return ['ok' => false, 'message' => "École introuvable.", 'appliquees' => [], 'backup' => null];
 
-    if (($e['type_enseignement'] ?? 'primaire') === 'secondaire') {
-        // bd/migration_v*.sql est la série PRIMAIRE — l'appliquer telle
-        // quelle à une base secondaire (schéma LAM_ABZ) tenterait des ALTER
-        // TABLE sur des tables/colonnes qui n'existent pas dans ce schéma.
-        // Pas encore de série de migrations secondaire (voir plan).
-        return ['ok' => false, 'message' => "École secondaire : pas encore de série de migrations dédiée.", 'appliquees' => [], 'backup' => null];
-    }
+    // Chaque école applique la série de SON type — jamais la série primaire
+    // sur une base secondaire (schéma LAM_ABZ) ni l'inverse : les ALTER
+    // TABLE viseraient des tables/colonnes inexistantes dans l'autre schéma.
+    $type_ecole = ($e['type_enseignement'] ?? 'primaire') === 'secondaire' ? 'secondaire' : 'primaire';
 
     require_once __DIR__ . '/bd/lib/ecole_maintenance.php';
     $etat = ecole_base_etat($e['db_name']);
@@ -1505,7 +1576,7 @@ function assoc_migrer_ecole(int $id, bool $backup = true): array {
         return ['ok' => false, 'message' => "La base « {$e['db_name']} » n'existe pas.", 'appliquees' => [], 'backup' => null];
     }
 
-    $dispo = assoc_migrations_disponibles();
+    $dispo = assoc_migrations_disponibles($type_ecole);
     $ver   = (int) (assoc_val("SELECT version FROM schema_version_etab WHERE id_etablissement=?", [$id]) ?? 0);
     $a_faire = array_values(array_filter(array_keys($dispo), fn($v) => $v > $ver));
     if (!$a_faire) return ['ok' => true, 'message' => "Déjà à jour (v$ver).", 'appliquees' => [], 'backup' => null];
@@ -1978,14 +2049,23 @@ function assoc_niu_generer_pour(int $id_etab, array $ident, string $par, ?string
  *   ['ecoles' => [['code','nom','crees','deja','total','erreur'], …],
  *    'total_crees' => int]
  */
+// Le secondaire est exclu à la source (pas seulement ignoré en boucle) :
+// cette rubrique ne le concerne pas du tout (voir association/niu/index.php)
+// — ces élèves ont déjà un NIU officiel, saisi à la main sur leur fiche
+// (eleve.niu, schéma secondaire) — cf. secondaire/pages/eleves/form.php.
+// Générer un NIU au format PMC+sigle+année ici écraserait ce NIU déjà
+// attribué, en plus d'utiliser des colonnes (Nom_elv…) qui n'existent pas
+// dans ce schéma. Demande explicite du 21/09/2026 (amendement du
+// 16/09/2026, qui se contentait de sauter l'école en boucle).
 function assoc_niu_generer_manquants(?int $id_etab, string $par): array {
     $ecoles = $id_etab
-        ? assoc_all("SELECT * FROM etablissement WHERE id=? AND actif=1", [$id_etab])
-        : assoc_all("SELECT * FROM etablissement WHERE actif=1 ORDER BY nom");
+        ? assoc_all("SELECT * FROM etablissement WHERE id=? AND actif=1 AND COALESCE(type_enseignement,'primaire')<>'secondaire'", [$id_etab])
+        : assoc_all("SELECT * FROM etablissement WHERE actif=1 AND COALESCE(type_enseignement,'primaire')<>'secondaire' ORDER BY nom");
     $out = ['ecoles' => [], 'total_crees' => 0];
 
     foreach ($ecoles as $e) {
         $ligne = ['code' => $e['code'], 'nom' => $e['nom'], 'crees' => 0, 'deja' => 0, 'total' => 0, 'erreur' => null];
+
         try {
             $l = mysqli_connect(DB_HOST, DB_USER, DB_PASS, $e['db_name']);
             mysqli_set_charset($l, 'utf8mb4');
@@ -2034,15 +2114,21 @@ function assoc_niu_generer_manquants(?int $id_etab, string $par): array {
 }
 
 /**
- * Liste agrégée des élèves de TOUTES les écoles (ou d'une seule), paginée,
- * avec filtres. $f : ['etab'=>?int, 'q'=>?string, 'niu'=>'avec'|'sans'|null].
- * Coûteux (une requête par école, filtrage/tri/pagination en PHP) — OK pour
- * un réseau de quelques milliers d'élèves.
+ * Liste agrégée des élèves de TOUTES les écoles PRIMAIRE (ou d'une seule),
+ * paginée, avec filtres. $f : ['etab'=>?int, 'q'=>?string, 'niu'=>'avec'|
+ * 'sans'|null]. Coûteux (une requête par école, filtrage/tri/pagination en
+ * PHP) — OK pour un réseau de quelques milliers d'élèves.
+ *
+ * Le secondaire est exclu ICI, à la source (pas seulement masqué dans le
+ * template) : son NIU est une information de fiche élève comme une autre,
+ * saisie/modifiée directement sur secondaire/pages/eleves/form.php — cette
+ * rubrique (registre NIU de l'association) ne le concerne pas du tout,
+ * ni pour la lister ni pour en générer. Demande explicite du 21/09/2026.
  */
 function assoc_eleves_systeme(array $f, int $page = 1, int $par_page = 40): array {
     $ecoles = !empty($f['etab'])
-        ? assoc_all("SELECT * FROM etablissement WHERE id=?", [(int) $f['etab']])
-        : assoc_all("SELECT * FROM etablissement WHERE actif=1 ORDER BY nom");
+        ? assoc_all("SELECT * FROM etablissement WHERE id=? AND COALESCE(type_enseignement,'primaire')<>'secondaire'", [(int) $f['etab']])
+        : assoc_all("SELECT * FROM etablissement WHERE actif=1 AND COALESCE(type_enseignement,'primaire')<>'secondaire' ORDER BY nom");
 
     $q  = trim((string) ($f['q'] ?? ''));
     $ql = mb_strtolower($q);
@@ -2050,17 +2136,33 @@ function assoc_eleves_systeme(array $f, int $page = 1, int $par_page = 40): arra
     $sans_niu = 0;
 
     foreach ($ecoles as $e) {
+        $secondaire = ($e['type_enseignement'] ?? 'primaire') === 'secondaire';
         try {
             $l = mysqli_connect(DB_HOST, DB_USER, DB_PASS, $e['db_name']);
             mysqli_set_charset($l, 'utf8mb4');
+
+            // Schéma DISTINCT selon le type d'école (Nom_elv/Mat_elv/id_eleve
+            // côté primaire vs nom/matricule/id côté secondaire) — jamais la
+            // requête primaire sur une base secondaire (bug réel constaté :
+            // exception mysqli « Champ inconnu », qui faisait planter TOUTE
+            // la page réseau dès la première école secondaire rencontrée).
+            $res = $secondaire
+                ? mysqli_query($l,
+                    "SELECT e.id AS id_eleve, e.matricule AS mat, e.nom, e.prenom,
+                            e.date_naiss AS naiss, e.sexe, e.niu,
+                            TRIM(CONCAT_WS(', ',
+                                (SELECT CONCAT(p.nom, ' ', COALESCE(p.prenom, '')) FROM parent p WHERE p.id = e.id_pere),
+                                (SELECT CONCAT(p.nom, ' ', COALESCE(p.prenom, '')) FROM parent p WHERE p.id = e.id_mere)
+                            )) AS parents
+                     FROM eleve e WHERE e.statut = 'actif'")
+                : mysqli_query($l,
+                    "SELECT e.id_eleve, e.Mat_elv AS mat, e.Nom_elv AS nom, e.Prenom_elv AS prenom,
+                            e.Date_naiss_elv AS naiss, e.Sexe_elv AS sexe, e.niu,
+                            (SELECT GROUP_CONCAT(CONCAT(p.nom, ' ', p.prenom) SEPARATOR ', ')
+                             FROM parent p WHERE p.id_eleve = e.id_eleve) AS parents
+                     FROM eleve e WHERE e.statut = 'actif'");
         } catch (\Throwable $ex) { continue; }
 
-        $res = mysqli_query($l,
-            "SELECT e.id_eleve, e.Mat_elv, e.Nom_elv, e.Prenom_elv, e.Date_naiss_elv,
-                    e.Sexe_elv, e.niu,
-                    (SELECT GROUP_CONCAT(CONCAT(p.nom, ' ', p.prenom) SEPARATOR ', ')
-                     FROM parent p WHERE p.id_eleve = e.id_eleve) AS parents
-             FROM eleve e WHERE e.statut = 'actif'");
         while ($res && ($r = mysqli_fetch_assoc($res))) {
             $niu = trim((string) $r['niu']);
             if ($niu === '') $sans_niu++;
@@ -2070,18 +2172,19 @@ function assoc_eleves_systeme(array $f, int $page = 1, int $par_page = 40): arra
 
             if ($q !== '') {
                 $hay = mb_strtolower(
-                    $r['Nom_elv'] . ' ' . $r['Prenom_elv'] . ' ' . $niu . ' '
-                    . $r['Mat_elv'] . ' ' . ($r['parents'] ?? ''));
+                    $r['nom'] . ' ' . $r['prenom'] . ' ' . $niu . ' '
+                    . $r['mat'] . ' ' . ($r['parents'] ?? ''));
                 if (mb_strpos($hay, $ql) === false) continue;
             }
 
             $tous[] = [
                 'ecole_code' => $e['code'], 'ecole_nom' => $e['nom'], 'ecole_id' => (int) $e['id'],
+                'secondaire' => $secondaire,
                 'id_eleve'   => (int) $r['id_eleve'],
-                'mat'        => $r['Mat_elv'],
-                'nom'        => trim($r['Nom_elv'] . ' ' . $r['Prenom_elv']),
-                'naiss'      => $r['Date_naiss_elv'],
-                'sexe'       => $r['Sexe_elv'],
+                'mat'        => $r['mat'],
+                'nom'        => trim($r['nom'] . ' ' . $r['prenom']),
+                'naiss'      => $r['naiss'],
+                'sexe'       => $r['sexe'],
                 'niu'        => $niu,
                 'parents'    => $r['parents'],
             ];

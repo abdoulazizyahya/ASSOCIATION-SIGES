@@ -160,6 +160,15 @@ function fondateur_ecriture_permise(): bool {
 function capacite_finances(): bool {
     if (est_visite_association() || est_proprietaire_association()) return true;
     if (est_fondateur()) return true;
+    // Rôles secondaire distincts du primaire (COMPTABLE/SECRETAIRE) — mêmes
+    // rôles déjà autorisés sur le module Paiements secondaire, voir
+    // exiger_role() dans secondaire/pages/paiements/*.php. Sans cette
+    // branche, un PROVISEUR/CENSEUR/INTENDANT (staff qui voit déjà les
+    // paiements dans son propre module) ne voyait jamais le bloc Finances
+    // du tableau de bord — bug réel constaté le 21/09/2026.
+    if (function_exists('type_enseignement_courant') && type_enseignement_courant() === 'secondaire') {
+        return in_array(role_connecte(), ['ADMIN', 'PROVISEUR', 'CENSEUR', 'INTENDANT'], true);
+    }
     return in_array(role_connecte(), ['COMPTABLE', 'SECRETAIRE'], true);
 }
 
@@ -393,12 +402,18 @@ function ecole_courante(): ?array {
     return $ETAB_COURANT ?: null;
 }
 
-// Type pédagogique de l'école courante : 'primaire' (défaut, y compris hors
-// contexte multi-établissement — mono-école historique) ou 'secondaire'.
+// Type pédagogique de l'école courante : 'primaire' ou 'secondaire'.
 // Détermine quel module de pages/menu/dashboard/schéma s'applique — voir
 // bd/assoc/schema_ref_ecole_secondaire.sql et le dossier secondaire/.
+// Hors contexte multi-établissement (annuaire absent — installation mono-
+// école, voir install.php mode « école unique »), il n'y a pas de ligne
+// annuaire pour porter ce type : on retombe sur la constante ECOLE_TYPE_SOLO
+// (config.php / config.local.php), 'primaire' par défaut (comportement
+// historique inchangé pour toute installation existante).
 function type_enseignement_courant(): string {
-    return ecole_courante()['type_enseignement'] ?? 'primaire';
+    $t = ecole_courante()['type_enseignement'] ?? null;
+    if ($t !== null) return $t;
+    return (defined('ECOLE_TYPE_SOLO') && ECOLE_TYPE_SOLO === 'secondaire') ? 'secondaire' : 'primaire';
 }
 
 // ── Bascule de la base « école courante » ───────────────────────────

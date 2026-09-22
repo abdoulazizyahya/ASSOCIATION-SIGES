@@ -332,7 +332,16 @@ CREATE TABLE `enseignant` (
   `date_1ere_etab` date DEFAULT NULL,
   `matiere_enseignee` varchar(120) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `signature` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  PRIMARY KEY (`matricule_ens`)
+  `matricule_cnps` varchar(30) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `indice_grille` varchar(30) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `nb_enfants` tinyint unsigned DEFAULT '0',
+  `nb_pers_charge` tinyint unsigned DEFAULT '0',
+  `date_recrutement` date DEFAULT NULL,
+  `mode_paiement` varchar(30) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `nom_banque` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `compte_bancaire` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  PRIMARY KEY (`matricule_ens`),
+  KEY `id_grade` (`id_grade`)
 ) ENGINE=InnoDB AUTO_INCREMENT=53 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 DROP TABLE IF EXISTS `enseignat_principal`;
@@ -367,6 +376,8 @@ CREATE TABLE `etablissement` (
   `arrondissement_fr` varchar(150) DEFAULT NULL,
   `subdivision_en` varchar(150) DEFAULT NULL,
   `chef_etablissement` varchar(150) DEFAULT 'Le Proviseur',
+  `chef_etablissement_en` varchar(150) DEFAULT 'The Principal',
+  `statut` enum('public','prive') NOT NULL DEFAULT 'public',
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
@@ -423,6 +434,7 @@ CREATE TABLE `inscription` (
   `id` int unsigned NOT NULL AUTO_INCREMENT,
   `id_eleve` int unsigned NOT NULL,
   `id_classe` int unsigned NOT NULL,
+  `id_serie` int unsigned DEFAULT NULL,
   `id_annee` int unsigned NOT NULL,
   `statut` varchar(30) DEFAULT 'Nouveau',
   `date_inscription` date DEFAULT (curdate()),
@@ -430,9 +442,11 @@ CREATE TABLE `inscription` (
   UNIQUE KEY `uq_insc` (`id_eleve`,`id_annee`),
   KEY `id_classe` (`id_classe`),
   KEY `id_annee` (`id_annee`),
+  KEY `idx_insc_serie` (`id_serie`),
   CONSTRAINT `inscription_ibfk_1` FOREIGN KEY (`id_eleve`) REFERENCES `eleve` (`id`) ON DELETE CASCADE,
   CONSTRAINT `inscription_ibfk_2` FOREIGN KEY (`id_classe`) REFERENCES `classe` (`id`) ON DELETE CASCADE,
-  CONSTRAINT `inscription_ibfk_3` FOREIGN KEY (`id_annee`) REFERENCES `annee_scolaire` (`id`) ON DELETE CASCADE
+  CONSTRAINT `inscription_ibfk_3` FOREIGN KEY (`id_annee`) REFERENCES `annee_scolaire` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_insc_serie` FOREIGN KEY (`id_serie`) REFERENCES `serie` (`id`) ON DELETE SET NULL ON UPDATE CASCADE
 ) ENGINE=InnoDB AUTO_INCREMENT=670 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 DROP TABLE IF EXISTS `matiere`;
@@ -544,7 +558,7 @@ CREATE TABLE `paiement_frais` (
   `montant` decimal(10,2) NOT NULL,
   `ref_paiement` varchar(50) DEFAULT NULL,
   `date_paiement` date NOT NULL,
-  `id_utilisateur` int unsigned NOT NULL,
+  `id_utilisateur` int unsigned DEFAULT NULL,
   `numero_recu` varchar(20) NOT NULL,
   `cree_le` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
@@ -643,6 +657,177 @@ CREATE TABLE `paiement_prive` (
   CONSTRAINT `fk_paypriv_utilisateur` FOREIGN KEY (`id_utilisateur`) REFERENCES `utilisateur` (`id`) ON DELETE SET NULL ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
+-- ── Paie (Ressources humaines) ───────────────────────────────────────
+-- Porté du module Paie du PRIMAIRE (pages/paie/*, paie_fonctions.php,
+-- bd/migration_v34.sql/v35.sql) — mêmes noms de tables/colonnes que le
+-- primaire, VOLONTAIREMENT identiques : paie_fonctions.php est réutilisé
+-- TEL QUEL par secondaire/pages/paie/* (aucune duplication du moteur de
+-- calcul), chaque école ayant de toute façon sa propre base. Seule
+-- différence de fond : bulletin_paie.id_depense référence `depense_privee`
+-- (PAIEMENT PRIVÉ ci-dessus), pas `depense` (absente du schéma secondaire)
+-- — marquer_bulletin_paye() (paie_fonctions.php) est rendue type-aware pour
+-- ça. Demande explicite du 21/09/2026.
+-- grade_enseignant/indemnite_grade en utf8mb4_unicode_ci (pas le
+-- utf8mb4_0900_ai_ci par défaut du reste de ce fichier) : enseignant.id_grade
+-- (table héritée, tout en unicode_ci) référence grade_enseignant.code_grade
+-- en clé étrangère (ALTER TABLE plus bas) — MySQL refuse une FK entre deux
+-- collations différentes ("are incompatible"), ce qui cassait la création de
+-- toute école secondaire neuve (bug réel constaté le 22/09/2026, en testant
+-- creer_etablissement() pour la création automatique des comptes par défaut).
+DROP TABLE IF EXISTS `grade_enseignant`;
+CREATE TABLE `grade_enseignant` (
+  `code_grade` varchar(20) NOT NULL,
+  `libelle_grade` varchar(150) NOT NULL,
+  `salaire_base` decimal(12,2) NOT NULL DEFAULT '0.00',
+  `ordre_affichage` int NOT NULL DEFAULT '0',
+  PRIMARY KEY (`code_grade`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+DROP TABLE IF EXISTS `indemnite_grade`;
+CREATE TABLE `indemnite_grade` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `code_grade` varchar(20) NOT NULL,
+  `libelle_indemnite` varchar(150) NOT NULL,
+  `montant` decimal(12,2) NOT NULL DEFAULT '0.00',
+  PRIMARY KEY (`id`),
+  KEY `code_grade` (`code_grade`),
+  CONSTRAINT `fk_indemnite_grade` FOREIGN KEY (`code_grade`) REFERENCES `grade_enseignant` (`code_grade`) ON DELETE CASCADE ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+DROP TABLE IF EXISTS `contrat_enseignant`;
+CREATE TABLE `contrat_enseignant` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `matricule_ens` int NOT NULL,
+  `type_contrat` varchar(30) NOT NULL,
+  `date_debut` date NOT NULL,
+  `date_fin` date DEFAULT NULL,
+  `actif` tinyint(1) NOT NULL DEFAULT '1',
+  `remarques` varchar(255) DEFAULT NULL,
+  `cree_le` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `matricule_ens` (`matricule_ens`),
+  CONSTRAINT `fk_contrat_enseignant` FOREIGN KEY (`matricule_ens`) REFERENCES `enseignant` (`matricule_ens`) ON DELETE CASCADE ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+DROP TABLE IF EXISTS `conge_enseignant`;
+CREATE TABLE `conge_enseignant` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `matricule_ens` int NOT NULL,
+  `type_conge` varchar(30) NOT NULL,
+  `date_debut` date NOT NULL,
+  `date_fin` date NOT NULL,
+  `nb_jours` int NOT NULL DEFAULT '0',
+  `motif` varchar(255) DEFAULT NULL,
+  `statut` varchar(20) NOT NULL DEFAULT 'Validé',
+  `deduit_paie` tinyint(1) NOT NULL DEFAULT '0',
+  `id_utilisateur` int unsigned DEFAULT NULL,
+  `cree_le` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `matricule_ens` (`matricule_ens`),
+  KEY `id_utilisateur` (`id_utilisateur`),
+  CONSTRAINT `fk_conge_enseignant` FOREIGN KEY (`matricule_ens`) REFERENCES `enseignant` (`matricule_ens`) ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT `fk_conge_utilisateur` FOREIGN KEY (`id_utilisateur`) REFERENCES `utilisateur` (`id`) ON DELETE SET NULL ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+DROP TABLE IF EXISTS `avance_salaire`;
+CREATE TABLE `avance_salaire` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `matricule_ens` int NOT NULL,
+  `montant` decimal(12,2) NOT NULL,
+  `date_avance` date NOT NULL,
+  `motif` varchar(255) DEFAULT NULL,
+  `id_utilisateur` int unsigned DEFAULT NULL,
+  `cree_le` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `matricule_ens` (`matricule_ens`),
+  KEY `id_utilisateur` (`id_utilisateur`),
+  CONSTRAINT `fk_avance_enseignant` FOREIGN KEY (`matricule_ens`) REFERENCES `enseignant` (`matricule_ens`) ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT `fk_avance_utilisateur` FOREIGN KEY (`id_utilisateur`) REFERENCES `utilisateur` (`id`) ON DELETE SET NULL ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+DROP TABLE IF EXISTS `periode_paie`;
+CREATE TABLE `periode_paie` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `mois` tinyint NOT NULL,
+  `annee` smallint NOT NULL,
+  `libelle` varchar(50) NOT NULL,
+  `statut` varchar(20) NOT NULL DEFAULT 'Brouillon',
+  `cree_le` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `date_validation` timestamp NULL DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_periode_mois_annee` (`mois`,`annee`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+DROP TABLE IF EXISTS `bulletin_paie`;
+CREATE TABLE `bulletin_paie` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `id_periode` int NOT NULL,
+  `matricule_ens` int NOT NULL,
+  `code_grade` varchar(20) DEFAULT NULL,
+  `salaire_base` decimal(12,2) NOT NULL DEFAULT '0.00',
+  `total_indemnites` decimal(12,2) NOT NULL DEFAULT '0.00',
+  `total_primes` decimal(12,2) NOT NULL DEFAULT '0.00',
+  `total_retenues` decimal(12,2) NOT NULL DEFAULT '0.00',
+  `montant_avance_deduite` decimal(12,2) NOT NULL DEFAULT '0.00',
+  `montant_absence_deduite` decimal(12,2) NOT NULL DEFAULT '0.00',
+  `jours_absence` int NOT NULL DEFAULT '0',
+  `brut` decimal(12,2) NOT NULL DEFAULT '0.00',
+  `net_a_payer` decimal(12,2) NOT NULL DEFAULT '0.00',
+  `statut` varchar(20) NOT NULL DEFAULT 'Généré',
+  `mode_paiement` varchar(30) DEFAULT NULL,
+  `reference_paiement` varchar(50) DEFAULT NULL,
+  `date_paiement` date DEFAULT NULL,
+  `id_depense` int unsigned DEFAULT NULL,
+  `id_utilisateur` int unsigned DEFAULT NULL,
+  `cree_le` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_bulletin_periode_ens` (`id_periode`,`matricule_ens`),
+  KEY `matricule_ens` (`matricule_ens`),
+  KEY `id_utilisateur` (`id_utilisateur`),
+  KEY `id_depense` (`id_depense`),
+  CONSTRAINT `fk_bulletin_periode` FOREIGN KEY (`id_periode`) REFERENCES `periode_paie` (`id`) ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT `fk_bulletin_enseignant` FOREIGN KEY (`matricule_ens`) REFERENCES `enseignant` (`matricule_ens`) ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT `fk_bulletin_utilisateur` FOREIGN KEY (`id_utilisateur`) REFERENCES `utilisateur` (`id`) ON DELETE SET NULL ON UPDATE CASCADE,
+  CONSTRAINT `fk_bulletin_depense` FOREIGN KEY (`id_depense`) REFERENCES `depense_privee` (`id`) ON DELETE SET NULL ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+DROP TABLE IF EXISTS `ligne_bulletin_paie`;
+CREATE TABLE `ligne_bulletin_paie` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `id_bulletin` int NOT NULL,
+  `type_ligne` varchar(10) NOT NULL,
+  `code_rubrique` varchar(10) DEFAULT NULL,
+  `libelle` varchar(150) NOT NULL,
+  `nb` decimal(10,2) DEFAULT NULL,
+  `montant` decimal(12,2) NOT NULL,
+  `base` decimal(12,2) DEFAULT NULL,
+  `taux_pct` decimal(6,2) DEFAULT NULL,
+  `ordre_affichage` int NOT NULL DEFAULT '0',
+  PRIMARY KEY (`id`),
+  KEY `id_bulletin` (`id_bulletin`),
+  CONSTRAINT `fk_ligne_bulletin` FOREIGN KEY (`id_bulletin`) REFERENCES `bulletin_paie` (`id`) ON DELETE CASCADE ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+DROP TABLE IF EXISTS `remboursement_avance`;
+CREATE TABLE `remboursement_avance` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `id_avance` int NOT NULL,
+  `id_bulletin` int NOT NULL,
+  `montant` decimal(12,2) NOT NULL,
+  `date_remboursement` date NOT NULL,
+  PRIMARY KEY (`id`),
+  KEY `id_avance` (`id_avance`),
+  KEY `id_bulletin` (`id_bulletin`),
+  CONSTRAINT `fk_rembours_avance` FOREIGN KEY (`id_avance`) REFERENCES `avance_salaire` (`id`) ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT `fk_rembours_bulletin` FOREIGN KEY (`id_bulletin`) REFERENCES `bulletin_paie` (`id`) ON DELETE CASCADE ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+-- FK vers grade_enseignant posée ICI (après sa création ci-dessus) — la
+-- table `enseignant` est définie plus haut dans ce fichier, avant
+-- `grade_enseignant` : une contrainte inline y aurait référencé une table
+-- pas encore créée (échec au chargement séquentiel du dump).
+ALTER TABLE `enseignant` ADD CONSTRAINT `fk_enseignant_grade` FOREIGN KEY (`id_grade`) REFERENCES `grade_enseignant` (`code_grade`) ON DELETE SET NULL ON UPDATE CASCADE;
+
 DROP TABLE IF EXISTS `parent`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
@@ -660,6 +845,18 @@ CREATE TABLE `parent` (
   KEY `telephone` (`telephone`),
   KEY `nom` (`nom`)
 ) ENGINE=InnoDB AUTO_INCREMENT=3 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+DROP TABLE IF EXISTS `pdf_couleur`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `pdf_couleur` (
+  `cle` varchar(40) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `libelle` varchar(150) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `r` tinyint unsigned NOT NULL,
+  `g` tinyint unsigned NOT NULL,
+  `b` tinyint unsigned NOT NULL,
+  PRIMARY KEY (`cle`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 DROP TABLE IF EXISTS `question_secrete`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
@@ -861,7 +1058,7 @@ CREATE TABLE `utilisateur` (
   `prenom` varchar(100) DEFAULT NULL,
   `login` varchar(80) NOT NULL,
   `mot_de_passe` varchar(255) NOT NULL,
-  `role` enum('ADMIN','PROVISEUR','CENSEUR','SG','SECRETAIRE','ENSEIGNANT','INTENDANT') NOT NULL DEFAULT 'SECRETAIRE',
+  `role` enum('ADMIN','PROVISEUR','CENSEUR','SG','SECRETAIRE','ENSEIGNANT','INTENDANT','FONDATEUR') NOT NULL DEFAULT 'SECRETAIRE',
   `actif` tinyint(1) NOT NULL DEFAULT '1',
   `matricule_ens` int DEFAULT NULL,
   `cree_le` timestamp NULL DEFAULT CURRENT_TIMESTAMP,

@@ -2,12 +2,13 @@
 require_once __DIR__ . '/../../../config.php';
 require_once __DIR__ . '/../../../connexion.php';
 require_once __DIR__ . '/../../../fonctions.php';
-exiger_role(['ADMIN','PROVISEUR','CENSEUR','INTENDANT']);
+exiger_role(['ADMIN','PROVISEUR', 'FONDATEUR','CENSEUR','INTENDANT']);
 
 $annee_active = get_annee_active();
 $id_annee     = (int)($annee_active['id'] ?? 0);
 $id_classe    = (int)($_GET['classe'] ?? 0);
 $id_eleve     = (int)($_GET['eleve']  ?? 0);
+$libelle_chef = libelle_role('PROVISEUR'); // "Proviseur(e)" (public) ou "Principal(e)" (privé)
 
 $classes = $id_annee
     ? db_all("SELECT c.* FROM classe c
@@ -73,7 +74,7 @@ require_once __DIR__ . '/../../../layout/header.php';
         <select id="selEleve" class="form-select form-select-sm" <?= $id_classe ? '' : 'disabled' ?>>
           <option value="">— Choisir un élève —</option>
           <?php foreach ($eleves as $e): ?>
-            <option value="<?= $e['id'] ?>" <?= $id_eleve === (int)$e['id'] ? 'selected' : '' ?>><?= h($e['nom'] . ' ' . ($e['prenom'] ?? '')) ?> (<?= h($e['matricule']) ?>)</option>
+            <option value="<?= $e['id'] ?>" <?= $id_eleve === (int)$e['id'] ? 'selected' : '' ?>><?= h($e['nom'] . ' ' . ($e['prenom'] ?? '')) ?></option>
           <?php endforeach; ?>
         </select>
       </div>
@@ -384,7 +385,7 @@ function ouvrirRecuPaiement() {
         'Reçu de paiement N° ' + numero,
         [
             { type: 'recu_paiement', code: 'intendant', label: 'Signature Intendant' },
-            { type: 'recu_paiement', code: 'chef_etablissement', label: 'Signature Proviseur' },
+            { type: 'recu_paiement', code: 'chef_etablissement', label: 'Signature <?= h($libelle_chef) ?>' },
         ]
     );
 }
@@ -394,7 +395,7 @@ function ouvrirRecap() {
     const url = '<?= APP_URL ?>/secondaire/pages/paiements/recap_paiement.php?numero_recu=' + encodeURIComponent(numero) + '&eleve=' + ID_ELEVE_COURANT + '&annee=' + ID_ANNEE_COURANTE;
     afficherApercu(url, 'Récapitulatif de paiement', [
         { type: 'recap_paiement', code: 'intendant', label: 'Signature Intendant' },
-        { type: 'recap_paiement', code: 'chef_etablissement', label: 'Signature Proviseur' },
+        { type: 'recap_paiement', code: 'chef_etablissement', label: 'Signature <?= h($libelle_chef) ?>' },
     ]);
 }
 function ouvrirRecuFiche() {
@@ -405,9 +406,9 @@ function ouvrirRecuFiche() {
         'Reçu + fiche de préinscription',
         [
             { type: 'recu_fiche_haut', code: 'intendant', label: 'Signature Intendant (reçu)' },
-            { type: 'recu_fiche_haut', code: 'chef_etablissement', label: 'Signature Proviseur (reçu)' },
+            { type: 'recu_fiche_haut', code: 'chef_etablissement', label: 'Signature <?= h($libelle_chef) ?> (reçu)' },
             { type: 'recu_fiche_bas', code: 'intendant', label: 'Signature Intendant (fiche)' },
-            { type: 'recu_fiche_bas', code: 'chef_etablissement', label: 'Signature Proviseur (fiche)' },
+            { type: 'recu_fiche_bas', code: 'chef_etablissement', label: 'Signature <?= h($libelle_chef) ?> (fiche)' },
         ]
     );
 }

@@ -48,9 +48,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         // École secondaire (schema_ref_ecole_secondaire.sql) : comptes dans
         // `utilisateur` (self-contained — nom/prenom/login/mot_de_passe/
         // role/actif directement dessus), pas user⋈enseignant comme en
-        // primaire. $ec n'est posé que si $choix_ecole (multi-établissement) ;
-        // une installation mono-école reste toujours primaire.
-        $secondaire = ($ec['type_enseignement'] ?? 'primaire') === 'secondaire';
+        // primaire. type_enseignement_courant() couvre les 3 cas : école déjà
+        // basculée ci-dessus ($choix_ecole), établissement unique résolu par
+        // connexion.php (annuaire à 1 école), et mono-école sans annuaire
+        // (ECOLE_TYPE_SOLO, voir ecole_contexte.php).
+        $secondaire = type_enseignement_courant() === 'secondaire';
 
         if ($secondaire) {
             $u = db_one("SELECT id, login, mot_de_passe, role, actif, nom, prenom, matricule_ens FROM utilisateur WHERE login = ? LIMIT 1", [$login]);
