@@ -170,7 +170,10 @@ function ecole_exec(mysqli $l, string $sql, array $params = []): int {
 //  LAM_ABZ — voir plan « Intégration du secondaire »). Doit correspondre à
 //  etablissement.type_enseignement (annuaire) pour cette école.
 //  Retourne le nombre de tables créées. Lève une RuntimeException sur échec.
-function charger_schema_ecole(mysqli $l, array $seed, string $type = 'primaire'): int {
+// $l par référence : peut être remplacée par une connexion neuve en cours
+// de route (voir plus bas) — l'appelant doit voir la connexion à jour,
+// puisqu'il enchaîne généralement d'autres écritures dessus juste après.
+function charger_schema_ecole(mysqli &$l, array $seed, string $type = 'primaire'): int {
     $fichier = $type === 'secondaire'
         ? __DIR__ . '/bd/assoc/schema_ref_ecole_secondaire.sql'
         : __DIR__ . '/bd/assoc/schema_ref_ecole.sql';
@@ -184,20 +187,13 @@ function charger_schema_ecole(mysqli $l, array $seed, string $type = 'primaire')
     if (mysqli_errno($l)) {
         throw new RuntimeException('Chargement du schéma : ' . mysqli_error($l));
     }
-    // Alias explicite obligatoire : information_schema.tables.table_name
-    // revient en TABLE_NAME (majuscules) sans lui sur ce serveur — array_column
-    // sur 'table_name' silencieusement vide sinon (bug trouvé le 22/09/2026).
-    $nomsTables = array_column(
-        mysqli_fetch_all(mysqli_query($l,
-            "SELECT table_name AS nom FROM information_schema.tables WHERE table_schema = DATABASE()"), MYSQLI_ASSOC),
-        'nom'
-    );
-    $nbTables = count($nomsTables);
+    $nbTables = (int) mysqli_fetch_row(mysqli_query($l,
+        "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE()"))[0];
     if ($nbTables < 10) {
         throw new RuntimeException("Schéma incomplet ($nbTables tables).");
     }
 
-    // FLUSH TABLES après un chargement en masse par mysqli_multi_query() :
+    // Reconnexion après un chargement en masse par mysqli_multi_query() :
     // sans ça, sur ce serveur (MySQL 9.1 constaté), TOUTE requête préparée
     // avec paramètre lié (UPDATE/DELETE, même l'INSERT de licence juste en
     // dessous) sur une table fraîchement créée échoue de façon PERMANENTE
@@ -206,17 +202,24 @@ function charger_schema_ecole(mysqli $l, array $seed, string $type = 'primaire')
     // appelant (bug réel constaté le 16/09/2026 en vérifiant l'étape 8
     // secondaire/Matières : classe/matiere/competence, toutes auto_increment,
     // inutilisables en écriture dès la création de l'école tant que rien ne
-    // force un FLUSH TABLES).
-    // FLUSH TABLES <liste> (tables nommées), PAS `FLUSH TABLES` seul : la
-    // forme globale exige le privilège RELOAD/FLUSH_TABLES (droit serveur,
-    // jamais accordé sur un compte MySQL mutualisé cPanel) — la forme avec
-    // liste de tables ne demande qu'un privilège SUR CES TABLES, que le
-    // compte a forcément puisqu'il vient de les créer. Sans ce correctif :
-    // "Access denied; you need (at least one of) the RELOAD or
-    // FLUSH_TABLES privilege(s)" sur toute création d'école en pool sur
-    // Camoo (bug réel constaté le 22/09/2026).
-    $listeTables = implode(',', array_map(fn($t) => "`$t`", $nomsTables));
-    mysqli_query($l, "FLUSH TABLES $listeTables");
+    // purge le cache de requêtes préparées de la connexion).
+    // Essayé d'abord : FLUSH TABLES (global), qui exige le privilège serveur
+    // RELOAD/FLUSH_TABLES — jamais accordé sur un compte MySQL mutualisé
+    // cPanel (Camoo). Essayé ensuite : FLUSH TABLES `t1`,`t2`,... (liste
+    // explicite des tables), en principe limité à un privilège sur CES
+    // tables d'après la documentation MySQL — "Access denied; you need (at
+    // least one of) the RELOAD or FLUSH_TABLES privilege(s)" persistait
+    // quand même sur l'hébergement réel (bug réel constaté le 22/09/2026,
+    // les deux fois en testant la création d'établissement sur Camoo).
+    // Une connexion NEUVE n'a, par construction, aucun cache à purger — ne
+    // demande donc AUCUN privilège particulier (juste la capacité de se
+    // connecter, déjà acquise puisque c'est la même connexion qu'à
+    // l'instant). $l est modifiée par référence : voir la signature de
+    // cette fonction.
+    $db_name = mysqli_fetch_row(mysqli_query($l, 'SELECT DATABASE()'))[0];
+    mysqli_close($l);
+    $l = mysqli_connect(DB_HOST, DB_USER, DB_PASS, $db_name);
+    mysqli_set_charset($l, 'utf8mb4');
 
     // Licence (bd/lib/licence.php, migration v56/v57) : période d'ESSAI de
     // 60 jours par défaut — sans ça, une école toute neuve serait
