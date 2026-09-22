@@ -234,6 +234,14 @@ function generer_bulletin(int $id_periode, int $matricule_ens, int $mois, int $a
 // cette logique. Sans effet si le bulletin est introuvable ou déjà payé —
 // silencieux plutôt qu'une erreur, pour que l'appelant puisse boucler sur une
 // sélection sans avoir à filtrer les bulletins déjà payés au préalable.
+//
+// Type-aware (21/09/2026) : ce fichier est réutilisé TEL QUEL par
+// secondaire/pages/paie/* (mêmes tables grade_enseignant/bulletin_paie/…,
+// voir bd/assoc/schema_ref_ecole_secondaire.sql) — seule la table où la
+// dépense "Salaires" est enregistrée diffère : `depense`/`categorie_depense`
+// (primaire) vs `depense_privee`/`categorie_depense_privee` (secondaire,
+// module PAIEMENT PRIVÉ — la table `depense` n'existe pas côté secondaire),
+// avec id_annee entier au lieu de val_annee texte.
 function marquer_bulletin_paye(int $id_bulletin, ?string $mode, ?string $reference, string $date_pay): array {
     $bulletin = db_one(
         "SELECT b.*, p.libelle AS periode_libelle FROM bulletin_paie b JOIN periode_paie p ON p.id=b.id_periode WHERE b.id=?",
@@ -243,22 +251,39 @@ function marquer_bulletin_paye(int $id_bulletin, ?string $mode, ?string $referen
         return ['ok' => false, 'deja_paye' => (bool) ($bulletin && $bulletin['statut'] === 'Payé'), 'depense_creee' => false];
     }
 
-    $ens          = db_one("SELECT nom_ens, prenom_ens FROM enseignant WHERE matricule_ens=?", [$bulletin['matricule_ens']]);
-    $id_categorie = db_val("SELECT id_categorie FROM categorie_depense WHERE libelle='Salaires'");
-    $annee_active = get_annee_active()['val_annee'] ?? '';
-    $id_depense   = null;
-    if ($id_categorie && $annee_active) {
-        db_exec(
-            "INSERT INTO depense (id_categorie, libelle, montant, date_depense, val_annee, id_utilisateur, beneficiaire, observation)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-            [
-                $id_categorie, 'Salaire ' . $bulletin['periode_libelle'], (float) $bulletin['net_a_payer'], $date_pay, $annee_active,
-                utilisateur_connecte()['id'] ?? null, trim(($ens['nom_ens'] ?? '') . ' ' . ($ens['prenom_ens'] ?? '')),
-                'Bulletin ' . numero_bulletin($id_bulletin),
-            ]
-        );
-        $id_depense = db_last_id();
+    $secondaire = function_exists('type_enseignement_courant') && type_enseignement_courant() === 'secondaire';
+    $ens = db_one("SELECT nom_ens, prenom_ens FROM enseignant WHERE matricule_ens=?", [$bulletin['matricule_ens']]);
+    $beneficiaire = trim(($ens['nom_ens'] ?? '') . ' ' . ($ens['prenom_ens'] ?? ''));
+    $libelle_depense = 'Salaire ' . $bulletin['periode_libelle'];
+    $observation = 'Bulletin ' . numero_bulletin($id_bulletin);
+    $id_depense = null;
+
+    if ($secondaire) {
+        $id_categorie = db_val("SELECT id FROM categorie_depense_privee WHERE libelle='Salaires'");
+        $id_annee     = get_annee_active()['id'] ?? null;
+        if ($id_categorie && $id_annee) {
+            db_exec(
+                "INSERT INTO depense_privee (id_categorie, libelle, montant, date_depense, id_annee, id_utilisateur, beneficiaire, observation)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                [$id_categorie, $libelle_depense, (float) $bulletin['net_a_payer'], $date_pay, $id_annee,
+                 utilisateur_connecte()['id'] ?? null, $beneficiaire, $observation]
+            );
+            $id_depense = db_last_id();
+        }
+    } else {
+        $id_categorie = db_val("SELECT id_categorie FROM categorie_depense WHERE libelle='Salaires'");
+        $annee_active = get_annee_active()['val_annee'] ?? '';
+        if ($id_categorie && $annee_active) {
+            db_exec(
+                "INSERT INTO depense (id_categorie, libelle, montant, date_depense, val_annee, id_utilisateur, beneficiaire, observation)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                [$id_categorie, $libelle_depense, (float) $bulletin['net_a_payer'], $date_pay, $annee_active,
+                 utilisateur_connecte()['id'] ?? null, $beneficiaire, $observation]
+            );
+            $id_depense = db_last_id();
+        }
     }
+
     db_exec(
         "UPDATE bulletin_paie SET statut='Payé', mode_paiement=?, reference_paiement=?, date_paiement=?, id_depense=? WHERE id=?",
         [$mode, $reference, $date_pay, $id_depense, $id_bulletin]

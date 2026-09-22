@@ -7,7 +7,14 @@
 require_once __DIR__ . '/../../../config.php';
 require_once __DIR__ . '/../../../connexion.php';
 require_once __DIR__ . '/../../../fonctions.php';
-exiger_role(['ADMIN', 'PROVISEUR', 'CENSEUR']);
+require_once __DIR__ . '/../../../paie_fonctions.php';
+exiger_role(['ADMIN', 'PROVISEUR', 'FONDATEUR', 'CENSEUR']);
+
+// Champs Paie (grade/salaire) : réservés aux mêmes rôles que le module
+// Paie lui-même (secondaire/pages/paie/index.php) — un Censeur peut éditer
+// la fiche mais pas voir/changer le grade salarial.
+$peut_gerer_paie = in_array(role_connecte(), ['ADMIN', 'PROVISEUR', 'FONDATEUR', 'INTENDANT'], true);
+$grades = $peut_gerer_paie ? grille_salariale() : [];
 
 $mat = (int) ($_GET['id'] ?? 0);
 $ens = $mat ? db_one("SELECT * FROM enseignant WHERE matricule_ens=?", [$mat]) : null;
@@ -95,7 +102,20 @@ require_once __DIR__ . '/../../../layout/header.php';
         </div>
         <div class="col-md-4">
           <label class="form-label">Grade</label>
-          <input type="text" name="grade" class="form-control" value="<?= $ve('id_grade') ?>">
+          <?php if ($peut_gerer_paie): ?>
+          <select name="grade" class="form-select">
+            <option value="">— Non défini —</option>
+            <?php foreach ($grades as $g): ?>
+              <option value="<?= h($g['code_grade']) ?>" <?= ($ens['id_grade'] ?? '') === $g['code_grade'] ? 'selected' : '' ?>>
+                <?= h($g['libelle_grade']) ?> (<?= number_format((float) $g['salaire_base'], 0, ',', ' ') ?> F)
+              </option>
+            <?php endforeach; ?>
+          </select>
+          <div class="form-text" style="font-size:.72rem">Détermine le salaire de base — voir Ressources humaines &gt; Grille salariale.</div>
+          <?php else: ?>
+          <input type="text" class="form-control" value="<?= $ve('id_grade') ?>" disabled>
+          <input type="hidden" name="grade" value="<?= $ve('id_grade') ?>">
+          <?php endif; ?>
         </div>
         <div class="col-md-4">
           <label class="form-label">Matière enseignée</label>
@@ -112,6 +132,53 @@ require_once __DIR__ . '/../../../layout/header.php';
       </div>
     </div>
   </div>
+
+  <?php if ($peut_gerer_paie): ?>
+  <div class="card mt-2">
+    <div class="card-body">
+      <div class="section-titre"><i class="bi bi-cash-coin me-1"></i>Paie</div>
+      <div class="row g-compact">
+        <div class="col-md-4">
+          <label class="form-label">Matricule CNPS</label>
+          <input type="text" name="matricule_cnps" class="form-control" value="<?= $ve('matricule_cnps') ?>">
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Indice / Position grille</label>
+          <input type="text" name="indice_grille" class="form-control" value="<?= $ve('indice_grille') ?>">
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Date de recrutement</label>
+          <input type="date" name="date_recrutement" class="form-control" value="<?= $ve('date_recrutement') ?>">
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">Enfants à charge</label>
+          <input type="number" name="nb_enfants" class="form-control" min="0" value="<?= h((string) ($ens['nb_enfants'] ?? 0)) ?>">
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">Autres pers. à charge</label>
+          <input type="number" name="nb_pers_charge" class="form-control" min="0" value="<?= h((string) ($ens['nb_pers_charge'] ?? 0)) ?>">
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">Mode de paiement</label>
+          <select name="mode_paiement" class="form-select">
+            <option value="">—</option>
+            <?php foreach (['Espèces', 'Virement bancaire', 'Mobile Money'] as $m): ?>
+              <option value="<?= $m ?>" <?= ($ens['mode_paiement'] ?? '') === $m ? 'selected' : '' ?>><?= $m ?></option>
+            <?php endforeach; ?>
+          </select>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">Banque</label>
+          <input type="text" name="nom_banque" class="form-control" value="<?= $ve('nom_banque') ?>">
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">N° de compte / Mobile Money</label>
+          <input type="text" name="compte_bancaire" class="form-control" value="<?= $ve('compte_bancaire') ?>">
+        </div>
+      </div>
+    </div>
+  </div>
+  <?php endif; ?>
 
   <div class="mt-3 d-flex gap-2">
     <button class="btn btn-primary btn-sm px-4"><i class="bi bi-check-lg me-1"></i>Enregistrer</button>
