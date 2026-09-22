@@ -28,12 +28,48 @@ $acces = assoc_one(
 
 // Effectifs agrégés depuis la base école (best-effort : une école toute
 // neuve ou une base injoignable ne doit pas casser la page).
+// Schéma DISTINCT selon type_enseignement (val_annee/Sexe_elv/inscrire côté
+// primaire vs libelle/sexe/inscription côté secondaire, schema_ref_ecole
+// vs schema_ref_ecole_secondaire.sql) — piloté ici, jamais mélangé, sinon
+// « Champ … inconnu » sur toute école secondaire (bug réel constaté, la
+// requête primaire tournait inconditionnellement, cf. $stats_err ci-dessous).
 $stats = null; $stats_err = '';
 if ($acces) {
+    $secondaire = ($e['type_enseignement'] ?? 'primaire') === 'secondaire';
     try {
-        $stats = avec_ecole($id, function (mysqli $l) use ($id) {
+        $stats = avec_ecole($id, function (mysqli $l) use ($id, $secondaire) {
             // Garde le logo de l'annuaire à jour (il se règle DANS l'école).
             assoc_sync_logo_ecole($l, $id);
+
+            if ($secondaire) {
+                $active = ecole_one($l, "SELECT id, libelle FROM annee_scolaire WHERE active=1 LIMIT 1");
+                $annee  = $active
+                      ?: ecole_one($l, "SELECT id, libelle FROM annee_scolaire ORDER BY libelle DESC LIMIT 1");
+                $id_annee = $annee['id'] ?? null;
+                $va = $annee['libelle'] ?? null;
+
+                $eff = $id_annee
+                    ? ecole_one($l,
+                        "SELECT
+                            COUNT(*) AS total,
+                            SUM(el.sexe = 'M') AS g,
+                            SUM(el.sexe = 'F') AS f
+                         FROM inscription i
+                         JOIN eleve el ON el.id = i.id_eleve
+                         WHERE i.id_annee = ? AND el.statut = 'actif'", [$id_annee])
+                    : ['total' => 0, 'g' => 0, 'f' => 0];
+
+                return [
+                    'annee'        => $va,
+                    'annee_active' => !empty($active),
+                    'eleves'      => (int) ($eff['total'] ?? 0),
+                    'garcons'     => (int) ($eff['g'] ?? 0),
+                    'filles'      => (int) ($eff['f'] ?? 0),
+                    'classes'     => count(ecole_all($l, "SELECT id FROM classe WHERE archivee=0")),
+                    'enseignants' => count(ecole_all($l, "SELECT matricule_ens FROM enseignant WHERE id_fonction='ENSEIGNANT'")),
+                ];
+            }
+
             $active = ecole_one($l, "SELECT val_annee FROM annee_scolaire WHERE Etat_annee_scolaire=1 LIMIT 1");
             $annee  = $active
                   ?: ecole_one($l, "SELECT val_annee FROM annee_scolaire ORDER BY val_annee DESC LIMIT 1");
@@ -90,6 +126,10 @@ asso_haut('Fiche — ' . $e['nom']);
 <?php if (est_superadmin_association()): ?>
   <a href="<?= APP_URL ?>/association/etablissement_modifier.php?id=<?= (int) $e['id'] ?>"
      class="btn btn-outline-light btn-sm ms-2"><i class="bi bi-pencil me-1"></i>Modifier</a>
+  <a href="<?= APP_URL ?>/association/etablissement_desactiver.php?id=<?= (int) $e['id'] ?>"
+     class="btn btn-outline-<?= $e['actif'] ? 'warning' : 'success' ?> btn-sm ms-2">
+    <i class="bi bi-<?= $e['actif'] ? 'slash-circle' : 'check-circle' ?> me-1"></i><?= $e['actif'] ? 'Désactiver' : 'Réactiver' ?>
+  </a>
   <?php if (!$e['actif'] && est_proprietaire_association()): ?>
     <a href="<?= APP_URL ?>/association/etablissement_supprimer.php?id=<?= (int) $e['id'] ?>"
        class="btn btn-outline-danger btn-sm ms-2"><i class="bi bi-trash3 me-1"></i>Supprimer</a>
@@ -137,9 +177,11 @@ asso_haut('Fiche — ' . $e['nom']);
       <i class="bi bi-pencil-square me-1"></i>Ouvrir en écriture
     </a>
     <?php endif; ?>
+    <?php if (($e['type_enseignement'] ?? 'primaire') !== 'secondaire'): ?>
     <a href="<?= APP_URL ?>/association/niu/index.php?etab=<?= (int) $e['id'] ?>" class="btn btn-outline-light btn-sm">
       <i class="bi bi-person-vcard me-1"></i>NIU de l'école
     </a>
+    <?php endif; ?>
   </div>
   <?php endif; ?>
 

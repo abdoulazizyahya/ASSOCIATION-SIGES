@@ -6,7 +6,14 @@ require_once __DIR__ . '/../../fonctions.php';
 require_once __DIR__ . '/../_layout.php';
 exiger_superadmin_association();
 
-$ecoles = assoc_all("SELECT id, code, sigle, nom FROM etablissement WHERE actif=1 ORDER BY nom");
+// Secondaire exclu : NIU manuel ici = format auto-généré PMC+sigle+année
+// (assoc_niu_generer_pour() ci-dessous), non pertinent pour le secondaire
+// dont le NIU est une simple information de fiche élève (voir
+// association/niu/index.php). Demande explicite du 21/09/2026.
+$ecoles = assoc_all(
+    "SELECT id, code, sigle, nom FROM etablissement
+     WHERE actif=1 AND COALESCE(type_enseignement,'primaire')<>'secondaire' ORDER BY nom"
+);
 
 $msg = ''; $err = ''; $niu_cree = '';
 $val = ['nom' => '', 'prenom' => '', 'date_naissance' => '', 'sexe' => 'Masculin', 'lieu_naissance' => '', 'id_etab' => ''];

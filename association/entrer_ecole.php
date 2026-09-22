@@ -55,16 +55,26 @@ if ($ecriture) {
 // journaliser_action() ci-dessous (qui membre, quelle école, quand) et par
 // le bandeau permanent « Visite association — LECTURE / ÉCRITURE ».
 //
-// En écriture : rôle « DIRECTEUR » synthétique — tous les boutons/actions
-// des pages école qui testent `role_connecte() === 'DIRECTEUR'` en dur
-// (classes, compétences/barème, matières arabes, signatures de bulletins,
-// meilleurs élèves…) deviennent disponibles. En lecture seule : rôle
-// « MEMBRE_ASSOCIATION » (les mêmes boutons restent masqués, cohérent avec
-// la consultation). `est_visite_association()` reste vrai dans les deux cas
-// (bandeau + accès à tout le menu via `$menu_voit_tout`).
+// En écriture : rôle « DIRECTEUR » synthétique côté PRIMAIRE — tous les
+// boutons/actions des pages école qui testent `role_connecte() === 'DIRECTEUR'`
+// en dur (classes, compétences/barème, matières arabes, signatures de
+// bulletins, meilleurs élèves…) deviennent disponibles. Côté SECONDAIRE,
+// vocabulaire de rôles totalement différent (ADMIN/PROVISEUR/CENSEUR/SG/
+// SECRETAIRE/ENSEIGNANT/INTENDANT, cf. schema_ref_ecole_secondaire.sql) —
+// « DIRECTEUR » n'y existe pas et est rejeté par les gardes en dur des
+// modules secondaire (bulletins, statistiques, discipline, absences,
+// conseil_classe : `in_array($role, ['ADMIN','PROVISEUR','CENSEUR'])`),
+// d'où un « Accès non autorisé » constaté le 16/09/2026 pour le
+// propriétaire de l'association en visite écriture. « ADMIN » est le rôle
+// secondaire le plus large (équivalent DIRECTEUR) — utilisé ici à la place.
+// En lecture seule : rôle « MEMBRE_ASSOCIATION » (les mêmes boutons restent
+// masqués, cohérent avec la consultation), quel que soit le type d'école.
+// `est_visite_association()` reste vrai dans tous les cas (bandeau + accès
+// à tout le menu via `$menu_voit_tout`).
+$secondaire = ($e['type_enseignement'] ?? 'primaire') === 'secondaire';
 $_SESSION['user'] = [
     'id'            => null,
-    'role'          => $ecriture ? 'DIRECTEUR' : 'MEMBRE_ASSOCIATION',
+    'role'          => $ecriture ? ($secondaire ? 'ADMIN' : 'DIRECTEUR') : 'MEMBRE_ASSOCIATION',
     'nom'           => $m['nom'] ?? 'Association',
     'prenom'        => $m['prenom'] ?? '',
     'login'         => $m['login'] ?? '',

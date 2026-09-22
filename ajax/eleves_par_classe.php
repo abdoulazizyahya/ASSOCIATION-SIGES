@@ -39,7 +39,7 @@ if (function_exists('type_enseignement_courant') && type_enseignement_courant() 
         : [];
     $out = array_map(fn($e) => [
         'id'    => (int) $e['id'],
-        'label' => trim($e['nom'] . ' ' . ($e['prenom'] ?? '')) . ' (' . $e['matricule'] . ')',
+        'label' => trim($e['nom'] . ' ' . ($e['prenom'] ?? '')),
     ], $eleves);
     ob_end_clean();
     header('Content-Type: application/json; charset=utf-8');
@@ -71,7 +71,7 @@ $eleves = ($id_classe && $val_annee)
 
 $out = array_map(fn($e) => [
     'id'    => (int) $e['id_eleve'],
-    'label' => trim($e['Nom_elv'] . ' ' . ($e['Prenom_elv'] ?? '')) . ' (' . $e['Mat_elv'] . ')',
+    'label' => trim($e['Nom_elv'] . ' ' . ($e['Prenom_elv'] ?? '')),
 ], $eleves);
 
 ob_end_clean();

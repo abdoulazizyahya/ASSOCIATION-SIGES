@@ -258,29 +258,37 @@ body.asso-nav-open .asso-backdrop { opacity: 1; visibility: visible; }
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  padding: 1.1rem 1.2rem;
+  padding: .45rem .6rem;
   box-shadow: var(--card-shadow);
   transition: border-color .16s, transform .16s, box-shadow .16s;
   animation: asso-rise .4s ease both;
 }
+/* Boutons Fiche/Ouvrir légèrement plus compacts que le .btn-sm standard,
+   pour limiter la hauteur de la case (logo fixé à 100px, cf. plus bas). */
+.ecole-card-btn { padding: .2rem .55rem; font-size: .74rem; }
+
 .ecole-card:hover {
   border-color: var(--gold);
   transform: translateY(-3px);
   box-shadow: var(--card-shadow-lg);
 }
-
-/* Zone du filigrane « PRIMAIRE »/« SECONDAIRE » (association/index.php) :
-   ne couvre QUE le bloc nom+logo de la case, jamais la rangée de boutons
-   Fiche/Ouvrir en dessous — sinon les boutons (opaques) coupent le mot en
-   plein milieu et le rendent illisible. Le filigrane reste donc toujours
-   entièrement visible, sans jamais passer derrière un bouton. */
-.ecole-filigrane-zone {
-  position: relative;
+/* Nom d'école sur 2 lignes maxi — évite qu'un nom long ne fasse gonfler la
+   hauteur de la case (3 par ligne = cases plus étroites qu'avant). */
+.ecole-card-titre {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
   overflow: hidden;
-  border-radius: calc(var(--radius) - 4px);
+  line-height: 1.25;
+  font-size: .92rem;
 }
 
-/* « PRIMAIRE »/« SECONDAIRE » — grand, majuscule, oblique, comme un tampon. */
+/* « PRIMAIRE »/« SECONDAIRE » — grand, majuscule, oblique, comme un tampon,
+   en fond de chaque case école (association/index.php). Boîte pleine case
+   par défaut (inset:0) ; sur une case avec boutons Fiche/Ouvrir en bas,
+   .ecole-filigrane--reserve retire la hauteur de cette rangée (marge +
+   boutons btn-sm) pour que le filigrane ne finisse jamais SOUS un bouton
+   opaque — sinon le mot y est coupé en plein milieu et devient illisible. */
 .ecole-filigrane {
   position: absolute;
   inset: 0;
@@ -288,9 +296,9 @@ body.asso-nav-open .asso-backdrop { opacity: 1; visibility: visible; }
   align-items: center;
   justify-content: center;
   font-family: var(--font-heading);
-  font-size: clamp(1.4rem, 6vw, 2rem);
+  font-size: clamp(1.1rem, 5vw, 1.5rem);
   font-weight: 800;
-  letter-spacing: .06em;
+  letter-spacing: .05em;
   text-transform: uppercase;
   color: #dc2626;
   opacity: .28;
@@ -300,20 +308,27 @@ body.asso-nav-open .asso-backdrop { opacity: 1; visibility: visible; }
   user-select: none;
   z-index: 0;
 }
+.ecole-filigrane.ecole-filigrane--reserve { bottom: 2.2rem; }
 
 /* Variante image : filigrane généré depuis le logo de l'école (fonctions.php
    ::generer_filigrane_logo(), déjà en niveaux de gris + alpha réduit dans
-   le fichier — la case n'a besoin que du gabarit/de l'inclinaison ici). */
-.ecole-filigrane-img {
+   le fichier). Même boîte/logique de réserve que .ecole-filigrane ci-dessus,
+   le centrage de l'image se faisant via ce wrapper flex plutôt que
+   top:50%/left:50%, pour que la réserve de bas de case s'applique pareil. */
+.ecole-filigrane-img-wrap {
   position: absolute;
-  top: 50%;
-  left: 50%;
-  width: 60%;
-  max-width: 220px;
-  transform: translate(-50%, -50%) rotate(-18deg);
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   pointer-events: none;
   user-select: none;
   z-index: 0;
+}
+.ecole-filigrane-img-wrap.ecole-filigrane--reserve { bottom: 2.2rem; }
+.ecole-filigrane-img {
+  width: 55%;
+  max-width: 150px;
 }
 
 .section-titre {

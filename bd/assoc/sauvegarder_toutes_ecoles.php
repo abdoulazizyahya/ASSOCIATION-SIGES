@@ -111,6 +111,14 @@ foreach (array_slice($dossiers, RETENTION) as $vieux) {
     echo "  purge  " . basename($vieux) . "\n";
 }
 
+// ── Purge des backups de SÉCURITÉ (avant_*, avant migration/import/vidage) ──
+//  Jusqu'ici uniquement déclenchée à la main depuis association/
+//  ecole_bd_sauvegarder.php — jamais si personne ne visite cette page.
+//  Rattachée ici pour qu'elle tourne aussi automatiquement, une fois par jour.
+require_once __DIR__ . '/../lib/ecole_maintenance.php';
+$n_purges = ecole_maint_purger_backups();
+if ($n_purges) echo "  purge  $n_purges sauvegarde(s) de sécurité (> 45 jours)\n";
+
 echo "=== $ok OK, $ko KO" . ($offsite_ok ? '' : ', hors-site INCOMPLET') . " — $dir ===\n";
 exit(($ko === 0 && $offsite_ok) ? 0 : 1);
 

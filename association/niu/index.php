@@ -28,7 +28,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $id_etab  = (int) ($_POST['ecole_id'] ?? 0);
         $id_eleve = (int) ($_POST['id_eleve'] ?? 0);
         $e = assoc_one("SELECT * FROM etablissement WHERE id=?", [$id_etab]);
-        if ($e && $id_eleve) {
+        if ($e && ($e['type_enseignement'] ?? 'primaire') === 'secondaire') {
+            $err = "Non applicable au secondaire — saisissez le NIU existant directement sur la fiche élève.";
+        } elseif ($e && $id_eleve) {
             try {
                 $l = mysqli_connect(DB_HOST, DB_USER, DB_PASS, $e['db_name']);
                 mysqli_set_charset($l, 'utf8mb4');
@@ -80,7 +82,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-$ecoles = assoc_all("SELECT id, code, nom, sigle, niu_sigle FROM etablissement WHERE actif=1 ORDER BY nom");
+// Le secondaire est exclu de TOUTE cette rubrique, à la source (pas
+// seulement de la génération automatique) : son NIU est une information de
+// fiche élève comme une autre, saisie/modifiée directement sur
+// secondaire/pages/eleves/form.php — ni listé ici, ni généré, ni doté d'un
+// sigle NIU. Demande explicite du 21/09/2026 (amendement du 16/09/2026, qui
+// n'excluait encore que la génération automatique).
+$ecoles = assoc_all(
+    "SELECT id, code, nom, sigle, niu_sigle, type_enseignement FROM etablissement
+     WHERE actif=1 AND COALESCE(type_enseignement,'primaire')<>'secondaire' ORDER BY nom"
+);
+$ecoles_generables = $ecoles;
 
 asso_haut('Registre NIU');
 $csrf = csrf_generer();
@@ -179,11 +191,13 @@ $csrf = csrf_generer();
             <?php endif; ?>
           </td>
           <td class="text-end">
-            <?php if ($r['niu'] === '' && $superadmin): ?>
+            <?php if ($r['niu'] === '' && $superadmin && empty($r['secondaire'])): ?>
               <button type="button" class="btn btn-outline-primary btn-sm py-0"
                       onclick="niuGenerer(<?= (int) $r['ecole_id'] ?>,<?= (int) $r['id_eleve'] ?>)">
                 <i class="bi bi-magic"></i> Générer
               </button>
+            <?php elseif ($r['niu'] === '' && !empty($r['secondaire'])): ?>
+              <span class="small text-muted2">à saisir sur la fiche élève</span>
             <?php endif; ?>
           </td>
         </tr>
@@ -235,10 +249,13 @@ function niuGenerer(idEcole, idEleve) {
 <?php else: /* ── Onglet Générer ─────────────────────────────────── */ ?>
 
 <?php
-  // Comptage des NIU manquants par école (léger : COUNT par base).
+  // Comptage des NIU manquants par école (léger : COUNT par base) — seules
+  // les écoles PRIMAIRE sont concernées par la génération auto (voir
+  // $ecoles_generables ci-dessus) : un secondaire « sans NIU » se règle en
+  // saisissant le NIU existant sur la fiche élève, pas en le générant ici.
   $etat = [];
   $total_manquants = 0;
-  foreach ($ecoles as $e) {
+  foreach ($ecoles_generables as $e) {
     $r = assoc_one("SELECT db_name FROM etablissement WHERE id=?", [$e['id']]);
     $n = null;
     try {
@@ -300,8 +317,8 @@ function niuGenerer(idEcole, idEleve) {
         <input type="hidden" name="csrf" value="<?= h($csrf) ?>">
         <input type="hidden" name="op" value="generer_masse">
         <select name="scope" class="form-select form-select-sm" style="max-width:280px">
-          <option value="tout">Toutes les écoles (<?= (int) $total_manquants ?>)</option>
-          <?php foreach ($ecoles as $e): if (!$etat[$e['id']]) continue; ?>
+          <option value="tout">Toutes les écoles primaire (<?= (int) $total_manquants ?>)</option>
+          <?php foreach ($ecoles_generables as $e): if (!$etat[$e['id']]) continue; ?>
             <option value="<?= (int) $e['id'] ?>"><?= h($e['code'] . ' — ' . $e['nom']) ?> (<?= (int) $etat[$e['id']] ?>)</option>
           <?php endforeach; ?>
         </select>
