@@ -2,7 +2,7 @@
 require_once __DIR__ . '/../../../config.php';
 require_once __DIR__ . '/../../../connexion.php';
 require_once __DIR__ . '/../../../fonctions.php';
-exiger_role(['ADMIN']);
+exiger_role(['ADMIN', 'FONDATEUR']);
 
 $users = db_all("SELECT * FROM utilisateur ORDER BY nom, prenom");
 
@@ -38,7 +38,7 @@ require_once __DIR__ . '/../../../layout/header.php';
               <?php
               // Voir form.php : 'PROF' (LAM_ABZ d'origine) n'existe pas dans
               // l'ENUM utilisateur.role, remplacé par les 7 rôles réels.
-              $badges = ['ADMIN'=>'bg-danger','PROVISEUR'=>'bg-primary','CENSEUR'=>'bg-info','SG'=>'bg-dark',
+              $badges = ['ADMIN'=>'bg-danger','PROVISEUR'=>'bg-primary','FONDATEUR'=>'bg-primary','CENSEUR'=>'bg-info','SG'=>'bg-dark',
                          'SECRETAIRE'=>'bg-warning text-dark','ENSEIGNANT'=>'bg-secondary','INTENDANT'=>'bg-success'];
               $bg = $badges[$u['role']] ?? 'bg-secondary';
               ?>
@@ -55,7 +55,7 @@ require_once __DIR__ . '/../../../layout/header.php';
               <a href="<?= APP_URL ?>/secondaire/pages/utilisateurs/form.php?id=<?= $u['id'] ?>" class="btn btn-sm btn-light" style="padding:3px 7px">
                 <i class="bi bi-pencil" style="font-size:.78rem"></i>
               </a>
-              <?php if ($u['id'] != $_SESSION['user_id']): ?>
+              <?php if ($u['id'] != ($_SESSION['user_id'] ?? null)): ?>
               <a href="<?= APP_URL ?>/secondaire/pages/utilisateurs/supprimer.php?id=<?= $u['id'] ?>&csrf=<?= csrf_generer() ?>"
                  class="btn btn-sm btn-light text-danger" style="padding:3px 7px"
                  onclick="return confirm('Supprimer cet utilisateur ?')">

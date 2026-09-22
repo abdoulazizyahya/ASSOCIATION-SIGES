@@ -2,7 +2,7 @@
 require_once __DIR__ . '/../../../config.php';
 require_once __DIR__ . '/../../../connexion.php';
 require_once __DIR__ . '/../../../fonctions.php';
-exiger_role(['ADMIN']);
+exiger_role(['ADMIN', 'FONDATEUR']);
 
 $id   = (int)($_GET['id'] ?? 0);
 $user = $id ? db_one("SELECT * FROM utilisateur WHERE id=?", [$id]) : null;

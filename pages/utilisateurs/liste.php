@@ -40,10 +40,36 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && post('action') === 'changer_role') 
     rediriger('pages/utilisateurs/liste.php');
 }
 
+// Activer/désactiver un compte (colonne user.actif, migration_v54) — un
+// compte désactivé ne peut plus se connecter (voir login.php). Ouvert à
+// DIRECTEUR et FONDATEUR (même accès que le reste de cette page), sans
+// restriction de rôle : le fondateur peut désactiver n'importe quel compte,
+// y compris Comptable (demande explicite du 21/09/2026). Autodésactivation
+// bloquée pour ne pas se retrouver enfermé dehors.
+$a_statut = db_colonne_existe('user', 'actif');
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && post('action') === 'toggle_actif') {
+    csrf_verifier();
+    $id_user = (int) post('id_user');
+    if (!$a_statut) {
+        flash_set('erreur', "Cette fonctionnalité nécessite la mise à jour de la base (colonne user.actif).");
+    } elseif ($id_user === (int) ($_SESSION['user_id'] ?? 0)) {
+        flash_set('erreur', 'Vous ne pouvez pas désactiver votre propre compte.');
+    } elseif ($id_user) {
+        $actuel = (int) db_val("SELECT actif FROM user WHERE id_user=?", [$id_user]);
+        $nouveau = $actuel ? 0 : 1;
+        db_exec("UPDATE user SET actif=? WHERE id_user=?", [$nouveau, $id_user]);
+        $login_cible = db_val("SELECT login_user FROM user WHERE id_user=?", [$id_user]);
+        journaliser_action($nouveau ? 'compte_active' : 'compte_desactive', null, $login_cible);
+        flash_set('succes', $nouveau ? 'Compte activé.' : 'Compte désactivé.');
+    }
+    rediriger('pages/utilisateurs/liste.php');
+}
+
 $roles_disponibles = fonctions_assignables();
 
+$col_actif = $a_statut ? ', u.actif' : '';
 $utilisateurs = db_all(
-    "SELECT u.id_user, u.login_user, u.matricule_ens, e.nom_ens, e.prenom_ens, e.id_fonction
+    "SELECT u.id_user, u.login_user, u.matricule_ens, e.nom_ens, e.prenom_ens, e.id_fonction $col_actif
      FROM user u JOIN enseignant e ON e.matricule_ens=u.matricule_ens
      ORDER BY e.id_fonction, e.nom_ens"
 );
@@ -68,16 +94,29 @@ require_once __DIR__ . '/../../layout/header.php';
   <div class="table-responsive">
     <table class="table table-abz table-hover align-middle mb-0">
       <thead>
-        <tr><th>Identifiant</th><th>Personne</th><th>Rôle</th><th class="text-end">Actions</th></tr>
+        <tr>
+          <th>Identifiant</th><th>Personne</th><th>Rôle</th>
+          <?php if ($a_statut): ?><th class="text-center">Statut</th><?php endif; ?>
+          <th class="text-end">Actions</th>
+        </tr>
       </thead>
       <tbody>
         <?php if (empty($utilisateurs)): ?>
-          <tr><td colspan="4" class="text-center text-muted py-4">Aucun compte trouvé.</td></tr>
+          <tr><td colspan="<?= $a_statut ? 5 : 4 ?>" class="text-center text-muted py-4">Aucun compte trouvé.</td></tr>
         <?php else: foreach ($utilisateurs as $u): ?>
           <tr>
             <td class="fw-semibold"><?= h($u['login_user']) ?></td>
             <td><?= h(mb_strtoupper($u['nom_ens'])) ?> <?= h($u['prenom_ens'] ?? '') ?></td>
             <td><span class="badge-code"><?= h(libelle_role($u['id_fonction'] ?? '')) ?></span></td>
+            <?php if ($a_statut): ?>
+            <td class="text-center">
+              <?php if ($u['actif']): ?>
+                <span class="badge" style="background:#d1fae5;color:#065f46;font-size:.7rem">Actif</span>
+              <?php else: ?>
+                <span class="badge" style="background:#f3f4f6;color:#6b7280;font-size:.7rem">Inactif</span>
+              <?php endif; ?>
+            </td>
+            <?php endif; ?>
             <td class="text-end">
               <button type="button" class="btn btn-sm btn-light" style="padding:3px 7px" title="Modifier le rôle (privilèges)"
                       onclick='ouvrirRole(<?= (int) $u['id_user'] ?>, <?= json_encode($u['id_fonction']) ?>, <?= json_encode(mb_strtoupper($u['nom_ens']) . ' ' . ($u['prenom_ens'] ?? '')) ?>)'>
@@ -91,6 +130,18 @@ require_once __DIR__ . '/../../layout/header.php';
                  class="btn btn-sm btn-light" style="padding:3px 7px" title="Réinitialiser le mot de passe">
                 <i class="bi bi-key" style="font-size:.78rem"></i>
               </a>
+              <?php if ($a_statut && $u['id_user'] != ($_SESSION['user_id'] ?? 0)): ?>
+              <form method="post" style="display:inline">
+                <?= csrf_champ() ?>
+                <input type="hidden" name="action" value="toggle_actif">
+                <input type="hidden" name="id_user" value="<?= (int) $u['id_user'] ?>">
+                <button type="submit" class="btn btn-sm btn-light <?= $u['actif'] ? 'text-warning' : 'text-success' ?>"
+                        style="padding:3px 7px" title="<?= $u['actif'] ? 'Désactiver le compte' : 'Activer le compte' ?>"
+                        onclick="return confirm('<?= $u['actif'] ? 'Désactiver' : 'Activer' ?> ce compte ?')">
+                  <i class="bi bi-<?= $u['actif'] ? 'toggle-on' : 'toggle-off' ?>" style="font-size:.78rem"></i>
+                </button>
+              </form>
+              <?php endif; ?>
               <?php if ($u['id_user'] != ($_SESSION['user_id'] ?? 0)): ?>
               <a href="<?= APP_URL ?>/pages/utilisateurs/supprimer.php?id=<?= (int)$u['id_user'] ?>&csrf=<?= csrf_generer() ?>"
                  class="btn btn-sm btn-light text-danger" style="padding:3px 7px"
