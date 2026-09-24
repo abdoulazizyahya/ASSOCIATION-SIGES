@@ -33,7 +33,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } else {
         db_exec("INSERT INTO classe (designation, code_niveau, libelle_section, id_filiere, id_serie, effectif_max, ordre, archivee) VALUES (?, ?, ?, ?, ?, ?, ?, 0)",
                 [$designation, $code_niveau ?: null, $libelle_section ?: null, $id_filiere ?: null, $id_serie, $effectif_max, $ordre]);
-        flash_set('succes', 'Classe créée.');
+        $nouvelle_id = db_last_id();
+        // Matières affectées automatiquement d'après le programme standard
+        // du niveau (secondaire/pages/matieres/liste.php, onglet « Programme
+        // par niveau ») — demande explicite du 24/09/2026.
+        $nb_mat = function_exists('secondaire_appliquer_programme_niveau')
+            ? secondaire_appliquer_programme_niveau((int) $nouvelle_id, $code_niveau ?: null, $libelle_section ?: null)
+            : 0;
+        flash_set('succes', 'Classe créée.' . ($nb_mat ? " $nb_mat matière(s) affectée(s) automatiquement (programme du niveau)." : ''));
     }
     rediriger('secondaire/pages/classes/liste.php');
 }

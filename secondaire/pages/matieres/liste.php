@@ -157,6 +157,18 @@ if ($onglet === 'par_classe') {
             ? db_all("SELECT * FROM groupe WHERE id_section=? ORDER BY id_groupe_comp", [$section])
             : $groupes;
 
+        // Classe sans AUCUNE matière affectée : applique automatiquement le
+        // programme standard de son niveau, s'il en existe un (onglet
+        // « Programme par niveau » ci-dessous) — jamais d'écrasement d'un
+        // réglage manuel déjà présent. Demande explicite du 24/09/2026.
+        $programme_auto_applique = 0;
+        if ($classe_info && !(int) db_val("SELECT COUNT(*) FROM discipline WHERE IDClasses=?", [$id_cl_aff])
+            && function_exists('secondaire_appliquer_programme_niveau')) {
+            $programme_auto_applique = secondaire_appliquer_programme_niveau(
+                $id_cl_aff, $classe_info['code_niveau'] ?? null, $classe_info['libelle_section'] ?? null
+            );
+        }
+
         $disciplines = db_all(
             "SELECT d.id_mat, d.IDClasses, d.id_groupe, d.coef, d.ordre,
                     m.libelle AS mat_libelle,
@@ -256,6 +268,75 @@ if ($onglet === 'competences_trim') {
              ORDER BY m.libelle, c.ordre",
             [$f_niveau_comp, $f_trim_comp]
         );
+    }
+}
+
+// ══════════════════════════════════════════════════════════════
+//  ONGLET 2ter — Programme par niveau (matières affectées automatiquement
+//  aux classes de ce niveau, à la création ou dès qu'une classe existante
+//  n'a encore aucune matière — voir fonctions.php::
+//  secondaire_appliquer_programme_niveau(), secondaire/pages/classes/
+//  form.php, onglet « Affectation par classe » ci-dessus). Demande
+//  explicite du 24/09/2026.
+// ══════════════════════════════════════════════════════════════
+$f_niveau_prog   = $_GET['niveau_prog'] ?? '';
+$programme_lignes = [];
+$nb_classes_niveau = 0;
+
+if ($onglet === 'programme') {
+    if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+        csrf_verifier();
+        $action = post('action');
+
+        if ($action === 'prog_ajouter') {
+            $niveau    = post('code_niveau');
+            $id_mat    = (int) post('id_matiere');
+            $id_groupe = (int) post('id_groupe');
+            $coef      = (int) post('coef') ?: 1;
+            $ordre     = (int) post('ordre') ?: 1;
+            if ($niveau && $id_mat && $id_groupe) {
+                db_exec(
+                    "INSERT INTO programme_niveau (code_niveau, id_matiere, id_groupe, coef, ordre) VALUES (?,?,?,?,?)
+                     ON DUPLICATE KEY UPDATE id_groupe=VALUES(id_groupe), coef=VALUES(coef), ordre=VALUES(ordre)",
+                    [$niveau, $id_mat, $id_groupe, $coef, $ordre]
+                );
+                flash_set('succes', 'Matière ajoutée au programme.');
+            }
+            rediriger("secondaire/pages/matieres/liste.php?onglet=programme&niveau_prog=" . urlencode($niveau));
+        }
+
+        if ($action === 'prog_supprimer') {
+            $id_prog = (int) post('id_prog');
+            $niveau  = post('code_niveau');
+            db_exec("DELETE FROM programme_niveau WHERE id=?", [$id_prog]);
+            flash_set('succes', 'Matière retirée du programme.');
+            rediriger("secondaire/pages/matieres/liste.php?onglet=programme&niveau_prog=" . urlencode($niveau));
+        }
+
+        if ($action === 'prog_appliquer' && $f_niveau_prog) {
+            $classes_niveau_prog = db_all("SELECT id, libelle_section FROM classe WHERE code_niveau=? AND archivee=0", [$f_niveau_prog]);
+            $total_appliquees = 0;
+            foreach ($classes_niveau_prog as $c) {
+                $total_appliquees += secondaire_appliquer_programme_niveau((int) $c['id'], $f_niveau_prog, $c['libelle_section'] ?? null);
+            }
+            flash_set('succes', count($classes_niveau_prog) . " classe(s) du niveau passée(s) en revue — matières manquantes complétées.");
+            rediriger("secondaire/pages/matieres/liste.php?onglet=programme&niveau_prog=" . urlencode($f_niveau_prog));
+        }
+    }
+
+    if ($f_niveau_prog) {
+        $programme_lignes = db_all(
+            "SELECT pn.id, pn.id_matiere, pn.id_groupe, pn.coef, pn.ordre,
+                    m.libelle AS mat_libelle, m.libelle_section,
+                    g.libelle_groupe_comp AS groupe_libelle
+             FROM programme_niveau pn
+             JOIN matiere m ON m.id = pn.id_matiere
+             LEFT JOIN groupe g ON g.id_groupe_comp = pn.id_groupe
+             WHERE pn.code_niveau = ?
+             ORDER BY m.libelle_section, pn.ordre, m.libelle",
+            [$f_niveau_prog]
+        );
+        $nb_classes_niveau = (int) db_val("SELECT COUNT(*) FROM classe WHERE code_niveau=? AND archivee=0", [$f_niveau_prog]);
     }
 }
 
@@ -367,6 +448,12 @@ function grp_style(string $lib, string $part): string {
     <a class="nav-link <?= $onglet==='par_classe'?'active':'' ?>"
        href="<?= APP_URL ?>/secondaire/pages/matieres/liste.php?onglet=par_classe<?= $id_cl_aff?"&classe_aff=$id_cl_aff":'' ?>">
       <i class="bi bi-diagram-3 me-1"></i>Affectation par classe
+    </a>
+  </li>
+  <li class="nav-item">
+    <a class="nav-link <?= $onglet==='programme'?'active':'' ?>"
+       href="<?= APP_URL ?>/secondaire/pages/matieres/liste.php?onglet=programme<?= $f_niveau_prog?"&niveau_prog=".urlencode($f_niveau_prog):'' ?>">
+      <i class="bi bi-diagram-2 me-1"></i>Programme par niveau
     </a>
   </li>
   <li class="nav-item">
@@ -623,6 +710,14 @@ function reinitForm() {
     </form>
   </div>
 </div>
+
+<?php if ($programme_auto_applique): ?>
+  <div class="alert alert-success py-2 mb-3" style="font-size:.82rem">
+    <i class="bi bi-magic me-1"></i>
+    <?= (int) $programme_auto_applique ?> matière(s) affectée(s) automatiquement d'après le programme standard du niveau
+    <strong><?= h($classe_info['code_niveau'] ?? '') ?></strong>.
+  </div>
+<?php endif; ?>
 
 <?php if (!$id_cl_aff): ?>
   <div class="text-center text-muted py-5">
@@ -960,6 +1055,140 @@ function ouvrirEditDisc(idMat, idGroupe, coef, ordre, nom) {
 
 <?php endif; // id_cl_aff ?>
 </div><!-- /#par-classe-dynamic -->
+
+<?php elseif ($onglet === 'programme'): ?>
+<!-- ══════════════════════════════════════════════════
+     ONGLET 2ter — Programme par niveau
+══════════════════════════════════════════════════ -->
+<div class="alert alert-info py-2 mb-3" style="font-size:.82rem">
+  <i class="bi bi-info-circle me-1"></i>
+  Les matières listées ici pour un niveau sont affectées <strong>automatiquement</strong> à toute nouvelle
+  classe de ce niveau, et à toute classe existante qui n'a encore aucune matière (dès que vous la
+  consultez dans l'onglet « Affectation par classe »).
+</div>
+
+<form method="get" class="d-flex align-items-center gap-3 flex-wrap mb-3">
+  <input type="hidden" name="onglet" value="programme">
+  <div style="min-width:220px">
+    <select name="niveau_prog" class="form-select form-select-sm" onchange="this.form.submit()">
+      <option value="">— Sélectionner un niveau —</option>
+      <?php foreach ($niveaux as $n): ?>
+        <option value="<?= h($n['code_niveau']) ?>" <?= $f_niveau_prog === $n['code_niveau'] ? 'selected' : '' ?>>
+          <?= h($n['libelle_niv']) ?>
+        </option>
+      <?php endforeach; ?>
+    </select>
+  </div>
+  <?php if ($f_niveau_prog): ?>
+    <span style="background:#f0fdf4;color:#166534;padding:3px 10px;border-radius:8px;font-size:.72rem;font-weight:600">
+      <i class="bi bi-door-open me-1"></i><?= $nb_classes_niveau ?> classe(s) à ce niveau
+    </span>
+  <?php endif; ?>
+</form>
+
+<?php if (!$f_niveau_prog): ?>
+  <div class="text-center text-muted py-5">
+    <i class="bi bi-cursor" style="font-size:2.5rem;display:block;opacity:.15;margin-bottom:.5rem"></i>
+    Sélectionnez un niveau pour voir ou modifier son programme.
+  </div>
+<?php else: ?>
+
+  <div class="card mb-3">
+    <div class="table-responsive">
+      <table class="table table-abz table-hover align-middle mb-0" style="font-size:.85rem">
+        <thead><tr><th>Section</th><th>Matière</th><th>Groupe de compétence</th><th>Coef.</th><th>Ordre</th><th class="text-end">Actions</th></tr></thead>
+        <tbody>
+          <?php if (!$programme_lignes): ?>
+            <tr><td colspan="6" class="text-center text-muted py-4">
+              Aucune matière dans le programme de ce niveau pour l'instant.
+            </td></tr>
+          <?php else: foreach ($programme_lignes as $pl): ?>
+            <tr>
+              <td><span class="badge-code"><?= h($pl['libelle_section'] ?? '—') ?></span></td>
+              <td class="fw-semibold"><?= h($pl['mat_libelle']) ?></td>
+              <td><?= h($pl['groupe_libelle'] ?? '—') ?></td>
+              <td><?= (int) $pl['coef'] ?></td>
+              <td><?= (int) $pl['ordre'] ?></td>
+              <td class="text-end">
+                <form method="post" class="d-inline" onsubmit="return confirm('Retirer cette matière du programme du niveau ?')">
+                  <?= csrf_champ() ?>
+                  <input type="hidden" name="action" value="prog_supprimer">
+                  <input type="hidden" name="id_prog" value="<?= (int) $pl['id'] ?>">
+                  <input type="hidden" name="code_niveau" value="<?= h($f_niveau_prog) ?>">
+                  <button class="btn btn-sm btn-light text-danger" style="padding:3px 7px"><i class="bi bi-trash" style="font-size:.78rem"></i></button>
+                </form>
+              </td>
+            </tr>
+          <?php endforeach; endif; ?>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="row g-3">
+    <div class="col-12 col-lg-6">
+      <div class="card h-100">
+        <div class="card-header py-2 fw-semibold"><i class="bi bi-plus-lg me-1"></i>Ajouter une matière au programme</div>
+        <div class="card-body">
+          <form method="post" class="row g-2">
+            <?= csrf_champ() ?>
+            <input type="hidden" name="action" value="prog_ajouter">
+            <input type="hidden" name="code_niveau" value="<?= h($f_niveau_prog) ?>">
+            <div class="col-12">
+              <label class="form-label">Matière</label>
+              <select name="id_matiere" class="form-select form-select-sm" required>
+                <option value="">— Choisir —</option>
+                <?php foreach ($all_matieres as $m): ?>
+                  <option value="<?= (int) $m['id'] ?>"><?= h($m['libelle']) ?> (<?= h($m['libelle_section'] ?? '—') ?>)</option>
+                <?php endforeach; ?>
+              </select>
+            </div>
+            <div class="col-12">
+              <label class="form-label">Groupe de compétence</label>
+              <select name="id_groupe" class="form-select form-select-sm" required>
+                <option value="">— Choisir —</option>
+                <?php foreach ($groupes as $g): ?>
+                  <option value="<?= (int) $g['id_groupe_comp'] ?>"><?= h($g['libelle_groupe_comp']) ?> (<?= h($g['id_section']) ?>)</option>
+                <?php endforeach; ?>
+              </select>
+            </div>
+            <div class="col-6">
+              <label class="form-label">Coefficient</label>
+              <input type="number" name="coef" class="form-control form-control-sm" value="1" min="1" required>
+            </div>
+            <div class="col-6">
+              <label class="form-label">Ordre</label>
+              <input type="number" name="ordre" class="form-control form-control-sm" value="1" min="1" required>
+            </div>
+            <div class="col-12 mt-2">
+              <button class="btn btn-primary btn-sm"><i class="bi bi-check-lg me-1"></i>Ajouter</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-12 col-lg-6">
+      <div class="card h-100">
+        <div class="card-header py-2 fw-semibold"><i class="bi bi-magic me-1"></i>Appliquer aux classes existantes</div>
+        <div class="card-body">
+          <p class="text-muted" style="font-size:.85rem">
+            Complète les classes de ce niveau qui n'ont pas encore toutes les matières du programme —
+            n'écrase jamais une affectation déjà présente.
+          </p>
+          <form method="post" onsubmit="return confirm('Compléter les matières manquantes sur les <?= $nb_classes_niveau ?> classe(s) de ce niveau ?')">
+            <?= csrf_champ() ?>
+            <input type="hidden" name="action" value="prog_appliquer">
+            <input type="hidden" name="code_niveau" value="<?= h($f_niveau_prog) ?>">
+            <button class="btn btn-outline-primary btn-sm" <?= $nb_classes_niveau ? '' : 'disabled' ?>>
+              <i class="bi bi-magic me-1"></i>Appliquer maintenant (<?= $nb_classes_niveau ?> classe(s))
+            </button>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+<?php endif; ?>
 
 <?php elseif ($onglet === 'competences_trim'): ?>
 <!-- ══════════════════════════════════════════════════

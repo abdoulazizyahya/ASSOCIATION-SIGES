@@ -393,6 +393,38 @@ function get_matricule_ens_connecte(): ?int {
     return $mat !== null ? (int) $mat : null;
 }
 
+/**
+ * Affecte à une classe (secondaire) les matières du programme standard de
+ * son niveau (table programme_niveau, bd/secondaire/migration_v7.sql), pour
+ * les couples (matière, classe) pas déjà présents dans `discipline` —
+ * jamais d'écrasement d'un réglage manuel existant, INSERT IGNORE. Appelée
+ * à la création d'une classe (secondaire/pages/classes/form.php) et dans
+ * l'onglet « Affectation par classe » (secondaire/pages/matieres/liste.php)
+ * quand la classe sélectionnée n'a encore aucune matière. Retourne le
+ * nombre de lignes de programme trouvées pour ce niveau/section (0 = pas
+ * encore de programme configuré pour ce niveau — rien à appliquer).
+ */
+function secondaire_appliquer_programme_niveau(int $id_classe, ?string $code_niveau, ?string $libelle_section): int {
+    if ($id_classe <= 0 || !$code_niveau) return 0;
+    $sql = "SELECT pn.id_matiere, pn.id_groupe, pn.coef, pn.ordre
+            FROM programme_niveau pn
+            JOIN matiere m ON m.id = pn.id_matiere
+            WHERE pn.code_niveau = ?";
+    $params = [$code_niveau];
+    if ($libelle_section !== null && $libelle_section !== '') {
+        $sql .= " AND m.libelle_section = ?";
+        $params[] = $libelle_section;
+    }
+    $rows = db_all($sql, $params);
+    foreach ($rows as $r) {
+        db_exec(
+            "INSERT IGNORE INTO discipline (id_mat, IDClasses, id_groupe, coef, ordre) VALUES (?,?,?,?,?)",
+            [$r['id_matiere'], $id_classe, $r['id_groupe'], $r['coef'], (string) $r['ordre']]
+        );
+    }
+    return count($rows);
+}
+
 // Un compte non-ENSEIGNANT (ex. COMPTABLE) est-il par ailleurs affecté à
 // enseigner une classe cette année ? (demande explicite du 22/08/2026 : les
 // menus Discipline/Pédagogie ne s'affichent pour un Agent financier QUE
