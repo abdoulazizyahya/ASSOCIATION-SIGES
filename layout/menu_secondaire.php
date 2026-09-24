@@ -99,9 +99,18 @@ $menu = [
         ['Mes bulletins de paie', 'secondaire/pages/paie/mes_bulletins.php',    'receipt',            ['CENSEUR','SG','SECRETAIRE','ENSEIGNANT']],
         ['Demandes de documents', 'secondaire/pages/demandes/index.php',        'file-earmark-text',  ['ENSEIGNANT','CENSEUR','PROVISEUR', 'FONDATEUR','ADMIN']],
     ],
-    'Administration' => [
-        ['Paramètres',   'secondaire/pages/parametres/index.php',   'gear',        ['ADMIN','PROVISEUR', 'FONDATEUR']],
-        ['Utilisateurs', 'secondaire/pages/utilisateurs/liste.php', 'person-gear', ['ADMIN', 'FONDATEUR']],
+    // Paramètres : alignée sur layout/menu.php (primaire) — mêmes 6 entrées,
+    // même ordre, mêmes fonctionnalités (Mon compte, Directeur/Proviseur,
+    // Configurations, Utilisateurs, Journal d'audit, Licence). Portée le
+    // 24/09/2026 (jusqu'ici groupe « Administration » à seulement 2 entrées,
+    // sans Mon compte/Directeur/Journal/Licence — demande explicite).
+    'Paramètres' => [
+        ['Mon compte',        'profil.php',                              'key',          []],
+        ['Directeur',         'secondaire/pages/fondateur/directeur.php', 'person-badge', ['FONDATEUR']],
+        ['Configurations',    'secondaire/pages/parametres/index.php',   'gear',        ['ADMIN','PROVISEUR', 'FONDATEUR']],
+        ['Utilisateurs',      'secondaire/pages/utilisateurs/liste.php', 'person-gear', ['ADMIN', 'FONDATEUR']],
+        ['Journal d\'audit',  'secondaire/pages/utilisateurs/journal.php','shield-check',['ADMIN','PROVISEUR', 'FONDATEUR']],
+        ['Licence',           'secondaire/pages/parametres/licence.php', 'award',       []],
     ],
 ];
 

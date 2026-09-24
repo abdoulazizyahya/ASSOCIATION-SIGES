@@ -1,34 +1,16 @@
 <?php
-// profil.php — Compte utilisateur en libre-service (login + mot de passe +
-// état des questions de sécurité), accessible à TOUS les rôles connectés
-// (demande explicite du 22/08/2026 : menu Paramètres visible à tous, en
-// libre-service pour tout rôle hors Directeur). La gestion complète des
-// comptes (création, rôle, suppression) reste un module séparé réservé au
-// Directeur — voir pages/utilisateurs/liste.php, ne PAS dupliquer ici.
-// Remplace un ancien profil.php copié tel quel d'un autre projet (table
-// `utilisateur`/colonnes `id`/`role`/`login`/`mot_de_passe` inexistantes
-// dans ce schéma — jamais fonctionnel, jamais lié au menu).
-require_once __DIR__ . '/config.php';
-require_once __DIR__ . '/connexion.php';
-require_once __DIR__ . '/fonctions.php';
-exiger_connexion();
-
-// École secondaire : table `utilisateur` (login/mot_de_passe/role directement
-// dessus, pas de jointure enseignant obligatoire) — même principe que
-// dashboard.php, séparé tôt avant la moindre requête primaire.
-if (function_exists('type_enseignement_courant') && type_enseignement_courant() === 'secondaire') {
-    require __DIR__ . '/secondaire/profil_contenu.php';
-    exit;
-}
+// secondaire/profil_contenu.php — « Mon compte » pour une école secondaire.
+// Porté depuis profil.php (primaire) le 24/09/2026 : même page libre-service
+// (identifiant, mot de passe, appareils connus), adaptée au schéma
+// secondaire — une SEULE table `utilisateur` (id/login/mot_de_passe/role),
+// pas de jointure enseignant obligatoire (matricule_ens nullable). Les
+// questions de sécurité (configurer_securite.php) ne sont pas encore
+// portées côté secondaire (déjà exempté par exiger_connexion()) : ce bloc
+// est donc omis ici, pas juste caché.
+// Inclus par profil.php (racine) via require + exit — jamais appelé seul.
 
 $user_id = (int) $_SESSION['user_id'];
-// $compte (pas $user) : layout/header.php écrase $user avec la session
-// ($_SESSION['user'] : clés nom/prenom/role, PAS nom_ens/id_fonction…).
-$compte  = db_one(
-    "SELECT u.id_user, u.login_user, u.matricule_ens, e.nom_ens, e.prenom_ens, e.id_fonction
-     FROM user u JOIN enseignant e ON e.matricule_ens = u.matricule_ens
-     WHERE u.id_user = ?", [$user_id]
-);
+$compte  = db_one("SELECT * FROM utilisateur WHERE id = ?", [$user_id]);
 if (!$compte) { flash_set('erreur', 'Compte introuvable.'); rediriger('dashboard.php'); }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -39,28 +21,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if (!$login) { flash_set('erreur', 'Le login est obligatoire.'); rediriger('profil.php'); }
 
-    $existe = db_val("SELECT id_user FROM user WHERE login_user=? AND id_user!=?", [$login, $user_id]);
+    $existe = db_val("SELECT id FROM utilisateur WHERE login=? AND id!=?", [$login, $user_id]);
     if ($existe) { flash_set('erreur', 'Ce login est déjà utilisé.'); rediriger('profil.php'); }
 
     if ($mdp !== '') {
         if ($mdp !== $conf) { flash_set('erreur', 'Les mots de passe ne correspondent pas.'); rediriger('profil.php'); }
-        db_exec("UPDATE user SET login_user=?, pwd_user=? WHERE id_user=?",
+        db_exec("UPDATE utilisateur SET login=?, mot_de_passe=? WHERE id=?",
                 [$login, password_hash($mdp, PASSWORD_DEFAULT), $user_id]);
         if (function_exists('journaliser_action')) journaliser_action('mot_de_passe_change');
     } else {
-        db_exec("UPDATE user SET login_user=? WHERE id_user=?", [$login, $user_id]);
+        db_exec("UPDATE utilisateur SET login=? WHERE id=?", [$login, $user_id]);
     }
     $_SESSION['user']['login'] = $login;
     flash_set('succes', 'Profil mis à jour.');
     rediriger('profil.php');
 }
 
-// ── Mes appareils (renommage) ─────────────────────────────────────────
-//  bd/lib/audit.php n'est chargé qu'à la demande ailleurs (ecole_contexte.
-//  php::journaliser_action()) — on le charge ici explicitement pour
-//  appareil_device_id() (function_exists() serait sinon faux tant
-//  qu'aucune action n'a encore été journalisée dans CETTE requête).
-require_once __DIR__ . '/bd/lib/audit.php';
+// ── Mes appareils (renommage) — générique, acteur_type='user' partagé ────
+require_once __DIR__ . '/../bd/lib/audit.php';
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && post('action') === 'appareil_renommer') {
     csrf_verifier();
     $ok = appareil_connu_renommer((int) post('id_appareil'), 'user', $user_id, (string) post('nom_appareil'));
@@ -71,17 +49,20 @@ $mes_appareils     = appareil_connu_lister('user', $user_id);
 $mon_appareil_actu = appareil_device_id();
 
 $titre_page = 'Mon compte';
-require_once __DIR__ . '/layout/header.php';
+require_once __DIR__ . '/../layout/header.php';
 
-$initiales = mb_strtoupper(mb_substr($compte['nom_ens'] ?? '?', 0, 1)) . mb_strtoupper(mb_substr($compte['prenom_ens'] ?? '', 0, 1));
+$initiales = mb_strtoupper(mb_substr($compte['nom'] ?? '?', 0, 1)) . mb_strtoupper(mb_substr($compte['prenom'] ?? '', 0, 1));
 $role_colors = [
-    'DIRECTEUR'  => ['bg' => '#fee2e2', 'txt' => '#991b1b'],
+    'ADMIN'      => ['bg' => '#fee2e2', 'txt' => '#991b1b'],
+    'PROVISEUR'  => ['bg' => '#fee2e2', 'txt' => '#991b1b'],
     'FONDATEUR'  => ['bg' => '#fef9c3', 'txt' => '#854d0e'],
+    'CENSEUR'    => ['bg' => '#e0e7ff', 'txt' => '#3730a3'],
+    'SG'         => ['bg' => '#f3f4f6', 'txt' => '#374151'],
     'ENSEIGNANT' => ['bg' => '#fdf4ff', 'txt' => '#6b21a8'],
     'SECRETAIRE' => ['bg' => '#f0fdf4', 'txt' => '#166534'],
-    'COMPTABLE'  => ['bg' => '#dbeafe', 'txt' => '#1e40af'],
+    'INTENDANT'  => ['bg' => '#dbeafe', 'txt' => '#1e40af'],
 ];
-$rc = $role_colors[$compte['id_fonction'] ?? ''] ?? ['bg' => '#f3f4f6', 'txt' => '#374151'];
+$rc = $role_colors[$compte['role'] ?? ''] ?? ['bg' => '#f3f4f6', 'txt' => '#374151'];
 ?>
 
 <div class="page-titre d-flex align-items-center justify-content-between">
@@ -105,36 +86,23 @@ $rc = $role_colors[$compte['id_fonction'] ?? ''] ?? ['bg' => '#f3f4f6', 'txt' =>
           </div>
         </div>
         <div class="fw-bold" style="font-size:1rem;color:#1e2a3a">
-          <?= h($compte['nom_ens']) ?> <?= h($compte['prenom_ens'] ?? '') ?>
+          <?= h($compte['nom']) ?> <?= h($compte['prenom'] ?? '') ?>
         </div>
         <div class="text-muted mb-2" style="font-size:.78rem">
-          <i class="bi bi-at"></i><?= h($compte['login_user']) ?>
+          <i class="bi bi-at"></i><?= h($compte['login']) ?>
         </div>
         <span style="background:<?= $rc['bg'] ?>;color:<?= $rc['txt'] ?>;padding:2px 9px;border-radius:10px;font-size:.68rem;font-weight:700">
-          <?= h(libelle_role($compte['id_fonction'] ?? '')) ?>
+          <?= h(libelle_role($compte['role'] ?? '')) ?>
         </span>
 
-        <!-- Questions de sécurité -->
-        <div class="mt-3 pt-2 border-top">
-          <div style="font-size:.65rem;text-transform:uppercase;letter-spacing:.06em;color:#9ca3af;margin-bottom:4px">
-            <i class="bi bi-shield-lock me-1"></i>Sécurité
-          </div>
-          <?php if (utilisateur_a_questions($user_id)): ?>
-            <span class="badge bg-success" style="font-size:.68rem">Questions configurées</span>
-          <?php else: ?>
-            <span class="badge bg-warning text-dark" style="font-size:.68rem">Non configurées</span>
-          <?php endif; ?>
-          <a href="<?= APP_URL ?>/configurer_securite.php?retour=profil.php" class="btn btn-light btn-sm d-block mt-2" style="font-size:.72rem">
-            <i class="bi bi-pencil me-1"></i>Modifier mes questions
-          </a>
-        </div>
-
+        <?php if (!empty($compte['matricule_ens'])): ?>
         <div class="mt-2 pt-2 border-top" style="font-size:.75rem;color:#6b7280">
           <i class="bi bi-person-badge me-1"></i>Fiche liée : matricule <?= h((string) $compte['matricule_ens']) ?>
-          <a href="<?= APP_URL ?>/pages/enseignants/mon_profil.php" class="d-block mt-1" style="font-size:.72rem">
+          <a href="<?= APP_URL ?>/secondaire/pages/enseignants/mon_profil.php" class="d-block mt-1" style="font-size:.72rem">
             <i class="bi bi-pencil-square me-1"></i>Modifier mes informations
           </a>
         </div>
+        <?php endif; ?>
       </div>
     </div>
   </div>
@@ -154,7 +122,7 @@ $rc = $role_colors[$compte['id_fonction'] ?? ''] ?? ['bg' => '#f3f4f6', 'txt' =>
             <label class="form-label">Nom d'utilisateur (login) <span class="text-danger">*</span></label>
             <div class="input-group input-group-sm">
               <span class="input-group-text" style="background:#f3f4f6"><i class="bi bi-at"></i></span>
-              <input type="text" name="login" class="form-control" required value="<?= h($compte['login_user']) ?>">
+              <input type="text" name="login" class="form-control" required value="<?= h($compte['login']) ?>">
             </div>
           </div>
 
@@ -192,7 +160,7 @@ $rc = $role_colors[$compte['id_fonction'] ?? ''] ?? ['bg' => '#f3f4f6', 'txt' =>
       <div class="card-body">
         <p class="text-muted" style="font-size:.75rem;margin-top:-4px">
           Donne un nom à un appareil pour le reconnaître facilement dans le
-          <a href="<?= APP_URL ?>/pages/utilisateurs/journal.php">journal d'audit</a> (ex. « PC du bureau »,
+          <a href="<?= APP_URL ?>/secondaire/pages/utilisateurs/journal.php">journal d'audit</a> (ex. « PC du bureau »,
           « Mon téléphone ») — à la place du type générique.
         </p>
         <?php if (!$mes_appareils): ?>
@@ -201,9 +169,6 @@ $rc = $role_colors[$compte['id_fonction'] ?? ''] ?? ['bg' => '#f3f4f6', 'txt' =>
           $ico    = ['ordinateur' => 'bi-laptop', 'tablette' => 'bi-tablet', 'mobile' => 'bi-phone'][$ap['ua_appareil'] ?? ''] ?? 'bi-question-circle';
           $type   = ['ordinateur' => 'Ordinateur', 'tablette' => 'Tablette', 'mobile' => 'Téléphone'][$ap['ua_appareil'] ?? ''] ?? '—';
           $modele = trim((string) ($ap['ua_modele'] ?? ''));
-          // Placeholder : le modèle détecté (ex. « TECNO L34 ») quand il
-          // existe — sinon le type générique. Toujours suggéré, jamais
-          // enregistré tant que le compte ne valide pas lui-même.
           $suggestion = $modele !== '' ? $modele : $type;
           $detail = trim(implode(' · ', array_filter([$modele !== '' ? $type : null, $ap['ua_os'] ?? null])));
           $ici = $ap['device_id'] === $mon_appareil_actu;
@@ -232,4 +197,4 @@ $rc = $role_colors[$compte['id_fonction'] ?? ''] ?? ['bg' => '#f3f4f6', 'txt' =>
   </div>
 </div>
 
-<?php require_once __DIR__ . '/layout/footer.php'; ?>
+<?php require_once __DIR__ . '/../layout/footer.php'; ?>

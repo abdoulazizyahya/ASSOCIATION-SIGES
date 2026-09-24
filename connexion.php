@@ -107,7 +107,9 @@ if (!$_db_ok) {
 //  Laissés passer dans les deux sens (déjà rendus compatibles, voir
 //  fonctions.php : get_annee_active()/get_sequence_active()/
 //  get_etablissement()/menu_definition() type-aware) : login.php,
-//  logout.php, dashboard.php (racine, type-aware lui aussi) et ajax/
+//  logout.php, dashboard.php et profil.php (racine, type-aware, branchent
+//  vers secondaire/dashboard_contenu.php / secondaire/profil_contenu.php)
+//  et ajax/
 //  (racine, partagé avec les deux modules — endpoints JSON appelés en
 //  fetch() par des pages secondaire, ex. secondaire/pages/paiements/
 //  index.php ou secondaire/pages/enseignants/mon_profil.php ; bloqués ici
@@ -125,7 +127,7 @@ if (function_exists('type_enseignement_courant')) {
     $_app = rtrim((string) parse_url(APP_URL, PHP_URL_PATH), '/');
     if ($_app !== '' && strpos($_rel, $_app . '/') === 0) $_rel = substr($_rel, strlen($_app) + 1);
     $_rel = ltrim($_rel, '/');
-    $_commun = in_array($_rel, ['login.php', 'logout.php', 'dashboard.php'], true) || str_starts_with($_rel, 'ajax/');
+    $_commun = in_array($_rel, ['login.php', 'logout.php', 'dashboard.php', 'profil.php'], true) || str_starts_with($_rel, 'ajax/');
     if (!$_commun) {
         $_secondaire = type_enseignement_courant() === 'secondaire';
         if ($_secondaire && !str_starts_with($_rel, 'secondaire/')) {
