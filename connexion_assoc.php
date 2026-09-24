@@ -674,6 +674,7 @@ function creer_etablissement(array $in): array {
          ON DUPLICATE KEY UPDATE version=GREATEST(version, VALUES(version))",
         [$id, $vmax]
     );
+    assoc_seeder_masque_visite($id, $type);
 
     regenerer_portail_accueil_best_effort();   // rafraîchit promeducamsiges.html
 
@@ -896,8 +897,10 @@ function supprimer_etablissement(int $id, array $opts = []): array {
 function assoc_membres_liste(): array {
     $cols = ['id', 'login', 'nom', 'prenom', 'email', 'actif', 'cree_le'];
     $prop = assoc_proprietaire_dispo();
+    $role_dispo = assoc_role_membre_dispo();
     if (assoc_2fa_disponible()) $cols[] = 'totp_actif';
     if ($prop)                  $cols[] = 'proprietaire';
+    if ($role_dispo)            $cols[] = 'role';
     $ordre = ($prop ? 'proprietaire DESC, ' : '') . 'actif DESC, login';
     $membres = assoc_all("SELECT " . implode(', ', $cols) . " FROM membre ORDER BY $ordre");
     foreach ($membres as &$m) {
@@ -914,6 +917,9 @@ function assoc_membres_liste(): array {
             "SELECT COUNT(*) FROM membre_acces WHERE id_membre=? AND actif=1 AND id_etablissement IS NULL AND plein_acces=0",
             [$m['id']]
         );
+        // Étiquette à 3 niveaux : Administrateur (superadmin, dérivé des
+        // accès — inchangé) > Superviseur (colonne role) > Membre (défaut).
+        $m['niveau'] = $m['superadmin'] ? 'administrateur' : ($role_dispo ? ($m['role'] ?? 'membre') : 'membre');
     }
     unset($m);
     return $membres;
@@ -928,6 +934,8 @@ function assoc_membre_detail(int $id): ?array {
         "SELECT COUNT(*) FROM membre_acces WHERE id_membre=? AND actif=1 AND id_etablissement IS NULL AND plein_acces=1",
         [$id]
     );
+    if (!assoc_role_membre_dispo()) $m['role'] = 'membre';
+    $m['niveau'] = $m['superadmin_effectif'] ? 'administrateur' : ($m['role'] ?? 'membre');
     $m['acces'] = assoc_all(
         "SELECT a.id, a.id_etablissement, a.plein_acces, a.actif, e.code, e.nom
          FROM membre_acces a
@@ -939,11 +947,12 @@ function assoc_membre_detail(int $id): ?array {
     return $m;
 }
 
-/** Crée un membre. $in : login, nom, prenom?, email?, pwd. */
+/** Crée un membre. $in : login, nom, prenom?, email?, pwd, role?(membre|supervision). */
 function assoc_membre_creer(array $in): array {
     $login = strtolower(trim($in['login'] ?? ''));
     $nom   = trim($in['nom'] ?? '');
     $pwd   = (string) ($in['pwd'] ?? '');
+    $role  = in_array($in['role'] ?? '', ['membre', 'supervision'], true) ? $in['role'] : 'membre';
     if (!preg_match('/^[a-z0-9._-]{3,50}$/', $login)) {
         return ['ok' => false, 'message' => "Login invalide : 3 à 50 caractères (a-z, 0-9, . _ -)."];
     }
@@ -952,13 +961,45 @@ function assoc_membre_creer(array $in): array {
     if (assoc_val("SELECT COUNT(*) FROM membre WHERE login=?", [$login])) {
         return ['ok' => false, 'message' => "Le login « $login » est déjà pris."];
     }
-    assoc_exec(
-        "INSERT INTO membre (login, pwd_hash, nom, prenom, email, actif)
-         VALUES (?, ?, ?, ?, ?, 1)",
-        [$login, password_hash($pwd, PASSWORD_DEFAULT), $nom,
-         trim($in['prenom'] ?? '') ?: null, trim($in['email'] ?? '') ?: null]
-    );
+    if (assoc_role_membre_dispo()) {
+        assoc_exec(
+            "INSERT INTO membre (login, pwd_hash, nom, prenom, email, actif, role)
+             VALUES (?, ?, ?, ?, ?, 1, ?)",
+            [$login, password_hash($pwd, PASSWORD_DEFAULT), $nom,
+             trim($in['prenom'] ?? '') ?: null, trim($in['email'] ?? '') ?: null, $role]
+        );
+    } else {
+        assoc_exec(
+            "INSERT INTO membre (login, pwd_hash, nom, prenom, email, actif)
+             VALUES (?, ?, ?, ?, ?, 1)",
+            [$login, password_hash($pwd, PASSWORD_DEFAULT), $nom,
+             trim($in['prenom'] ?? '') ?: null, trim($in['email'] ?? '') ?: null]
+        );
+    }
     return ['ok' => true, 'id' => assoc_last_id(), 'message' => "Membre « $login » créé."];
+}
+
+/**
+ * Change le niveau Membre / Superviseur d'un compte (jamais Administrateur :
+ * ce tier reste géré exclusivement via l'accès global écriture, réservé au
+ * propriétaire — association/membres/voir.php, grille des accès). Un
+ * Superviseur reste toujours en lecture seule quelle que soit son
+ * attribution par école, appliqué dans association/entrer_ecole.php.
+ */
+function assoc_membre_role_definir(int $id, string $role): array {
+    if (!assoc_role_membre_dispo()) {
+        return ['ok' => false, 'message' => "Colonne membre.role absente — lancez bd/assoc/maj_assoc.php."];
+    }
+    if (!in_array($role, ['membre', 'supervision'], true)) {
+        return ['ok' => false, 'message' => "Niveau invalide."];
+    }
+    if (!assoc_val("SELECT COUNT(*) FROM membre WHERE id=?", [$id])) {
+        return ['ok' => false, 'message' => "Membre introuvable."];
+    }
+    assoc_exec("UPDATE membre SET role=? WHERE id=?", [$role, $id]);
+    return ['ok' => true, 'message' => $role === 'supervision'
+        ? "Compte défini en Superviseur (lecture seule partout)."
+        : "Compte défini en Membre."];
 }
 
 /** Met à jour l'identité d'un membre (pas le mot de passe). */
@@ -1188,6 +1229,30 @@ function acces_regle_definir(int $id_etab, string $portee, string $cible, array 
              VALUES (?, ?, ?, ?, ?)",
             [$id_etab, $portee, $cible, $cle, $niveau]
         );
+    }
+}
+
+/**
+ * Règles Privilèges par défaut pour une visite association non-administrateur
+ * (rôle synthétique MEMBRE_ASSOCIATION, voir association/entrer_ecole.php) :
+ * Utilisateurs + Paramètres masqués. Idempotente (INSERT IGNORE) — n'écrase
+ * jamais une règle déjà réglée à la main depuis association/acces.php.
+ * Appelée à la création d'une école (creer_etablissement()) et par
+ * bd/assoc/maj_assoc.php pour les écoles existantes.
+ */
+function assoc_seeder_masque_visite(int $id_etablissement, string $type): void {
+    if (!annuaire_dispo() || $id_etablissement <= 0) return;
+    $urls = $type === 'secondaire'
+        ? ['secondaire/pages/parametres/index.php', 'secondaire/pages/utilisateurs/liste.php']
+        : ['pages/parametres/index.php', 'pages/utilisateurs/liste.php'];
+    foreach ($urls as $u) {
+        try {
+            assoc_exec(
+                "INSERT IGNORE INTO acces_regle (id_etablissement, portee, cible, cle, niveau)
+                 VALUES (?, 'role', 'MEMBRE_ASSOCIATION', ?, 'masque')",
+                [$id_etablissement, $u]
+            );
+        } catch (\Throwable $e) { /* table pas encore migrée — ignoré */ }
     }
 }
 
@@ -1738,6 +1803,20 @@ function assoc_proprietaire_dispo(): bool {
             $ok = (bool) assoc_val(
                 "SELECT COUNT(*) FROM information_schema.columns
                  WHERE table_schema = DATABASE() AND table_name = 'membre' AND column_name = 'proprietaire'"
+            );
+        } catch (\Throwable $e) { $ok = false; }
+    }
+    return $ok;
+}
+
+/** La colonne membre.role existe-t-elle (bd/assoc/maj_assoc.php passé) ? */
+function assoc_role_membre_dispo(): bool {
+    static $ok = null;
+    if ($ok === null) {
+        try {
+            $ok = (bool) assoc_val(
+                "SELECT COUNT(*) FROM information_schema.columns
+                 WHERE table_schema = DATABASE() AND table_name = 'membre' AND column_name = 'role'"
             );
         } catch (\Throwable $e) { $ok = false; }
     }

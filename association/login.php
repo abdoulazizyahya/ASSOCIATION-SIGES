@@ -42,6 +42,7 @@ function _membre_connecter(array $m): void {
     $_SESSION['membre'] = [
         'id' => (int) $m['id'], 'login' => $m['login'],
         'nom' => $m['nom'], 'prenom' => $m['prenom'],
+        'role' => $m['role'] ?? 'membre',
     ];
     session_regenerate_id(true);
     require_once __DIR__ . '/../bd/lib/audit.php';

@@ -55,6 +55,7 @@ CREATE TABLE IF NOT EXISTS `membre` (
   `tel`          varchar(30)  DEFAULT NULL,          -- téléphone (récupération de mot de passe)
   `actif`        tinyint(1)   NOT NULL DEFAULT 1,
   `proprietaire` tinyint(1)   NOT NULL DEFAULT 0,    -- compte fondateur : seul habilité à créer/retirer d'autres superadmins
+  `role`         enum('membre','supervision') NOT NULL DEFAULT 'membre', -- « Administrateur » = accès global écriture (membre_acces), pas une valeur d'ici ; « Superviseur » = toujours lecture seule, quelle que soit son attribution par école
   `totp_secret`  varchar(64)  DEFAULT NULL,          -- secret Base32 de la double authentification
   `totp_actif`   tinyint(1)   NOT NULL DEFAULT 0,    -- 2FA exigée à la connexion
   `cree_le`      datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP,

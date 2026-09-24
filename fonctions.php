@@ -259,7 +259,11 @@ function acces_refuses_utilisateur(?int $id_user = null): array {
  * Utilisé par layout/header.php pour masquer les entrées retirées.
  */
 function menu_acces_autorise(string $groupe, string $url): bool {
-    if (function_exists('est_visite_association') && est_visite_association()) return true;
+    // Visite association « Administrateur » : accès complet, hors module
+    // Privilèges (inchangé). Membre/Superviseur : DÉSORMAIS soumis à ce
+    // module comme n'importe quel rôle (Utilisateurs/Paramètres masqués par
+    // défaut, voir assoc_seeder_masque_visite()) — demande du 23/09/2026.
+    if (function_exists('est_visite_association_administrateur') && est_visite_association_administrateur()) return true;
     // Règle « Privilèges » centrale : 'masque' cache l'entrée pour ce
     // rôle/compte (y compris le fondateur). 'lecture'/'ecriture' = octroi,
     // géré côté header.php (révèle une entrée hors périmètre de rôle).
@@ -508,10 +512,25 @@ function normaliser_reponse(string $r): string {
 
 function exiger_role(array $roles): void {
     exiger_connexion();
-    // Membre association en visite : lecture accordée sur toutes les pages
-    // (« visiter toutes les infos »). Les écritures restent bloquées par
-    // csrf_verifier() / db_exec() (est_lecture_seule()).
+    // Membre association en visite.
     if (function_exists('est_visite_association') && est_visite_association()) {
+        // Administrateur (superadmin/propriétaire) : lecture accordée sur
+        // toutes les pages, comportement inchangé (« visiter toutes les
+        // infos »). Les écritures restent bloquées par csrf_verifier() /
+        // db_exec() (est_lecture_seule()).
+        if (function_exists('est_visite_association_administrateur') && est_visite_association_administrateur()) {
+            return;
+        }
+        // Membre / Superviseur : bloqué pour de vrai (pas juste en lecture
+        // seule) si la page est masquée pour son rôle synthétique
+        // MEMBRE_ASSOCIATION — Utilisateurs/Paramètres école par défaut,
+        // configurable depuis association/acces.php. Demande du 23/09/2026 :
+        // ces rubriques ne doivent pas être VUES, pas seulement non-modifiables.
+        if (function_exists('niveau_central_page_courante') && niveau_central_page_courante() === 'masque') {
+            http_response_code(403);
+            die('<div style="font-family:sans-serif;padding:2rem;color:#b45309">
+                 Cette rubrique n\'est pas accessible à votre profil de visite.</div>');
+        }
         return;
     }
     // Règle « Privilèges » centrale (association/acces.php) : un octroi

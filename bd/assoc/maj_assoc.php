@@ -255,6 +255,37 @@ if (!table_existe('acces_regle')) {
     $fait[] = "table acces_regle créée";
 }
 
+// ── Rôles membre (Administrateur / Membre / Superviseur) ────────────
+//  « Administrateur » reste dérivé de membre_acces (accès global écriture,
+//  inchangé) — cette colonne ne distingue que Membre / Superviseur, les 2
+//  seuls cas qui n'étaient pas différenciés jusqu'ici. Un Superviseur est
+//  TOUJOURS en lecture seule, quelle que soit son attribution par école
+//  (voir association/entrer_ecole.php). Demande explicite du 23/09/2026 :
+//  en visite, Membre/Superviseur ne doivent plus voir Utilisateurs ni
+//  Paramètres école, ni la fiche établissement, ni créer de NIU/personnel
+//  (ces 2 dernières restrictions existaient déjà, réservées au superadmin).
+if (!col_existe('membre', 'role')) {
+    mysqli_query($link_assoc,
+        "ALTER TABLE `membre` ADD COLUMN `role` enum('membre','supervision') NOT NULL DEFAULT 'membre' AFTER `proprietaire`");
+    $fait[] = "membre.role ajoutée (tous les membres existants restent 'membre')";
+}
+
+// ── Règles Privilèges par défaut pour les visites association ───────
+//  Masque Utilisateurs + Paramètres pour le rôle synthétique
+//  MEMBRE_ASSOCIATION (Membre/Superviseur en visite — un Administrateur,
+//  lui, n'est jamais concerné par ce module, voir regles_centrales()).
+//  INSERT IGNORE : n'écrase jamais une règle qu'un admin aurait déjà réglée
+//  différemment depuis la page Privilèges ; relançable sans risque.
+if (table_existe('acces_regle') && table_existe('etablissement')
+    && function_exists('assoc_seeder_masque_visite')) {
+    $nb = 0;
+    foreach (assoc_all("SELECT id, COALESCE(type_enseignement,'primaire') AS type FROM etablissement WHERE actif=1") as $e) {
+        assoc_seeder_masque_visite((int) $e['id'], $e['type']);
+        $nb++;
+    }
+    if ($nb) $fait[] = "règles Privilèges par défaut (MEMBRE_ASSOCIATION) posées pour $nb école(s)";
+}
+
 if ($fait) {
     foreach ($fait as $f) echo "  OK  $f\n";
 } else {

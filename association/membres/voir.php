@@ -84,6 +84,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $msg = $r['ok'] ? $r['message'] : ''; $err = $r['ok'] ? '' : $r['message'];
             if ($r['ok']) journaliser_action('membre_acces', ($portee === 'global' ? null : (int) $portee), $detail['login'] . " → $niveau");
         }
+    } elseif ($op === 'role') {
+        // Bascule Membre / Superviseur — sans effet sur un Administrateur
+        // (superadmin_effectif) : ce tier reste géré via la grille des accès
+        // ci-dessous (accès global écriture), pas par ce sélecteur.
+        if ($est_superadmin_cible) {
+            $err = "Ce compte est Administrateur — retirez d'abord l'accès global écriture pour changer son niveau.";
+        } else {
+            $r = assoc_membre_role_definir($id, ($_POST['role_membre'] ?? '') === 'supervision' ? 'supervision' : 'membre');
+            $msg = $r['ok'] ? $r['message'] : ''; $err = $r['ok'] ? '' : $r['message'];
+            if ($r['ok']) journaliser_action('membre_role', null, $detail['login'] . " → " . ($_POST['role_membre'] ?? 'membre'));
+        }
     } elseif ($op === 'transfert_propriete' && $je_suis_proprietaire && assoc_proprietaire_dispo()) {
         // Le propriétaire transmet son rôle à un autre superadmin.
         if ($id === $moi) {
@@ -143,7 +154,19 @@ $csrf = csrf_generer();
 
 <div class="d-flex flex-wrap align-items-center gap-2 mt-2 mb-1">
   <?php if ($cible_proprietaire): ?><span class="badge bg-warning text-dark"><i class="bi bi-key-fill me-1"></i>Propriétaire</span>
-  <?php elseif ($est_superadmin_cible): ?><span class="badge bg-primary">Superadmin</span><?php endif; ?>
+  <?php elseif ($est_superadmin_cible): ?><span class="badge bg-primary">Administrateur</span>
+  <?php else: ?>
+    <form method="post" class="d-flex align-items-center gap-2">
+      <input type="hidden" name="csrf" value="<?= h($csrf) ?>">
+      <input type="hidden" name="op" value="role">
+      <span class="small text-muted2">Rôle</span>
+      <select name="role_membre" class="form-select form-select-sm" style="width:150px" <?= $lecture_seule ? 'disabled' : 'onchange="this.form.submit()"' ?>>
+        <option value="membre" <?= ($detail['niveau'] ?? 'membre') === 'membre' ? 'selected' : '' ?>>Membre</option>
+        <option value="supervision" <?= ($detail['niveau'] ?? 'membre') === 'supervision' ? 'selected' : '' ?>>Superviseur</option>
+      </select>
+      <noscript><button class="btn btn-outline-primary btn-sm">OK</button></noscript>
+    </form>
+  <?php endif; ?>
   <?php if ($lecture_seule): ?><span class="small text-muted2">consultation — modifiable seulement par le propriétaire</span><?php endif; ?>
 </div>
 

@@ -46,6 +46,17 @@ function est_visite_association(): bool {
     return !empty($_SESSION['visite_asso']);
 }
 
+// Visite association de niveau « Administrateur » (superadmin/propriétaire) :
+// seule catégorie qui garde l'accès complet, sans passer par le module
+// Privilèges — voir regles_centrales(), menu_acces_autorise(), exiger_role().
+// Un Membre / Superviseur en visite (posé par entrer_ecole.php) est
+// désormais restreint comme n'importe quel rôle par ce module (Utilisateurs
+// / Paramètres masqués par défaut). Demande explicite du 23/09/2026.
+function est_visite_association_administrateur(): bool {
+    ecole_session_demarrer();
+    return est_visite_association() && (($_SESSION['visite_asso_niveau'] ?? 'administrateur') === 'administrateur');
+}
+
 // Rôle « FONDATEUR » : consulte toute son école. Il peut ENREGISTRER les
 // personnes et la structure (élèves, personnel, directeur, comptes,
 // classes, niveaux…) mais PAS l'argent ni les notes : paiements, dépenses,
@@ -210,8 +221,13 @@ function est_lecture_seule(): bool {
 function regles_centrales(): array {
     static $cache = null;
     if ($cache !== null) return $cache;
-    // Un membre association « en visite » n'est jamais restreint par ce module.
-    if (est_visite_association() || !function_exists('acces_regle_pour')) return $cache = [];
+    if (!function_exists('acces_regle_pour')) return $cache = [];
+    // Un membre association « Administrateur » (superadmin/propriétaire) en
+    // visite n'est jamais restreint par ce module. Un Membre / Superviseur
+    // EST concerné (rôle synthétique MEMBRE_ASSOCIATION, voir
+    // entrer_ecole.php) — c'est justement ce module qui masque par défaut
+    // Utilisateurs / Paramètres pour lui (bd/assoc/maj_assoc.php).
+    if (est_visite_association() && est_visite_association_administrateur()) return $cache = [];
     $ec = ecole_courante();
     $id = $ec['id'] ?? null;
     if (!$id) return $cache = [];

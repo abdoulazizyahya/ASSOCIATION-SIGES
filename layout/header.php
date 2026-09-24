@@ -246,8 +246,12 @@ function lien_actif(string $url): string {
       // École courante (id annuaire) + droit d'écriture du membre sur elle
       // (superadmin, ou membre_acces.plein_acces) — pour le bouton bascule.
       $ec_id = (int) (function_exists('ecole_courante') && ecole_courante() ? ecole_courante()['id'] : ($_SESSION['ecole']['id'] ?? 0));
+      // Un Superviseur reste TOUJOURS en lecture seule (jamais de bascule
+      // écriture), quelle que soit son attribution par école — voir
+      // association/entrer_ecole.php. Administrateur/Membre : inchangé.
       $peut_ecrire_visite = false;
-      if ($ec_id && function_exists('est_superadmin_association')) {
+      if ($ec_id && function_exists('est_superadmin_association')
+          && ($_SESSION['visite_asso_niveau'] ?? 'administrateur') !== 'supervision') {
           if (est_superadmin_association()) {
               $peut_ecrire_visite = true;
           } else {

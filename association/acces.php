@@ -10,7 +10,13 @@ require_once __DIR__ . '/../fonctions.php';
 require_once __DIR__ . '/_layout.php';
 exiger_superadmin_association();
 
-$ROLES = ['DIRECTEUR', 'FONDATEUR', 'COMPTABLE', 'SECRETAIRE', 'ENSEIGNANT'];
+// MEMBRE_ASSOCIATION : rôle synthétique d'un Membre/Superviseur de
+// l'association en visite dans cette école (association/entrer_ecole.php).
+// Un Administrateur (superadmin) n'est jamais concerné par ce module —
+// voir regles_centrales(). Par défaut, Utilisateurs et Paramètres école y
+// sont masqués (bd/assoc/maj_assoc.php / assoc_seeder_masque_visite()) ;
+// réglable ici comme n'importe quel rôle. Demande explicite du 23/09/2026.
+$ROLES = ['DIRECTEUR', 'FONDATEUR', 'COMPTABLE', 'SECRETAIRE', 'ENSEIGNANT', 'MEMBRE_ASSOCIATION'];
 
 $ecoles = assoc_all("SELECT id, code, nom FROM etablissement WHERE actif = 1 ORDER BY nom");
 

@@ -2,11 +2,15 @@
 // association/entrer_ecole.php — un membre « ouvre » une école dans
 // l'application scolaire normale.
 //
-//   Superadmin / membre_acces.plein_acces=1 : entre en LECTURE / ÉCRITURE
-//     PAR DÉFAUT (peut tout faire dans l'école — créer, modifier, supprimer
-//     — exactement comme un DIRECTEUR local). ?id=N&mode=lecture pour se
-//     limiter volontairement à la consultation.
-//   Membre en accès simple (lecture) : LECTURE SEULE, toujours.
+//   Administrateur (superadmin) : entre en LECTURE / ÉCRITURE PAR DÉFAUT
+//     (peut tout faire dans l'école — créer, modifier, supprimer — comme un
+//     DIRECTEUR local). ?id=N&mode=lecture pour se limiter volontairement à
+//     la consultation. Seul niveau non concerné par le module Privilèges.
+//   Membre : suit son attribution par école (membre_acces) — lecture seule
+//     ou écriture. Utilisateurs/Paramètres école masqués par défaut.
+//   Superviseur : LECTURE SEULE, toujours, quelle que soit son attribution.
+//     Utilisateurs/Paramètres école masqués par défaut (configurable depuis
+//     association/acces.php, rôle « MEMBRE_ASSOCIATION »).
 require_once __DIR__ . '/../config.php';
 require_once __DIR__ . '/../connexion.php';
 require_once __DIR__ . '/../fonctions.php';
@@ -32,16 +36,28 @@ if (!$acces) {
     die('Accès non autorisé à cet établissement.');
 }
 
-// Un superadmin (ou un membre disposant de plein_acces sur cette école)
+// Niveau du membre en visite — Administrateur (superadmin/propriétaire) au-
+// dessus de tout ; sinon Membre ou Superviseur (membre.role, colonne posée
+// par bd/assoc/maj_assoc.php — 'membre' par défaut si absente/non migrée).
+// Demande explicite du 23/09/2026 : un Superviseur reste TOUJOURS en lecture
+// seule, quelle que soit son attribution par école (contrairement à
+// Membre, qui suit $acces['plein_acces'] comme avant).
+$niveau = est_superadmin_association()
+    ? 'administrateur'
+    : ((($m['role'] ?? 'membre') === 'supervision') ? 'supervision' : 'membre');
+
+// Un Administrateur (ou un Membre disposant de plein_acces sur cette école)
 // entre EN ÉCRITURE par défaut : il a le privilège de tout faire dans
 // toutes les écoles. Il peut se limiter volontairement avec ?mode=lecture.
-// Un membre en accès simple reste en LECTURE SEULE, quoi qu'il demande.
-$peut_ecrire = est_superadmin_association() || !empty($acces['plein_acces']);
+// Un Superviseur, ou un Membre en accès simple, reste en LECTURE SEULE.
+$peut_ecrire = ($niveau === 'administrateur')
+    || ($niveau === 'membre' && !empty($acces['plein_acces']));
 $ecriture    = $peut_ecrire && (($_GET['mode'] ?? '') !== 'lecture');
 
 // Bascule de contexte : session « visite association », rôle synthétique,
 // base école sélectionnée.
-$_SESSION['visite_asso'] = true;
+$_SESSION['visite_asso']        = true;
+$_SESSION['visite_asso_niveau'] = $niveau;
 if ($ecriture) {
     $_SESSION['visite_asso_ecriture'] = true;
 } else {
@@ -55,26 +71,35 @@ if ($ecriture) {
 // journaliser_action() ci-dessous (qui membre, quelle école, quand) et par
 // le bandeau permanent « Visite association — LECTURE / ÉCRITURE ».
 //
-// En écriture : rôle « DIRECTEUR » synthétique côté PRIMAIRE — tous les
-// boutons/actions des pages école qui testent `role_connecte() === 'DIRECTEUR'`
-// en dur (classes, compétences/barème, matières arabes, signatures de
-// bulletins, meilleurs élèves…) deviennent disponibles. Côté SECONDAIRE,
-// vocabulaire de rôles totalement différent (ADMIN/PROVISEUR/CENSEUR/SG/
-// SECRETAIRE/ENSEIGNANT/INTENDANT, cf. schema_ref_ecole_secondaire.sql) —
-// « DIRECTEUR » n'y existe pas et est rejeté par les gardes en dur des
-// modules secondaire (bulletins, statistiques, discipline, absences,
-// conseil_classe : `in_array($role, ['ADMIN','PROVISEUR','CENSEUR'])`),
-// d'où un « Accès non autorisé » constaté le 16/09/2026 pour le
-// propriétaire de l'association en visite écriture. « ADMIN » est le rôle
-// secondaire le plus large (équivalent DIRECTEUR) — utilisé ici à la place.
-// En lecture seule : rôle « MEMBRE_ASSOCIATION » (les mêmes boutons restent
-// masqués, cohérent avec la consultation), quel que soit le type d'école.
-// `est_visite_association()` reste vrai dans tous les cas (bandeau + accès
-// à tout le menu via `$menu_voit_tout`).
+// Administrateur en écriture : rôle « DIRECTEUR » synthétique côté PRIMAIRE
+// — tous les boutons/actions des pages école qui testent
+// `role_connecte() === 'DIRECTEUR'` en dur (classes, compétences/barème,
+// matières arabes, signatures de bulletins, meilleurs élèves…) deviennent
+// disponibles. Côté SECONDAIRE, vocabulaire de rôles totalement différent
+// (ADMIN/PROVISEUR/CENSEUR/SG/SECRETAIRE/ENSEIGNANT/INTENDANT, cf.
+// schema_ref_ecole_secondaire.sql) — « DIRECTEUR » n'y existe pas et est
+// rejeté par les gardes en dur des modules secondaire (bulletins,
+// statistiques, discipline, absences, conseil_classe :
+// `in_array($role, ['ADMIN','PROVISEUR','CENSEUR'])`), d'où un « Accès non
+// autorisé » constaté le 16/09/2026 pour le propriétaire de l'association en
+// visite écriture. « ADMIN » est le rôle secondaire le plus large
+// (équivalent DIRECTEUR) — utilisé ici à la place.
+//
+// Administrateur en lecture seule, OU Membre/Superviseur (lecture ou
+// écriture) : rôle « MEMBRE_ASSOCIATION », quel que soit le type d'école.
+// Pour Administrateur, ce rôle reste hors du module Privilèges (accès
+// complet, voir regles_centrales()). Pour Membre/Superviseur, CE rôle EST
+// désormais soumis au module Privilèges — Utilisateurs/Paramètres masqués
+// par défaut (bd/assoc/maj_assoc.php / assoc_seeder_masque_visite()),
+// configurable par l'administrateur depuis association/acces.php.
+// `est_visite_association()` reste vrai dans tous les cas (bandeau).
 $secondaire = ($e['type_enseignement'] ?? 'primaire') === 'secondaire';
+$role_session = ($niveau === 'administrateur' && $ecriture)
+    ? ($secondaire ? 'ADMIN' : 'DIRECTEUR')
+    : 'MEMBRE_ASSOCIATION';
 $_SESSION['user'] = [
     'id'            => null,
-    'role'          => $ecriture ? ($secondaire ? 'ADMIN' : 'DIRECTEUR') : 'MEMBRE_ASSOCIATION',
+    'role'          => $role_session,
     'nom'           => $m['nom'] ?? 'Association',
     'prenom'        => $m['prenom'] ?? '',
     'login'         => $m['login'] ?? '',

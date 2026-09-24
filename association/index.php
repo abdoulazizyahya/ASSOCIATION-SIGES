@@ -37,10 +37,14 @@ asso_haut('Établissements de l\'association');
         </div>
         <div class="d-flex align-items-start gap-2">
           <div class="flex-grow-1">
+            <?php if ($superadmin): ?>
             <a href="<?= APP_URL ?>/association/etablissement.php?id=<?= (int) $e['id'] ?>"
                class="fw-bold text-decoration-none stretched-link ecole-card-titre">
               <?= h($e['nom']) ?>
             </a>
+            <?php else: ?>
+            <span class="fw-bold ecole-card-titre"><?= h($e['nom']) ?></span>
+            <?php endif; ?>
             <div class="small text-muted2">
               <span class="badge badge-soft me-1"><?= h($e['code']) ?></span>
               <?= h($e['ville'] ?? '') ?>
@@ -48,12 +52,14 @@ asso_haut('Établissements de l\'association');
             </div>
             <?php if ($e['actif']): ?>
             <div class="d-flex gap-2 position-relative" style="z-index:2;margin-top:1rem">
+              <?php if ($superadmin): ?>
               <a href="<?= APP_URL ?>/association/etablissement.php?id=<?= (int) $e['id'] ?>"
                  class="btn btn-outline-light btn-sm ecole-card-btn">
                 <i class="bi bi-bar-chart me-1"></i>Fiche
               </a>
+              <?php endif; ?>
               <a href="<?= APP_URL ?>/association/entrer_ecole.php?id=<?= (int) $e['id'] ?>"
-                 class="btn btn-primary btn-sm ecole-card-btn" title="Lecture seule">
+                 class="btn btn-primary btn-sm ecole-card-btn <?= $superadmin ? '' : 'stretched-link' ?>" title="Lecture seule">
                 <i class="bi bi-box-arrow-in-right me-1"></i>Ouvrir
               </a>
             </div>
