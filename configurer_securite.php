@@ -1,21 +1,29 @@
 <?php
 // configurer_securite.php — 2 questions secrètes par compte (mot_de_passe_
 // oublie.php s'en sert pour réinitialiser un mot de passe sans passer par le
-// Directeur). Configuration OBLIGATOIRE dès la 1ère connexion — voir
-// exiger_connexion() (fonctions.php), qui redirige ici tant que
-// utilisateur_a_questions() est faux. Reconfigurable ensuite à tout moment
-// (lien « Modifier mes questions », profil.php). Voir bd/migration_v45.sql.
+// Directeur). PROPOSÉE dès la 1ère connexion (bandeau, voir layout/header.php
+// et exiger_connexion()) mais pas bloquante : un compte peut la reporter et
+// continuer à utiliser l'application (demande explicite du 24/09/2026 — avant
+// cette date, obligatoire côté primaire et totalement absente côté
+// secondaire). Reconfigurable ensuite à tout moment (lien « Modifier mes
+// questions », profil.php). Type-aware : question_secrete/
+// utilisateur_question_secrete existent déjà dans le schéma secondaire de
+// référence (table `utilisateur` autoporteuse, colonne id_utilisateur au
+// lieu de id_user) — voir bd/migration_v45.sql (primaire) et
+// bd/secondaire/migration_v6.sql (secondaire).
 require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/connexion.php';
 require_once __DIR__ . '/fonctions.php';
 exiger_connexion();
 
+$secondaire  = function_exists('type_enseignement_courant') && type_enseignement_courant() === 'secondaire';
 $user_id     = (int) $_SESSION['user_id'];
 $retour      = $_GET['retour'] ?? 'dashboard.php';
-$obligatoire = !utilisateur_a_questions($user_id);
 
 $questions_dispo = db_all("SELECT id, libelle FROM question_secrete WHERE actif = 1 ORDER BY libelle");
-$actuelles        = db_all("SELECT id_question FROM user_question_secrete WHERE id_user = ?", [$user_id]);
+$actuelles        = $secondaire
+    ? db_all("SELECT id_question FROM utilisateur_question_secrete WHERE id_utilisateur = ?", [$user_id])
+    : db_all("SELECT id_question FROM user_question_secrete WHERE id_user = ?", [$user_id]);
 $id_q1_actuel     = $actuelles[0]['id_question'] ?? '';
 $id_q2_actuel     = $actuelles[1]['id_question'] ?? '';
 
@@ -35,11 +43,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         rediriger('configurer_securite.php' . ($retour !== 'dashboard.php' ? '?retour=' . urlencode($retour) : ''));
     }
 
-    db_exec("DELETE FROM user_question_secrete WHERE id_user = ?", [$user_id]);
-    db_exec("INSERT INTO user_question_secrete (id_user, id_question, reponse_hash) VALUES (?,?,?)",
-            [$user_id, $id_q1, password_hash(normaliser_reponse($rep1), PASSWORD_DEFAULT)]);
-    db_exec("INSERT INTO user_question_secrete (id_user, id_question, reponse_hash) VALUES (?,?,?)",
-            [$user_id, $id_q2, password_hash(normaliser_reponse($rep2), PASSWORD_DEFAULT)]);
+    if ($secondaire) {
+        db_exec("DELETE FROM utilisateur_question_secrete WHERE id_utilisateur = ?", [$user_id]);
+        db_exec("INSERT INTO utilisateur_question_secrete (id_utilisateur, id_question, reponse_hash) VALUES (?,?,?)",
+                [$user_id, $id_q1, password_hash(normaliser_reponse($rep1), PASSWORD_DEFAULT)]);
+        db_exec("INSERT INTO utilisateur_question_secrete (id_utilisateur, id_question, reponse_hash) VALUES (?,?,?)",
+                [$user_id, $id_q2, password_hash(normaliser_reponse($rep2), PASSWORD_DEFAULT)]);
+    } else {
+        db_exec("DELETE FROM user_question_secrete WHERE id_user = ?", [$user_id]);
+        db_exec("INSERT INTO user_question_secrete (id_user, id_question, reponse_hash) VALUES (?,?,?)",
+                [$user_id, $id_q1, password_hash(normaliser_reponse($rep1), PASSWORD_DEFAULT)]);
+        db_exec("INSERT INTO user_question_secrete (id_user, id_question, reponse_hash) VALUES (?,?,?)",
+                [$user_id, $id_q2, password_hash(normaliser_reponse($rep2), PASSWORD_DEFAULT)]);
+    }
 
     if (function_exists('journaliser_action')) journaliser_action('questions_secretes');
     flash_set('succes', 'Vos questions de sécurité ont été enregistrées.');
@@ -53,12 +69,10 @@ require_once __DIR__ . '/layout/header.php';
   <h4><i class="bi bi-shield-lock me-1 text-primary"></i><?= h($titre_page) ?></h4>
 </div>
 
-<?php if ($obligatoire): ?>
-<div class="alert alert-warning py-2" style="font-size:.85rem">
-  <i class="bi bi-exclamation-triangle me-1"></i>
-  Configuration obligatoire avant de continuer : ces 2 questions permettront de récupérer votre mot de passe en cas d'oubli, sans passer par le Directeur.
+<div class="alert alert-info py-2" style="font-size:.85rem">
+  <i class="bi bi-info-circle me-1"></i>
+  Facultatif, mais recommandé : ces 2 questions permettent de récupérer votre mot de passe en cas d'oubli, sans passer par le Directeur. Vous pouvez le faire plus tard depuis « Mon compte ».
 </div>
-<?php endif; ?>
 
 <div class="card" style="max-width:640px">
   <div class="card-body">
@@ -91,9 +105,7 @@ require_once __DIR__ . '/layout/header.php';
         <input type="text" name="reponse_2" class="form-control" required autocomplete="off">
       </div>
       <button class="btn btn-primary"><i class="bi bi-check-lg me-1"></i>Enregistrer</button>
-      <?php if (!$obligatoire): ?>
-        <a href="<?= APP_URL ?>/<?= h($retour) ?>" class="btn btn-light ms-1">Annuler</a>
-      <?php endif; ?>
+      <a href="<?= APP_URL ?>/<?= h($retour) ?>" class="btn btn-light ms-1">Plus tard</a>
     </form>
   </div>
 </div>

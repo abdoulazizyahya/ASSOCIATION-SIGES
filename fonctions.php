@@ -196,18 +196,12 @@ function exiger_connexion(): void {
         header('Location: ' . APP_URL . '/login.php?bloque=1');
         exit;
     }
-    // Questions secrètes (récupération de mot de passe) : repose sur
-    // user_question_secrete, table absente du schéma secondaire — ce
-    // parcours de configuration obligatoire n'est pas encore porté (comme
-    // configurer_securite.php lui-même). Sans cette exemption, le tout
-    // premier compte d'une école secondaire ne pouvait même pas atteindre
-    // le tableau de bord (Fatal error, bug réel constaté le 15/09/2026).
-    $secondaire = function_exists('type_enseignement_courant') && type_enseignement_courant() === 'secondaire';
-    $exemptes = ['configurer_securite.php', 'logout.php'];
-    if (!$secondaire && !in_array($script_courant, $exemptes, true) && !utilisateur_a_questions((int) ($_SESSION['user_id'] ?? 0))) {
-        header('Location: ' . APP_URL . '/configurer_securite.php');
-        exit;
-    }
+    // Questions secrètes (récupération de mot de passe) : DÉSORMAIS
+    // facultatives, jamais bloquantes (demande explicite du 24/09/2026 —
+    // avant cette date, redirection forcée côté primaire tant que non
+    // configurées ; côté secondaire, absentes du tout). Un bandeau
+    // dismissible (layout/header.php) invite à les configurer sans empêcher
+    // l'accès aux pages — voir configurer_securite.php, utilisateur_a_questions().
     // Privilèges par utilisateur / règle centrale / rôle sans accès à ce
     // menu : NE bloque plus la page (demande explicite du 11/09/2026 — un
     // menu « retiré » doit rester consultable, seule l'écriture disparaît).
@@ -503,6 +497,9 @@ function exiger_acces_eleve(int $id_eleve, string $piste = 'union'): void {
 
 function utilisateur_a_questions(int $id_user): bool {
     if (!$id_user) return false;
+    if (function_exists('type_enseignement_courant') && type_enseignement_courant() === 'secondaire') {
+        return (int) db_val("SELECT COUNT(*) FROM utilisateur_question_secrete WHERE id_utilisateur = ?", [$id_user]) >= 2;
+    }
     return (int) db_val("SELECT COUNT(*) FROM user_question_secrete WHERE id_user = ?", [$id_user]) >= 2;
 }
 
@@ -945,6 +942,31 @@ function get_sequence_active(): array {
     ) ?? [];
 }
 
+// Applique le gabarit de compétences (bd/assoc/seed_competences_secondaire.sql,
+// indexé par libellé de matière + niveau + ordre de trimestre) aux trimestres
+// de l'année donnée. Idempotent (NOT EXISTS) ; ne touche jamais à une
+// compétence existante. Retourne le nombre de compétences ajoutées.
+// Nécessite les matières/niveaux de référence (seed_ref_ecole_secondaire.sql) :
+// une matière ou un niveau absent est simplement ignoré.
+function appliquer_competences_ref_secondaire(int $id_annee): int {
+    global $link;
+    if ($id_annee <= 0) return 0;
+    if (function_exists('est_lecture_seule') && est_lecture_seule()) return 0;
+    $sql = @file_get_contents(__DIR__ . '/bd/assoc/seed_competences_secondaire.sql');
+    if ($sql === false || trim($sql) === '') return 0;
+    $sql = str_replace(':ID_ANNEE:', (string) $id_annee, $sql);
+    try {
+        if (!mysqli_query($link, $sql)) {
+            error_log('appliquer_competences_ref_secondaire: ' . mysqli_error($link));
+            return 0;
+        }
+        return max(0, mysqli_affected_rows($link));
+    } catch (\Throwable $e) {
+        error_log('appliquer_competences_ref_secondaire: ' . $e->getMessage());
+        return 0;
+    }
+}
+
 // Crée (si absentes) les 3 trimestres et leurs 2 séquences chacun d'une
 // année scolaire secondaire donnée — structure seulement, AUCUN active=1
 // décidé ici (voir activer_trimestre()/activer_sequence() ci-dessous) :
@@ -962,6 +984,11 @@ function provisionner_trimestres_annee(int $id_annee): void {
             db_exec("INSERT INTO trimestre (libelle, ordre, id_annee, active) VALUES (?, ?, ?, 0)",
                     [$lib, $i + 1, $id_annee]);
         }
+        // Compétences par matière/niveau/trimestre : liées aux trimestres de
+        // l'année, donc perdues avec elle — on repart du gabarit de référence
+        // (une seule fois, à la création des trimestres : ne réinjecte jamais
+        // ce qu'une école aurait volontairement supprimé ensuite).
+        appliquer_competences_ref_secondaire($id_annee);
     }
     // Chaque trimestre est subdivisé en 2 séquences — système d'évaluation
     // historique de LAM_ABZ (table `sequence`), toujours utilisé par

@@ -4,10 +4,17 @@
 // bd/migration_v45.sql). Accessible depuis login.php. Limité à
 // MAX_TENTATIVES réponses incorrectes avant de devoir recommencer la
 // procédure depuis le début (anti brute-force sur les réponses).
+// Type-aware depuis le 24/09/2026 (porté au secondaire, table `utilisateur`
+// autoporteuse au lieu de user⋈enseignant — question_secrete/
+// utilisateur_question_secrete existent déjà dans le schéma de référence
+// secondaire). Les requêtes secondaire aliasent leurs colonnes sur les mêmes
+// clés que le primaire (id_user, login_user…) pour que tout le reste du
+// fichier (sessions, affichage) reste inchangé.
 require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/connexion.php';
 require_once __DIR__ . '/fonctions.php';
 session_init();
+$secondaire = function_exists('type_enseignement_courant') && type_enseignement_courant() === 'secondaire';
 
 if (est_connecte()) {
     header('Location: ' . APP_URL . '/dashboard.php'); exit;
@@ -39,13 +46,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $etape  = 'login';
             } else {
                 basculer_base_ecole($ec);
+                $secondaire = function_exists('type_enseignement_courant') && type_enseignement_courant() === 'secondaire';
             }
         }
-        $u = $erreur === '' ? db_one("SELECT id_user FROM user WHERE login_user = ?", [$login]) : null;
-        $questions = $u ? db_all(
-            "SELECT q.id, q.libelle FROM user_question_secrete uqs
-             JOIN question_secrete q ON q.id = uqs.id_question
-             WHERE uqs.id_user = ? ORDER BY uqs.id", [$u['id_user']]
+        $u = $erreur === '' ? ($secondaire
+            ? db_one("SELECT id AS id_user FROM utilisateur WHERE login = ?", [$login])
+            : db_one("SELECT id_user FROM user WHERE login_user = ?", [$login])
+        ) : null;
+        $questions = $u ? ($secondaire
+            ? db_all(
+                "SELECT q.id, q.libelle FROM utilisateur_question_secrete uqs
+                 JOIN question_secrete q ON q.id = uqs.id_question
+                 WHERE uqs.id_utilisateur = ? ORDER BY uqs.id", [$u['id_user']])
+            : db_all(
+                "SELECT q.id, q.libelle FROM user_question_secrete uqs
+                 JOIN question_secrete q ON q.id = uqs.id_question
+                 WHERE uqs.id_user = ? ORDER BY uqs.id", [$u['id_user']])
         ) : [];
 
         if ($u && count($questions) >= 2) {
@@ -67,7 +83,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $rep2 = post('reponse_2');
         $qids = $_SESSION['reset_qids'] ?? [0, 0];
 
-        $hashes = db_all("SELECT id_question, reponse_hash FROM user_question_secrete WHERE id_user = ?", [$uid]);
+        $hashes = $secondaire
+            ? db_all("SELECT id_question, reponse_hash FROM utilisateur_question_secrete WHERE id_utilisateur = ?", [$uid])
+            : db_all("SELECT id_question, reponse_hash FROM user_question_secrete WHERE id_user = ?", [$uid]);
         $map = [];
         foreach ($hashes as $h) { $map[$h['id_question']] = $h['reponse_hash']; }
 
@@ -103,12 +121,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $erreur = "Les mots de passe ne correspondent pas.";
             $etape  = 'nouveau';
         } else {
-            db_exec("UPDATE user SET pwd_user = ? WHERE id_user = ?", [password_hash($mdp, PASSWORD_DEFAULT), $uid]);
+            if ($secondaire) {
+                db_exec("UPDATE utilisateur SET mot_de_passe = ? WHERE id = ?", [password_hash($mdp, PASSWORD_DEFAULT), $uid]);
+            } else {
+                db_exec("UPDATE user SET pwd_user = ? WHERE id_user = ?", [password_hash($mdp, PASSWORD_DEFAULT), $uid]);
+            }
             if (function_exists('annuaire_dispo') && annuaire_dispo()) {
                 require_once __DIR__ . '/bd/lib/audit.php';
                 audit_log('action', [
                     'action' => 'mot_de_passe_change',
-                    'login'  => db_val("SELECT login_user FROM user WHERE id_user=?", [$uid]),
+                    'login'  => $secondaire
+                        ? db_val("SELECT login FROM utilisateur WHERE id=?", [$uid])
+                        : db_val("SELECT login_user FROM user WHERE id_user=?", [$uid]),
                     'cible'  => 'réinitialisation via questions secrètes',
                 ]);
             }

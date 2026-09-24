@@ -59,6 +59,18 @@ $licence_sur_sa_page = str_ends_with(page_courante_relative(), 'pages/parametres
 $licence_bloque_ecriture = $licence_expiree && !$licence_sur_sa_page
     && !(function_exists('est_proprietaire_association') && est_proprietaire_association());
 
+// Bandeau « questions de sécurité » — facultatif (demande explicite du
+// 24/09/2026, primaire ET secondaire) : proposé tant que le compte ne les a
+// pas configurées, jamais bloquant. « Plus tard » le masque pour LA SESSION
+// en cours (réapparaît à la prochaine connexion tant que ce n'est pas fait).
+// Jamais pour une visite association (pas de compte local) ni sur la page
+// elle-même / la page de connexion.
+$questions_a_proposer = !$visite_asso && !empty($_SESSION['user_id'])
+    && empty($_SESSION['questions_securite_reportees'])
+    && function_exists('utilisateur_a_questions')
+    && !utilisateur_a_questions((int) $_SESSION['user_id'])
+    && !str_ends_with(page_courante_relative(), 'configurer_securite.php');
+
 // Année RÉELLEMENT active (Etat_annee_scolaire=1), pas juste le repli de
 // get_annee_active() sur l'année la plus récente — demande explicite du
 // 18/08/2026 : tant qu'aucune année n'est explicitement activée, les menus
@@ -386,8 +398,28 @@ function lien_actif(string $url): string {
           (<?= h(date_fr($licence_etat_info['licence']['date_expiration'] ?? '')) ?>).
         <?php endif; ?>
       </span>
-      <a href="<?= APP_URL ?>/pages/parametres/licence.php" class="ms-auto btn btn-sm <?= $licence_etat_info['etat'] === 'expiree' ? 'btn-danger' : 'btn-outline-secondary' ?> py-0 px-2" style="font-size:.78rem">
+      <a href="<?= APP_URL ?>/<?= (function_exists('type_enseignement_courant') && type_enseignement_courant() === 'secondaire') ? 'secondaire/pages/parametres/licence.php' : 'pages/parametres/licence.php' ?>" class="ms-auto btn btn-sm <?= $licence_etat_info['etat'] === 'expiree' ? 'btn-danger' : 'btn-outline-secondary' ?> py-0 px-2" style="font-size:.78rem">
         <i class="bi bi-award me-1"></i>Voir la licence
+      </a>
+    </div>
+    <?php endif; ?>
+
+    <?php if ($questions_a_proposer): ?>
+    <!-- Bandeau « questions de sécurité » — facultatif, fermable (« Plus
+         tard »), indépendant des bandeaux ci-dessus. -->
+    <div class="d-flex flex-wrap align-items-center gap-2 px-3 py-1"
+         style="background:#eef2ff;border-bottom:1px solid #c7d2fe;color:#3730a3;font-size:.8rem">
+      <span>
+        <i class="bi bi-shield-lock me-1"></i>
+        <strong>Questions de sécurité non configurées</strong>
+        — permettent de récupérer votre mot de passe en cas d'oubli, sans passer par le Directeur.
+      </span>
+      <a href="<?= APP_URL ?>/configurer_securite.php" class="ms-auto btn btn-sm btn-primary py-0 px-2" style="font-size:.78rem">
+        <i class="bi bi-check2-circle me-1"></i>Configurer
+      </a>
+      <a href="<?= APP_URL ?>/questions_securite_reporter.php?retour=<?= urlencode(page_courante_relative()) ?>"
+         class="btn btn-sm btn-outline-secondary py-0 px-2" style="font-size:.78rem">
+        Plus tard
       </a>
     </div>
     <?php endif; ?>
