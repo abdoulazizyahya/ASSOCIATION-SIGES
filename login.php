@@ -35,6 +35,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $ec   = $code !== '' ? assoc_one("SELECT * FROM etablissement WHERE code=? AND actif=1", [$code]) : null;
         if ($ec) {
             basculer_base_ecole($ec);
+            // Mémorise le dernier établissement choisi (cookie 1 an, ce
+            // navigateur/appareil) pour présélectionner la liste au prochain
+            // passage sur login.php — demande explicite du 24/09/2026.
+            setcookie('siges_dernier_ecole', $ec['code'], time() + 365 * 86400, APP_URL . '/', '', false, true);
         } else {
             $erreur = 'Veuillez sélectionner votre établissement.';
         }
@@ -109,7 +113,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             ];
             session_regenerate_id(true);
             audit_log('connexion', ['id_etab' => $id_etab_ctx, 'role' => $_SESSION['user']['role']]);
-            header('Location: ' . APP_URL . '/dashboard.php'); exit;
+            // Questions de sécurité pas encore configurées : proposées une
+            // fois, juste après la connexion — « Plus tard » (bouton sur
+            // cette page) renvoie vers le tableau de bord. Jamais bloquant
+            // (demande explicite du 24/09/2026) : un bandeau reste ensuite
+            // disponible sur les autres pages tant que ce n'est pas fait
+            // (layout/header.php + questions_securite_reporter.php).
+            $dest = (function_exists('utilisateur_a_questions') && !utilisateur_a_questions($u_id))
+                ? '/configurer_securite.php'
+                : '/dashboard.php';
+            header('Location: ' . APP_URL . $dest); exit;
         } elseif ($u && password_verify($mdp, $u_pwd_hash) && $u_actif !== 1) {
             audit_log('connexion_echec', ['login' => $login, 'id_etab' => $id_etab_ctx, 'cible' => 'compte désactivé']);
             $erreur = "Ce compte a été désactivé. Contactez l'administration de l'établissement.";
@@ -200,10 +213,16 @@ if (preg_match_all('/\b[\p{L}]/u', $marque_defaut, $mm) && count($mm[0]) > 1) {
       <label class="form-label">Établissement</label>
       <div class="input-group">
         <span class="input-group-text" style="background:#f8faff"><i class="bi bi-building" style="color:#6b7280"></i></span>
+        <?php
+          // Présélection : la soumission en cours (erreur → on ne perd pas
+          // la saisie) sinon le dernier établissement choisi sur cet
+          // appareil (cookie posé plus haut à la connexion).
+          $ecole_preselectionnee = post('ecole') !== '' ? post('ecole') : ($_COOKIE['siges_dernier_ecole'] ?? '');
+        ?>
         <select name="ecole" class="form-select" required>
           <option value="">— Choisir —</option>
           <?php foreach ($ecoles as $ec): ?>
-            <option value="<?= h($ec['code']) ?>" <?= post('ecole') === $ec['code'] ? 'selected' : '' ?>>
+            <option value="<?= h($ec['code']) ?>" <?= $ecole_preselectionnee === $ec['code'] ? 'selected' : '' ?>>
               <?= h($ec['nom']) ?>
             </option>
           <?php endforeach; ?>
