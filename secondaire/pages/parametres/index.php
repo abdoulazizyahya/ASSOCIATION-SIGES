@@ -31,12 +31,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = post('action');
 
     // ── Établissement ─────────────────────────────
-    // FONDATEUR ne peut PAS modifier les infos de l'établissement (nom,
-    // logo, signature…) — demande explicite du 17/09/2026.
-    if ($action === 'etab' && $est_fondateur_local) {
-        flash_set('erreur', "Le fondateur ne peut pas modifier les informations de l'établissement.");
-        rediriger('secondaire/pages/parametres/index.php?onglet=etablissement');
-    }
+    // FONDATEUR peut modifier les infos de l'établissement (nom, logo,
+    // signature…), comme côté primaire (pages/parametres/index.php, où
+    // FONDATEUR n'a aucune restriction sur cet onglet — « structure »,
+    // gouvernée par fondateur_ecriture_permise()). La restriction posée ici
+    // le 17/09/2026 était une incohérence propre au secondaire, levée le
+    // 24/09/2026 (demande explicite).
     if ($action === 'etab') {
         $logo = $etab['logo'] ?? null;
         if (!empty($_FILES['logo']['tmp_name']) && $_FILES['logo']['error'] === UPLOAD_ERR_OK) {
@@ -106,12 +106,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     // ── Suppression du logo / de la signature ─────
-    // Même restriction que 'etab' : le fondateur ne peut pas non plus
-    // supprimer ces fichiers (lecture seule, voir plus haut).
-    if ($action === 'etab_media_supprimer' && $est_fondateur_local) {
-        flash_set('erreur', "Le fondateur ne peut pas modifier les informations de l'établissement.");
-        rediriger('secondaire/pages/parametres/index.php?onglet=etablissement');
-    }
     if ($action === 'etab_media_supprimer') {
         $cible = post('cible');
         if ($cible === 'logo' && !empty($etab['logo'])) {
@@ -416,16 +410,10 @@ require_once __DIR__ . '/../../../layout/header.php';
 ══════════════════════════════════════════════════ -->
 <div class="card">
   <div class="card-body">
-    <?php if ($est_fondateur_local): ?>
-    <div class="alert alert-warning border py-2 mb-3" style="font-size:.8rem">
-      <i class="bi bi-lock me-1"></i>
-      Le fondateur ne peut pas modifier les informations de l'établissement — lecture seule ci-dessous.
-    </div>
-    <?php endif; ?>
     <form method="post" enctype="multipart/form-data">
       <?= csrf_champ() ?>
       <input type="hidden" name="action" value="etab">
-      <fieldset <?= $est_fondateur_local ? 'disabled' : '' ?>>
+      <fieldset>
       <div class="row g-compact">
         <div class="col-md-8">
           <label class="form-label">Nom français <span class="text-danger">*</span></label>
@@ -553,14 +541,6 @@ require_once __DIR__ . '/../../../layout/header.php';
 <!-- ══════════════════════════════════════════════════
      ONGLET 2 — Années scolaires
 ══════════════════════════════════════════════════ -->
-<?php if (!$est_superadmin): ?>
-<div class="alert alert-warning border py-2 mb-3" style="font-size:.8rem">
-  <i class="bi bi-lock me-1"></i>
-  La création d'une année scolaire est réservée au <strong>propriétaire</strong> ou au
-  <strong>superadministrateur</strong> du système — aucun compte local (ADMIN, PROVISEUR…) ne peut y toucher.
-  L'activation/désactivation d'une année existante reste possible ci-dessous.
-</div>
-<?php endif; ?>
 <div class="row g-3">
   <?php if ($est_superadmin): ?>
   <div class="col-md-5">
