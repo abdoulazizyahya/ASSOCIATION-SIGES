@@ -34,14 +34,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         db_exec("INSERT INTO classe (designation, code_niveau, libelle_section, id_filiere, id_serie, effectif_max, ordre, archivee) VALUES (?, ?, ?, ?, ?, ?, ?, 0)",
                 [$designation, $code_niveau ?: null, $libelle_section ?: null, $id_filiere ?: null, $id_serie, $effectif_max, $ordre]);
         $nouvelle_id = db_last_id();
-        // Matières héritées automatiquement d'une classe sœur du même
-        // niveau/section déjà affectée (onglet « Affectation par classe »)
-        // — sans effet si c'est la 1ère classe de ce niveau. Demande
-        // explicite du 25/09/2026 (fonctionnement identique à LAM_ABZ).
-        $nb_mat = function_exists('secondaire_copier_matieres_niveau')
-            ? secondaire_copier_matieres_niveau((int) $nouvelle_id, $code_niveau ?: null, $libelle_section ?: null)
+        // Matières affectées automatiquement : d'abord depuis une classe
+        // sœur du même niveau/section déjà affectée, sinon depuis les
+        // compétences déjà configurées pour ce niveau (onglet « Compétences
+        // par trimestre »). Demande explicite du 25/09/2026.
+        $nb_mat = function_exists('secondaire_auto_matieres_classe')
+            ? secondaire_auto_matieres_classe((int) $nouvelle_id, $code_niveau ?: null, $libelle_section ?: null)
             : 0;
-        flash_set('succes', 'Classe créée.' . ($nb_mat ? " $nb_mat matière(s) reprise(s) automatiquement d'une classe du même niveau." : ''));
+        flash_set('succes', 'Classe créée.' . ($nb_mat ? " $nb_mat matière(s) affectée(s) automatiquement." : ''));
     }
     rediriger('secondaire/pages/classes/liste.php');
 }

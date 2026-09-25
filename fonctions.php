@@ -428,6 +428,61 @@ function secondaire_copier_matieres_niveau(int $id_classe, ?string $code_niveau,
     return count($rows);
 }
 
+/**
+ * Dérive les matières d'une classe (secondaire) à partir des COMPÉTENCES
+ * déjà configurées pour son niveau (onglet « Compétences par trimestre »,
+ * table `competence` : matière + code_niveau + trimestre — indépendante de
+ * toute classe, donc disponible AVANT qu'une classe existe). Une matière
+ * ayant au moins une compétence pour ce niveau est considérée enseignée à
+ * ce niveau. Groupe de compétence = celui de la section de la classe
+ * (`groupe.id_section`, un seul groupe par section) ; coefficient/ordre par
+ * défaut à 1 — à ajuster ensuite au besoin depuis l'onglet « Affectation
+ * par classe » (édition déjà possible par matière). INSERT IGNORE : jamais
+ * d'écrasement d'un réglage déjà présent. Demande explicite du 25/09/2026.
+ */
+function secondaire_deriver_matieres_competences(int $id_classe, ?string $code_niveau, ?string $libelle_section): int {
+    if ($id_classe <= 0 || !$code_niveau) return 0;
+    $id_groupe = $libelle_section !== null && $libelle_section !== ''
+        ? db_val("SELECT id_groupe_comp FROM groupe WHERE id_section=? LIMIT 1", [$libelle_section])
+        : db_val("SELECT id_groupe_comp FROM groupe ORDER BY id_groupe_comp LIMIT 1");
+    if (!$id_groupe) return 0;
+
+    $sql = "SELECT DISTINCT c.id_matiere
+            FROM competence c
+            JOIN matiere m ON m.id = c.id_matiere
+            WHERE c.code_niveau = ?";
+    $params = [$code_niveau];
+    if ($libelle_section !== null && $libelle_section !== '') {
+        $sql .= " AND m.libelle_section = ?";
+        $params[] = $libelle_section;
+    }
+    $matieres = db_all($sql, $params);
+    foreach ($matieres as $m) {
+        db_exec(
+            "INSERT IGNORE INTO discipline (id_mat, IDClasses, id_groupe, coef, ordre) VALUES (?,?,?,1,'1')",
+            [$m['id_matiere'], $id_classe, (int) $id_groupe]
+        );
+    }
+    return count($matieres);
+}
+
+/**
+ * Point d'entrée unique : remplit automatiquement les matières d'une
+ * classe (secondaire) qui n'en a encore aucune — d'abord depuis une classe
+ * sœur déjà affectée (coefficients réels déjà saisis), sinon depuis les
+ * compétences déjà configurées pour le niveau (coefficient par défaut 1).
+ * Appelée à la création d'une classe (secondaire/pages/classes/form.php)
+ * et dans l'onglet « Affectation par classe » dès qu'une classe sans
+ * aucune matière est sélectionnée. Demande explicite du 25/09/2026.
+ */
+function secondaire_auto_matieres_classe(int $id_classe, ?string $code_niveau, ?string $libelle_section): int {
+    if ($id_classe <= 0 || (int) db_val("SELECT COUNT(*) FROM discipline WHERE IDClasses=?", [$id_classe])) {
+        return 0;
+    }
+    $n = secondaire_copier_matieres_niveau($id_classe, $code_niveau, $libelle_section);
+    return $n > 0 ? $n : secondaire_deriver_matieres_competences($id_classe, $code_niveau, $libelle_section);
+}
+
 // Un compte non-ENSEIGNANT (ex. COMPTABLE) est-il par ailleurs affecté à
 // enseigner une classe cette année ? (demande explicite du 22/08/2026 : les
 // menus Discipline/Pédagogie ne s'affichent pour un Agent financier QUE

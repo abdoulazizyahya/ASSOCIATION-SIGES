@@ -157,6 +157,16 @@ if ($onglet === 'par_classe') {
             ? db_all("SELECT * FROM groupe WHERE id_section=? ORDER BY id_groupe_comp", [$section])
             : $groupes;
 
+        // Classe sans AUCUNE matière : affectation automatique — d'abord
+        // depuis une classe sœur du même niveau déjà affectée, sinon depuis
+        // les compétences déjà configurées pour ce niveau (onglet
+        // « Compétences par trimestre », indépendant de toute classe).
+        // Jamais d'écrasement d'un réglage déjà présent. Demande explicite
+        // du 25/09/2026.
+        if ($classe_info && function_exists('secondaire_auto_matieres_classe')) {
+            secondaire_auto_matieres_classe($id_cl_aff, $classe_info['code_niveau'] ?? null, $classe_info['libelle_section'] ?? null);
+        }
+
         $disciplines = db_all(
             "SELECT d.id_mat, d.IDClasses, d.id_groupe, d.coef, d.ordre,
                     m.libelle AS mat_libelle,
