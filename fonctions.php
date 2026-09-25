@@ -394,32 +394,35 @@ function get_matricule_ens_connecte(): ?int {
 }
 
 /**
- * Affecte à une classe (secondaire) les matières du programme standard de
- * son niveau (table programme_niveau, bd/secondaire/migration_v7.sql), pour
- * les couples (matière, classe) pas déjà présents dans `discipline` —
- * jamais d'écrasement d'un réglage manuel existant, INSERT IGNORE. Appelée
- * à la création d'une classe (secondaire/pages/classes/form.php) et dans
- * l'onglet « Affectation par classe » (secondaire/pages/matieres/liste.php)
- * quand la classe sélectionnée n'a encore aucune matière. Retourne le
- * nombre de lignes de programme trouvées pour ce niveau/section (0 = pas
- * encore de programme configuré pour ce niveau — rien à appliquer).
+ * À la création d'une classe (secondaire), copie les matières (groupe de
+ * compétence, coefficient, ordre) d'une classe SŒUR déjà existante — même
+ * niveau, même section (Fr/An) — vers la nouvelle, via la table `discipline`
+ * existante (pas de table de programme séparée : les affectations réelles
+ * DÉJÀ saisies pour ce niveau, onglet « Affectation par classe », en tiennent
+ * lieu). INSERT IGNORE : n'écrase jamais un réglage déjà présent sur la
+ * classe cible. Sans effet (retourne 0) si aucune classe de ce niveau/
+ * section n'a encore de matière assignée — l'admin affecte alors la
+ * première classe du niveau normalement (onglet « Affectation par classe »),
+ * les suivantes en hériteront automatiquement. Demande explicite du
+ * 25/09/2026 (menu/fonctionnement identiques à LAM_ABZ, sans écran de
+ * configuration supplémentaire).
  */
-function secondaire_appliquer_programme_niveau(int $id_classe, ?string $code_niveau, ?string $libelle_section): int {
+function secondaire_copier_matieres_niveau(int $id_classe, ?string $code_niveau, ?string $libelle_section): int {
     if ($id_classe <= 0 || !$code_niveau) return 0;
-    $sql = "SELECT pn.id_matiere, pn.id_groupe, pn.coef, pn.ordre
-            FROM programme_niveau pn
-            JOIN matiere m ON m.id = pn.id_matiere
-            WHERE pn.code_niveau = ?";
-    $params = [$code_niveau];
-    if ($libelle_section !== null && $libelle_section !== '') {
-        $sql .= " AND m.libelle_section = ?";
-        $params[] = $libelle_section;
-    }
-    $rows = db_all($sql, $params);
+    $classe_source = db_val(
+        "SELECT c.id FROM classe c
+         WHERE c.code_niveau=? AND c.libelle_section<=>? AND c.id<>? AND c.archivee=0
+           AND EXISTS (SELECT 1 FROM discipline d WHERE d.IDClasses=c.id)
+         ORDER BY c.id LIMIT 1",
+        [$code_niveau, $libelle_section, $id_classe]
+    );
+    if (!$classe_source) return 0;
+
+    $rows = db_all("SELECT id_mat, id_groupe, coef, ordre FROM discipline WHERE IDClasses=?", [(int) $classe_source]);
     foreach ($rows as $r) {
         db_exec(
             "INSERT IGNORE INTO discipline (id_mat, IDClasses, id_groupe, coef, ordre) VALUES (?,?,?,?,?)",
-            [$r['id_matiere'], $id_classe, $r['id_groupe'], $r['coef'], (string) $r['ordre']]
+            [$r['id_mat'], $id_classe, $r['id_groupe'], $r['coef'], $r['ordre']]
         );
     }
     return count($rows);

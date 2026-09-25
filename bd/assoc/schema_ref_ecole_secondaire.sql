@@ -252,31 +252,6 @@ CREATE TABLE `discipline` (
   KEY `discipline_classe` (`IDClasses`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
-DROP TABLE IF EXISTS `programme_niveau`;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!50503 SET character_set_client = utf8mb4 */;
--- Programme standard : quelles matières (+ coefficient, groupe de
--- compétence, ordre) sont enseignées à un niveau donné — la section (Fr/An)
--- est déjà portée par matiere.libelle_section, pas de colonne séparée ici.
--- Source de vérité utilisée pour affecter AUTOMATIQUEMENT `discipline` à la
--- création d'une classe et depuis l'onglet « Programme par niveau »
--- (secondaire/pages/matieres/liste.php). Demande explicite du 24/09/2026.
-CREATE TABLE `programme_niveau` (
-  `id`          int unsigned NOT NULL AUTO_INCREMENT,
-  `code_niveau` varchar(25) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL,
-  `id_matiere`  int unsigned NOT NULL,
-  `id_groupe`   int NOT NULL,
-  `coef`        int NOT NULL DEFAULT '1',
-  `ordre`       tinyint NOT NULL DEFAULT '1',
-  PRIMARY KEY (`id`),
-  UNIQUE KEY `uq_programme` (`code_niveau`,`id_matiere`),
-  KEY `fk_prog_matiere` (`id_matiere`),
-  KEY `fk_prog_groupe` (`id_groupe`),
-  CONSTRAINT `fk_prog_matiere` FOREIGN KEY (`id_matiere`) REFERENCES `matiere` (`id`) ON DELETE CASCADE ON UPDATE CASCADE,
-  CONSTRAINT `fk_prog_groupe` FOREIGN KEY (`id_groupe`) REFERENCES `groupe` (`id_groupe_comp`) ON DELETE CASCADE ON UPDATE CASCADE,
-  CONSTRAINT `fk_prog_niveau` FOREIGN KEY (`code_niveau`) REFERENCES `niveau` (`code_niveau`) ON DELETE CASCADE ON UPDATE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-/*!40101 SET character_set_client = @saved_cs_client */;
 DROP TABLE IF EXISTS `dispenser`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
