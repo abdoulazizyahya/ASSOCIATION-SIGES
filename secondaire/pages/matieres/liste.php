@@ -22,8 +22,9 @@ $classes = db_all(
 );
 $niveaux         = db_all("SELECT * FROM niveau ORDER BY id_cycle, ordre_niveau, libelle_niv");
 $sections_dispo  = db_all("SELECT * FROM section_classe ORDER BY libelle_section");
+$groupes         = db_all("SELECT * FROM groupe ORDER BY id_groupe_comp");
 // Groupes de compétence actifs — utilisés à la fois par l'onglet
-// « Affectation par classe » et l'onglet « Compétences par trimestre ».
+// « Matières de la classe » et l'onglet « Compétences par trimestre ».
 $all_matieres = db_all("SELECT * FROM matiere WHERE actif=1 ORDER BY libelle");
 
 $annee     = get_annee_active();
@@ -84,84 +85,28 @@ if ($onglet === 'catalogue') {
 }
 
 // ══════════════════════════════════════════════════════════════
-//  ONGLET 2 — Affectation par classe
+//  ONGLET 2 — Matières de la classe (LECTURE SEULE)
 // ══════════════════════════════════════════════════════════════
+//  Plus d'affectation manuelle classe par classe (demande explicite du
+//  25/09/2026, revient sur l'onglet « Affectation par classe » du
+//  24/09/2026) : les matières et leurs compétences sont configurées UNE
+//  FOIS par niveau (onglet « Programme par niveau » ci-dessous) et doivent
+//  exister AVANT la classe. Choisir une classe se contente d'appliquer
+//  silencieusement (si besoin) puis d'AFFICHER le programme de son niveau —
+//  aucune case à cocher, aucun bouton « Affecter », aucune suppression ici.
+//  Pour changer les matières d'un niveau, on modifie son programme, pas
+//  chaque classe individuellement.
 $disciplines    = [];
 $total_coeff    = 0;
-$groupes        = [];
-$groupes_filtre = [];
-$assigned_ids   = [];
 $classe_info    = null;
+$programme_auto_applique = 0;
 
 if ($onglet === 'par_classe') {
-    $groupes = db_all("SELECT * FROM groupe ORDER BY id_groupe_comp");
-
-    if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-        csrf_verifier();
-        $action = post('action');
-
-        if ($action === 'add_disc' && $id_cl_aff) {
-            $selected      = $_POST['mats'] ?? [];
-            $id_groupe_lot = (int)post('groupe_batch');
-            $added = 0;
-            foreach ($selected as $id_mat) {
-                $id_mat    = (int)$id_mat;
-                $id_groupe = $id_groupe_lot;
-                $coef      = (int)($_POST['coef'][$id_mat] ?? 1);
-                $ordre     = (int)($_POST['ordre'][$id_mat] ?? 1);
-                if ($id_mat && $id_groupe) {
-                    db_exec("INSERT IGNORE INTO discipline (id_mat,IDClasses,id_groupe,coef,ordre) VALUES (?,?,?,?,?)",
-                            [$id_mat, $id_cl_aff, $id_groupe, $coef, (string)$ordre]);
-                    $added++;
-                }
-            }
-            flash_set('succes', "$added matière(s) affectée(s).");
-            rediriger("secondaire/pages/matieres/liste.php?onglet=par_classe&niveau_aff=" . urlencode($niveau_aff) . "&classe_aff=$id_cl_aff");
-        }
-
-        if ($action === 'del_disc' && $id_cl_aff) {
-            $id_mat    = (int)post('id_mat');
-            $id_groupe = (int)post('id_groupe');
-            db_exec("DELETE FROM discipline WHERE id_mat=? AND IDClasses=? AND id_groupe=?",
-                    [$id_mat, $id_cl_aff, $id_groupe]);
-            db_exec("DELETE FROM dispenser WHERE id_mat=? AND IDClasses=? AND val_annee=?",
-                    [$id_mat, $id_cl_aff, $val_annee]);
-            flash_set('succes', 'Matière retirée.');
-            rediriger("secondaire/pages/matieres/liste.php?onglet=par_classe&niveau_aff=" . urlencode($niveau_aff) . "&classe_aff=$id_cl_aff");
-        }
-
-        if ($action === 'edit_disc' && $id_cl_aff) {
-            $id_mat_old    = (int)post('id_mat_old');
-            $id_groupe_old = (int)post('id_groupe_old');
-            $id_groupe_new = (int)post('id_groupe_new');
-            $coef_new      = (int)post('coef_new') ?: 1;
-            $ordre_new     = (int)post('ordre_new') ?: 1;
-            if ($id_groupe_new !== $id_groupe_old) {
-                db_exec("DELETE FROM discipline WHERE id_mat=? AND IDClasses=? AND id_groupe=?",
-                        [$id_mat_old, $id_cl_aff, $id_groupe_old]);
-                db_exec("INSERT IGNORE INTO discipline (id_mat,IDClasses,id_groupe,coef,ordre) VALUES (?,?,?,?,?)",
-                        [$id_mat_old, $id_cl_aff, $id_groupe_new, $coef_new, (string)$ordre_new]);
-            } else {
-                db_exec("UPDATE discipline SET coef=?,ordre=? WHERE id_mat=? AND IDClasses=? AND id_groupe=?",
-                        [$coef_new, (string)$ordre_new, $id_mat_old, $id_cl_aff, $id_groupe_old]);
-            }
-            flash_set('succes', 'Matière mise à jour.');
-            rediriger("secondaire/pages/matieres/liste.php?onglet=par_classe&niveau_aff=" . urlencode($niveau_aff) . "&classe_aff=$id_cl_aff");
-        }
-    }
-
     if ($id_cl_aff) {
-        $classe_info    = db_one("SELECT * FROM classe WHERE id=?", [$id_cl_aff]);
-        $section        = $classe_info['libelle_section'] ?? '';
-        $groupes_filtre = $section
-            ? db_all("SELECT * FROM groupe WHERE id_section=? ORDER BY id_groupe_comp", [$section])
-            : $groupes;
+        $classe_info = db_one("SELECT * FROM classe WHERE id=?", [$id_cl_aff]);
 
-        // Classe sans AUCUNE matière affectée : applique automatiquement le
-        // programme standard de son niveau, s'il en existe un (onglet
-        // « Programme par niveau » ci-dessous) — jamais d'écrasement d'un
-        // réglage manuel déjà présent. Demande explicite du 24/09/2026.
-        $programme_auto_applique = 0;
+        // Applique silencieusement le programme du niveau si la classe n'a
+        // encore aucune matière — jamais d'écrasement d'un réglage déjà là.
         if ($classe_info && !(int) db_val("SELECT COUNT(*) FROM discipline WHERE IDClasses=?", [$id_cl_aff])
             && function_exists('secondaire_appliquer_programme_niveau')) {
             $programme_auto_applique = secondaire_appliquer_programme_niveau(
@@ -181,7 +126,6 @@ if ($onglet === 'par_classe') {
             [$id_cl_aff]
         );
         $total_coeff  = array_sum(array_column($disciplines, 'coef'));
-        $assigned_ids = array_column($disciplines, 'id_mat');
     }
 }
 
@@ -447,7 +391,7 @@ function grp_style(string $lib, string $part): string {
   <li class="nav-item">
     <a class="nav-link <?= $onglet==='par_classe'?'active':'' ?>"
        href="<?= APP_URL ?>/secondaire/pages/matieres/liste.php?onglet=par_classe<?= $id_cl_aff?"&classe_aff=$id_cl_aff":'' ?>">
-      <i class="bi bi-diagram-3 me-1"></i>Affectation par classe
+      <i class="bi bi-diagram-3 me-1"></i>Matières de la classe
     </a>
   </li>
   <li class="nav-item">
@@ -659,13 +603,13 @@ function reinitForm() {
 
 <?php elseif ($onglet === 'par_classe'): ?>
 <!-- ══════════════════════════════════════════════════
-     ONGLET 2 — Affectation par classe
+     ONGLET 2 — Matières de la classe (lecture seule)
+     Plus d'affectation manuelle : les matières viennent du programme de
+     son niveau (onglet « Programme par niveau »), configuré AVANT la
+     classe. Demande explicite du 25/09/2026.
 ══════════════════════════════════════════════════ -->
 <div id="par-classe-dynamic">
 <?php
-  // Sélection en cascade niveau → classe : le niveau détermine la section
-  // (Fr/An) qui sert ensuite à filtrer les groupes de compétence proposables
-  // ci-dessous.
   $classes_niveau = $niveau_aff
       ? array_values(array_filter($classes, fn($c) => $c['code_niveau'] === $niveau_aff))
       : $classes;
@@ -711,347 +655,102 @@ function reinitForm() {
   </div>
 </div>
 
-<?php if ($programme_auto_applique): ?>
-  <div class="alert alert-success py-2 mb-3" style="font-size:.82rem">
-    <i class="bi bi-magic me-1"></i>
-    <?= (int) $programme_auto_applique ?> matière(s) affectée(s) automatiquement d'après le programme standard du niveau
-    <strong><?= h($classe_info['code_niveau'] ?? '') ?></strong>.
-  </div>
-<?php endif; ?>
-
 <?php if (!$id_cl_aff): ?>
   <div class="text-center text-muted py-5">
     <i class="bi bi-cursor" style="font-size:2.5rem;display:block;opacity:.15;margin-bottom:.5rem"></i>
-    Sélectionnez une classe pour gérer ses matières.
+    Sélectionnez une classe pour voir ses matières.
   </div>
 
-<?php else:
-  $nom_classe = h($classe_info['designation'] ?? '');
-  $section    = $classe_info['libelle_section'] ?? '';
-?>
+<?php else: $nom_classe = h($classe_info['designation'] ?? ''); ?>
 
-<div class="row g-2" style="align-items:flex-start">
-
-  <!-- ══ Panneau gauche : Ajouter ══ -->
-  <?php
-    // Seules les matières de la section (Fr/An) du niveau de la classe
-    // choisie sont proposables ici — une matière Fr ne doit pas apparaître
-    // pour une classe anglophone et inversement.
-    $all_matieres_section = array_values(array_filter(
-        $all_matieres, fn($m) => ($m['libelle_section'] ?? '') === $section
-    ));
-  ?>
-  <div class="col-xl-5 col-lg-6">
-    <div class="card h-100" style="border:1px solid #c7d2fe;overflow:hidden">
-      <div class="card-header py-2 px-3 d-flex align-items-center gap-2"
-           style="background:linear-gradient(135deg,#eef2ff,#e0e7ff);border-bottom:1px solid #c7d2fe">
-        <i class="bi bi-plus-circle-fill" style="color:#4338ca;font-size:.95rem"></i>
-        <span class="fw-bold" style="font-size:.8rem;color:#312e81">Ajouter des matières</span>
-        <span class="ms-auto badge" style="background:#c7d2fe;color:#3730a3;font-size:.65rem">
-          <?= count($all_matieres_section) ?> disponibles
-        </span>
-      </div>
-      <div class="card-body p-0">
-        <form method="post" id="form-disc">
-          <?= csrf_champ() ?>
-          <input type="hidden" name="action" value="add_disc">
-
-          <!-- Filtre rapide -->
-          <div class="px-2 pt-2 pb-1" style="background:#f8faff;border-bottom:1px solid #e5e7eb">
-            <div class="d-flex align-items-center gap-1" style="background:#fff;border:1px solid #dde3f0;border-radius:7px;padding:3px 8px">
-              <i class="bi bi-search" style="color:#9ca3af;font-size:.72rem"></i>
-              <input type="text" id="filtre-mat" class="form-control form-control-sm border-0 p-0 shadow-none"
-                     style="font-size:.78rem" placeholder="Filtrer les matières...">
-            </div>
-          </div>
-
-          <!-- En-têtes colonnes -->
-          <div style="display:grid;grid-template-columns:20px 1fr 56px 56px;gap:3px;
-                      padding:4px 8px;font-size:.62rem;font-weight:700;color:#6b7280;
-                      background:#f8faff;border-bottom:1px solid #e9ecef;text-transform:uppercase;letter-spacing:.04em">
-            <div></div>
-            <div>Matière</div>
-            <div class="text-center">Coef</div>
-            <div class="text-center">Ordre</div>
-          </div>
-
-          <div style="max-height:420px;overflow-y:auto">
-            <?php foreach ($all_matieres_section as $m):
-              $deja = in_array($m['id'], $assigned_ids);
-            ?>
-            <div class="mat-row" data-lib="<?= strtolower(h($m['libelle'])) ?>"
-                 style="display:grid;grid-template-columns:20px 1fr 56px 56px;gap:3px;
-                        align-items:center;padding:4px 8px;border-bottom:1px solid #f3f4f6;
-                        background:<?= $deja?'#f8fffe':'#fff' ?>">
-              <div style="text-align:center">
-                <?php if ($deja): ?>
-                  <i class="bi bi-check-circle-fill" style="color:#10b981;font-size:.78rem"></i>
-                <?php else: ?>
-                  <input type="checkbox" name="mats[]" value="<?= $m['id'] ?>"
-                         class="form-check-input mat-cb" style="width:13px;height:13px;margin:0;cursor:pointer">
-                <?php endif; ?>
-              </div>
-              <div style="font-size:.75rem;font-weight:<?= $deja?'400':'500' ?>;
-                          color:<?= $deja?'#9ca3af':'#111827' ?>;
-                          white-space:nowrap;overflow:hidden;text-overflow:ellipsis"
-                   title="<?= h($m['libelle']) ?>">
-                <?= h($m['libelle']) ?>
-              </div>
-              <?php if (!$deja): ?>
-              <div>
-                <select name="coef[<?= $m['id'] ?>]" class="form-select form-select-sm text-center"
-                        style="font-size:.78rem;padding:3px 4px">
-                  <?php for ($c=1;$c<=10;$c++): ?><option value="<?= $c ?>"><?= $c ?></option><?php endfor; ?>
-                </select>
-              </div>
-              <div>
-                <select name="ordre[<?= $m['id'] ?>]" class="form-select form-select-sm text-center"
-                        style="font-size:.78rem;padding:3px 4px">
-                  <?php for ($o=1;$o<=30;$o++): ?><option value="<?= $o ?>"><?= $o ?></option><?php endfor; ?>
-                </select>
-              </div>
-              <?php else: ?>
-              <div style="color:#10b981;font-size:.65rem;text-align:center;grid-column:3/5">
-                <i class="bi bi-check2-all"></i> affectée
-              </div>
-              <?php endif; ?>
-            </div>
-            <?php endforeach; ?>
-          </div>
-
-          <div class="d-flex align-items-center gap-2 px-2 py-2 border-top flex-wrap" style="background:#f8faff">
-            <div style="min-width:150px">
-              <select name="groupe_batch" class="form-select form-select-sm" style="font-size:.7rem">
-                <?php foreach ($groupes_filtre as $g): ?>
-                  <option value="<?= $g['id_groupe_comp'] ?>">
-                    <?= h($g['libelle_groupe_comp']) ?>
-                  </option>
-                <?php endforeach; ?>
-              </select>
-            </div>
-            <button type="submit" class="btn btn-primary btn-sm px-3">
-              <i class="bi bi-save me-1"></i>Affecter
-            </button>
-            <label style="display:flex;align-items:center;gap:4px;font-size:.72rem;cursor:pointer;margin:0;color:#374151">
-              <input type="checkbox" id="chk-all" class="form-check-input" style="width:13px;height:13px;margin:0">
-              Tout
-            </label>
-            <span id="sel-count" class="text-muted ms-auto" style="font-size:.7rem">0 sél.</span>
-          </div>
-        </form>
-      </div>
-    </div>
+<div class="card">
+  <div class="card-header py-2 px-3 d-flex align-items-center gap-2"
+       style="background:linear-gradient(135deg,#eef2ff,#e0e7ff);border-bottom:1px solid #c7d2fe">
+    <i class="bi bi-journal-check" style="color:#4338ca;font-size:.95rem"></i>
+    <span class="fw-bold" style="font-size:.8rem;color:#312e81">
+      Matières &mdash; <?= $nom_classe ?>
+    </span>
+    <span class="ms-auto badge" style="background:#c7d2fe;color:#3730a3;font-size:.65rem">
+      <?= count($disciplines) ?> mat. &nbsp;|&nbsp; Σ coef <strong><?= $total_coeff ?></strong>
+    </span>
   </div>
-
-  <!-- ══ Panneau droit : Matières affectées ══ -->
-  <div class="col-xl-7 col-lg-6">
-    <div class="card h-100" style="border:1px solid #c7d2fe;overflow:hidden">
-      <div class="card-header py-2 px-3 d-flex align-items-center gap-2"
-           style="background:linear-gradient(135deg,#eef2ff,#e0e7ff);border-bottom:1px solid #c7d2fe">
-        <i class="bi bi-journal-check" style="color:#4338ca;font-size:.95rem"></i>
-        <span class="fw-bold" style="font-size:.8rem;color:#312e81">
-          Matières &mdash; <?= $nom_classe ?>
-        </span>
-        <span class="ms-auto badge" style="background:#c7d2fe;color:#3730a3;font-size:.65rem">
-          <?= count($disciplines) ?> mat. &nbsp;|&nbsp; Σ coef <strong><?= $total_coeff ?></strong>
-        </span>
-      </div>
-      <div class="card-body p-0">
-        <?php if (empty($disciplines)): ?>
-          <div class="text-center text-muted py-5" style="font-size:.82rem">
-            <i class="bi bi-inbox" style="font-size:2.2rem;display:block;opacity:.15;margin-bottom:.4rem"></i>
-            Aucune matière affectée à cette classe.
-          </div>
-        <?php else: ?>
-        <div style="max-height:520px;overflow-y:auto">
-          <table style="width:100%;border-collapse:collapse;border:1px solid #e5e7eb">
-            <thead>
-              <tr style="position:sticky;top:0;z-index:2;background:#f8faff;border-bottom:1px solid #e9ecef">
-                <th style="width:24px;padding:5px 4px 5px 12px;border-right:1px solid #e5e7eb"></th>
-                <th style="padding:5px 6px;width:184px;text-align:left;font-size:.62rem;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:.04em;border-right:1px solid #e5e7eb">
-                  Groupe de compétence
-                </th>
-                <th style="width:10px;padding:5px 2px;text-align:center;font-size:.62rem;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:.04em;border-right:1px solid #e5e7eb">
-                  Coef
-                </th>
-                <th style="width:6px;padding:5px 2px;text-align:center;font-size:.62rem;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:.04em;border-right:1px solid #e5e7eb">
-                  Ordre
-                </th>
-                <th style="width:25px;padding:5px 0;text-align:center;font-size:.62rem;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:.04em">
-                  Actions
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              <?php foreach ($disciplines as $i => $d): ?>
-              <tr class="disc-row" style="border-bottom:1px solid #e5e7eb"
-                  onmouseover="this.style.background='#f8faff'" onmouseout="this.style.background=''">
-                <td style="width:24px;padding:5px 4px 5px 12px;color:#d1d5db;font-size:.7rem;text-align:right;white-space:nowrap;border-right:1px solid #e5e7eb">
-                  <?= $i+1 ?>
-                </td>
-                <td style="padding:5px 6px;font-size:.8rem;font-weight:600;color:#111827;max-width:184px;width:184px;border-right:1px solid #e5e7eb">
-                  <div style="white-space:normal;word-break:break-word" title="<?= h($d['mat_libelle']) ?>">
-                    <?= h($d['mat_libelle']) ?>
-                  </div>
-                </td>
-                <td style="width:10px;padding:5px 2px;text-align:center;border-right:1px solid #e5e7eb">
-                  <span style="display:inline-block;min-width:10px;padding:1px 2px;border-radius:6px;
-                               background:#dbeafe;color:#1e40af;font-size:.66rem;font-weight:700">
-                    <?= $d['coef'] ?>
-                  </span>
-                </td>
-                <td style="width:6px;padding:5px 2px;text-align:center;color:#9ca3af;font-size:.64rem;border-right:1px solid #e5e7eb">
-                  <?= (int)$d['ordre'] ?>
-                </td>
-                <td style="width:25px;padding:4px 0;text-align:center;white-space:nowrap">
-                  <button type="button" class="btn btn-sm btn-light" style="padding:3px 5px;margin-right:20px"
-                          title="Modifier"
-                          onclick="ouvrirEditDisc(<?= $d['id_mat'] ?>,<?= $d['id_groupe'] ?>,<?= $d['coef'] ?>,<?= (int)$d['ordre'] ?>,<?= h(json_encode($d['mat_libelle'])) ?>)">
-                    <i class="bi bi-pencil" style="font-size:.7rem;color:#2563eb"></i>
-                  </button>
-                  <button type="button" class="btn btn-sm btn-light text-danger" style="padding:3px 5px"
-                          title="Retirer"
-                          onclick="supprimerDisc(<?= $d['id_mat'] ?>,<?= $d['id_groupe'] ?>,<?= h(json_encode($d['mat_libelle'])) ?>)">
-                    <i class="bi bi-trash" style="font-size:.7rem"></i>
-                  </button>
-                </td>
-              </tr>
-              <?php endforeach; ?>
-            </tbody>
-          </table>
-
-          <!-- Pied total -->
-          <div style="display:flex;align-items:center;justify-content:flex-end;gap:8px;
-                      padding:6px 12px;background:#eef2ff;border-top:2px solid #c7d2fe;
-                      position:sticky;bottom:0">
-            <span style="font-size:.72rem;color:#374151;font-weight:600;text-transform:uppercase;letter-spacing:.04em">
-              Total coefficients
-            </span>
-            <span style="background:#3730a3;color:#fff;padding:2px 12px;border-radius:10px;font-size:.88rem;font-weight:700">
-              <?= $total_coeff ?>
-            </span>
-          </div>
+  <div class="card-body p-0">
+    <?php if (empty($disciplines)): ?>
+      <div class="text-center text-muted py-5" style="font-size:.82rem">
+        <i class="bi bi-inbox" style="font-size:2.2rem;display:block;opacity:.15;margin-bottom:.4rem"></i>
+        Aucune matière dans le programme du niveau <strong><?= h($classe_info['code_niveau'] ?? '') ?></strong> pour l'instant.
+        <div class="mt-2">
+          <a href="?onglet=programme&niveau_prog=<?= urlencode($classe_info['code_niveau'] ?? '') ?>" class="btn btn-sm btn-outline-primary">
+            <i class="bi bi-diagram-2 me-1"></i>Configurer le programme de ce niveau
+          </a>
         </div>
-        <?php endif; ?>
+      </div>
+    <?php else: ?>
+    <div style="max-height:520px;overflow-y:auto">
+      <table style="width:100%;border-collapse:collapse;border:1px solid #e5e7eb">
+        <thead>
+          <tr style="position:sticky;top:0;z-index:2;background:#f8faff;border-bottom:1px solid #e9ecef">
+            <th style="width:24px;padding:5px 4px 5px 12px;border-right:1px solid #e5e7eb"></th>
+            <th style="padding:5px 6px;text-align:left;font-size:.62rem;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:.04em;border-right:1px solid #e5e7eb">
+              Matière
+            </th>
+            <th style="padding:5px 6px;text-align:left;font-size:.62rem;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:.04em;border-right:1px solid #e5e7eb">
+              Groupe de compétence
+            </th>
+            <th style="width:60px;padding:5px 2px;text-align:center;font-size:.62rem;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:.04em;border-right:1px solid #e5e7eb">
+              Coef
+            </th>
+            <th style="width:60px;padding:5px 2px;text-align:center;font-size:.62rem;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:.04em">
+              Ordre
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          <?php foreach ($disciplines as $i => $d): ?>
+          <tr style="border-bottom:1px solid #e5e7eb">
+            <td style="width:24px;padding:5px 4px 5px 12px;color:#d1d5db;font-size:.7rem;text-align:right;white-space:nowrap;border-right:1px solid #e5e7eb">
+              <?= $i+1 ?>
+            </td>
+            <td style="padding:5px 6px;font-size:.8rem;font-weight:600;color:#111827;border-right:1px solid #e5e7eb">
+              <?= h($d['mat_libelle']) ?>
+            </td>
+            <td style="padding:5px 6px;font-size:.78rem;color:#4b5563;border-right:1px solid #e5e7eb">
+              <?= h($d['groupe_libelle'] ?? '—') ?>
+            </td>
+            <td style="width:60px;padding:5px 2px;text-align:center;border-right:1px solid #e5e7eb">
+              <span style="display:inline-block;min-width:20px;padding:1px 6px;border-radius:6px;background:#dbeafe;color:#1e40af;font-size:.72rem;font-weight:700">
+                <?= $d['coef'] ?>
+              </span>
+            </td>
+            <td style="width:60px;padding:5px 2px;text-align:center;color:#9ca3af;font-size:.72rem">
+              <?= (int) $d['ordre'] ?>
+            </td>
+          </tr>
+          <?php endforeach; ?>
+        </tbody>
+      </table>
+
+      <!-- Pied total -->
+      <div style="display:flex;align-items:center;justify-content:flex-end;gap:8px;
+                  padding:6px 12px;background:#eef2ff;border-top:2px solid #c7d2fe;
+                  position:sticky;bottom:0">
+        <span style="font-size:.72rem;color:#374151;font-weight:600;text-transform:uppercase;letter-spacing:.04em">
+          Total coefficients
+        </span>
+        <span style="background:#3730a3;color:#fff;padding:2px 12px;border-radius:10px;font-size:.88rem;font-weight:700">
+          <?= $total_coeff ?>
+        </span>
       </div>
     </div>
-  </div>
-
-</div><!-- /row -->
-
-<!-- Formulaire caché supprimer (via JS) -->
-<form method="post" id="form-del" style="display:none">
-  <?= csrf_champ() ?>
-  <input type="hidden" name="action" value="del_disc">
-  <input type="hidden" name="id_mat"    id="del_id_mat">
-  <input type="hidden" name="id_groupe" id="del_id_groupe">
-</form>
-
-<!-- Modal Modifier -->
-<div class="modal fade" id="modalEditDisc" tabindex="-1">
-  <div class="modal-dialog modal-sm">
-    <div class="modal-content" style="border-radius:14px;overflow:hidden">
-      <div class="modal-header py-2" style="background:linear-gradient(135deg,#eef2ff,#e0e7ff);border-bottom:1px solid #c7d2fe">
-        <h6 class="modal-title fw-bold d-flex align-items-center gap-2" style="font-size:.85rem;color:#312e81">
-          <i class="bi bi-pencil-square text-primary"></i>Modifier la matière
-        </h6>
-        <button type="button" class="btn-close btn-close-sm" data-bs-dismiss="modal"></button>
-      </div>
-      <form method="post">
-        <?= csrf_champ() ?>
-        <input type="hidden" name="action" value="edit_disc">
-        <input type="hidden" name="id_mat_old"    id="edit_id_mat">
-        <input type="hidden" name="id_groupe_old" id="edit_id_groupe_old">
-        <div class="modal-body py-3">
-          <div class="mb-3 p-2 rounded" style="background:#f8faff;border:1px solid #e0e7ff">
-            <span style="font-size:.72rem;color:#6b7280;display:block">Matière</span>
-            <span class="fw-bold" id="edit_mat_nom" style="font-size:.88rem;color:#1e40af"></span>
-          </div>
-          <div class="row g-2">
-            <div class="col-6">
-              <label class="form-label" style="font-size:.78rem">Coefficient</label>
-              <select name="coef_new" id="edit_coef" class="form-select form-select-sm">
-                <?php for ($c=1;$c<=10;$c++): ?>
-                  <option value="<?= $c ?>"><?= $c ?></option>
-                <?php endfor; ?>
-              </select>
-            </div>
-            <div class="col-6">
-              <label class="form-label" style="font-size:.78rem">Ordre</label>
-              <select name="ordre_new" id="edit_ordre" class="form-select form-select-sm">
-                <?php for ($o=1;$o<=30;$o++): ?>
-                  <option value="<?= $o ?>"><?= $o ?></option>
-                <?php endfor; ?>
-              </select>
-            </div>
-            <div class="col-12">
-              <label class="form-label" style="font-size:.78rem">Groupe</label>
-              <select name="id_groupe_new" id="edit_groupe" class="form-select form-select-sm">
-                <?php foreach ($groupes_filtre ?: $groupes as $g): ?>
-                  <option value="<?= $g['id_groupe_comp'] ?>">
-                    <?= h($g['libelle_groupe_comp']) ?>
-                  </option>
-                <?php endforeach; ?>
-              </select>
-            </div>
-          </div>
-        </div>
-        <div class="modal-footer py-2" style="border-top:1px solid #e5e7eb">
-          <button class="btn btn-primary btn-sm px-4">
-            <i class="bi bi-check-lg me-1"></i>Enregistrer
-          </button>
-          <button type="button" class="btn btn-light btn-sm" data-bs-dismiss="modal">Annuler</button>
-        </div>
-      </form>
-    </div>
+    <?php endif; ?>
   </div>
 </div>
-
-<script>
-// Délégation sur document (et non un binding direct par élément) : le
-// contenu de #par-classe-dynamic est reconstruit à chaque changement de
-// niveau/classe via ajaxSelectReload() (innerHTML), ce qui ne réexécute pas
-// les <script> et casserait des listeners attachés directement aux
-// éléments d'origine — la délégation survit à ces remplacements.
-document.addEventListener('input', function(e) {
-    if (e.target.id !== 'filtre-mat') return;
-    var q = e.target.value.toLowerCase();
-    document.querySelectorAll('.mat-row').forEach(function(row) {
-        row.style.display = (row.dataset.lib || '').includes(q) ? '' : 'none';
-    });
-});
-document.addEventListener('change', function(e) {
-    if (e.target.id === 'chk-all') {
-        document.querySelectorAll('.mat-cb').forEach(function(cb) { cb.checked = e.target.checked; });
-        majCount();
-    } else if (e.target.classList.contains('mat-cb')) {
-        majCount();
-    }
-});
-function majCount() {
-    var n  = document.querySelectorAll('.mat-cb:checked').length;
-    var el = document.getElementById('sel-count');
-    if (el) el.textContent = n + ' sélectionnée(s)';
-}
-
-// Supprimer une affectation
-function supprimerDisc(idMat, idGroupe, nom) {
-    if (!confirm('Retirer « ' + nom + ' » de cette classe ?')) return;
-    document.getElementById('del_id_mat').value    = idMat;
-    document.getElementById('del_id_groupe').value = idGroupe;
-    document.getElementById('form-del').submit();
-}
-// Ouvrir modal édition
-function ouvrirEditDisc(idMat, idGroupe, coef, ordre, nom) {
-    document.getElementById('edit_id_mat').value       = idMat;
-    document.getElementById('edit_id_groupe_old').value = idGroupe;
-    document.getElementById('edit_coef').value         = coef;
-    document.getElementById('edit_ordre').value        = ordre;
-    document.getElementById('edit_groupe').value       = idGroupe;
-    document.getElementById('edit_mat_nom').textContent = nom;
-    new bootstrap.Modal(document.getElementById('modalEditDisc')).show();
-}
-</script>
+<div class="text-muted mt-2" style="font-size:.78rem">
+  <i class="bi bi-info-circle me-1"></i>
+  Pour changer les matières d'une classe, modifiez le programme de son niveau
+  (<a href="?onglet=programme&niveau_prog=<?= urlencode($classe_info['code_niveau'] ?? '') ?>">onglet « Programme par niveau »</a>)
+  — jamais une classe individuellement.
+</div>
 
 <?php endif; // id_cl_aff ?>
 </div><!-- /#par-classe-dynamic -->
@@ -1062,9 +761,9 @@ function ouvrirEditDisc(idMat, idGroupe, coef, ordre, nom) {
 ══════════════════════════════════════════════════ -->
 <div class="alert alert-info py-2 mb-3" style="font-size:.82rem">
   <i class="bi bi-info-circle me-1"></i>
-  Les matières listées ici pour un niveau sont affectées <strong>automatiquement</strong> à toute nouvelle
-  classe de ce niveau, et à toute classe existante qui n'a encore aucune matière (dès que vous la
-  consultez dans l'onglet « Affectation par classe »).
+  Configurez ici le programme <strong>avant</strong> de créer vos classes. Les matières listées pour un
+  niveau s'affichent ensuite automatiquement pour toute classe de ce niveau — à la création et dans
+  l'onglet « Matières de la classe » — sans aucune action supplémentaire.
 </div>
 
 <form method="get" class="d-flex align-items-center gap-3 flex-wrap mb-3">
