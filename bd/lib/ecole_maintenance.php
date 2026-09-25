@@ -311,7 +311,14 @@ function ecole_vider(int $id_etab): array {
             'sigle'  => $e['sigle'] ?: null,
             'ville'  => $e['ville'] ?: null,
         ];
-        $nb = charger_schema_ecole($l, $seed);   // connexion_assoc.php
+        // Type de l'école (primaire/secondaire) : SANS ce paramètre,
+        // charger_schema_ecole() retombe sur son défaut 'primaire' et
+        // charge le MAUVAIS schéma de référence pour une école secondaire
+        // (bug réel constaté le 26/09/2026 sur COLLEGE MINHADJOUL MOUSLIM —
+        // base vidée puis rechargée en primaire alors que l'annuaire la
+        // déclare secondaire, causant « Champ 'id' inconnu » partout
+        // ensuite, la structure primaire n'ayant pas les mêmes colonnes).
+        $nb = charger_schema_ecole($l, $seed, $e['type_enseignement'] ?? 'primaire');   // connexion_assoc.php
         mysqli_close($l);
     } catch (\Throwable $ex) {
         return ['ok' => false, 'backup' => $backup, 'tables' => 0,
@@ -379,12 +386,14 @@ function ecole_creer_base(int $id_etab): array {
             mysqli_query($srv, "CREATE DATABASE `" . str_replace('`', '', $db)
                              . "` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci");
             mysqli_select_db($srv, $db);
-            $nb = charger_schema_ecole($srv, $seed);   // connexion_assoc.php
+            // Type de l'école — voir le commentaire équivalent dans
+            // ecole_vider() ci-dessus (même bug, même correctif).
+            $nb = charger_schema_ecole($srv, $seed, $e['type_enseignement'] ?? 'primaire');   // connexion_assoc.php
             mysqli_close($srv);
         } else {
             // Base présente mais vide : on la peuple simplement.
             $l = ecole_maint_lien($db);
-            $nb = charger_schema_ecole($l, $seed);
+            $nb = charger_schema_ecole($l, $seed, $e['type_enseignement'] ?? 'primaire');
             mysqli_close($l);
         }
     } catch (\Throwable $ex) {
