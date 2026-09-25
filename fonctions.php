@@ -429,16 +429,35 @@ function secondaire_copier_matieres_niveau(int $id_classe, ?string $code_niveau,
 }
 
 /**
+ * Coefficient/ordre réels par (niveau, matière), extraits une fois pour
+ * toutes de la base de référence LAM_ABZ le 25/09/2026 (bd/secondaire/
+ * reference_coefficients.php, 267 couples). Utilisé par
+ * secondaire_deriver_matieres_competences() pour ne plus affecter un
+ * coefficient par défaut (1) mais la VRAIE valeur — demande explicite du
+ * 25/09/2026 (« les coef ne sont pas corrects... il faut copier LAM_ABZ »).
+ */
+function secondaire_reference_coefficients(): array {
+    static $ref = null;
+    if ($ref === null) {
+        $f = __DIR__ . '/bd/secondaire/reference_coefficients.php';
+        $ref = is_file($f) ? (require $f) : [];
+    }
+    return $ref;
+}
+
+/**
  * Dérive les matières d'une classe (secondaire) à partir des COMPÉTENCES
  * déjà configurées pour son niveau (onglet « Compétences par trimestre »,
  * table `competence` : matière + code_niveau + trimestre — indépendante de
  * toute classe, donc disponible AVANT qu'une classe existe). Une matière
  * ayant au moins une compétence pour ce niveau est considérée enseignée à
  * ce niveau. Groupe de compétence = celui de la section de la classe
- * (`groupe.id_section`, un seul groupe par section) ; coefficient/ordre par
- * défaut à 1 — à ajuster ensuite au besoin depuis l'onglet « Affectation
- * par classe » (édition déjà possible par matière). INSERT IGNORE : jamais
- * d'écrasement d'un réglage déjà présent. Demande explicite du 25/09/2026.
+ * (`groupe.id_section`, un seul groupe par section) ; coefficient/ordre =
+ * la vraie valeur si connue (secondaire_reference_coefficients(), extraite
+ * de LAM_ABZ), sinon 1 par défaut — ajustable ensuite depuis l'onglet
+ * « Affectation par classe » (édition déjà possible par matière). INSERT
+ * IGNORE : jamais d'écrasement d'un réglage déjà présent. Demande
+ * explicite du 25/09/2026.
  */
 function secondaire_deriver_matieres_competences(int $id_classe, ?string $code_niveau, ?string $libelle_section): int {
     if ($id_classe <= 0 || !$code_niveau) return 0;
@@ -447,7 +466,7 @@ function secondaire_deriver_matieres_competences(int $id_classe, ?string $code_n
         : db_val("SELECT id_groupe_comp FROM groupe ORDER BY id_groupe_comp LIMIT 1");
     if (!$id_groupe) return 0;
 
-    $sql = "SELECT DISTINCT c.id_matiere
+    $sql = "SELECT DISTINCT c.id_matiere, m.libelle
             FROM competence c
             JOIN matiere m ON m.id = c.id_matiere
             WHERE c.code_niveau = ?";
@@ -457,10 +476,12 @@ function secondaire_deriver_matieres_competences(int $id_classe, ?string $code_n
         $params[] = $libelle_section;
     }
     $matieres = db_all($sql, $params);
+    $reference = secondaire_reference_coefficients();
     foreach ($matieres as $m) {
+        [$coef, $ordre] = $reference[$code_niveau . '|' . $m['libelle']] ?? [1, 1];
         db_exec(
-            "INSERT IGNORE INTO discipline (id_mat, IDClasses, id_groupe, coef, ordre) VALUES (?,?,?,1,'1')",
-            [$m['id_matiere'], $id_classe, (int) $id_groupe]
+            "INSERT IGNORE INTO discipline (id_mat, IDClasses, id_groupe, coef, ordre) VALUES (?,?,?,?,?)",
+            [$m['id_matiere'], $id_classe, (int) $id_groupe, $coef, (string) $ordre]
         );
     }
     return count($matieres);
