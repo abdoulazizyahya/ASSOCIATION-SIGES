@@ -126,10 +126,13 @@ if ($partiel) {
     exit;
 }
 
+// Effectif par classe : un seul comptage regroupé (au lieu d'une
+// sous-requête par classe).
 $classes = db_all(
-    "SELECT c.IDClasses, c.DesignationClasses,
-            (SELECT COUNT(*) FROM inscrire i2 WHERE i2.IDClasses=c.IDClasses AND i2.val_annee=?) AS nb
+    "SELECT c.IDClasses, c.DesignationClasses, COALESCE(ef.nb, 0) AS nb
      FROM classe c LEFT JOIN niveau n ON n.LibelleNiveau=c.Niveau
+     LEFT JOIN (SELECT IDClasses, COUNT(*) AS nb FROM inscrire WHERE val_annee=? GROUP BY IDClasses) ef
+            ON ef.IDClasses=c.IDClasses
      ORDER BY n.OrdreNiveau, c.DesignationClasses", [$val_annee]);
 // Enseignant restreint : le filtre « Classe » ne propose que ses classes.
 if ($ids_classes_vis !== null) {

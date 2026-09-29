@@ -114,6 +114,7 @@ function detecter_ip_lan(): ?string {
 // JAMAIS voir un fatal error brut ; le personnel connecté voit en plus le
 // message technique. Termine toujours la requête (never revient).
 function pdf_erreur_generation(Throwable $e): never {
+    error_log('[PDF] ' . ($_SERVER['REQUEST_URI'] ?? '') . ' : ' . $e->getMessage() . ' @ ' . $e->getFile() . ':' . $e->getLine());
     http_response_code(500);
     $connecte = est_connecte();
     $adresse_reseau = 'http://' . hote_verif_reseau() . APP_URL . '/';
@@ -604,6 +605,65 @@ function exiger_acces_eleve(int $id_eleve, string $piste = 'union'): void {
     }
 }
 
+// ── Contrôle d'accès par classe / élève — ÉCOLE SECONDAIRE ─────────────
+// Équivalent secondaire de classes_ids_visibles()/exiger_acces_*() ci-dessus
+// (schéma différent : dispenser / enseignat_principal / sg, année = libellé).
+// Empêche d'ouvrir la fiche, la liste, la carte, le certificat ou le
+// bulletin d'un élève hors de son périmètre en modifiant l'identifiant dans
+// la barre d'adresse (?id=, ?eleve=, ?classe=).
+//   ENSEIGNANT : classes où il enseigne (dispenser) + dont il est PP ;
+//   SG         : ses classes (table sg) + celles où il enseigne / est PP ;
+//   autres     : non restreints (null) — leurs pages restent gardées par rôle.
+// $pp_seulement : seulement les classes dont il est professeur principal
+// (règle des bulletins, comme secondaire/pages/bulletins/pdf_classe.php).
+function sec_classes_ids_visibles(bool $pp_seulement = false): ?array {
+    $role = role_connecte();
+    if (!in_array($role, ['ENSEIGNANT', 'SG'], true)) return null;
+    $mat   = matricule_ens_courant();
+    if (!$mat) return [];
+    $annee = get_annee_active()['libelle'] ?? '';
+    $sql   = ["SELECT IDClasses FROM enseignat_principal WHERE matricule_ens=? AND val_annee=?"];
+    if (!$pp_seulement) {
+        $sql[] = "SELECT IDClasses FROM dispenser WHERE matricule_ens=? AND val_annee=?";
+        if ($role === 'SG') $sql[] = "SELECT IDClasses FROM sg WHERE matricule_ens=? AND val_annee=?";
+    }
+    $ids = [];
+    foreach ($sql as $q) foreach (db_all($q, [$mat, $annee]) as $r) $ids[(int) $r['IDClasses']] = true;
+    return array_keys($ids);
+}
+
+function sec_refuser_acces(string $message): never {
+    http_response_code(403);
+    die('<div style="font-family:sans-serif;padding:2rem;color:#b91c1c">' . h($message) . '</div>');
+}
+
+function sec_classe_eleve(int $id_eleve): int {
+    return (int) db_val("SELECT id_classe FROM inscription WHERE id_eleve=? AND id_annee=?",
+                        [$id_eleve, (int) (get_annee_active()['id'] ?? 0)]);
+}
+
+function exiger_acces_classe_secondaire(int $id_classe): void {
+    if ($id_classe <= 0) return;
+    $ids = sec_classes_ids_visibles();
+    if ($ids !== null && !in_array($id_classe, $ids, true)) sec_refuser_acces('Accès refusé : cette classe ne fait pas partie de vos classes.');
+}
+
+function exiger_acces_eleve_secondaire(int $id_eleve): void {
+    if ($id_eleve <= 0) return;
+    $ids = sec_classes_ids_visibles();
+    if ($ids !== null && !in_array(sec_classe_eleve($id_eleve), $ids, true)) sec_refuser_acces('Accès refusé : cet élève ne fait pas partie de vos classes.');
+}
+
+// Bulletin individuel : administration, ou professeur principal de la classe
+// de l'élève — mêmes personnes que pour le bulletin de classe.
+function exiger_acces_bulletin_secondaire(int $id_eleve): void {
+    $role = role_connecte();
+    if (in_array($role, ['ADMIN', 'PROVISEUR', 'FONDATEUR', 'CENSEUR', 'MEMBRE_ASSOCIATION'], true)
+        || (function_exists('est_visite_association') && est_visite_association())) return;
+    if ($role === 'ENSEIGNANT' && in_array(sec_classe_eleve($id_eleve), sec_classes_ids_visibles(true) ?? [], true)) return;
+    sec_refuser_acces('Accès refusé : seuls l\'administration et le professeur principal de la classe peuvent consulter ce bulletin.');
+}
+
 // ── Questions secrètes (récupération de mot de passe — migration_v45) ────
 
 function utilisateur_a_questions(int $id_user): bool {
@@ -825,6 +885,35 @@ function csrf_verifier(): void {
     }
 }
 
+// ── Liens signés (paramètres non modifiables dans la barre d'adresse) ──
+// Un lien généré par url_signee() porte un code « t » calculé côté serveur
+// (HMAC-SHA256 avec une clé propre à la SESSION) sur son contexte et ses
+// paramètres : changer ?classe=17 en ?classe=21 à la main invalide le code et
+// exiger_lien_signe() refuse la page. $contexte regroupe les pages qui
+// partagent le même lien (ex. 'finances_classe' : écran + PDF + Excel).
+// Limite assumée : un lien signé n'est valable que pendant la session (un
+// favori ne marche plus après déconnexion — rouvrir depuis le menu).
+// Complément, PAS un remplacement, des contrôles de rôle / de classe.
+function lien_signature(string $contexte, array $params): string {
+    session_init();
+    if (empty($_SESSION['cle_liens'])) $_SESSION['cle_liens'] = bin2hex(random_bytes(32));
+    ksort($params);
+    $params = array_map('strval', $params);
+    return substr(hash_hmac('sha256', $contexte . '|' . http_build_query($params), $_SESSION['cle_liens']), 0, 20);
+}
+
+// URL complète (APP_URL + chemin relatif) avec les paramètres et leur code.
+function url_signee(string $chemin, string $contexte, array $params): string {
+    return APP_URL . '/' . ltrim($chemin, '/') . '?' . http_build_query($params + ['t' => lien_signature($contexte, $params)]);
+}
+
+function exiger_lien_signe(string $contexte, array $params): void {
+    if (hash_equals(lien_signature($contexte, $params), (string) ($_GET['t'] ?? ''))) return;
+    http_response_code(403);
+    die('<div style="font-family:sans-serif;padding:2rem;color:#b91c1c">Lien invalide ou modifié. '
+      . 'Rouvrez cette page depuis le menu de l\'application.</div>');
+}
+
 // ── Redirection ───────────────────────────────────────────────
 
 function rediriger(string $url): void {
@@ -844,7 +933,16 @@ function date_fr(?string $d): string {
 
 // ── Données globales souvent utilisées ───────────────────────
 
+// get_annee_active() / get_etablissement() : appelées de nombreuses fois par
+// page (en-tête, pied de page, PDF, fonctions) — résultat mémorisé le temps
+// de la requête, par base d'école, vidé à toute écriture sur la table (voir
+// db_cache_cle() / db_cache_vider(), connexion.php).
 function get_annee_active(): array {
+    $cle = db_cache_cle('annee_active');
+    return $GLOBALS['_db_cache_globales'][$cle] ??= get_annee_active_sans_cache();
+}
+
+function get_annee_active_sans_cache(): array {
     // École secondaire : annee_scolaire.active/.libelle (pas Etat_annee_
     // scolaire/val_annee) — mêmes clés val_annee/Etat_annee_scolaire
     // rajoutées en alias pour que TOUT le reste de l'appli (header.php,
@@ -881,6 +979,11 @@ function get_etablissement(): array {
     // Contexte neutre (multi-école, aucune choisie) : aucune identité d'école
     // — la page appelante doit afficher un habillage générique (login.php).
     if (function_exists('est_contexte_neutre') && est_contexte_neutre()) return [];
+    $cle = db_cache_cle('etablissement');
+    return $GLOBALS['_db_cache_globales'][$cle] ??= get_etablissement_sans_cache();
+}
+
+function get_etablissement_sans_cache(): array {
     $e = db_one("SELECT * FROM etablissement LIMIT 1") ?? [];
     // École secondaire (schema_ref_ecole_secondaire.sql, porté de LAM_ABZ) :
     // colonnes nom_fr/sigle au lieu de Nom_Etab_Fr/Initial_Etab — alias

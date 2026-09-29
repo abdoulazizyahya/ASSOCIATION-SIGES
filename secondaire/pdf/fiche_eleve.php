@@ -9,6 +9,7 @@ require_once __DIR__ . '/fpdf.php';
 require_once __DIR__ . '/header_pdf.php';
 
 $id    = (int)($_GET['id'] ?? 0);
+exiger_acces_eleve_secondaire($id);   // enseignant / SG : seulement leurs classes
 $dl    = ($_GET['dl'] ?? '0') === '1';
 $eleve = db_one("SELECT * FROM eleve WHERE id=?", [$id]);
 if (!$eleve) die('Élève introuvable.');

@@ -18,6 +18,7 @@ use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
 
 $id_classe = (int) ($_GET['classe'] ?? 0);
+exiger_lien_signe('finances_classe', ['classe' => $id_classe]);   // lien de pages/finances/etat_classe.php
 $classe    = db_one("SELECT * FROM classe WHERE IDClasses=?", [$id_classe]);
 if (!$classe) die('Classe introuvable.');
 

@@ -13,6 +13,9 @@ exiger_role(['DIRECTEUR', 'SECRETAIRE', 'COMPTABLE']);
 $annee     = get_annee_active();
 $val_annee = $annee['val_annee'] ?? '';
 $id_classe = (int) ($_GET['classe'] ?? 0);
+// Lien signé : la classe vient de la liste déroulante (URL signée par le
+// serveur) — un ?classe= modifié à la main dans la barre d'adresse est refusé.
+if ($id_classe) exiger_lien_signe('finances_classe', ['classe' => $id_classe]);
 
 $classes = db_all(
     "SELECT c.IDClasses, c.DesignationClasses, n.OrdreNiveau FROM classe c
@@ -69,7 +72,7 @@ if (!$es_partiel) {
     <button type="button" class="btn btn-outline-danger btn-sm" onclick="ouvrirEtatClassePdf()">
       <i class="bi bi-file-earmark-pdf me-1"></i>PDF
     </button>
-    <a class="btn btn-outline-success btn-sm" href="<?= APP_URL ?>/pages/finances/excel_etat_classe.php?classe=<?= $id_classe ?>">
+    <a class="btn btn-outline-success btn-sm" href="<?= h(url_signee('pages/finances/excel_etat_classe.php', 'finances_classe', ['classe' => $id_classe])) ?>">
       <i class="bi bi-file-earmark-excel me-1"></i>Excel
     </a>
   </div>
@@ -82,7 +85,8 @@ if (!$es_partiel) {
     <select id="selClasse" class="form-select form-select-sm" style="max-width:320px">
       <option value="">— Choisir une classe —</option>
       <?php foreach ($classes as $c): ?>
-        <option value="<?= (int) $c['IDClasses'] ?>" <?= $id_classe === (int) $c['IDClasses'] ? 'selected' : '' ?>><?= h($c['DesignationClasses']) ?></option>
+        <option value="<?= (int) $c['IDClasses'] ?>" data-url="<?= h(url_signee('pages/finances/etat_classe.php', 'finances_classe', ['classe' => (int) $c['IDClasses']])) ?>"
+                <?= $id_classe === (int) $c['IDClasses'] ? 'selected' : '' ?>><?= h($c['DesignationClasses']) ?></option>
       <?php endforeach; ?>
     </select>
   </div>
@@ -159,7 +163,8 @@ if (!$es_partiel) {
 
 <script>
 document.getElementById('selClasse').addEventListener('change', function() {
-    var url = '<?= APP_URL ?>/pages/finances/etat_classe.php' + (this.value ? '?classe=' + encodeURIComponent(this.value) : '');
+    // Adresse signée par le serveur (data-url de l'option choisie).
+    var url = this.value ? this.options[this.selectedIndex].dataset.url : '<?= APP_URL ?>/pages/finances/etat_classe.php';
     chargerPartiel(url, 'etat-classe-zone');
 });
 // Passe par la modale d'aperçu partagée (afficherApercu(), layout/footer.php)
@@ -167,7 +172,7 @@ document.getElementById('selClasse').addEventListener('change', function() {
 // bouton ouvrait pdf/finances_etat_classe.php directement dans un nouvel
 // onglet (target="_blank").
 function ouvrirEtatClassePdf() {
-    afficherApercu('<?= APP_URL ?>/pdf/finances_etat_classe.php?classe=<?= $id_classe ?>', 'État des paiements', null, 'portrait');
+    afficherApercu(<?= json_encode(url_signee('pdf/finances_etat_classe.php', 'finances_classe', ['classe' => $id_classe])) ?>, 'État des paiements', null, 'portrait');
 }
 </script>
 

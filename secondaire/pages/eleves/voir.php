@@ -6,6 +6,7 @@ require_once __DIR__ . '/../../../fonctions.php';
 exiger_connexion();
 
 $id    = (int) ($_GET['id'] ?? 0);
+exiger_acces_eleve_secondaire($id);   // enseignant / SG : seulement leurs classes
 $eleve = $id ? db_one("SELECT * FROM eleve WHERE id=?", [$id]) : null;
 if (!$eleve) { flash_set('erreur', 'Élève introuvable.'); rediriger('secondaire/pages/eleves/liste.php'); }
 

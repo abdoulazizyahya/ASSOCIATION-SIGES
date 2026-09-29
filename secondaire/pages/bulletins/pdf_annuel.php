@@ -23,6 +23,9 @@ if ($vh_verif !== '' && (int)($_GET['eleve'] ?? 0) > 0 && (int)($_GET['annee'] ?
 }
 if (!$acces_public) {
     exiger_connexion();
+    // Hors QR code : administration ou professeur principal de la classe
+    // (un identifiant d'élève modifié à la main dans l'adresse est refusé).
+    exiger_acces_bulletin_secondaire((int) ($_GET['eleve'] ?? 0));
 }
 require_once __DIR__ . '/../../pdf/fpdf.php';
 require_once __DIR__ . '/../../pdf/header_pdf.php';

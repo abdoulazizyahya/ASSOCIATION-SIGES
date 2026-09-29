@@ -157,13 +157,44 @@ if (function_exists('type_enseignement_courant')) {
 //  requêtes préparées PDO utilisées auparavant.
 function _db_stmt(string $sql, array $params) {
     global $link;
+    $t0   = microtime(true);
     $stmt = mysqli_prepare($link, $sql);
     if ($params) {
         $types = str_repeat('s', count($params));
         mysqli_stmt_bind_param($stmt, $types, ...$params);
     }
     mysqli_stmt_execute($stmt);
+    // Compteur de requêtes / temps SQL de la page — affiché en local
+    // uniquement (layout/footer.php, db_stats_html()) pour repérer les
+    // pages les plus lourdes. Coût négligeable en production.
+    $GLOBALS['_db_stats']['n']  = ($GLOBALS['_db_stats']['n'] ?? 0) + 1;
+    $GLOBALS['_db_stats']['ms'] = ($GLOBALS['_db_stats']['ms'] ?? 0) + (microtime(true) - $t0) * 1000;
     return $stmt;
+}
+
+// Données « globales » relues très souvent dans une même page
+// (get_etablissement(), get_annee_active() — fonctions.php) : mémorisées le
+// temps de la requête HTTP, PAR BASE D'ÉCOLE (la base peut changer en cours
+// de page : login.php, portail association). Vidé automatiquement par
+// db_exec() à toute écriture sur ces tables.
+function db_cache_cle(string $nom): string {
+    $db = function_exists('ecole_courante') ? (string) (ecole_courante()['db_name'] ?? '') : '';
+    return $nom . '@' . $db;
+}
+function db_cache_vider(): void {
+    $GLOBALS['_db_cache_globales'] = [];
+}
+
+// Indicateur « N requêtes SQL / X ms » (pied de page) — seulement quand
+// l'application tourne sur le poste lui-même (localhost), jamais en ligne.
+function db_stats_html(): string {
+    $hote = explode(':', $_SERVER['HTTP_HOST'] ?? '')[0];
+    if (!in_array($hote, ['localhost', '127.0.0.1', '::1'], true)) return '';
+    $s = $GLOBALS['_db_stats'] ?? ['n' => 0, 'ms' => 0];
+    $total = isset($_SERVER['REQUEST_TIME_FLOAT']) ? (microtime(true) - $_SERVER['REQUEST_TIME_FLOAT']) * 1000 : 0;
+    return '<div style="position:fixed;left:6px;bottom:6px;z-index:2000;background:rgba(15,26,58,.85);color:#fff;'
+         . 'font:11px/1.4 monospace;padding:2px 7px;border-radius:4px;pointer-events:none" title="Visible en local uniquement">'
+         . (int) $s['n'] . ' requêtes SQL · ' . number_format($s['ms'], 1) . ' ms SQL · ' . number_format($total, 0) . ' ms page</div>';
 }
 
 // Retourne toutes les lignes d'une requête (tableau de tableaux associatifs)
@@ -271,6 +302,7 @@ function db_exec(string $sql, array $params = []): int {
     $stmt = _db_stmt($sql, $params);
     $n    = mysqli_stmt_affected_rows($stmt);
     mysqli_stmt_close($stmt);
+    if (preg_match('/\b(etablissement|annee_scolaire)\b/i', $sql)) db_cache_vider();
     return (int) $n;
 }
 

@@ -18,6 +18,7 @@ function u(string $s): string {
 
 // ── Paramètres ────────────────────────────────────────────────────
 $id_eleve = (int)($_GET['eleve'] ?? 0);
+exiger_acces_bulletin_secondaire($id_eleve);   // administration ou PP de la classe
 $id_trim  = (int)($_GET['trim']  ?? 0);
 $id_seq_u = (int)($_GET['seq']   ?? 0);
 $id_annee = (int)($_GET['annee'] ?? 0);

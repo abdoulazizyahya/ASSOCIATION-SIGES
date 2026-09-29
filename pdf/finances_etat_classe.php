@@ -12,6 +12,7 @@ require_once __DIR__ . '/fpdf.php';
 require_once __DIR__ . '/header_pdf.php';
 
 $id_classe = (int) ($_GET['classe'] ?? 0);
+exiger_lien_signe('finances_classe', ['classe' => $id_classe]);   // lien de pages/finances/etat_classe.php
 $dl        = ($_GET['dl'] ?? '0') === '1';
 $classe    = db_one("SELECT * FROM classe WHERE IDClasses=?", [$id_classe]);
 if (!$classe) die('Classe introuvable.');

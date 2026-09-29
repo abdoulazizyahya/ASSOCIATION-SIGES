@@ -35,6 +35,17 @@ if ($q !== '') {
     $like     = "%$q%";
     $params   = array_merge($params, [$like, $like, $like, $like]);
 }
+// Enseignant / SG : seulement les élèves de leurs classes (comme au primaire).
+$ids_classes_vis = sec_classes_ids_visibles();
+if ($ids_classes_vis !== null) {
+    if (!$ids_classes_vis) {
+        $where[] = '1=0';
+    } else {
+        $where[] = 'i.id_classe IN (' . implode(',', array_fill(0, count($ids_classes_vis), '?')) . ')';
+        $params  = array_merge($params, $ids_classes_vis);
+    }
+    if ($id_classe && !in_array($id_classe, $ids_classes_vis, true)) $id_classe = 0;
+}
 if ($id_classe) { $where[] = 'i.id_classe = ?'; $params[] = $id_classe; }
 if ($id_serie)  { $where[] = 'i.id_serie = ?';  $params[] = $id_serie; }
 $sql_where = 'WHERE ' . implode(' AND ', $where);
@@ -65,6 +76,9 @@ $classes = db_all(
      FROM classe c WHERE c.archivee=0 ORDER BY c.ordre, c.designation",
     [$id_annee]
 );
+if ($ids_classes_vis !== null) {
+    $classes = array_values(array_filter($classes, fn($c) => in_array((int) $c['id'], $ids_classes_vis, true)));
+}
 $series = db_all("SELECT * FROM serie ORDER BY libelle");
 $nb_pages = max(1, (int) ceil($total / $pp));
 $base = APP_URL . '/secondaire/pages/eleves/liste.php?' . http_build_query(array_filter([

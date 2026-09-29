@@ -22,6 +22,9 @@ $acces_public = $vh_verif !== '' && $id_eleve > 0 && $id_annee > 0
     && hash_equals(carte_verif_hash($id_eleve, $id_annee), $vh_verif);
 if (!$acces_public) {
     exiger_connexion();
+    // Enseignant / SG : seulement leurs classes (classe entière ou élève).
+    exiger_acces_classe_secondaire($id_classe);
+    exiger_acces_eleve_secondaire($id_eleve);
 }
 
 require_once __DIR__ . '/fpdf.php';

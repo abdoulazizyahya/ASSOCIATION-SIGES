@@ -690,5 +690,6 @@ initAjaxZone(<?= json_encode($ajax_zone_id) ?>);
   document.addEventListener('partielCharge', function (e) { initialiserSaisieNumerique(e.target); });
 })();
 </script>
+<?= function_exists('db_stats_html') ? db_stats_html() : '' /* N requêtes SQL — en local uniquement */ ?>
 </body>
 </html>

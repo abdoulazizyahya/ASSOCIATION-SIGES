@@ -31,6 +31,7 @@ require_once __DIR__ . '/qrcode.php';
 
 $etab      = get_etablissement();
 $annee_act = get_annee_active();
+    exiger_acces_eleve_secondaire($id_eleve);   // enseignant / SG : seulement leurs classes
 $val_annee = $annee_act['libelle'] ?? '';
 
 $insc = db_one(

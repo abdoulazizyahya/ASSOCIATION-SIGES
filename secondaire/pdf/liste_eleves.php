@@ -10,6 +10,7 @@ require_once __DIR__ . '/header_pdf.php';
 
 $id_annee  = (int)($_GET['annee']  ?? 0);
 $id_classe = (int)($_GET['classe'] ?? 0);
+exiger_acces_classe_secondaire($id_classe);   // enseignant / SG : seulement leurs classes
 $cols      = explode(',', $_GET['cols'] ?? 'no,nom,date,lieu,sexe,matricule');
 $aligns    = explode(',', $_GET['align'] ?? ''); // même ordre/longueur que $cols ; 'L'/'C'/'R' par colonne
 $dl        = ($_GET['dl'] ?? '0') === '1';
