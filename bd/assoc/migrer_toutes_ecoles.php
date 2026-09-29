@@ -20,6 +20,11 @@ require_once __DIR__ . '/../../config.php';
 require_once __DIR__ . '/../../connexion_assoc.php';
 
 if (PHP_SAPI !== 'cli') header('Content-Type: text/plain; charset=utf-8');
+// Option inconnue (ex. « --dry » au lieu de « --dry-run ») : ARRÊT, jamais
+// d'application silencieuse des migrations par faute de frappe.
+foreach (array_slice($argv ?? [], 1) as $opt) {
+    if ($opt !== '--dry-run') exit("Option inconnue « $opt » — seule option acceptée : --dry-run. Rien n'a été fait.\n");
+}
 $dry = in_array('--dry-run', $argv ?? [], true) || isset($_GET['dry']);
 if (!annuaire_dispo()) { die("Annuaire absent.\n"); }
 
@@ -46,7 +51,8 @@ foreach (assoc_all("SELECT id, code, nom, db_name, type_enseignement FROM etabli
         continue;
     }
 
-    $a_faire = array_filter(array_keys($dispo), fn($v) => $v > $ver);
+    // Jamais sous le schéma de référence (v50) : voir assoc_version_depart().
+    $a_faire = array_filter(array_keys($dispo), fn($v) => $v > assoc_version_depart('primaire', $ver));
     if (!$a_faire) { echo "  — a jour\n"; continue; }
     echo "  -> " . implode(', ', array_map(fn($v) => "v$v", $a_faire)) . "\n";
     if ($dry) continue;

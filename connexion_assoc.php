@@ -1609,6 +1609,20 @@ function assoc_migrations_disponibles(string $type = 'primaire'): array {
 }
 
 /**
+ * Version à partir de laquelle migrer une école : jamais en dessous du
+ * schéma de référence de son type. PRIMAIRE : les bases partent de
+ * schema_ref_ecole.sql (état v50) — les migrations <= 50 (dont d'anciennes
+ * migrations ABZ_MBE sans rapport avec ce schéma) ne doivent JAMAIS être
+ * rejouées. Sans ce plancher, une école sans ligne schema_version_etab
+ * (version 0) rejouait v1, l'enregistrait, puis échouait en v2 (« colonne
+ * déjà existante ») : c'est ce qui avait remis toutes les écoles primaires
+ * à v1 le 25/09/2026 (recalées par bd/assoc/recaler_versions.php).
+ */
+function assoc_version_depart(string $type, int $version): int {
+    return max($version, $type === 'secondaire' ? 0 : 50);
+}
+
+/**
  * État des migrations par école : version courante + versions en retard,
  * chaque école comparée à la série de SON PROPRE type_enseignement (primaire
  * bd/migration_v*.sql, ou secondaire bd/secondaire/migration_v*.sql — jamais
@@ -1623,7 +1637,8 @@ function assoc_migrations_etat(): array {
     foreach (assoc_all("SELECT id, code, nom, db_name, actif, type_enseignement FROM etablissement ORDER BY actif DESC, nom") as $e) {
         $ver   = (int) (assoc_val("SELECT version FROM schema_version_etab WHERE id_etablissement=?", [$e['id']]) ?? 0);
         $dispo = $e['type_enseignement'] === 'secondaire' ? $dispo_secondaire : $dispo_primaire;
-        $retard = array_values(array_filter(array_keys($dispo), fn($v) => $v > $ver));
+        $depart = assoc_version_depart($e['type_enseignement'] === 'secondaire' ? 'secondaire' : 'primaire', $ver);
+        $retard = array_values(array_filter(array_keys($dispo), fn($v) => $v > $depart));
         $out[] = $e + ['version' => $ver, 'retard' => $retard, 'a_jour' => !$retard];
     }
     return ['ecoles' => $out, 'vmax' => $vmax, 'nb_migrations' => count($dispo_primaire)];
@@ -1661,6 +1676,7 @@ function assoc_migrer_ecole(int $id, bool $backup = true): array {
 
     $dispo = assoc_migrations_disponibles($type_ecole);
     $ver   = (int) (assoc_val("SELECT version FROM schema_version_etab WHERE id_etablissement=?", [$id]) ?? 0);
+    $ver   = assoc_version_depart($type_ecole, $ver);   // jamais sous le schéma de référence
     $a_faire = array_values(array_filter(array_keys($dispo), fn($v) => $v > $ver));
     if (!$a_faire) return ['ok' => true, 'message' => "Déjà à jour (v$ver).", 'appliquees' => [], 'backup' => null];
 
