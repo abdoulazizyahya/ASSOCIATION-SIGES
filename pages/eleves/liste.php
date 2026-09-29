@@ -31,10 +31,11 @@ $peut_importer = $asso_ecriture || in_array(role_connecte(), ['DIRECTEUR','SECRE
 // aux rôles qui peuvent importer / configurer.
 // « photos » = onglet Photos par classe (_eleves_photos.php) — rôles qui
 // peuvent modifier une fiche élève ($peut_gerer).
-$statut = in_array($_GET['statut'] ?? '', ['actif','desactive','outils','photos'], true) ? $_GET['statut'] : 'actif';
+// « incompletes » = onglet Fiches incomplètes (_eleves_incompletes.php).
+$statut = in_array($_GET['statut'] ?? '', ['actif','desactive','outils','photos','incompletes'], true) ? $_GET['statut'] : 'actif';
 if ($statut === 'outils' && !$peut_importer) $statut = 'actif';
-if ($statut === 'photos' && !$peut_gerer) $statut = 'actif';
-$vue_outils = in_array($statut, ['outils', 'photos'], true);   // pas de liste paginée
+if (in_array($statut, ['photos', 'incompletes'], true) && !$peut_gerer) $statut = 'actif';
+$vue_outils = in_array($statut, ['outils', 'photos', 'incompletes'], true);   // pas de liste paginée
 $tri       = in_array($_GET['tri'] ?? '', ['nom','mat','sexe','classe']) ? $_GET['tri'] : 'nom';
 $ordre     = ($_GET['ordre'] ?? 'asc') === 'desc' ? 'DESC' : 'ASC';
 $page      = max(1, (int)($_GET['page'] ?? 1));

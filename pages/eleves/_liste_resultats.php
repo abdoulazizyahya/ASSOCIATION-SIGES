@@ -30,6 +30,11 @@ $nb_pages = max(1, (int)ceil($total / $pp));
       <i class="bi bi-camera me-1"></i>Photos par classe
     </a>
   </li>
+  <li class="nav-item">
+    <a class="nav-link <?= $statut === 'incompletes' ? 'active' : '' ?>" href="#" onclick="changerStatutListe('incompletes');return false">
+      <i class="bi bi-clipboard-x me-1"></i>Fiches incomplètes
+    </a>
+  </li>
   <?php endif; ?>
 </ul>
 
@@ -37,6 +42,8 @@ $nb_pages = max(1, (int)ceil($total / $pp));
   <?php require __DIR__ . '/_eleves_outils.php'; ?>
 <?php elseif (($statut ?? '') === 'photos'): ?>
   <?php require __DIR__ . '/_eleves_photos.php'; ?>
+<?php elseif (($statut ?? '') === 'incompletes'): ?>
+  <?php require __DIR__ . '/_eleves_incompletes.php'; ?>
 <?php else: ?>
 
 <div class="text-muted mb-1" style="font-size:.78rem"><?= $total ?> élève(s) <?= $statut === 'actif' ? 'actif(s)' : 'désactivé(s)' ?><?= $q !== '' ? ' — recherche « ' . h($q) . ' »' : '' ?></div>

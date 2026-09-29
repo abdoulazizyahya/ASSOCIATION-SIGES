@@ -19,9 +19,11 @@ require_once __DIR__ . '/../../../pages/eleves/_photos_lib.php';
 // pages/eleves/_eleves_photos.php) — mêmes rôles que la fiche élève.
 $peut_gerer = in_array(role_connecte(), photos_roles(), true)
            && !(function_exists('est_lecture_seule') && est_lecture_seule());
-$statut    = in_array($_GET['statut'] ?? '', ['desactive', 'photos'], true) ? $_GET['statut'] : 'actif';
-if ($statut === 'photos' && !$peut_gerer) $statut = 'actif';
-$vue_photos = $statut === 'photos';
+// « incompletes » = onglet Fiches incomplètes (pages/eleves/_eleves_incompletes.php).
+$statut    = in_array($_GET['statut'] ?? '', ['desactive', 'photos', 'incompletes'], true) ? $_GET['statut'] : 'actif';
+if (in_array($statut, ['photos', 'incompletes'], true) && !$peut_gerer) $statut = 'actif';
+$vue_incompletes = $statut === 'incompletes';
+$vue_photos = $statut === 'photos' || $vue_incompletes;   // pas de liste paginée
 $page      = max(1, (int) ($_GET['page'] ?? 1));
 $pp        = 25;
 $offset    = ($page - 1) * $pp;
@@ -108,9 +110,15 @@ require_once __DIR__ . '/../../../layout/header.php';
   </li>
   <?php if ($peut_gerer): ?>
   <li class="nav-item">
-    <a class="nav-link <?= $vue_photos ? 'active' : '' ?>"
+    <a class="nav-link <?= $statut === 'photos' ? 'active' : '' ?>"
        href="?<?= http_build_query(array_merge($qs_tab, ['statut' => 'photos'])) ?>">
       <i class="bi bi-camera me-1"></i>Photos par classe
+    </a>
+  </li>
+  <li class="nav-item">
+    <a class="nav-link <?= $vue_incompletes ? 'active' : '' ?>"
+       href="?<?= http_build_query(array_merge($qs_tab, ['statut' => 'incompletes'])) ?>">
+      <i class="bi bi-clipboard-x me-1"></i>Fiches incomplètes
     </a>
   </li>
   <?php endif; ?>
@@ -159,7 +167,9 @@ require_once __DIR__ . '/../../../layout/header.php';
   </div>
 </div>
 
-<?php if ($vue_photos): ?>
+<?php if ($vue_incompletes): ?>
+  <?php require __DIR__ . '/../../../pages/eleves/_eleves_incompletes.php'; ?>
+<?php elseif ($vue_photos): ?>
   <?php require __DIR__ . '/../../../pages/eleves/_eleves_photos.php'; ?>
 <?php else: ?>
 
