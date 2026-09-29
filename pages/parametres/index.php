@@ -595,13 +595,6 @@ if (!$es_partiel) {
   Créer une année provisionne automatiquement sa structure standard (3 trimestres, 6 évaluations UA1-UA6) —
   la même que celle utilisée pour la saisie de notes des années existantes.
 </div>
-<?php else: ?>
-<div class="alert alert-warning border py-2 mb-3" style="font-size:.8rem">
-  <i class="bi bi-lock me-1"></i>
-  Création et suppression d'une année scolaire sont réservées au <strong>propriétaire</strong> ou au
-  <strong>superadministrateur</strong> du système — aucun compte de l'école (Directeur, Fondateur…) ne peut y toucher.
-  L'activation/désactivation d'une année existante reste possible ci-dessous.
-</div>
 <?php endif; ?>
 
 <div class="row g-3">
