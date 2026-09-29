@@ -48,6 +48,8 @@ $csrf = csrf_generer();
   (<?= (int) $etat['nb_migrations'] ?> fichiers <span class="font-monospace">bd/migration_v*.sql</span>).
   Une <strong>sauvegarde de sécurité</strong> de la base est écrite dans
   <span class="font-monospace">bd/sauvegardes/</span> avant toute application.
+  <br>Une migration échoue avec « déjà existant » ? La version enregistrée ne correspond sans doute plus à la base :
+  <a href="<?= APP_URL ?>/association/versions.php"><i class="bi bi-search me-1"></i>vérifier les versions réelles</a>.
 </p>
 
 <div class="asso-card p-0 mb-3">

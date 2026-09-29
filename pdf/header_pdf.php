@@ -25,7 +25,9 @@ function pdf_u(?string $s): string {
 function pdf_filigrane_chemin(array $etab): ?string {
     $logo_src_path = !empty($etab['logo']) ? __DIR__ . '/../assets/uploads/' . $etab['logo'] : '';
     if (!$logo_src_path || !is_file($logo_src_path)) return null;
-    $dest_path = __DIR__ . '/../assets/uploads/filigrane_logo.png';
+    // Un fichier de cache PAR LOGO (multi-établissement) : un nom fixe unique
+    // faisait afficher le filigrane d'une autre école (constaté le 29/09/2026).
+    $dest_path = __DIR__ . '/../assets/uploads/filigrane_' . md5($etab['logo']) . '.png';
     if (is_file($dest_path) && filemtime($dest_path) >= filemtime($logo_src_path)) return $dest_path;
     $src = @imagecreatefromstring(file_get_contents($logo_src_path));
     if (!$src) return null;

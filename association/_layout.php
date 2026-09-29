@@ -18,7 +18,7 @@ function _asso_nav_entrees(): array {
     return [
         ['Établissements',  'buildings',      'index.php',           ['index.php', 'etablissement', 'ecole_bd_'], false, false],
         ['Tableau de bord', 'speedometer2',   'dashboard.php',       ['dashboard.php'],                           true,  false],
-        ['Migrations',      'database-gear',  'migrations.php',      ['migrations.php'],                          true,  true],
+        ['Migrations',      'database-gear',  'migrations.php',      ['migrations.php', 'versions.php'],          true,  true],
         ['Membres',         'people',         'membres/index.php',   ['membres/'],                               true,  false],
         ['Privilèges',      'sliders',        'acces.php',           ['acces.php'],                              true,  false],
         ['Journal',         'journal-text',   'journal.php',         ['journal.php'],                            true,  false],
