@@ -24,11 +24,45 @@
 
 function tcpdf_filigrane(TCPDF $pdf, array $etab, float $page_w, float $page_h): void {
     $chemin = pdf_filigrane_chemin($etab); // réutilise le cache PNG déjà généré côté FPDF
-    if (!$chemin) return;
-    $w_fili = $page_w * 0.70;
-    $dim = @getimagesize($chemin);
-    $h_fili = ($dim && $dim[0] > 0) ? $w_fili * $dim[1] / $dim[0] : $w_fili;
-    $pdf->Image($chemin, ($page_w - $w_fili) / 2, ($page_h - $h_fili) / 2, $w_fili);
+    if ($chemin) {
+        $w_fili = $page_w * 0.70;
+        $dim = @getimagesize($chemin);
+        $h_fili = ($dim && $dim[0] > 0) ? $w_fili * $dim[1] / $dim[0] : $w_fili;
+        $pdf->Image($chemin, ($page_w - $w_fili) / 2, ($page_h - $h_fili) / 2, $w_fili);
+    }
+    // Ouvert depuis le scan du QR code : même tampon que pdf_filigrane() (FPDF).
+    if (pdf_tampon_actif()) tcpdf_tampon_authentique($pdf, $page_w / 2, $page_h * 0.52, $page_w * 0.80);
+}
+
+// Tampon oblique « AUTHENTIQUE » (version TCPDF de pdf_tampon_authentique(),
+// header_pdf.php — même rendu : vert clair, dessiné avant le texte).
+function tcpdf_tampon_authentique(TCPDF $pdf, float $cx, float $cy, float $largeur, string $mention = 'AUTHENTIQUE'): void {
+    $rtl = $pdf->getRTL();
+    $pdf->SetRTL(false, false);
+    $pdf->SetFont('helvetica', 'B', 10);
+    $taille = max(8, min(60, 10 * ($largeur * 0.80) / max(1, $pdf->GetStringWidth($mention))));
+    $pdf->SetFont('helvetica', 'B', $taille);
+    $w_txt = $pdf->GetStringWidth($mention);
+    $k = $taille / 54;
+    $w = $w_txt + 16 * $k; $h = 34 * $k;
+    $couleur = [120, 200, 150];
+    $pdf->StartTransform();
+    $pdf->Rotate(28, $cx, $cy);
+    $pdf->SetDrawColor(...$couleur);
+    $pdf->SetTextColor(...$couleur);
+    $pdf->SetLineWidth(max(0.3, 1.6 * $k));
+    $pdf->RoundedRect($cx - $w / 2, $cy - $h / 2, $w, $h, 4 * $k, '1111', 'D');
+    $pdf->SetLineWidth(max(0.15, 0.6 * $k));
+    $m = 2 * $k;
+    $pdf->RoundedRect($cx - $w / 2 + $m, $cy - $h / 2 + $m, $w - 2 * $m, $h - 2 * $m, 3 * $k, '1111', 'D');
+    $pdf->SetXY($cx - $w / 2, $cy - 9 * $k);
+    $pdf->Cell($w, 14 * $k, $mention, 0, 0, 'C', false, '', 0, false, 'T', 'M');
+    $pdf->SetFont('helvetica', 'B', max(4, 10 * $k));
+    $pdf->SetXY($cx - $w / 2, $cy + 7 * $k);
+    $pdf->Cell($w, 6 * $k, pdf_tampon_mention(), 0, 0, 'C', false, '', 0, false, 'T', 'M');
+    $pdf->StopTransform();
+    $pdf->SetDrawColor(0); $pdf->SetTextColor(0); $pdf->SetLineWidth(0.2);
+    $pdf->SetRTL($rtl, false);
 }
 
 // Dessine une colonne comme une suite de lignes simples (Cell(), jamais

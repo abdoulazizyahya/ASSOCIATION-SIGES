@@ -14,6 +14,99 @@ function pdf_u(?string $s): string {
     return mb_convert_encoding($s ?? '', 'Windows-1252', 'UTF-8');
 }
 
+// Fixe la police ($style, $taille au plus) de sorte que $texte (DÉJÀ
+// converti, pdf_u()/u()) tienne sur une ligne de $largeur mm — réduite par
+// pas de 0,5 pt jusqu'à $taille_min. Retourne $texte (utilisable directement
+// dans Cell()). Ex. « PROVISEUR DU COLLÈGE … » trop long pour la page.
+function pdf_police_ajustee(FPDF $pdf, string $texte, string $style, float $taille, float $largeur, float $taille_min = 7): string {
+    $pdf->SetFont('Arial', $style, $taille);
+    while ($taille > $taille_min && $pdf->GetStringWidth($texte) > $largeur - 1) {
+        $taille -= 0.5;
+        $pdf->SetFont('Arial', $style, $taille);
+    }
+    return $texte;
+}
+
+// Texte (UTF-8 brut) centré dans une colonne de largeur $w, sur $lignes_max
+// lignes au plus : la police est réduite de $taille_max à $taille_min (pas
+// de 0,5 pt) jusqu'à ce que le texte tienne — les noms d'établissement très
+// longs passent ainsi sur plusieurs lignes au lieu de déborder sur les
+// colonnes voisines (demande du 29/09/2026). Un nom court garde $taille_max.
+// Au-delà de $taille_min, le texte prend simplement plus de lignes.
+// Retourne la position Y de fin.
+function pdf_texte_ajuste(FPDF $pdf, float $x, float $y, float $w, string $texte,
+                          float $taille_max = 9, float $taille_min = 6, int $lignes_max = 2,
+                          string $style = 'B'): float {
+    $t = pdf_u($texte);
+    $nb_lignes = function (float $taille) use ($pdf, $t, $w, $style): int {
+        $pdf->SetFont('Arial', $style, $taille);
+        $n = 1; $ligne = '';
+        foreach (preg_split('/\s+/', trim($t)) as $mot) {
+            $essai = $ligne === '' ? $mot : $ligne . ' ' . $mot;
+            if ($ligne !== '' && $pdf->GetStringWidth($essai) > $w - 2) { $n++; $ligne = $mot; }
+            else $ligne = $essai;
+        }
+        return $n;
+    };
+    $taille = $taille_max;
+    while ($taille > $taille_min && $nb_lignes($taille) > $lignes_max) $taille -= 0.5;
+    $pdf->SetFont('Arial', $style, $taille);
+    $pdf->SetXY($x, $y);
+    $pdf->MultiCell($w, $taille * 0.42, $t, 0, 'C');
+    return $pdf->GetY();
+}
+
+// Tampon oblique « AUTHENTIQUE », semi-transparent, en fond de page —
+// imprimé sur un document ouvert depuis le scan de son QR code de
+// vérification (le document vient d'être authentifié par le serveur).
+// À appeler juste après pdf_filigrane() pour qu'il reste DERRIÈRE le texte
+// (dessiné avant, le texte s'imprime par-dessus).
+function pdf_tampon_authentique(FPDF $pdf, float $cx, float $cy, float $largeur, string $mention = 'AUTHENTIQUE'): void {
+    $angle = 28;
+    // Taille de police calculée pour que le mot occupe ~80 % de $largeur
+    // (page entière, exemplaire de reçu ou carte : même rendu, à l'échelle).
+    $pdf->SetFont('Arial', 'B', 10);
+    $taille = max(8, min(60, 10 * ($largeur * 0.80) / max(1, $pdf->GetStringWidth($mention))));
+    $pdf->SetFont('Arial', 'B', $taille);
+    $w_txt = $pdf->GetStringWidth($mention);
+    $k = $taille / 54;                         // échelle par rapport au modèle pleine page
+    $w = $w_txt + 16 * $k; $h = 34 * $k;
+    $x = $cx - $w / 2; $y = $cy - $h / 2;
+    // Vert CLAIR plutôt que transparence : SetAlpha() est inopérant dans ces
+    // copies de FPDF (ExtGState non écrit, voir _putresourcedict()) — le
+    // tampon est dessiné AVANT le texte, qui s'imprime donc par-dessus.
+    $couleur = [120, 200, 150];
+    $pdf->Rotate($angle, $cx, $cy);
+    $pdf->SetDrawColor(...$couleur);
+    $pdf->SetTextColor(...$couleur);
+    $pdf->SetLineWidth(max(0.3, 1.6 * $k));
+    if (method_exists($pdf, 'RoundedRect')) $pdf->RoundedRect($x, $y, $w, $h, 4 * $k, 'D'); else $pdf->Rect($x, $y, $w, $h, 'D');
+    $pdf->SetLineWidth(max(0.15, 0.6 * $k));
+    $m = 2 * $k;
+    if (method_exists($pdf, 'RoundedRect')) $pdf->RoundedRect($x + $m, $y + $m, $w - 2 * $m, $h - 2 * $m, 3 * $k, 'D'); else $pdf->Rect($x + $m, $y + $m, $w - 2 * $m, $h - 2 * $m, 'D');
+    $pdf->Text($cx - $w_txt / 2, $cy + 4 * $k, $mention);
+    $pdf->SetFont('Arial', 'B', max(4, 10 * $k));
+    $sous = pdf_u(pdf_tampon_mention());
+    $pdf->Text($cx - $pdf->GetStringWidth($sous) / 2, $cy + 12 * $k, $sous);
+    $pdf->Rotate(0);
+    $pdf->SetDrawColor(0); $pdf->SetTextColor(0); $pdf->SetLineWidth(0.2);
+}
+
+// Le document courant a-t-il été ouvert depuis le scan de son QR code ?
+// Tous les générateurs vérifiables (bulletins, certificats, cartes, reçus,
+// attestations…) posent une variable GLOBALE $acces_public = true quand le
+// jeton « vh » du QR est valide — lue ici, sans rien changer dans ces fichiers.
+// Uniquement sur scan : jamais sur un document imprimé depuis l'application
+// (demande explicite du 29/09/2026).
+function pdf_tampon_actif(): bool {
+    return !empty($GLOBALS['acces_public']);
+}
+
+// Mention sous « AUTHENTIQUE ».
+function pdf_tampon_mention(): string {
+    return 'Vérifié par QR code le ' . date('d/m/Y à H:i');
+}
+
 // Filigrane (logo de l'établissement très éclairci, en fond de page) —
 // généré une fois puis mis en cache sur disque (régénéré seulement si le
 // logo source est modifié après coup). Centralisé ici (au lieu d'être
@@ -50,13 +143,20 @@ function pdf_filigrane_chemin(array $etab): ?string {
 
 function pdf_filigrane(FPDF $pdf, array $etab, float $page_w, float $page_h, float $largeur_mm = 0, ?float $x = null, ?float $y = null): void {
     $chemin = pdf_filigrane_chemin($etab);
-    if (!$chemin) return;
     $w_fili = $largeur_mm > 0 ? $largeur_mm : $page_w * 0.70;
-    $dim = @getimagesize($chemin);
+    $dim = $chemin ? @getimagesize($chemin) : false;
     $h_fili = ($dim && $dim[0] > 0) ? $w_fili * $dim[1] / $dim[0] : $w_fili;
     $px = $x ?? (($page_w - $w_fili) / 2);
     $py = $y ?? (($page_h - $h_fili) / 2);
-    $pdf->Image($chemin, $px, $py, $w_fili);
+    if ($chemin) $pdf->Image($chemin, $px, $py, $w_fili);
+    // Document ouvert depuis le scan de son QR code : tampon oblique
+    // « AUTHENTIQUE » centré sur la zone du filigrane (page entière, ou
+    // exemplaire de reçu…), dessiné AVANT le texte donc en fond.
+    if (pdf_tampon_actif()) {
+        $largeur = $largeur_mm > 0 ? min($page_w, $w_fili * 1.35) : $page_w * 0.80;
+        $cy = $largeur_mm > 0 ? $py + $h_fili / 2 : $page_h * 0.52;
+        pdf_tampon_authentique($pdf, $px + $w_fili / 2, $cy, $largeur);
+    }
 }
 
 // Signature numérique — plusieurs signataires possibles (chef
@@ -124,9 +224,8 @@ function pdf_entete(FPDF $pdf, array $etab, float $page_w, float $marge = 10, ?f
         ($etab['departement_fr']    ?? 'DÉPARTEMENT DE LA VINA') . "\n" .
         ($etab['arrondissement_fr'] ?? 'ARRONDISSEMENT DE MBÉ')
     ), 0, 'C');
-    $pdf->SetFont('Arial', 'B', 8.5 * $echelle);
-    $pdf->SetX($marge);
-    $pdf->MultiCell($col, $lh2, pdf_u(strtoupper($etab['nom_fr'] ?? 'LYCÉE TECHNIQUE DE MBÉ')), 0, 'C');
+    // Nom long : 2 lignes max, police réduite si besoin (pdf_texte_ajuste()).
+    pdf_texte_ajuste($pdf, $marge, $pdf->GetY(), $col, mb_strtoupper($etab['nom_fr'] ?? 'LYCÉE TECHNIQUE DE MBÉ'), 8.5 * $echelle, 6 * $echelle, 2);
     $pdf->SetFont('Arial', '', 6.5 * $echelle);
     $pdf->SetX($marge);
     $pdf->MultiCell($col, $lh3, pdf_u(
@@ -157,9 +256,7 @@ function pdf_entete(FPDF $pdf, array $etab, float $page_w, float $marge = 10, ?f
         ($etab['division_en']    ?? 'VINA DIVISION') . "\n" .
         ($etab['subdivision_en'] ?? 'MBE SUBDIVISION')
     ), 0, 'C');
-    $pdf->SetFont('Arial', 'B', 8.5 * $echelle);
-    $pdf->SetX($xr);
-    $pdf->MultiCell($col, $lh2, pdf_u(strtoupper($etab['nom_en'] ?? 'GTHS OF MBE')), 0, 'C');
+    pdf_texte_ajuste($pdf, $xr, $pdf->GetY(), $col, mb_strtoupper($etab['nom_en'] ?? 'GTHS OF MBE'), 8.5 * $echelle, 6 * $echelle, 2);
     $pdf->SetFont('Arial', '', 6.5 * $echelle);
     $pdf->SetX($xr);
     $pdf->MultiCell($col, $lh3, pdf_u(

@@ -132,7 +132,10 @@ if (function_exists('type_enseignement_courant')) {
     // téléphone pas encore connecté (contexte primaire par défaut) serait
     // renvoyé au tableau de bord avant d'atteindre la connexion.
     $_commun = in_array($_rel, ['login.php', 'logout.php', 'dashboard.php', 'profil.php', 'configurer_securite.php', 'mot_de_passe_oublie.php', 'questions_securite_reporter.php',
-                                'pages/eleves/photos_seance.php', 'secondaire/pages/eleves/photos_seance.php'], true) || str_starts_with($_rel, 'ajax/');
+                                'pages/eleves/photos_seance.php', 'secondaire/pages/eleves/photos_seance.php',
+                                // Vérification publique du certificat de scolarité (QR) : type-aware
+                                // — sans cela, un QR d'école secondaire tombait sur « En construction ».
+                                'verif_scolarite.php'], true) || str_starts_with($_rel, 'ajax/');
     if (!$_commun) {
         $_secondaire = type_enseignement_courant() === 'secondaire';
         if ($_secondaire && !str_starts_with($_rel, 'secondaire/')) {

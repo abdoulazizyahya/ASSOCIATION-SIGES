@@ -1815,8 +1815,17 @@ function synchroniser_bareme_niveau_arabe(string $code_niveau, ?array $ids_class
     }
 }
 
-// Identifiant d'affichage d'un élève (matricule — clé métier de `eleve`)
+// Identifiant d'affichage d'un élève (matricule — clé métier de `eleve`).
+// Type-aware depuis le 26/09/2026 : appelée par ~12 fichiers secondaire
+// (bulletins, cartes, certificat de scolarité, tableau d'honneur, fiche/
+// liste élèves…) qui recevaient jusqu'ici une chaîne vide en permanence
+// (colonne Mat_elv inexistante côté secondaire, qui utilise `matricule` —
+// bug réel constaté le 26/09/2026 en corrigeant le QR du certificat de
+// scolarité : le matricule signé dans le QR était toujours '').
 function id_affichage_eleve(array $eleve): string {
+    if (function_exists('type_enseignement_courant') && type_enseignement_courant() === 'secondaire') {
+        return (string) ($eleve['matricule'] ?? '');
+    }
     return (string)($eleve['Mat_elv'] ?? '');
 }
 

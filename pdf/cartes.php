@@ -166,7 +166,7 @@ function carte_photo_box(FPDF $pdf, array $el, float $x, float $y, float $w, flo
 // centre donc précisément dans son propre cadre x,y,cW,cH).
 function carte_filigrane(FPDF $pdf, array $etab, float $x, float $y, float $cW, float $cH): void {
     $chemin = pdf_filigrane_chemin($etab);
-    if (!$chemin) return;
+    if (!$chemin) { if (pdf_tampon_actif()) pdf_tampon_authentique($pdf, $x + $cW / 2, $y + $cH / 2, $cW * 0.85); return; }
     $w_fili = $cW * 0.5;
     $dim = @getimagesize($chemin);
     $h_fili = ($dim && $dim[0] > 0) ? $w_fili * $dim[1] / $dim[0] : $w_fili;
@@ -175,6 +175,9 @@ function carte_filigrane(FPDF $pdf, array $etab, float $x, float $y, float $cW, 
         $w_fili = ($dim && $dim[1] > 0) ? $h_fili * $dim[0] / $dim[1] : $h_fili;
     }
     $pdf->Image($chemin, $x + ($cW - $w_fili) / 2, $y + ($cH - $h_fili) / 2, $w_fili);
+    // Carte ouverte depuis le scan de son QR code : tampon « AUTHENTIQUE »
+    // à l'échelle de la carte, en fond (voir pdf_tampon_actif(), header_pdf.php).
+    if (pdf_tampon_actif()) pdf_tampon_authentique($pdf, $x + $cW / 2, $y + $cH / 2, $cW * 0.85);
 }
 
 // Coin drapeau camerounais diagonal (triangle vert/rouge/jaune + étoile).

@@ -2,7 +2,14 @@
 require_once __DIR__ . '/../../config.php';
 require_once __DIR__ . '/../../connexion.php';
 require_once __DIR__ . '/../../fonctions.php';
-require_once __DIR__ . '/verif_scolarite_lib.php';
+// Bibliothèque PARTAGÉE avec le primaire (pas de duplicata) : mêmes
+// fonctions hash/URL utilisées par pdf/certificat_scolarite.php (primaire)
+// et verif_scolarite.php — schéma-agnostique (id_eleve + matricule en
+// chaînes, jamais de requête SQL dedans). Corrige au passage l'absence de
+// &ec= dans l'URL du QR (verif_ajout_ec(), manquant dans l'ancien duplicata
+// secondaire/pdf/verif_scolarite_lib.php, supprimé) — cassait la
+// vérification en multi-établissement. Demande explicite du 26/09/2026.
+require_once __DIR__ . '/../../pdf/verif_scolarite_lib.php';
 
 function u(string $s): string {
     return mb_convert_encoding($s, 'Windows-1252', 'UTF-8');
@@ -24,6 +31,7 @@ $vh_verif = (string)($_GET['vh'] ?? '');
 $acces_public = $vh_verif !== '' && hash_equals(scolarite_verif_hash($id_eleve, id_affichage_eleve($eleve)), $vh_verif);
 if (!$acces_public) {
     exiger_connexion();
+    exiger_acces_eleve_secondaire($id_eleve);   // enseignant / SG : seulement leurs classes
 }
 require_once __DIR__ . '/fpdf.php';
 require_once __DIR__ . '/header_pdf.php'; // pour pdf_filigrane()
@@ -31,7 +39,6 @@ require_once __DIR__ . '/qrcode.php';
 
 $etab      = get_etablissement();
 $annee_act = get_annee_active();
-    exiger_acces_eleve_secondaire($id_eleve);   // enseignant / SG : seulement leurs classes
 $val_annee = $annee_act['libelle'] ?? '';
 
 $insc = db_one(
@@ -65,6 +72,9 @@ $ml = 15; $mr = 15;
 $uw = $pw - $ml - $mr;
 
 pdf_filigrane($pdf, $etab, $pw, $ph);
+// Ouvert depuis le scan du QR code UNIQUEMENT : tampon « AUTHENTIQUE » en fond,
+// posé par pdf_filigrane() (voir pdf_tampon_actif(), header_pdf.php). Jamais
+// sur un certificat imprimé depuis l'application.
 
 // ── En-tête bilingue façon MINESEC (Ministère + Délégations) ────────
 // Extrait juste le nom du lieu à partir des libellés complets stockés en
@@ -108,9 +118,9 @@ $pdf->MultiCell($col3, 3.1, u(
 $y_en_fin = $pdf->GetY();
 
 $y_nom = max($y_fr_fin, $y_en_fin) + 1;
-$pdf->SetXY($ml, $y_nom);
-$pdf->SetFont('Arial', 'B', 9);
-$pdf->Cell($col3, 4, u(strtoupper($etab['nom_fr'] ?? APP_NOM)), 0, 1, 'C');
+// Nom de l'établissement : 2 lignes max, police réduite si besoin — un nom
+// très long débordait sur le logo et la colonne anglaise (pdf_texte_ajuste()).
+pdf_texte_ajuste($pdf, $ml, $y_nom, $col3, mb_strtoupper($etab['nom_fr'] ?? APP_NOM), 9, 6, 2);
 $pdf->SetFont('Arial', '', 6.5);
 $pdf->SetX($ml);
 $pdf->MultiCell($col3, 3, u(
@@ -119,9 +129,7 @@ $pdf->MultiCell($col3, 3, u(
 ), 0, 'C');
 $y_left_fin = $pdf->GetY();
 
-$pdf->SetXY($ml + 2 * $col3, $y_nom);
-$pdf->SetFont('Arial', 'B', 9);
-$pdf->Cell($col3, 4, u(strtoupper($etab['nom_en'] ?? 'GTHS OF MBE')), 0, 1, 'C');
+pdf_texte_ajuste($pdf, $ml + 2 * $col3, $y_nom, $col3, mb_strtoupper($etab['nom_en'] ?? 'GTHS OF MBE'), 9, 6, 2);
 $pdf->SetFont('Arial', '', 6.5);
 $pdf->SetX($ml + 2 * $col3);
 $pdf->MultiCell($col3, 3, u(
@@ -177,97 +185,106 @@ $dnaiss = $eleve['date_naiss'] ? date('d/m/Y', strtotime($eleve['date_naiss'])) 
 $nom_complet = strtoupper($eleve['nom']) . ' ' . ($eleve['prenom'] ?? '');
 
 $pdf->Ln(4);
-$pdf->SetFont('Arial', '', 10);
+$pdf->SetFont('Arial', '', 11);
 $pdf->SetX($ml);
 // Interlignes bilingues : chaque ligne française est SUIVIE DE PRÈS de sa
-// traduction anglaise (FR 4,6 mm puis EN 3,4 mm), et un espace plus net
-// (2,2 mm) sépare chaque paire FR/EN de la suivante — lisibilité demandée
+// traduction anglaise (FR 4,6 mm puis EN 3,3 mm, police +1 pt), et un espace plus net
+// (3,2 mm) sépare chaque paire FR/EN de la suivante — lisibilité demandée
 // le 29/09/2026 (avant : FR→EN et EN→FR suivant avaient le même écart).
 $pdf->Cell($uw * 0.35, 4.6, u('Je soussigné(e),'), 0, 1, 'L');
 $pdf->SetX($ml);
-$pdf->SetFont('Arial', 'I', 8.5);
-$pdf->Cell($uw, 3.4, u('I, the undersigned'), 0, 1, 'L');
+$pdf->SetFont('Arial', 'I', 9.5);
+$pdf->Cell($uw, 3.3, u('I, the undersigned'), 0, 1, 'L');
 
-$pdf->Ln(2.2);
-$pdf->SetFont('Arial', 'B', 10.5);
+$pdf->Ln(3.2);
+$pdf->SetFont('Arial', 'B', 11.5);
 $pdf->SetX($ml);
-$pdf->Cell($uw, 4.6, u('PROVISEUR DU ' . strtoupper($etab['nom_fr'] ?? APP_NOM)), 0, 1, 'C');
-$pdf->SetFont('Arial', 'I', 8.5);
+$pdf->Cell($uw, 4.6, pdf_police_ajustee($pdf, u('PROVISEUR DU ' . strtoupper($etab['nom_fr'] ?? APP_NOM)), 'B', 11.5, $uw), 0, 1, 'C');
+$pdf->SetFont('Arial', 'I', 9.5);
 $pdf->SetX($ml);
-$pdf->Cell($uw, 3.4, u('PRINCIPAL OF THE ' . strtoupper($etab['nom_en'] ?? 'GTHS OF MBE')), 0, 1, 'C');
+$pdf->Cell($uw, 3.3, pdf_police_ajustee($pdf, u('PRINCIPAL OF THE ' . strtoupper($etab['nom_en'] ?? 'GTHS OF MBE')), 'I', 9.5, $uw), 0, 1, 'C');
 
 $pdf->Ln(3);
 $champ = function (string $fr, string $val, string $en) use ($pdf, $ml, $uw): void {
-    $pdf->SetFont('Arial', '', 10);
+    // La valeur suit l'étiquette à ~3 mm (et non plus une colonne fixe, qui
+    // laissait un grand vide après « Et de », « Fils/Fille de »…).
     $pdf->SetX($ml);
-    $pdf->Cell($uw * 0.32, 4.6, u($fr), 0, 0, 'L');
-    $pdf->SetFont('Arial', 'B', 10);
-    $pdf->Cell($uw * 0.68, 4.6, u($val), 0, 1, 'L');
-    $pdf->SetFont('Arial', 'I', 7.5);
+    $t = pdf_police_ajustee($pdf, u($fr), '', 11, $uw * 0.50);
+    $w = $pdf->GetStringWidth($t) + 3;
+    $pdf->Cell($w, 4.6, $t, 0, 0, 'L');
+    $pdf->SetFont('Arial', 'B', 11);
+    $pdf->Cell($uw - $w, 4.6, u($val), 0, 1, 'L');
+    $pdf->SetFont('Arial', 'I', 8.5);
     $pdf->SetX($ml);
-    $pdf->Cell($uw * 0.32, 3.4, u($en), 0, 1, 'L');
-    $pdf->Ln(2.2);   // espace entre deux paires FR/EN
+    $pdf->Cell($uw, 3.3, u($en), 0, 1, 'L');
+    $pdf->Ln(3.2);   // espace entre deux paires FR/EN
 };
 
 $champ('Certifie que l\'élève', $nom_complet, 'Certifies that the student');
 $champ('Fils/Fille de', $pere ?: '.....................', 'Son(daughter) of');
 $champ('Et de', $mere ?: '.....................', 'And of');
 
-$pdf->SetFont('Arial', '', 10);
+$pdf->SetFont('Arial', '', 11);
 $pdf->SetX($ml);
-$pdf->Cell($uw * 0.16, 4.6, u($sexe[0] . '(e) le'), 0, 0, 'L');
-$pdf->SetFont('Arial', 'B', 10);
-$pdf->Cell($uw * 0.24, 4.6, u($dnaiss), 0, 0, 'L');
-$pdf->SetFont('Arial', '', 10);
-$pdf->Cell($uw * 0.10, 4.6, u('à'), 0, 0, 'L');
-$pdf->SetFont('Arial', 'B', 10);
-$pdf->Cell($uw * 0.50, 4.6, u($eleve['lieu_naiss'] ?? '.....................'), 0, 1, 'L');
-$pdf->SetFont('Arial', 'I', 7.5);
+// Chaque partie suit la précédente à ~3 mm ; « Born on » / « at » restent
+// alignés sous « Né(e) le » / « à ».
+$t = u($sexe[0] . '(e) le');
+$pdf->Cell($pdf->GetStringWidth($t) + 3, 4.6, $t, 0, 0, 'L');
+$pdf->SetFont('Arial', 'B', 11);
+$t = u($dnaiss);
+$pdf->Cell($pdf->GetStringWidth($t) + 4, 4.6, $t, 0, 0, 'L');
+$pdf->SetFont('Arial', '', 11);
+$x_a = $pdf->GetX();
+$t = u('à');
+$pdf->Cell($pdf->GetStringWidth($t) + 3, 4.6, $t, 0, 0, 'L');
+$pdf->SetFont('Arial', 'B', 11);
+$pdf->Cell($ml + $uw - $pdf->GetX(), 4.6, u($eleve['lieu_naiss'] ?? '.....................'), 0, 1, 'L');
+$pdf->SetFont('Arial', 'I', 8.5);
 $pdf->SetX($ml);
-$pdf->Cell($uw * 0.16, 3.4, 'Born on', 0, 0, 'L');
-$pdf->SetX($ml + $uw * 0.40);
-$pdf->Cell($uw * 0.10, 3.4, 'at', 0, 1, 'L');
+$pdf->Cell($x_a - $ml, 3.3, 'Born on', 0, 0, 'L');
+$pdf->SetX($x_a);
+$pdf->Cell(10, 3.3, 'at', 0, 1, 'L');
 
-$pdf->Ln(2.2);
-$pdf->SetFont('Arial', '', 10);
+$pdf->Ln(3.2);
+$pdf->SetFont('Arial', '', 11);
 $pdf->SetX($ml);
-$pdf->MultiCell($uw, 4.8, u(
+$pdf->MultiCell($uw, 4.7, u(
     'Est effectivement ' . $sexe[1] . '(e) dans mon établissement en classe de : ' . strtoupper($insc['classe'])
 ), 0, 'L');
-$pdf->SetFont('Arial', 'I', 7.5);
+$pdf->SetFont('Arial', 'I', 8.5);
 $pdf->SetX($ml);
-$pdf->Cell($uw, 3.4, 'Is effectively part of my school in class', 0, 1, 'L');
+$pdf->Cell($uw, 3.3, 'Is effectively part of my school in class', 0, 1, 'L');
 
-$pdf->Ln(2.2);
+$pdf->Ln(3.2);
 $champ('Pour le compte de l\'année scolaire :', $val_annee, 'On behalf of the school year');
 $champ('Sous le matricule national :', id_affichage_eleve($eleve), 'Under the national matricule');
 
 $pdf->Ln(2);   // + 2,2 mm déjà ajoutés après la dernière paire
-$pdf->SetFont('Arial', '', 9.5);
+$pdf->SetFont('Arial', '', 10.5);
 $pdf->SetX($ml);
-$pdf->MultiCell($uw, 4.8, u(
+$pdf->MultiCell($uw, 4.7, u(
     "En foi de quoi le présent Certificat est établi et délivré pour servir et valoir ce que de droit./."
 ), 0, 'L');
-$pdf->SetFont('Arial', 'I', 8);
+$pdf->SetFont('Arial', 'I', 9);
 $pdf->SetX($ml);
-$pdf->MultiCell($uw, 3.6, u(
+$pdf->MultiCell($uw, 3.5, u(
     'In testimony whereof, the present attestation is issued for the purpose it deserves'
 ), 0, 'L');
 
 $pdf->Ln(8);
-$pdf->SetFont('Arial', '', 10);
+$pdf->SetFont('Arial', '', 11);
 $pdf->SetX($ml + $uw * 0.55);
 $pdf->Cell($uw * 0.45, 4.6, u(($etab['ville'] ?? 'Mbe') . ', le ' . date('d/m/Y') . '.'), 0, 1, 'C');
-$pdf->SetFont('Arial', 'I', 8);
+$pdf->SetFont('Arial', 'I', 9);
 $pdf->SetX($ml + $uw * 0.55);
-$pdf->Cell($uw * 0.45, 3.4, 'On', 0, 1, 'C');
-$pdf->Ln(2.2);
+$pdf->Cell($uw * 0.45, 3.3, 'On', 0, 1, 'C');
+$pdf->Ln(3.2);
 $pdf->SetX($ml + $uw * 0.55);
-$pdf->SetFont('Arial', 'B', 10);
+$pdf->SetFont('Arial', 'B', 11);
 $pdf->Cell($uw * 0.45, 4.6, u(strtoupper($etab['chef_etablissement'] ?? 'LE PROVISEUR') . ','), 0, 1, 'C');
-$pdf->SetFont('Arial', 'I', 8);
+$pdf->SetFont('Arial', 'I', 9);
 $pdf->SetX($ml + $uw * 0.55);
-$pdf->Cell($uw * 0.45, 3.4, ($etab['chef_etablissement_en'] ?? 'The Principal'), 0, 0, 'C');
+$pdf->Cell($uw * 0.45, 3.3, ($etab['chef_etablissement_en'] ?? 'The Principal'), 0, 0, 'C');
 
 // Signature numérique (uniquement si demandée à l'impression — jamais
 // automatique — et si l'admin en a configuré une dans les paramètres).
