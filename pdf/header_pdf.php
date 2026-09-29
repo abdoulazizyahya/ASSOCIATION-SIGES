@@ -10,8 +10,8 @@
 // faire une seule fois, juste avant l'appel Cell()/MultiCell()/Write().
 // Fonction canonique à utiliser dans tous les fichiers PDF du projet (au
 // lieu de réimplémenter localement u()/pvpdf_u()/ud()/uc()...).
-function pdf_u(string $s): string {
-    return mb_convert_encoding($s, 'Windows-1252', 'UTF-8');
+function pdf_u(?string $s): string {
+    return mb_convert_encoding($s ?? '', 'Windows-1252', 'UTF-8');
 }
 
 // Filigrane (logo de l'établissement très éclairci, en fond de page) —
