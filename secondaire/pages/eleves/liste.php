@@ -14,13 +14,20 @@ $id_annee = (int) ($annee['id'] ?? 0);
 $q         = trim($_GET['q'] ?? '');
 $id_classe = (int) ($_GET['classe'] ?? 0);
 $id_serie  = (int) ($_GET['serie'] ?? 0);
-$statut    = ($_GET['statut'] ?? 'actif') === 'desactive' ? 'desactive' : 'actif';
+require_once __DIR__ . '/../../../pages/eleves/_photos_lib.php';
+// Onglet « Photos par classe » (commun primaire/secondaire,
+// pages/eleves/_eleves_photos.php) — mêmes rôles que la fiche élève.
+$peut_gerer = in_array(role_connecte(), photos_roles(), true)
+           && !(function_exists('est_lecture_seule') && est_lecture_seule());
+$statut    = in_array($_GET['statut'] ?? '', ['desactive', 'photos'], true) ? $_GET['statut'] : 'actif';
+if ($statut === 'photos' && !$peut_gerer) $statut = 'actif';
+$vue_photos = $statut === 'photos';
 $page      = max(1, (int) ($_GET['page'] ?? 1));
 $pp        = 25;
 $offset    = ($page - 1) * $pp;
 
 $where  = ['e.statut = ?'];
-$params = [$statut];
+$params = [$vue_photos ? 'actif' : $statut];
 if ($q !== '') {
     $where[]  = '(e.matricule LIKE ? OR e.niu LIKE ? OR e.nom LIKE ? OR e.prenom LIKE ?)';
     $like     = "%$q%";
@@ -99,6 +106,14 @@ require_once __DIR__ . '/../../../layout/header.php';
       <i class="bi bi-slash-circle me-1"></i>Désactivés
     </a>
   </li>
+  <?php if ($peut_gerer): ?>
+  <li class="nav-item">
+    <a class="nav-link <?= $vue_photos ? 'active' : '' ?>"
+       href="?<?= http_build_query(array_merge($qs_tab, ['statut' => 'photos'])) ?>">
+      <i class="bi bi-camera me-1"></i>Photos par classe
+    </a>
+  </li>
+  <?php endif; ?>
 </ul>
 
 <div class="card mb-2">
@@ -143,6 +158,10 @@ require_once __DIR__ . '/../../../layout/header.php';
     </form>
   </div>
 </div>
+
+<?php if ($vue_photos): ?>
+  <?php require __DIR__ . '/../../../pages/eleves/_eleves_photos.php'; ?>
+<?php else: ?>
 
 <!-- Barre d'actions groupées (démasquée par JS dès qu'une case est cochée) -->
 <div class="card mb-2 d-none" id="barreMasse">
@@ -266,6 +285,10 @@ require_once __DIR__ . '/../../../layout/header.php';
     <?= pagination_html($page, $nb_pages, $base) ?>
   </div>
 <?php endif; ?>
+
+<?php endif; // fin liste vs. onglet « Photos par classe » ?>
+
+<?php if ($peut_gerer) require __DIR__ . '/../../../pages/eleves/_photos_outils.php'; ?>
 
 <script>
 // Actions groupées (sélection multiple) — secondaire/pages/eleves/liste.php.

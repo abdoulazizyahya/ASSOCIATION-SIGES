@@ -29,9 +29,12 @@ $peut_importer = $asso_ecriture || in_array(role_connecte(), ['DIRECTEUR','SECRE
 
 // « outils » = onglet Import & matricules (pas une liste d'élèves) — réservé
 // aux rôles qui peuvent importer / configurer.
-$statut = in_array($_GET['statut'] ?? '', ['actif','desactive','outils'], true) ? $_GET['statut'] : 'actif';
+// « photos » = onglet Photos par classe (_eleves_photos.php) — rôles qui
+// peuvent modifier une fiche élève ($peut_gerer).
+$statut = in_array($_GET['statut'] ?? '', ['actif','desactive','outils','photos'], true) ? $_GET['statut'] : 'actif';
 if ($statut === 'outils' && !$peut_importer) $statut = 'actif';
-$vue_outils = ($statut === 'outils');
+if ($statut === 'photos' && !$peut_gerer) $statut = 'actif';
+$vue_outils = in_array($statut, ['outils', 'photos'], true);   // pas de liste paginée
 $tri       = in_array($_GET['tri'] ?? '', ['nom','mat','sexe','classe']) ? $_GET['tri'] : 'nom';
 $ordre     = ($_GET['ordre'] ?? 'asc') === 'desc' ? 'DESC' : 'ASC';
 $page      = max(1, (int)($_GET['page'] ?? 1));
@@ -308,6 +311,8 @@ require_once __DIR__ . '/../../layout/header.php';
     </div>
   </div>
 </div>
+
+<?php if ($peut_gerer) require __DIR__ . '/_photos_outils.php'; ?>
 
 <script>
 // ═══ Recherche instantanée façon Google : aucun rechargement de page, aucun

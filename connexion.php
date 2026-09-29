@@ -127,7 +127,12 @@ if (function_exists('type_enseignement_courant')) {
     $_app = rtrim((string) parse_url(APP_URL, PHP_URL_PATH), '/');
     if ($_app !== '' && strpos($_rel, $_app . '/') === 0) $_rel = substr($_rel, strlen($_app) + 1);
     $_rel = ltrim($_rel, '/');
-    $_commun = in_array($_rel, ['login.php', 'logout.php', 'dashboard.php', 'profil.php', 'configurer_securite.php', 'mot_de_passe_oublie.php', 'questions_securite_reporter.php'], true) || str_starts_with($_rel, 'ajax/');
+    // Séance photo au téléphone (QR code) : page type-aware
+    // (pages/eleves/_photos_lib.php) — commune aux deux types, sinon un
+    // téléphone pas encore connecté (contexte primaire par défaut) serait
+    // renvoyé au tableau de bord avant d'atteindre la connexion.
+    $_commun = in_array($_rel, ['login.php', 'logout.php', 'dashboard.php', 'profil.php', 'configurer_securite.php', 'mot_de_passe_oublie.php', 'questions_securite_reporter.php',
+                                'pages/eleves/photos_seance.php', 'secondaire/pages/eleves/photos_seance.php'], true) || str_starts_with($_rel, 'ajax/');
     if (!$_commun) {
         $_secondaire = type_enseignement_courant() === 'secondaire';
         if ($_secondaire && !str_starts_with($_rel, 'secondaire/')) {

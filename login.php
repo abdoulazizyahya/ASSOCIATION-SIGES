@@ -122,6 +122,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $dest = (function_exists('utilisateur_a_questions') && !utilisateur_a_questions($u_id))
                 ? '/configurer_securite.php'
                 : '/dashboard.php';
+            // Retour vers la page demandée avant connexion — posé uniquement
+            // par pages/eleves/photos_seance.php (QR code de la séance photo
+            // au téléphone, primaire ou secondaire). Chemin interne à
+            // l'application seulement.
+            $retour = (string) ($_SESSION['retour_apres_login'] ?? '');
+            unset($_SESSION['retour_apres_login'], $_SESSION['ecole_suggeree']);
+            if ($retour !== '' && (str_starts_with($retour, APP_URL . '/pages/') || str_starts_with($retour, APP_URL . '/secondaire/pages/')) &&!str_contains($retour, '//') && !str_contains($retour, '\\')) {
+                header('Location: ' . $retour); exit;
+            }
             header('Location: ' . APP_URL . $dest); exit;
         } elseif ($u && password_verify($mdp, $u_pwd_hash) && $u_actif !== 1) {
             audit_log('connexion_echec', ['login' => $login, 'id_etab' => $id_etab_ctx, 'cible' => 'compte désactivé']);
@@ -217,7 +226,7 @@ if (preg_match_all('/\b[\p{L}]/u', $marque_defaut, $mm) && count($mm[0]) > 1) {
           // Présélection : la soumission en cours (erreur → on ne perd pas
           // la saisie) sinon le dernier établissement choisi sur cet
           // appareil (cookie posé plus haut à la connexion).
-          $ecole_preselectionnee = post('ecole') !== '' ? post('ecole') : ($_COOKIE['siges_dernier_ecole'] ?? '');
+          $ecole_preselectionnee = post('ecole') !== '' ? post('ecole') : ($_SESSION['ecole_suggeree'] ?? ($_COOKIE['siges_dernier_ecole'] ?? ''));
         ?>
         <select name="ecole" class="form-select" required>
           <option value="">— Choisir —</option>

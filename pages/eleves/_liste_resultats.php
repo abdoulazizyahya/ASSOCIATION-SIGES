@@ -24,10 +24,19 @@ $nb_pages = max(1, (int)ceil($total / $pp));
     </a>
   </li>
   <?php endif; ?>
+  <?php if (!empty($peut_gerer)): ?>
+  <li class="nav-item">
+    <a class="nav-link <?= $statut === 'photos' ? 'active' : '' ?>" href="#" onclick="changerStatutListe('photos');return false">
+      <i class="bi bi-camera me-1"></i>Photos par classe
+    </a>
+  </li>
+  <?php endif; ?>
 </ul>
 
 <?php if (($statut ?? '') === 'outils'): ?>
   <?php require __DIR__ . '/_eleves_outils.php'; ?>
+<?php elseif (($statut ?? '') === 'photos'): ?>
+  <?php require __DIR__ . '/_eleves_photos.php'; ?>
 <?php else: ?>
 
 <div class="text-muted mb-1" style="font-size:.78rem"><?= $total ?> élève(s) <?= $statut === 'actif' ? 'actif(s)' : 'désactivé(s)' ?><?= $q !== '' ? ' — recherche « ' . h($q) . ' »' : '' ?></div>
@@ -131,4 +140,4 @@ $nb_pages = max(1, (int)ceil($total / $pp));
   </div>
 <?php endif; ?>
 
-<?php endif; // fin onglet liste vs. onglet « outils » ?>
+<?php endif; // fin onglet liste vs. onglets « outils » / « photos » ?>
