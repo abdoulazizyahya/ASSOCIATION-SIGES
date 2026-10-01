@@ -40,6 +40,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
     $action = post('action');
 
+    // Un et un seul directeur (01/10/2026) : nommer quelqu'un rétrograde
+    // en enseignant TOUT autre directeur (actif ou non) — son compte de
+    // connexion est conservé. Retourne les noms rétrogradés.
+    $retrograder_autres = function (int $garde): array {
+        $noms = array_column(chefs_etablissement($garde), 'nom');
+        db_exec("UPDATE enseignant SET id_fonction='ENSEIGNANT' WHERE id_fonction='DIRECTEUR' AND matricule_ens<>?", [$garde]);
+        return $noms;
+    };
+    $note_remplaces = fn(array $noms): string => $noms
+        ? ' Ancien directeur rétrogradé en enseignant : ' . implode(', ', array_map('trim', $noms)) . '.' : '';
+
     if ($action === 'creer') {
         $nom    = mb_strtoupper(post('nom'));
         $prenom = post('prenom');
@@ -55,6 +66,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 [$nom, $prenom ?: null, $sexe, $tel, $email]
             );
             $mat_ens   = db_last_id();
+            $remplaces = $retrograder_autres((int) $mat_ens);
             $login     = fondateur_login_unique($nom, $prenom);
             $mdp_clair = bin2hex(random_bytes(4));
             db_exec(
@@ -65,7 +77,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $ec = function_exists('ecole_courante') ? ecole_courante() : null;
                 journaliser_action('directeur_cree', $ec['id'] ?? null, $login);
             }
-            flash_set('succes', "Directeur enregistré. Identifiant « $login » — mot de passe temporaire : $mdp_clair (à changer à la 1re connexion).");
+            flash_set('succes', "Directeur enregistré. Identifiant « $login » — mot de passe temporaire : $mdp_clair (à changer à la 1re connexion)." . $note_remplaces($remplaces));
         }
         rediriger('pages/fondateur/directeur.php');
     }
@@ -77,6 +89,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             flash_set('erreur', 'Membre du personnel introuvable.');
         } else {
             db_exec("UPDATE enseignant SET id_fonction='DIRECTEUR', statut_ens='actif' WHERE matricule_ens=?", [$mat_ens]);
+            $remplaces = $retrograder_autres($mat_ens);
             // Crée un compte si le membre n'en a pas encore.
             $msg = "« " . trim(mb_strtoupper($ex['nom_ens']) . ' ' . ($ex['prenom_ens'] ?? '')) . " » est désormais directeur.";
             if (!db_val("SELECT COUNT(*) FROM user WHERE matricule_ens=?", [$mat_ens])) {
@@ -86,7 +99,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         [$login, password_hash($mdp_clair, PASSWORD_DEFAULT), $mat_ens]);
                 $msg .= " Identifiant « $login » — mot de passe temporaire : $mdp_clair.";
             }
-            flash_set('succes', $msg);
+            flash_set('succes', $msg . $note_remplaces($remplaces));
+        }
+        rediriger('pages/fondateur/directeur.php');
+    }
+
+    // Plusieurs directeurs hérités d'avant la règle : garder celui-ci seul.
+    if ($action === 'garder') {
+        $mat_ens = (int) post('matricule_ens');
+        if ($mat_ens && db_val("SELECT COUNT(*) FROM enseignant WHERE matricule_ens=? AND id_fonction='DIRECTEUR'", [$mat_ens])) {
+            db_exec("UPDATE enseignant SET statut_ens='actif' WHERE matricule_ens=?", [$mat_ens]);
+            flash_set('succes', 'Directeur unique confirmé.' . $note_remplaces($retrograder_autres($mat_ens)));
+        } else {
+            flash_set('erreur', 'Directeur introuvable.');
         }
         rediriger('pages/fondateur/directeur.php');
     }
@@ -142,6 +167,14 @@ require_once __DIR__ . '/../../layout/header.php';
 
 <?= flash_html() ?>
 
+<?php if (count($directeurs) > 1): ?>
+<div class="alert alert-warning py-2" style="font-size:.85rem">
+  <i class="bi bi-exclamation-triangle me-1"></i>
+  <strong><?= count($directeurs) ?> directeurs</strong> sont enregistrés, or une école n'en a qu'<strong>un seul</strong>.
+  Cliquez sur « Garder seul » devant le vrai directeur : les autres seront rétrogradés en enseignant (leurs comptes restent).
+</div>
+<?php endif; ?>
+
 <div class="card mb-3">
   <div class="card-header py-2 fw-semibold"><i class="bi bi-people me-1"></i>Directeur(s) enregistré(s)</div>
   <div class="table-responsive">
@@ -166,6 +199,14 @@ require_once __DIR__ . '/../../layout/header.php';
             <td class="text-end">
               <?php if ($peut_ecrire): ?>
               <div class="d-inline-flex gap-1">
+                <?php if (count($directeurs) > 1): ?>
+                  <form method="post" onsubmit="return confirm('Garder cette personne comme SEUL directeur ? Les autres seront rétrogradés en enseignant.')">
+                    <?= csrf_champ() ?>
+                    <input type="hidden" name="action" value="garder">
+                    <input type="hidden" name="matricule_ens" value="<?= (int) $d['matricule_ens'] ?>">
+                    <button class="btn btn-sm btn-primary py-0"><i class="bi bi-check2-circle me-1"></i>Garder seul</button>
+                  </form>
+                <?php endif; ?>
                 <?php if ($actif): ?>
                   <form method="post" onsubmit="return confirm('Désactiver ce directeur ?')">
                     <?= csrf_champ() ?>
@@ -230,7 +271,7 @@ require_once __DIR__ . '/../../layout/header.php';
           </div>
           <div class="col-12">
             <button class="btn btn-primary btn-sm"><i class="bi bi-check-lg me-1"></i>Enregistrer</button>
-            <span class="text-muted ms-2" style="font-size:.75rem">Un compte est créé, avec un mot de passe temporaire affiché ensuite.</span>
+            <span class="text-muted ms-2" style="font-size:.75rem">Un compte est créé (mot de passe temporaire affiché ensuite). Le directeur actuel est remplacé : il redevient enseignant.</span>
           </div>
         </form>
       </div>
@@ -244,7 +285,7 @@ require_once __DIR__ . '/../../layout/header.php';
         <?php if (!$promouvables): ?>
           <p class="text-muted mb-0" style="font-size:.85rem">Aucun membre du personnel actif à promouvoir.</p>
         <?php else: ?>
-        <form method="post" class="row g-2" onsubmit="return confirm('Nommer cette personne directeur ?')">
+        <form method="post" class="row g-2" onsubmit="return confirm('Nommer cette personne directeur ? Le directeur actuel sera rétrogradé en enseignant.')">
           <?= csrf_champ() ?>
           <input type="hidden" name="action" value="promouvoir">
           <div class="col-12">

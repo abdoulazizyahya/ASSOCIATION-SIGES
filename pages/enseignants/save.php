@@ -60,6 +60,11 @@ if (!in_array($fonction, fonctions_assignables(), true)) {
     flash_set('erreur', 'Fonction invalide.');
     rediriger('pages/enseignants/form.php' . ($mat_existant ? '?mat=' . $mat_existant : ''));
 }
+// Un seul directeur par école (fonctions.php::refus_second_chef()).
+if ($fonction === 'DIRECTEUR' && ($refus = refus_second_chef($mat_existant ? (int) $mat_existant : null)) !== '') {
+    flash_set('erreur', $refus);
+    rediriger('pages/enseignants/form.php' . ($mat_existant ? '?mat=' . $mat_existant : ''));
+}
 if ($id_grade && !db_val("SELECT COUNT(*) FROM grade_enseignant WHERE code_grade=?", [$id_grade])) {
     $id_grade = null;
 }

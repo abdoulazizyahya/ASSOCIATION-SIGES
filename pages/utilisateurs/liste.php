@@ -28,7 +28,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && post('action') === 'changer_role') 
     $roles_ok  = fonctions_assignables();
     if ($id_user && in_array($nouveau, $roles_ok, true)) {
         $mat = db_val("SELECT matricule_ens FROM user WHERE id_user=?", [$id_user]);
-        if ($mat) {
+        if ($mat && $nouveau === 'DIRECTEUR' && ($refus = refus_second_chef((int) $mat)) !== '') {
+            flash_set('erreur', $refus);   // un seul directeur par école
+        } elseif ($mat) {
             $login_cible = db_val("SELECT login_user FROM user WHERE id_user=?", [$id_user]);
             db_exec("UPDATE enseignant SET id_fonction=? WHERE matricule_ens=?", [$nouveau, $mat]);
             journaliser_action('role_modifie', null, ($login_cible ? $login_cible . ' → ' : '') . libelle_role($nouveau));

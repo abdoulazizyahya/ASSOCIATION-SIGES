@@ -45,6 +45,17 @@ if ($nom === '') {
     rediriger('secondaire/pages/enseignants/form.php' . ($mat ? "?id=$mat" : ''));
 }
 
+// Un seul chef d'établissement : la fonction « Principal / Proviseur /
+// Directeur… » ne peut être portée que par une fiche du personnel.
+if (fonction_est_chef($fonction)) {
+    foreach (db_all("SELECT matricule_ens, CONCAT_WS(' ', UPPER(nom_ens), prenom_ens) AS n, id_fonction FROM enseignant WHERE matricule_ens<>?", [$mat]) as $autre) {
+        if (fonction_est_chef($autre['id_fonction'])) {
+            flash_set('erreur', "Une école ne peut avoir qu'un seul chef d'établissement : « " . trim($autre['n']) . ' » a déjà la fonction « ' . $autre['id_fonction'] . ' ». Modifiez d\'abord sa fiche.');
+            rediriger('secondaire/pages/enseignants/form.php' . ($mat ? "?id=$mat" : ''));
+        }
+    }
+}
+
 if ($mat) {
     $existe = db_one("SELECT matricule_ens FROM enseignant WHERE matricule_ens=?", [$mat]);
     if (!$existe) { flash_set('erreur', 'Membre du personnel introuvable.'); rediriger('secondaire/pages/enseignants/liste.php'); }

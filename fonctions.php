@@ -1822,6 +1822,117 @@ function synchroniser_bareme_niveau_arabe(string $code_niveau, ?array $ids_class
 // (colonne Mat_elv inexistante côté secondaire, qui utilise `matricule` —
 // bug réel constaté le 26/09/2026 en corrigeant le QR du certificat de
 // scolarité : le matricule signé dans le QR était toujours '').
+/**
+ * Nom du chef d'établissement (directeur / principal / proviseur) tel
+ * qu'enregistré dans Ressources humaines, pour les documents officiels
+ * (certificat de scolarité…). Ordre de recherche :
+ *   1. l'utilisateur connecté s'il est lui-même le chef (sa fiche « Mes
+ *      informations ») ;
+ *   2. le compte d'accès DIRECTEUR (primaire) / PROVISEUR (secondaire)
+ *      actif, via sa fiche personnel liée (matricule_ens) ;
+ *   3. le personnel dont la fonction est directeur / directrice / principal
+ *      / proviseur (en poste, avec un accès actif en priorité) ;
+ *   4. (secondaire) le nom saisi sur le compte PROVISEUR lui-même.
+ * Les libellés génériques (« Direction (Principal) », « Le Directeur »…)
+ * posés par l'installation sont ignorés : '' si aucun vrai nom trouvé.
+ */
+function nom_chef_etablissement(): string {
+    static $cache = [];
+    $cle = db_cache_cle('chef') . '|' . (string) matricule_ens_courant();
+    if (isset($cache[$cle])) return $cache[$cle];
+
+    $generique = fn(string $n): bool => trim(preg_replace(
+        '/\b(le|la|l|du|de|des|general|générale?|direction|directeur|directrice|principale?|proviseure?|chef|etablissement|établissement)\b|[^\p{L}]+/iu',
+        '', $n)) === '';
+    $retenir = function (?string $n) use ($generique): ?string {
+        $n = trim(preg_replace('/\s+/', ' ', (string) $n));
+        // Fiche créée d'office avec l'école (« DIRECTEUR <nom de l'école> »,
+        // « Direction SAB1 »…) : un vrai nom ne commence pas par un titre.
+        $premier = preg_split('/[^\p{L}]+/u', $n, -1, PREG_SPLIT_NO_EMPTY)[0] ?? '';
+        return ($n !== '' && !$generique($n) && !$generique($premier)) ? $n : null;
+    };
+    $sec = function_exists('type_enseignement_courant') && type_enseignement_courant() === 'secondaire';
+    $nom = null;
+    try {
+        $mat = matricule_ens_courant();
+        if ($mat !== null && in_array(role_connecte(), ['DIRECTEUR', 'PROVISEUR'], true)) {
+            $nom = $retenir(db_val("SELECT CONCAT_WS(' ', nom_ens, prenom_ens) FROM enseignant WHERE matricule_ens=?", [$mat]));
+        }
+        if ($nom === null && $sec) {
+            foreach (db_all(
+                "SELECT CONCAT_WS(' ', e.nom_ens, e.prenom_ens) AS fiche, CONCAT_WS(' ', u.nom, u.prenom) AS compte
+                 FROM utilisateur u LEFT JOIN enseignant e ON e.matricule_ens = u.matricule_ens
+                 WHERE u.role = 'PROVISEUR' ORDER BY u.actif DESC, u.id DESC") as $r) {
+                if (($nom = $retenir($r['fiche'])) !== null) break;
+            }
+            if ($nom === null) {
+                foreach (db_all(
+                    "SELECT CONCAT_WS(' ', e.nom_ens, e.prenom_ens) AS n, e.id_fonction FROM enseignant e
+                     LEFT JOIN utilisateur u ON u.matricule_ens = e.matricule_ens
+                     WHERE e.id_fonction IS NOT NULL
+                     ORDER BY COALESCE(u.actif, 0) DESC, e.matricule_ens DESC") as $r) {
+                    if (fonction_est_chef($r['id_fonction']) && ($nom = $retenir($r['n'])) !== null) break;
+                }
+            }
+            if ($nom === null) {
+                foreach (db_all("SELECT CONCAT_WS(' ', nom, prenom) AS n FROM utilisateur
+                                 WHERE role = 'PROVISEUR' ORDER BY actif DESC, id DESC") as $r) {
+                    if (($nom = $retenir($r['n'])) !== null) break;
+                }
+            }
+        } elseif ($nom === null) {
+            foreach (db_all(
+                "SELECT CONCAT_WS(' ', e.nom_ens, e.prenom_ens) AS n FROM enseignant e
+                 LEFT JOIN user u ON u.matricule_ens = e.matricule_ens
+                 WHERE e.id_fonction = 'DIRECTEUR'
+                 ORDER BY (COALESCE(e.statut_ens, 'actif') = 'actif') DESC,
+                          COALESCE(u.actif, 0) DESC, e.matricule_ens DESC") as $r) {
+                if (($nom = $retenir($r['n'])) !== null) break;
+            }
+        }
+    } catch (Throwable $e) {
+        $nom = null;   // table/colonne absente sur une base non migrée : jamais fatal
+    }
+    return $cache[$cle] = (string) $nom;
+}
+
+// ── Un et un seul chef d'établissement par école (01/10/2026) ──────────
+// Primaire : personnel de fonction DIRECTEUR. Secondaire : compte de rôle
+// PROVISEUR (+ la fonction RH libre, voir fonction_est_chef()). Nommer un
+// nouveau chef depuis Fondateur → Directeur REMPLACE l'ancien (rétrogradé
+// en enseignant) ; partout ailleurs une 2e nomination est refusée.
+
+/** Fonction RH libre (secondaire) désignant le chef : « Principal », « Le Proviseur »… */
+function fonction_est_chef(?string $fonction): bool {
+    $f = mb_strtolower(trim(preg_replace('/\s+/', ' ', (string) $fonction)));
+    $f = preg_replace('/^(le |la |l\')/u', '', $f);
+    return in_array($f, ['directeur', 'directrice', 'principal', 'principale', 'proviseur', 'proviseure'], true);
+}
+
+/**
+ * Chef(s) d'établissement enregistré(s), actifs ou non — normalement 0 ou 1.
+ * Chaque ligne : ['cle' => matricule_ens (primaire) | id utilisateur
+ * (secondaire), 'nom' => « NOM Prénom »]. $sauf : clé à ignorer (la fiche
+ * ou le compte en cours de modification).
+ */
+function chefs_etablissement(?int $sauf = null): array {
+    $sec = function_exists('type_enseignement_courant') && type_enseignement_courant() === 'secondaire';
+    $rows = $sec
+        ? db_all("SELECT id AS cle, CONCAT_WS(' ', UPPER(nom), prenom) AS nom FROM utilisateur WHERE role='PROVISEUR' ORDER BY actif DESC, id DESC")
+        : db_all("SELECT matricule_ens AS cle, CONCAT_WS(' ', UPPER(nom_ens), prenom_ens) AS nom FROM enseignant WHERE id_fonction='DIRECTEUR'
+                  ORDER BY (COALESCE(statut_ens,'actif')='actif') DESC, matricule_ens DESC");
+    return array_values(array_filter($rows, fn($r) => $sauf === null || (int) $r['cle'] !== $sauf));
+}
+
+/** Message de refus si un autre chef existe déjà ('' sinon). */
+function refus_second_chef(?int $sauf = null): string {
+    $autres = chefs_etablissement($sauf);
+    if (!$autres) return '';
+    $poste = libelle_role(type_enseignement_courant() === 'secondaire' ? 'PROVISEUR' : 'DIRECTEUR');
+    return 'Une école ne peut avoir qu\'un seul ' . mb_strtolower($poste) . ' : « ' . trim($autres[0]['nom'])
+         . ' » l\'est déjà. Pour le remplacer, le fondateur passe par le menu « Directeur » (l\'ancien sera rétrogradé).';
+}
+
 function id_affichage_eleve(array $eleve): string {
     if (function_exists('type_enseignement_courant') && type_enseignement_courant() === 'secondaire') {
         return (string) ($eleve['matricule'] ?? '');

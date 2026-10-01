@@ -47,6 +47,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
     $action = post('action');
 
+    // Un et un seul chef d'établissement (01/10/2026) : nommer quelqu'un
+    // rétrograde en enseignant TOUT autre compte PROVISEUR (actif ou non) —
+    // le compte est conservé. Retourne les noms rétrogradés.
+    $retrograder_autres = function (int $garde): array {
+        $noms = array_column(chefs_etablissement($garde), 'nom');
+        db_exec("UPDATE utilisateur SET role='ENSEIGNANT' WHERE role='PROVISEUR' AND id<>?", [$garde]);
+        return $noms;
+    };
+    $note_remplaces = fn(array $noms): string => $noms
+        ? ' Ancien ' . $libelle_poste . ' rétrogradé en enseignant : ' . implode(', ', array_map('trim', $noms)) . '.' : '';
+
     if ($action === 'creer') {
         $nom    = mb_strtoupper(post('nom'));
         $prenom = post('prenom');
@@ -61,11 +72,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                  VALUES (?, ?, ?, ?, 'PROVISEUR', 1, ?)",
                 [$nom, $prenom ?: null, $login, password_hash($mdp_clair, PASSWORD_DEFAULT), $email]
             );
+            $remplaces = $retrograder_autres((int) db_last_id());
             if (function_exists('journaliser_action')) {
                 $ec = function_exists('ecole_courante') ? ecole_courante() : null;
                 journaliser_action('proviseur_cree', $ec['id'] ?? null, $login);
             }
-            flash_set('succes', ucfirst($libelle_poste) . " enregistré. Identifiant « $login » — mot de passe temporaire : $mdp_clair (à changer à la 1re connexion).");
+            flash_set('succes', ucfirst($libelle_poste) . " enregistré. Identifiant « $login » — mot de passe temporaire : $mdp_clair (à changer à la 1re connexion)." . $note_remplaces($remplaces));
         }
         rediriger('secondaire/pages/fondateur/directeur.php');
     }
@@ -77,7 +89,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             flash_set('erreur', 'Compte introuvable.');
         } else {
             db_exec("UPDATE utilisateur SET role='PROVISEUR', actif=1 WHERE id=?", [$id]);
-            flash_set('succes', "« " . trim(mb_strtoupper($ex['nom']) . ' ' . ($ex['prenom'] ?? '')) . " » est désormais " . $libelle_poste . ".");
+            $remplaces = $retrograder_autres($id);
+            flash_set('succes', "« " . trim(mb_strtoupper($ex['nom']) . ' ' . ($ex['prenom'] ?? '')) . " » est désormais " . $libelle_poste . "." . $note_remplaces($remplaces));
+        }
+        rediriger('secondaire/pages/fondateur/directeur.php');
+    }
+
+    // Plusieurs comptes PROVISEUR hérités d'avant la règle : garder celui-ci seul.
+    if ($action === 'garder') {
+        $id = (int) post('id_utilisateur');
+        if ($id && db_val("SELECT COUNT(*) FROM utilisateur WHERE id=? AND role='PROVISEUR'", [$id])) {
+            db_exec("UPDATE utilisateur SET actif=1 WHERE id=?", [$id]);
+            flash_set('succes', ucfirst($libelle_poste) . ' unique confirmé.' . $note_remplaces($retrograder_autres($id)));
+        } else {
+            flash_set('erreur', ucfirst($libelle_poste) . ' introuvable.');
         }
         rediriger('secondaire/pages/fondateur/directeur.php');
     }
@@ -131,6 +156,14 @@ require_once __DIR__ . '/../../../layout/header.php';
 
 <?= flash_html() ?>
 
+<?php if (count($directeurs) > 1): ?>
+<div class="alert alert-warning py-2" style="font-size:.85rem">
+  <i class="bi bi-exclamation-triangle me-1"></i>
+  <strong><?= count($directeurs) ?> comptes <?= h($libelle_poste) ?></strong> sont enregistrés, or une école n'en a qu'<strong>un seul</strong>.
+  Cliquez sur « Garder seul » devant le bon compte : les autres seront rétrogradés en enseignant (leurs comptes restent).
+</div>
+<?php endif; ?>
+
 <div class="card mb-3">
   <div class="card-header py-2 fw-semibold"><i class="bi bi-people me-1"></i><?= h(ucfirst($libelle_poste)) ?>(s) enregistré(s)</div>
   <div class="table-responsive">
@@ -155,6 +188,14 @@ require_once __DIR__ . '/../../../layout/header.php';
             <td class="text-end">
               <?php if ($peut_ecrire): ?>
               <div class="d-inline-flex gap-1">
+                <?php if (count($directeurs) > 1): ?>
+                  <form method="post" onsubmit="return confirm('Garder ce compte comme SEUL <?= h($libelle_poste) ?> ? Les autres seront rétrogradés en enseignant.')">
+                    <?= csrf_champ() ?>
+                    <input type="hidden" name="action" value="garder">
+                    <input type="hidden" name="id_utilisateur" value="<?= (int) $d['id'] ?>">
+                    <button class="btn btn-sm btn-primary py-0"><i class="bi bi-check2-circle me-1"></i>Garder seul</button>
+                  </form>
+                <?php endif; ?>
                 <?php if ($actif): ?>
                   <form method="post" onsubmit="return confirm('Désactiver ce compte ?')">
                     <?= csrf_champ() ?>
@@ -209,7 +250,7 @@ require_once __DIR__ . '/../../../layout/header.php';
           </div>
           <div class="col-12">
             <button class="btn btn-primary btn-sm"><i class="bi bi-check-lg me-1"></i>Enregistrer</button>
-            <span class="text-muted ms-2" style="font-size:.75rem">Un compte est créé, avec un mot de passe temporaire affiché ensuite.</span>
+            <span class="text-muted ms-2" style="font-size:.75rem">Un compte est créé (mot de passe temporaire affiché ensuite). Le <?= h($libelle_poste) ?> actuel est remplacé : il redevient enseignant.</span>
           </div>
         </form>
       </div>
@@ -223,7 +264,7 @@ require_once __DIR__ . '/../../../layout/header.php';
         <?php if (!$promouvables): ?>
           <p class="text-muted mb-0" style="font-size:.85rem">Aucun autre compte actif à promouvoir.</p>
         <?php else: ?>
-        <form method="post" class="row g-2" onsubmit="return confirm('Nommer ce compte <?= h($libelle_poste) ?> ?')">
+        <form method="post" class="row g-2" onsubmit="return confirm('Nommer ce compte <?= h($libelle_poste) ?> ? Le compte actuel sera rétrogradé en enseignant.')">
           <?= csrf_champ() ?>
           <input type="hidden" name="action" value="promouvoir">
           <div class="col-12">

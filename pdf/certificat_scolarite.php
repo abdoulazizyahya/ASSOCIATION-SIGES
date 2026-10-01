@@ -125,7 +125,18 @@ $pdf->SetX($ml);
 // traduction anglaise (FR 4,6 mm puis EN 3,3 mm, police +1 pt), et un espace plus net
 // (3,2 mm) sépare chaque paire FR/EN de la suivante — lisibilité demandée
 // le 29/09/2026 (avant : FR→EN et EN→FR suivant avaient le même écart).
-$pdf->Cell($uw * 0.35, 4.6, u('Je soussigné(e),'), 0, 1, 'L');
+// Nom du chef d'établissement juste après « Je soussigné(e), » — en
+// MAJUSCULES et même police que le nom de l'élève (Arial gras 11), demandé
+// le 01/10/2026. Pris dans Ressources humaines (fonctions.php::
+// nom_chef_etablissement()) ; aucun vrai nom -> « Je soussigné(e), » seule.
+$nom_chef = mb_strtoupper(nom_chef_etablissement());
+$t_sous = u('Je soussigné(e), ');
+$w_sous = $pdf->GetStringWidth($t_sous) + 1;
+$pdf->Cell($w_sous, 4.6, $t_sous, 0, $nom_chef !== '' ? 0 : 1, 'L');
+if ($nom_chef !== '') {
+    $pdf->Cell($uw - $w_sous, 4.6, pdf_police_ajustee($pdf, u($nom_chef), 'B', 11, $uw - $w_sous), 0, 1, 'L');
+    $pdf->SetFont('Arial', '', 11);
+}
 $pdf->SetX($ml);
 $pdf->SetFont('Arial', 'I', 9.5);
 $pdf->Cell($uw, 3.3, u('I, the undersigned'), 0, 1, 'L');
@@ -252,9 +263,8 @@ try {
     if (is_file($qr_tmp)) unlink($qr_tmp);
     if ($photo_est_temp && is_file($photo_path)) unlink($photo_path);
 }
-$pdf->SetFont('Arial', 'I', 6.5);
-$pdf->SetXY($qr_x, $qr_y + $qr_size + 1);
-$pdf->Cell($qr_size, 3, u('Scanner pour vérifier'), 0, 0, 'C');
+// (QR sans légende « Scanner pour vérifier » — retirée le 01/10/2026.)
+
 
 // ── Copyright standard du système (pdf/header_pdf.php) — texte unique sur
 //    tous les PDF du projet, voir pdf_copyright().

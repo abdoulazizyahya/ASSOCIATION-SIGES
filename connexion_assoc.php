@@ -2562,6 +2562,11 @@ function assoc_compte_ecole_action(int $id_etab, int $id_user, string $op, array
                 if ($est_directeur && $role !== 'DIRECTEUR' && $dernier_dir) {
                     return ['ok' => false, 'message' => "Impossible : c'est le dernier Directeur actif de « {$e['nom']} »."];
                 }
+                // Un et un seul directeur par école (fonctions.php::refus_second_chef()).
+                if ($role === 'DIRECTEUR' && !$est_directeur) {
+                    $autre = ecole_one($l, "SELECT CONCAT_WS(' ', UPPER(nom_ens), prenom_ens) AS n FROM enseignant WHERE id_fonction = 'DIRECTEUR' LIMIT 1");
+                    if ($autre) return ['ok' => false, 'message' => "Impossible : « " . trim($autre['n']) . " » est déjà le directeur de « {$e['nom']} » (un seul par école). Rétrogradez-le d'abord."];
+                }
                 ecole_exec($l, "UPDATE enseignant SET id_fonction = ? WHERE matricule_ens = ?",
                     [$role, $u['matricule_ens']]);
                 return ['ok' => true, 'message' => "Rôle de $qui : " . assoc_role_libelle($role) . "."];

@@ -24,6 +24,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         rediriger('secondaire/pages/utilisateurs/form.php' . ($id ? "?id=$id" : ''));
     }
 
+    // Un seul chef d'établissement (compte PROVISEUR) par école.
+    if ($role === 'PROVISEUR' && ($refus = refus_second_chef($id ?: null)) !== '') {
+        flash_set('erreur', $refus);
+        rediriger('secondaire/pages/utilisateurs/form.php' . ($id ? "?id=$id" : ''));
+    }
+
     if ($id) {
         $sql = "UPDATE utilisateur SET nom=?,prenom=?,login=?,email=?,role=?,actif=? WHERE id=?";
         $p   = [$nom,$prenom,$login,$email,$role,$actif,$id];
