@@ -15,6 +15,13 @@
 /assets/uploads/dossiers_eleves/
 /assets/uploads/profils/
 
+# ── Images propres à chaque école (logos, signatures, bordures) déposées
+# via Paramètres — données, pas du code. Racine de uploads/ seulement :
+# les logos d'opérateurs (assets/uploads/operateurs/) restent versionnés.
+/assets/uploads/*.jpg
+/assets/uploads/*.jpeg
+/assets/uploads/*.png
+
 # ── Dumps SQL de sauvegarde (contiennent des données réelles d'élèves,
 # pas seulement le schéma — les migrations elles-mêmes (migration_v*.sql)
 # restent versionnées, ce sont les backup_*.sql à écarter) ────────────
