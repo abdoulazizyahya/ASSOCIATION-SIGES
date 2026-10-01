@@ -43,7 +43,7 @@ $sheet = $spreadsheet->getActiveSheet();
 $sheet->setTitle('Répartition par catégorie');
 
 $logo_src_path  = !empty($etab['logo']) ? __DIR__ . '/../../assets/uploads/' . $etab['logo'] : '';
-$filigrane_path = __DIR__ . '/../../assets/uploads/filigrane_excel.png';
+$filigrane_path = __DIR__ . '/../../assets/uploads/filigrane_excel_' . md5((string) ($etab['logo'] ?? '')) . '.png'; // un fichier PAR logo : un nom fixe partagé mélangeait les écoles
 if ($logo_src_path && generer_filigrane_excel($logo_src_path, $filigrane_path)) {
     $sheet->setBackgroundImage(file_get_contents($filigrane_path));
 }

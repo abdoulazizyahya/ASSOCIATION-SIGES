@@ -4,7 +4,7 @@
 # voir pdf/verif_lib.php, pdf/header_pdf.php, pdf/fpdf.php) ────────────
 /assets/uploads/fond_degrade_*.png
 /assets/uploads/filigrane_logo.png
-/assets/uploads/filigrane_excel.png
+/assets/uploads/filigrane_*.png
 /assets/uploads/qr_bulletins/
 /assets/uploads/qr_honneur/
 /assets/uploads/qr_recus/

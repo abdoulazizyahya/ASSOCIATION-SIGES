@@ -39,7 +39,7 @@ $etab_brut = get_etablissement();
 $etab      = etab_pour_pdf($etab_brut);
 
 $logo_src_path  = !empty($etab['logo']) ? __DIR__ . '/../../assets/uploads/' . $etab['logo'] : '';
-$filigrane_path = __DIR__ . '/../../assets/uploads/filigrane_excel.png';
+$filigrane_path = __DIR__ . '/../../assets/uploads/filigrane_excel_' . md5((string) ($etab['logo'] ?? '')) . '.png'; // un fichier PAR logo : un nom fixe partagé mélangeait les écoles
 $a_filigrane     = $logo_src_path && generer_filigrane_excel($logo_src_path, $filigrane_path);
 
 $lettre = fn(int $c) => Coordinate::stringFromColumnIndex($c);
