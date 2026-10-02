@@ -106,7 +106,7 @@ require_once __DIR__ . '/_photos_lib.php';
 </div>
 
 <script src="<?= APP_URL ?>/assets/vendor/cropper/cropper.min.js"></script>
-<script src="<?= APP_URL ?>/assets/js/photos-eleves.js"></script>
+<script src="<?= APP_URL ?>/assets/js/photos-eleves.js?v=<?= (int) @filemtime(__DIR__ . '/../../assets/js/photos-eleves.js') ?>"></script>
 <script>
 // ═══ Onglet « Photos par classe » ═══════════════════════════════════
 // Les données de la grille viennent du bloc JSON #photosData du fragment

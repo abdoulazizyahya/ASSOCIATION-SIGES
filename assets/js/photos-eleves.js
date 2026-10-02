@@ -141,11 +141,21 @@ window.PhotosEleves = (function () {
   // Envoi d'une photo (dataURL) — résout { ok, message, url }. La photo part
   // comme FICHIER (multipart) et non comme texte base64 : le pare-feu
   // ModSecurity de l'hébergeur (Camoo) rejetait le texte en 403.
+  // Secours : si le pare-feu refuse encore (403), la photo est renvoyée en
+  // HEXADÉCIMAL (uniquement 0-9 a-f) — ni du SQL ni du HTML pour lui.
   function envoyer(urlApi, csrf, idEleve, dataUrl) {
     const fd = new FormData();
     fd.append('csrf', csrf); fd.append('id_eleve', idEleve);
     fd.append('photo_fichier', dataUrlVersBlob(dataUrl), 'photo.jpg');
-    return poster(urlApi, fd);
+    return poster(urlApi, fd).then(res => {
+      if (res.statut !== 403) return res;
+      const octets = new Uint8Array(atob(dataUrl.split(',')[1]).split('').map(c => c.charCodeAt(0)));
+      let hex = '';
+      for (let i = 0; i < octets.length; i++) hex += octets[i].toString(16).padStart(2, '0');
+      const fd2 = new FormData();
+      fd2.append('csrf', csrf); fd2.append('id_eleve', idEleve); fd2.append('photo_hex', hex);
+      return poster(urlApi, fd2);
+    });
   }
   // Suppression de la photo — résout { ok, message, url (avatar) }.
   function supprimer(urlApi, csrf, idEleve) {
@@ -155,10 +165,10 @@ window.PhotosEleves = (function () {
   }
   function poster(urlApi, fd) {
     return fetch(urlApi, { method: 'POST', body: fd, headers: { 'X-Requested-With': 'XMLHttpRequest' } })
-      .then(r => r.text())
-      .then(t => {
-        try { return JSON.parse(t); }
-        catch (e) { return { ok: false, message: (t || 'Réponse invalide du serveur').replace(/<[^>]+>/g, ' ').trim().slice(0, 200) }; }
+      .then(r => r.text().then(t => ({ statut: r.status, t })))
+      .then(({ statut, t }) => {
+        try { return Object.assign(JSON.parse(t), { statut }); }
+        catch (e) { return { ok: false, statut, message: (t || 'Réponse invalide du serveur').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 200) }; }
       })
       .catch(() => ({ ok: false, message: 'Connexion au serveur impossible.' }));
   }

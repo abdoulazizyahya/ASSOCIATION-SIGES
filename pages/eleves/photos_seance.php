@@ -150,7 +150,7 @@ $donnees = $classe ? photos_eleves_classe($id_classe) : [];
 
 <?php if ($donnees): ?>
 <script src="<?= APP_URL ?>/assets/vendor/cropper/cropper.min.js"></script>
-<script src="<?= APP_URL ?>/assets/js/photos-eleves.js"></script>
+<script src="<?= APP_URL ?>/assets/js/photos-eleves.js?v=<?= (int) @filemtime(__DIR__ . '/../../assets/js/photos-eleves.js') ?>"></script>
 <script>
 const API    = <?= json_encode($base . '/photo_enregistrer.php') ?>;
 const CSRF   = <?= json_encode(csrf_generer()) ?>;

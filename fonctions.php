@@ -2745,6 +2745,12 @@ function photo_postee(string $champ_fichier = 'photo_fichier', string $champ_b64
         $data = file_get_contents($f['tmp_name']);
         return $data !== false && $data !== '' ? $data : null;
     }
+    // Secours hexadécimal (assets/js/photos-eleves.js, après un 403 du pare-feu).
+    $hex = $_POST['photo_hex'] ?? '';
+    if (is_string($hex) && $hex !== '' && strlen($hex) % 2 === 0 && strlen($hex) <= 4 * 1024 * 1024 && ctype_xdigit($hex)) {
+        $data = hex2bin($hex);
+        return $data !== false && $data !== '' ? $data : null;
+    }
     return decoder_photo_b64($_POST[$champ_b64] ?? null);
 }
 
