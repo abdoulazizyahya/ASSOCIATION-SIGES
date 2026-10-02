@@ -18,7 +18,7 @@ $dl  = ($_GET['dl'] ?? '0') === '1';
 $e = db_one("SELECT * FROM enseignant WHERE matricule_ens=?", [$mat]);
 if (!$e) die('Enseignant introuvable.');
 
-$etab      = get_etablissement();
+$etab      = etab_pour_pdf(get_etablissement());   // colonnes du primaire -> clés communes des PDF
 $annee_act = get_annee_active();
 $val_annee = $annee_act['libelle'] ?? '';
 

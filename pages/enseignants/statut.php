@@ -12,8 +12,12 @@ exiger_role(['DIRECTEUR']);
 csrf_verifier();
 
 $mat = (int) ($_GET['mat'] ?? 0);
-$ens = db_one("SELECT matricule_ens, statut_ens FROM enseignant WHERE matricule_ens=?", [$mat]);
-if ($ens) {
+$ens = db_one("SELECT matricule_ens, statut_ens, id_fonction FROM enseignant WHERE matricule_ens=?", [$mat]);
+if ($ens && (string) $mat === (string) matricule_ens_courant()) {
+    flash_set('erreur', 'Vous ne pouvez pas désactiver votre propre fiche.');
+} elseif ($ens && !fiche_gerable($mat)) {
+    flash_set('erreur', refus_compte_non_gerable((string) $ens['id_fonction']));   // directeur : son personnel seulement
+} elseif ($ens) {
     $nouveau = ($ens['statut_ens'] ?? 'actif') === 'actif' ? 'inactif' : 'actif';
     db_exec("UPDATE enseignant SET statut_ens=? WHERE matricule_ens=?", [$nouveau, $mat]);
     $msg = $nouveau === 'actif'

@@ -53,9 +53,11 @@ require_once __DIR__ . '/../../layout/header.php';
     </div>
   </div>
   <div class="d-flex gap-2">
+    <?php if (fiche_gerable((int) $mat, (string) ($ens['id_fonction'] ?? ''))): ?>
     <a href="<?= APP_URL ?>/pages/enseignants/form.php?mat=<?= $mat ?>" class="btn btn-primary btn-sm">
       <i class="bi bi-pencil-square me-1"></i>Modifier
     </a>
+    <?php endif; ?>
     <div class="dropdown">
       <button class="btn btn-outline-primary btn-sm dropdown-toggle" data-bs-toggle="dropdown">
         <i class="bi bi-file-earmark-text me-1"></i>Documents

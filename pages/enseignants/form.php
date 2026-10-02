@@ -17,6 +17,10 @@ exiger_role(['DIRECTEUR']);
 $mat = (int) ($_GET['mat'] ?? 0);
 $ens = $mat ? db_one("SELECT * FROM enseignant WHERE matricule_ens=?", [$mat]) : null;
 if ($mat && !$ens) { flash_set('erreur', 'Membre du personnel introuvable.'); rediriger('pages/enseignants/liste.php'); }
+if ($ens && !fiche_gerable($mat, (string) ($ens['id_fonction'] ?? ''))) {
+    flash_set('erreur', refus_compte_non_gerable((string) $ens['id_fonction']));   // directeur : son personnel seulement
+    rediriger('pages/enseignants/liste.php');
+}
 
 $grades = grille_salariale();
 

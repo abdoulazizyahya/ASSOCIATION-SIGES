@@ -95,7 +95,7 @@ return [
         ['Paie',                  'pages/paie/index.php',        'cash-stack',     ['COMPTABLE','FONDATEUR']],
         ['Avances sur salaire',   'pages/paie/avances.php',      'cash',           ['COMPTABLE','FONDATEUR']],
         ['Mes informations',      'pages/enseignants/mon_profil.php', 'person-vcard', ['DIRECTEUR','ENSEIGNANT','SECRETAIRE','COMPTABLE']],
-        ['Mes bulletins de paie', 'pages/paie/mes_bulletins.php','receipt',        ['ENSEIGNANT','SECRETAIRE','COMPTABLE']],
+        ['Mes bulletins de paie', 'pages/paie/mes_bulletins.php','receipt',        ['DIRECTEUR','ENSEIGNANT','SECRETAIRE','COMPTABLE']],
     ],
     // Paramètres : 'Mon compte' (profil.php) est un libre-service ouvert à TOUS.
     'Paramètres' => [

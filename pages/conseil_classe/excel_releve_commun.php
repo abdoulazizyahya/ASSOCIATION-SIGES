@@ -130,9 +130,9 @@ function genererExcelReleve(
     $lettre = fn(int $c) => Coordinate::stringFromColumnIndex($c);
     $texte_etab = "REGION DE L'ADAMAOUA\n" .
         ($etab['departement_fr'] ?? 'DEPARTEMENT DE LA VINA') . "\n" .
-        ($etab['arrondissement_fr'] ?? 'ARRONDISSEMENT DE MBE') . "\n" .
+        ($etab['arrondissement_fr'] ?? '') . "\n" .
         '***********';
-    $nom_etab = strtoupper($etab['nom_fr'] ?? 'LYCEE TECHNIQUE DE MBE');
+    $nom_etab = strtoupper($etab['nom_fr'] ?? '');
 
     foreach ([[$col_g_debut, $col_g_fin], [$col_d_debut, $col_d_fin]] as [$c1, $c2]) {
         $sheet->mergeCells("{$lettre($c1)}1:{$lettre($c2)}4");

@@ -36,7 +36,7 @@ if (post('action') === 'supprimer') {
 }
 
 // ── Enregistrement ──────────────────────────────────────────
-$bin = decoder_photo_b64($_POST['photo_b64'] ?? null);
+$bin = photo_postee();   // fichier (multipart) de préférence, base64 en secours
 if ($bin === null) photo_json(false, 'Photo absente ou trop volumineuse (2 Mo max).');
 
 // Contrôle du contenu réel (jamais la seule déclaration data:image/… du

@@ -366,6 +366,39 @@ function acces_page_lecture_seule(): bool {
     return false;
 }
 
+/**
+ * Le compte connecté peut-il gérer CE compte (rôle, mot de passe,
+ * activation, suppression, privilèges) ? — 01/10/2026 : un DIRECTEUR ne
+ * gère que SON personnel (agent financier, secrétaire, enseignant…), jamais
+ * un autre Directeur ni le Fondateur ; ces comptes relèvent du fondateur
+ * (menu « Directeur ») et de l'association. Son propre compte : mot de passe
+ * seulement (rôle / statut / suppression déjà refusés sur soi-même).
+ * Fondateur et membre de l'association en visite : inchangés.
+ */
+function compte_gerable(string $fonction_cible, int $id_user_cible): bool {
+    if (function_exists('est_visite_association') && est_visite_association()) return true;
+    if (function_exists('est_fondateur') && est_fondateur()) return true;
+    if (role_connecte() !== 'DIRECTEUR') return false;
+    if ($id_user_cible === (int) ($_SESSION['user_id'] ?? 0)) return true;
+    return !in_array($fonction_cible, ['DIRECTEUR', 'FONDATEUR'], true);
+}
+
+/** Même règle pour une FICHE du personnel (matricule_ens) : modification, activation. */
+function fiche_gerable(int $matricule_ens, ?string $fct = null): bool {
+    if (function_exists('est_visite_association') && est_visite_association()) return true;
+    if (function_exists('est_fondateur') && est_fondateur()) return true;
+    if (role_connecte() !== 'DIRECTEUR') return false;
+    if ((string) $matricule_ens === (string) matricule_ens_courant()) return true;
+    $fct = $fct ?? (string) db_val("SELECT id_fonction FROM enseignant WHERE matricule_ens=?", [$matricule_ens]);
+    return !in_array($fct, ['DIRECTEUR', 'FONDATEUR'], true);
+}
+
+/** Message affiché quand compte_gerable() refuse. */
+function refus_compte_non_gerable(string $fonction_cible): string {
+    return 'Le compte d\'un(e) ' . mb_strtolower(libelle_role($fonction_cible))
+         . ' ne peut être modifié que par le fondateur ou l\'association. Vous gérez uniquement votre personnel.';
+}
+
 function utilisateur_connecte(): array {
     session_init();
     return $_SESSION['user'] ?? [];
@@ -1406,6 +1439,7 @@ function appliquer_promotions_annee(string $annee_precedente, string $nouvelle_a
             "INSERT INTO inscrire (id_eleve, IDClasses, val_annee, Date_Inscrire, Statut_elv) VALUES (?, ?, ?, CURDATE(), ?)",
             [$eid, $classe_dest, $nouvelle_annee, $statut]
         );
+        journaliser_mouvement_classe($eid, $nouvelle_annee, null, $classe_dest, 'inscription');
         $nb_inscrits++;
     }
     return ['inscrits' => $nb_inscrits, 'ignores' => $nb_ignores];
@@ -2580,7 +2614,7 @@ function etab_pour_pdf(array $etab): array {
             'arrondissement_fr' => $etab['arrondissement_fr'] ?? '',
             'region_en' => $etab['region_en'] ?? '', 'division_en' => $etab['division_en'] ?? '',
             'subdivision_en' => $etab['subdivision_en'] ?? '',
-            'chef_etablissement' => $etab['chef_etablissement'] ?? '', 'chef_etablissement_en' => $etab['chef_etablissement'] ?? '',
+            'chef_etablissement' => $etab['chef_etablissement'] ?? '', 'chef_etablissement_en' => $etab['chef_etablissement_en'] ?? '',
             'logo' => $etab['logo'] ?? '',
         ];
     }
@@ -2593,12 +2627,11 @@ function etab_pour_pdf(array $etab): array {
         'telephone'         => $etab['tel_etab'] ?? '',
         'email'             => $etab['email_etab'] ?? '',
         'ville'             => $etab['ville_etab'] ?? '',
-        // Localité de signature des bulletins ("Fait à ..., le ...") —
-        // distincte de la ville de l'établissement (etab.lieu_etab dans le
-        // schéma jaynitaare, ex. "Bamyanga" ≠ ville_etab "Ngaoundere" sur la
-        // vraie fiche établissement) : c'est bien ce champ que BULLETIN_
-        // ANNUEL_CLASSE.php (jaynitaare legacy) affiche à cet endroit.
-        'lieu'              => $etab['lieu_etab'] ?? '',
+        // Localité de signature des documents ("Fait à ..., le ...") : la
+        // VILLE de l'établissement en priorité (demande du 01/10/2026 —
+        // « Fait à Général » apparaissait avec le lieu-dit), le lieu-dit
+        // (etab.lieu_etab, ex. « Bamyanga ») seulement si la ville est vide.
+        'lieu'              => trim((string) ($etab['ville_etab'] ?? '')) ?: ($etab['lieu_etab'] ?? ''),
         'region_fr'         => $etab['region_etab_fr'] ?? '',
         // `departement_fr`/`arrondissement_fr` : colonnes réelles de
         // `etablissement` — pas `delegation_regional_fr`/
@@ -2612,6 +2645,28 @@ function etab_pour_pdf(array $etab): array {
         'chef_etablissement_en' => $etab['fonction_dirigeant_en'] ?? '',
         'logo'              => $etab['logo'] ?? '',
     ];
+}
+
+/**
+ * Titre du chef d'établissement pour les documents du personnel, en
+ * [français, anglais] : celui saisi dans les paramètres de l'école
+ * (fonction_dirigeant_* au primaire, chef_etablissement* au secondaire),
+ * sinon « Le Directeur / The Director » (primaire) ou « Le Proviseur /
+ * The Principal » (secondaire).  = sortie de etab_pour_pdf().
+ */
+function titres_chef_pdf(array $etab): array {
+    $sec = function_exists('type_enseignement_courant') && type_enseignement_courant() === 'secondaire';
+    $casse = fn(string $t): string => mb_convert_case(mb_strtolower(trim($t)), MB_CASE_TITLE);
+    $fr = trim((string) ($etab['chef_etablissement'] ?? ''));
+    $en = trim((string) ($etab['chef_etablissement_en'] ?? ''));
+    return [$fr !== '' ? $casse($fr) : ($sec ? 'Le Proviseur' : 'Le Directeur'),
+            $en !== '' ? $casse($en) : ($sec ? 'The Principal' : 'The Director')];
+}
+
+/** « Ngaoundéré, » (ville de l'école, sinon lieu-dit) ou '' si aucun. */
+function lieu_signature_pdf(array $etab): string {
+    $l = trim((string) (($etab['ville'] ?? '') ?: ($etab['lieu'] ?? '')));
+    return $l !== '' ? $l . ', ' : '';
 }
 
 // Chemin de la signature numérique de l'établissement (Directeur — un seul
@@ -2644,6 +2699,42 @@ function decoder_photo_b64(?string $photo_b64): ?string {
     $data = base64_decode($m[2]);
     if (!$data || strlen($data) > 2 * 1024 * 1024) return null;
     return $data;
+}
+
+/**
+ * Photo recadrée reçue par POST : de préférence comme vrai FICHIER
+ * (multipart, champ $champ_fichier — Blob JPEG envoyé par le navigateur),
+ * sinon l'ancien champ texte base64 $champ_b64. Le texte base64 (plusieurs
+ * centaines de Ko de « data:image/jpeg;base64,… ») est bloqué en 403 par
+ * le pare-feu ModSecurity de certains hébergeurs mutualisés (Camoo,
+ * constaté le 02/10/2026) alors qu'un fichier passe. Binaire ou null.
+ */
+function photo_postee(string $champ_fichier = 'photo_fichier', string $champ_b64 = 'photo_b64'): ?string {
+    $f = $_FILES[$champ_fichier] ?? null;
+    if ($f && ($f['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_OK && is_uploaded_file($f['tmp_name'])) {
+        if ($f['size'] <= 0 || $f['size'] > 2 * 1024 * 1024) return null;
+        $data = file_get_contents($f['tmp_name']);
+        return $data !== false && $data !== '' ? $data : null;
+    }
+    return decoder_photo_b64($_POST[$champ_b64] ?? null);
+}
+
+/**
+ * Journalise un mouvement de classe d'un élève (table mouvement_classe,
+ * migration v60) : 'inscription' (première classe de l'année),
+ * 'changement' (passage d'une classe à une autre en cours d'année),
+ * 'retrait' (désinscription de l'année). Jamais bloquant : base pas encore
+ * migrée -> rien n'est enregistré, l'inscription elle-même se fait quand même.
+ */
+function journaliser_mouvement_classe(int $id_eleve, string $val_annee, ?int $avant, ?int $apres, string $type): void {
+    if ($avant !== null && $avant === $apres) return;   // pas de mouvement réel
+    try {
+        db_exec("INSERT INTO mouvement_classe (id_eleve, val_annee, classe_avant, classe_apres, type_mvt, date_mvt, auteur)
+                 VALUES (?, ?, ?, ?, ?, NOW(), ?)",
+                [$id_eleve, $val_annee, $avant, $apres, $type, $_SESSION['user']['login'] ?? null]);
+    } catch (\Throwable $e) {
+        // table absente (migration v60 non appliquée) : historique non tenu
+    }
 }
 
 // ── Dossier élève (pièces jointes) ──────────────────────────

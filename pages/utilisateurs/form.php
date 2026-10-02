@@ -10,6 +10,11 @@ $u  = $id ? db_one(
      JOIN enseignant e ON e.matricule_ens=u.matricule_ens WHERE u.id_user=?", [$id]
 ) : null;
 if ($id && !$u) { flash_set('erreur', 'Compte introuvable.'); rediriger('pages/utilisateurs/liste.php'); }
+// Un directeur ne réinitialise pas le compte d'un autre directeur ni du fondateur.
+if ($u && !compte_gerable((string) $u['id_fonction'], $id)) {
+    flash_set('erreur', refus_compte_non_gerable((string) $u['id_fonction']));
+    rediriger('pages/utilisateurs/liste.php');
+}
 
 $erreur = '';
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -20,6 +25,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if ($login === '' || $mdp === '' || (!$id && !$matricule_ens)) {
         $erreur = 'Veuillez remplir tous les champs.';
+    } elseif (!$id && !fiche_gerable($matricule_ens)) {
+        // Pas de compte créé par le directeur pour le fondateur / un autre directeur.
+        $erreur = refus_compte_non_gerable((string) db_val("SELECT id_fonction FROM enseignant WHERE matricule_ens=?", [$matricule_ens]));
     } elseif (strlen($mdp) < 4) {
         $erreur = 'Le mot de passe doit contenir au moins 4 caractères.';
     } else {
@@ -48,6 +56,8 @@ $sans_compte = db_all(
      WHERE e.matricule_ens NOT IN (SELECT matricule_ens FROM user)
      ORDER BY e.nom_ens"
 );
+$sans_compte = array_values(array_filter($sans_compte,
+    fn($e) => fiche_gerable((int) $e['matricule_ens'], (string) ($e['id_fonction'] ?? ''))));
 
 $es_partiel = isset($_GET['partiel']);
 if (!$es_partiel) {

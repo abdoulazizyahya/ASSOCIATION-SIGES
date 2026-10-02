@@ -25,6 +25,11 @@ $u  = $id ? db_one(
      WHERE u.id_user = ?", [$id]
 ) : null;
 if (!$u) { flash_set('erreur', 'Compte introuvable.'); rediriger('pages/utilisateurs/liste.php'); }
+// Un directeur ne règle pas les privilèges d'un autre directeur ni du fondateur.
+if (!compte_gerable((string) $u['id_fonction'], $id)) {
+    flash_set('erreur', refus_compte_non_gerable((string) $u['id_fonction']));
+    rediriger('pages/utilisateurs/liste.php');
+}
 
 // Anti-verrouillage : on ne restreint pas son propre compte, ni ces entrées.
 $est_moi        = $id === (int) ($_SESSION['user_id'] ?? 0);

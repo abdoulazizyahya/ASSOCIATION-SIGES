@@ -164,10 +164,14 @@ if (!$es_partiel) {
                  class="btn btn-sm" style="background:#eef2ff;color:#1e4fd8;padding:3px 7px" title="Voir">
                 <i class="bi bi-eye" style="font-size:.78rem"></i>
               </a>
+              <?php if (!fiche_gerable((int) $e['matricule_ens'], (string) ($e['id_fonction'] ?? ''))): ?>
+                <span class="text-muted ms-1" style="font-size:.75rem" title="<?= h(refus_compte_non_gerable((string) $e['id_fonction'])) ?>"><i class="bi bi-lock"></i></span>
+              <?php else: ?>
               <a href="<?= APP_URL ?>/pages/enseignants/form.php?mat=<?= (int) $e['matricule_ens'] ?>"
                  class="btn btn-sm" style="background:#eef7ee;color:#15803d;padding:3px 7px" title="Modifier">
                 <i class="bi bi-pencil-square" style="font-size:.78rem"></i>
               </a>
+              <?php if ((string) $e['matricule_ens'] !== (string) matricule_ens_courant()): ?>
               <form method="post" action="<?= APP_URL ?>/pages/enseignants/statut.php?mat=<?= (int) $e['matricule_ens'] ?>" class="d-inline"
                     data-ajax-post-form onsubmit="return confirm('<?= $actif ? 'Désactiver' : 'Réactiver' ?> ce membre du personnel ?')">
                 <?= csrf_champ() ?>
@@ -175,6 +179,8 @@ if (!$es_partiel) {
                   <i class="bi bi-<?= $actif ? 'x-circle' : 'check-circle' ?>" style="font-size:.78rem"></i>
                 </button>
               </form>
+              <?php endif; ?>
+              <?php endif; ?>
             </td>
           </tr>
         <?php endforeach; endif; ?>

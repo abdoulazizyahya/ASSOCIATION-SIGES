@@ -122,7 +122,7 @@ $col_g = [
     ['N° de compte',     $v($bulletin['compte_bancaire'] ?? null)],
 ];
 $col_d = [
-    ['Matricule',   (string) $bulletin['matricule_ens'] . '  ' . $nom_complet, true],
+    ['Nom',         $nom_complet, true],   // nom seul (sans le n° interne de fiche) — demande du 01/10/2026
     ['Type paie',   'Paie mensuelle'],
     ['Sit. adm.',   $contrat ? libelle_type_contrat($contrat['type_contrat']) : '—'],
     ['Emploi',      libelle_role($bulletin['id_fonction'] ?? '')],
@@ -262,11 +262,21 @@ if ($pdf->GetY() > $ph - 30) { $pdf->AddPage(); pdf_filigrane($pdf, $etab, $pw, 
 $w_sign = $LARGEUR * 0.4;
 $x_sign = $MR - $w_sign;
 $pdf->SetFont('Arial', '', 9);
+$t_fait = pdf_u('Fait à ' . (($etab['lieu'] ?: $etab['ville']) ?: '') . ', le ' . date('d/m/Y'));
 $pdf->SetX($x_sign);
-$pdf->Cell($w_sign, 5, pdf_u('Fait à ' . (($etab['lieu'] ?: $etab['ville']) ?: '') . ', le ' . date('d/m/Y')), 0, 1, 'R');
+$pdf->Cell($w_sign, 5, $t_fait, 0, 1, 'R');
+$x_fait = $x_sign + $w_sign - $pdf->GetStringWidth($t_fait) - 1;   // début réel du texte « Fait à »
 $pdf->SetFont('Arial', 'B', 9);
-$pdf->SetX($x_sign);
-$pdf->Cell($w_sign, 5, pdf_u(mb_strtoupper($etab['chef_etablissement'] ?: 'LE DIRECTEUR') . ','), 0, 1, 'R');
+// Ligne des signatures (02/10/2026) : « LE BÉNÉFICIAIRE, » décalé vers la
+// droite (il commence là où il finissait auparavant) ; le chef
+// d'établissement aligné à gauche, ~10 px (2,6 mm) après le début de « Fait à ».
+$pdf->Ln(5);                      // une ligne vide entre « Fait à » et les signatures
+$y_sign  = $pdf->GetY();
+$t_benef = pdf_u('LE BÉNÉFICIAIRE,');
+$pdf->SetXY($ML + $pdf->GetStringWidth($t_benef), $y_sign);
+$pdf->Cell($pdf->GetStringWidth($t_benef) + 2, 5, $t_benef, 0, 0, 'L');
+$pdf->SetXY($x_fait + 2.6 - 1, $y_sign);   // -1 : marge interne de la cellule
+$pdf->Cell($MR - $x_fait - 1.6, 5, pdf_u(mb_strtoupper($etab['chef_etablissement'] ?: 'LE DIRECTEUR') . ','), 0, 1, 'L');
 
 // Copyright standard du système (pdf/header_pdf.php) — texte unique sur tous
 // les PDF du projet, voir pdf_copyright().

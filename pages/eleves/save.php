@@ -73,7 +73,7 @@ $etab      = get_etablissement();
 // Photo : décodée depuis le champ caché photo_b64 (recadrage Cropper.js) —
 // aucune gestion d'upload "brut" séparée, cohérent avec form.php qui force
 // systématiquement le recadrage avant validation.
-$photo_bin = decoder_photo_b64($_POST['photo_b64'] ?? null);
+$photo_bin = photo_postee();   // fichier recadré (multipart) de préférence, base64 en secours
 
 if ($id_existant) {
     // ── Modification ──────────────────────────────────────
@@ -141,15 +141,22 @@ if ($id_existant) {
 }
 
 // Inscription pour l'année active (upsert)
+// Chaque mouvement (inscription, changement de classe, retrait) est aussi
+// journalisé dans mouvement_classe (migration v60) : `inscrire` ne garde que
+// la classe ACTUELLE de l'année, l'historique complet est là.
+$classe_avant = db_val("SELECT IDClasses FROM inscrire WHERE id_eleve=? AND val_annee=?", [$id, $val_annee]);
+$classe_avant = $classe_avant !== null && $classe_avant !== false ? (int) $classe_avant : null;
 if ($id_classe) {
-    $existe_insc = db_val("SELECT COUNT(*) FROM inscrire WHERE id_eleve=? AND val_annee=?", [$id, $val_annee]);
-    if ($existe_insc) {
+    if ($classe_avant !== null) {
         db_exec("UPDATE inscrire SET IDClasses=?, Statut_elv=? WHERE id_eleve=? AND val_annee=?", [$id_classe, $statut_insc, $id, $val_annee]);
+        journaliser_mouvement_classe($id, $val_annee, $classe_avant, (int) $id_classe, 'changement');
     } else {
         db_exec("INSERT INTO inscrire (id_eleve, IDClasses, val_annee, Date_Inscrire, Statut_elv) VALUES (?, ?, ?, CURDATE(), ?)", [$id, $id_classe, $val_annee, $statut_insc]);
+        journaliser_mouvement_classe($id, $val_annee, null, (int) $id_classe, 'inscription');
     }
 } else {
     db_exec("DELETE FROM inscrire WHERE id_eleve=? AND val_annee=?", [$id, $val_annee]);
+    if ($classe_avant !== null) journaliser_mouvement_classe($id, $val_annee, $classe_avant, null, 'retrait');
 }
 
 flash_set('succes', $msg);

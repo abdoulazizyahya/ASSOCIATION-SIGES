@@ -169,8 +169,35 @@ if (!$es_partiel) {
   <div class="col-lg-3">
     <div class="card text-center h-100">
       <div class="card-body">
-        <img src="<?= url_photo_eleve((int)$eleve['id_eleve'], $eleve['Photo_elv'] !== null, $eleve['Sexe_elv']) ?>"
+        <img id="photo-eleve" src="<?= url_photo_eleve((int)$eleve['id_eleve'], $eleve['Photo_elv'] !== null, $eleve['Sexe_elv']) ?>"
              style="width:100px;height:120px;object-fit:cover;border-radius:8px;border:2px solid #d1daf0;margin-bottom:.6rem">
+        <?php if ($peut_gerer && $eleve['Photo_elv'] !== null): ?>
+          <div class="mb-2" id="zone-suppr-photo">
+            <button type="button" class="btn btn-sm btn-outline-danger py-0 px-2" style="font-size:.72rem" onclick="supprimerPhotoEleve(this)">
+              <i class="bi bi-trash me-1"></i>Supprimer la photo
+            </button>
+          </div>
+          <script>
+          // Suppression de la photo depuis la fiche (même action que l'onglet
+          // « Photos par classe » : pages/eleves/photo_enregistrer.php).
+          function supprimerPhotoEleve(btn) {
+            if (!confirm('Supprimer la photo de cet élève ?')) return;
+            btn.disabled = true;
+            const fd = new FormData();
+            fd.append('csrf', <?= json_encode(csrf_generer()) ?>);
+            fd.append('id_eleve', <?= (int) $eleve['id_eleve'] ?>);
+            fd.append('action', 'supprimer');
+            fetch(<?= json_encode(APP_URL . '/pages/eleves/photo_enregistrer.php') ?>, { method: 'POST', body: fd, headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+              .then(r => r.json())
+              .then(j => {
+                if (!j.ok) throw new Error(j.message || 'Suppression impossible.');
+                if (j.url) document.getElementById('photo-eleve').src = j.url;
+                document.getElementById('zone-suppr-photo').remove();
+              })
+              .catch(e => { alert(e.message); btn.disabled = false; });
+          }
+          </script>
+        <?php endif; ?>
         <div class="fw-bold" style="font-size:.88rem">
           <?= h(mb_strtoupper($eleve['Nom_elv'])) ?> <?= h($eleve['Prenom_elv'] ?? '') ?>
         </div>
@@ -290,24 +317,63 @@ if (!$es_partiel) {
     <div class="card">
       <div class="card-body">
         <div class="section-titre"><i class="bi bi-journal-text me-1"></i>Historique scolaire</div>
-        <?php if (empty($inscriptions)): ?>
+        <?php
+          // Mouvements datés (migration v60) : inscription, changements de
+          // classe en cours d'année, retrait — gardés d'année en année.
+          $mvts_par_annee = [];
+          try {
+              foreach (db_all(
+                  "SELECT m.*, ca.DesignationClasses AS cl_avant, cp.DesignationClasses AS cl_apres
+                   FROM mouvement_classe m
+                   LEFT JOIN classe ca ON ca.IDClasses = m.classe_avant
+                   LEFT JOIN classe cp ON cp.IDClasses = m.classe_apres
+                   WHERE m.id_eleve = ? ORDER BY m.date_mvt, m.id", [$id]) as $m) {
+                  $mvts_par_annee[$m['val_annee']][] = $m;
+              }
+          } catch (\Throwable $e) { $mvts_par_annee = []; }   // migration v60 pas encore appliquée
+          // Années : celles des inscriptions + celles où il ne reste qu'un mouvement (retrait).
+          $annees_hist = array_unique(array_merge(array_column($inscriptions, 'val_annee'), array_keys($mvts_par_annee)));
+          rsort($annees_hist);
+          $insc_par_annee = array_column($inscriptions, null, 'val_annee');
+          $fmt_dt = fn(string $d): string => date('d/m/Y', strtotime($d)) . (substr($d, 11, 5) !== '00:00' && strlen($d) > 10 ? ' ' . substr($d, 11, 5) : '');
+        ?>
+        <?php if (!$annees_hist): ?>
           <p class="text-muted mb-0" style="font-size:.78rem">Aucune inscription.</p>
-        <?php else: ?>
-          <table class="table table-sm mb-0" style="font-size:.78rem">
-            <thead style="background:#f8faff">
-              <tr><th style="padding:4px 6px">Année</th><th style="padding:4px 6px">Classe</th><th style="padding:4px 6px">Statut</th></tr>
-            </thead>
-            <tbody>
-              <?php foreach ($inscriptions as $i): ?>
-                <tr>
-                  <td style="padding:4px 6px"><?= h($i['val_annee']) ?></td>
-                  <td style="padding:4px 6px"><?= h($i['DesignationClasses']) ?></td>
-                  <td style="padding:4px 6px"><span class="badge-code"><?= h(libelle_statut_insc($i['Statut_elv'])) ?></span></td>
-                </tr>
-              <?php endforeach; ?>
-            </tbody>
-          </table>
-        <?php endif; ?>
+        <?php else: foreach ($annees_hist as $an): $ins = $insc_par_annee[$an] ?? null; $mv = $mvts_par_annee[$an] ?? []; ?>
+          <div class="mb-2 pb-2" style="border-bottom:1px solid #eef1f7">
+            <div class="d-flex justify-content-between align-items-center" style="font-size:.8rem">
+              <span class="fw-bold"><?= h($an) ?></span>
+              <span>
+                <?php if ($ins): ?>
+                  <span class="fw-semibold"><?= h($ins['DesignationClasses']) ?></span>
+                  <span class="badge-code ms-1"><?= h(libelle_statut_insc($ins['Statut_elv'])) ?></span>
+                <?php else: ?>
+                  <span class="text-muted">non inscrit</span>
+                <?php endif; ?>
+              </span>
+            </div>
+            <?php if ($mv): ?>
+              <ul class="list-unstyled mb-0 mt-1 ps-2" style="font-size:.72rem;border-left:2px solid #d1daf0">
+                <?php foreach ($mv as $m): ?>
+                  <li class="ps-2 mb-1">
+                    <span class="text-muted"><?= h($fmt_dt($m['date_mvt'])) ?></span> —
+                    <?php if ($m['type_mvt'] === 'changement'): ?>
+                      <i class="bi bi-arrow-left-right text-warning"></i> Changement de classe :
+                      <strong><?= h($m['cl_avant'] ?? '?') ?></strong> → <strong><?= h($m['cl_apres'] ?? '?') ?></strong>
+                    <?php elseif ($m['type_mvt'] === 'retrait'): ?>
+                      <i class="bi bi-box-arrow-left text-danger"></i> Retiré de <strong><?= h($m['cl_avant'] ?? '?') ?></strong>
+                    <?php else: ?>
+                      <i class="bi bi-box-arrow-in-right text-success"></i> Inscrit en <strong><?= h($m['cl_apres'] ?? '?') ?></strong>
+                    <?php endif; ?>
+                    <?php if (!empty($m['auteur'])): ?><span class="text-muted">(par <?= h($m['auteur']) ?>)</span><?php endif; ?>
+                  </li>
+                <?php endforeach; ?>
+              </ul>
+            <?php elseif ($ins && !empty($ins['Date_Inscrire'])): ?>
+              <div class="text-muted ps-2 mt-1" style="font-size:.72rem">Inscrit le <?= h(date('d/m/Y', strtotime($ins['Date_Inscrire']))) ?></div>
+            <?php endif; ?>
+          </div>
+        <?php endforeach; endif; ?>
       </div>
     </div>
   </div>

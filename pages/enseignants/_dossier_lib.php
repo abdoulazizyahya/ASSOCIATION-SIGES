@@ -41,29 +41,29 @@ class FPDF_Dossier extends FPDF {
         if ($this->newDossier) {
             // ── En-tête complet (bilingue) ───────────────────────────
             $this->SetXY($ml, $y0); $this->SetFont('Arial','',7.2); $this->SetTextColor(30,79,216);
-            $this->MultiCell($col3, 3.8,
+            $this->MultiCell($col3, 3.8, ud(
                 "REPUBLIQUE DU CAMEROUN\nPaix - Travail - Patrie\n".
                 ($etab['region_fr']         ?? "REGION DE L'ADAMAOUA")."\n".
                 ($etab['departement_fr']    ?? 'DEPARTEMENT DE LA VINA')."\n".
-                ($etab['arrondissement_fr'] ?? 'ARRONDISSEMENT DE MBE'), 0, 'C');
+                ($etab['arrondissement_fr'] ?? '')), 0, 'C');
             $this->SetX($ml); $this->SetFont('Arial','B',8);
-            $this->MultiCell($col3, 4, ud(strtoupper($etab['nom_fr'] ?? 'LYCEE TECHNIQUE DE MBE')), 0, 'C');
+            $this->MultiCell($col3, 4, ud(strtoupper($etab['nom_fr'] ?? '')), 0, 'C');
             $yl = $this->GetY();
 
             $logo = !empty($etab['logo']) ? __DIR__.'/../../assets/uploads/'.$etab['logo'] : '';
             $lx = $ml + $col3 + ($col3 - 22)/2;
             if ($logo && is_file($logo)) { $this->Image($logo, $lx, $y0, 22); }
-            else { $this->SetFont('Arial','B',9); $this->SetXY($lx, $y0+4); $this->Cell(22,10,ud($etab['sigle'] ?? 'LTM'),1,0,'C'); }
+            else { $this->SetFont('Arial','B',9); $this->SetXY($lx, $y0+4); $this->Cell(22,10,ud($etab['sigle'] ?? ''),1,0,'C'); }
 
             $xr = $ml + $col3*2;
             $this->SetXY($xr, $y0); $this->SetFont('Arial','',7.2); $this->SetTextColor(30,79,216);
-            $this->MultiCell($col3, 3.8,
+            $this->MultiCell($col3, 3.8, ud(
                 "REPUBLIC OF CAMEROON\nPeace - Work - Fatherland\n".
                 ($etab['region_en']      ?? 'ADAMAWA REGION')."\n".
                 ($etab['division_en']    ?? 'VINA DIVISION')."\n".
-                ($etab['subdivision_en'] ?? 'MBE SUBDIVISION'), 0, 'C');
+                ($etab['subdivision_en'] ?? '')), 0, 'C');
             $this->SetX($xr); $this->SetFont('Arial','B',8);
-            $this->MultiCell($col3, 4, ud(strtoupper($etab['nom_en'] ?? 'GTHS OF MBE')), 0, 'C');
+            $this->MultiCell($col3, 4, ud(strtoupper($etab['nom_en'] ?? '')), 0, 'C');
             $yr = $this->GetY();
 
             $this->SetY(max($yl, $yr) + 1);
@@ -99,7 +99,7 @@ class FPDF_Dossier extends FPDF {
         $this->SetDrawColor(200); $this->Line(15, $this->GetY(), $this->GetPageWidth()-15, $this->GetY());
         $this->SetDrawColor(0);
         $this->SetFont('Arial','I',7); $this->SetTextColor(120);
-        $this->Cell(0, 6, ud('Document généré le/Generated on '.date('d/m/Y à H:i').'  -  '.($this->etab['nom_fr'] ?? 'Lycée Technique de Mbé')), 0, 0, 'L');
+        $this->Cell(0, 6, ud('Document généré le/Generated on '.date('d/m/Y à H:i').'  -  '.($this->etab['nom_fr'] ?? '')), 0, 0, 'L');
         $this->Cell(0, 6, ud('Page '.$this->PageNo().'/{nb}'), 0, 0, 'R');
         $this->SetTextColor(0);
     }
@@ -279,9 +279,9 @@ function dossier_render_one(FPDF $pdf, array $e, array $etab, string $val_annee)
     // Bloc signature
     $pdf->Ln(8);
     $pdf->SetX($ml + $uw*0.58); $pdf->SetFont('Arial','',9);
-    $pdf->Cell($uw*0.42, 5, ud('Mbé, le/on '.date('d/m/Y')), 0, 1, 'C');
+    $pdf->Cell($uw*0.42, 5, ud(lieu_signature_pdf($etab).'le/on '.date('d/m/Y')), 0, 1, 'C');
     $pdf->SetX($ml + $uw*0.58); $pdf->SetFont('Arial','B',9);
-    $pdf->Cell($uw*0.42, 5, ud('Le Proviseur / The Principal'), 0, 1, 'C');
+    $pdf->Cell($uw*0.42, 5, ud(implode(' / ', titres_chef_pdf($etab))), 0, 1, 'C');
     // Signature numérique (uniquement si demandée à l'impression — jamais
     // automatique — et si l'admin en a configuré une dans les paramètres).
     if (($_GET['signature'] ?? '0') === '1') {

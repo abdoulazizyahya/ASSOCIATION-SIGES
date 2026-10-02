@@ -79,6 +79,7 @@ if (!$es_partiel) {
   <?= csrf_champ() ?>
   <input type="hidden" name="id" value="<?= $eleve ? (int)$eleve['id_eleve'] : '' ?>">
   <input type="hidden" name="photo_b64" id="photo_b64">
+  <input type="file" name="photo_fichier" id="photo_fichier" accept="image/jpeg" style="display:none">
 
   <div class="row g-2">
     <div class="col-lg-8">
@@ -293,8 +294,22 @@ function fermerCrop() { document.getElementById('cropOverlay').classList.remove(
 function validerCrop() {
   const dataUrl = cropper.getCroppedCanvas({width:300,height:400}).toDataURL('image/jpeg', 0.88);
   document.getElementById('preview').src = dataUrl;
-  document.getElementById('photo_b64').value = dataUrl;
   document.getElementById('file_photo').value = '';
+  // Photo recadrée envoyée comme vrai FICHIER (champ photo_fichier) et non
+  // comme long texte base64 : le pare-feu de l'hébergeur (Camoo) bloquait
+  // le formulaire en 403. Base64 seulement si le navigateur ne sait pas
+  // remplir un champ fichier (DataTransfer absent).
+  try {
+    const [entete, b64] = dataUrl.split(',');
+    const bin = atob(b64); const buf = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) buf[i] = bin.charCodeAt(i);
+    const dt = new DataTransfer();
+    dt.items.add(new File([buf], 'photo.jpg', { type: 'image/jpeg' }));
+    document.getElementById('photo_fichier').files = dt.files;
+    document.getElementById('photo_b64').value = '';
+  } catch (e) {
+    document.getElementById('photo_b64').value = dataUrl;
+  }
   fermerCrop();
 }
 document.getElementById('cropOverlay').addEventListener('click', e => { if (e.target === e.currentTarget) fermerCrop(); });

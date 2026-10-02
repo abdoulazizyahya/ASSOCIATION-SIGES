@@ -10,6 +10,17 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') rediriger('pages/enseignants/liste.ph
 csrf_verifier();
 
 $mat_existant   = (int) post('mat');
+// Un directeur ne modifie pas la fiche d'un autre directeur ni du fondateur
+// (fonctions.php::fiche_gerable()) ; sur sa propre fiche, il garde sa fonction.
+if ($mat_existant && !fiche_gerable($mat_existant)) {
+    flash_set('erreur', refus_compte_non_gerable((string) db_val("SELECT id_fonction FROM enseignant WHERE matricule_ens=?", [$mat_existant])));
+    rediriger('pages/enseignants/liste.php');
+}
+if ($mat_existant && role_connecte() === 'DIRECTEUR' && (string) $mat_existant === (string) matricule_ens_courant()
+    && post('fonction') !== 'DIRECTEUR') {
+    flash_set('erreur', 'Vous ne pouvez pas changer votre propre fonction de directeur.');
+    rediriger('pages/enseignants/form.php?mat=' . $mat_existant);
+}
 $civilite       = post('civilite') ?: 'M.';
 $nom            = post('nom');
 $prenom         = post('prenom');

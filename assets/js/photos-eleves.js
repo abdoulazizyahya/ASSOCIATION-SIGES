@@ -130,10 +130,21 @@ window.PhotosEleves = (function () {
     o.classList.add('show');
   }
 
-  // Envoi d'une photo (dataURL) — résout { ok, message, url }.
+  // dataURL → Blob JPEG (envoi comme vrai fichier).
+  function dataUrlVersBlob(dataUrl) {
+    const [entete, b64] = dataUrl.split(',');
+    const mime = (entete.match(/data:([^;]+)/) || [])[1] || 'image/jpeg';
+    const bin = atob(b64); const buf = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) buf[i] = bin.charCodeAt(i);
+    return new Blob([buf], { type: mime });
+  }
+  // Envoi d'une photo (dataURL) — résout { ok, message, url }. La photo part
+  // comme FICHIER (multipart) et non comme texte base64 : le pare-feu
+  // ModSecurity de l'hébergeur (Camoo) rejetait le texte en 403.
   function envoyer(urlApi, csrf, idEleve, dataUrl) {
     const fd = new FormData();
-    fd.append('csrf', csrf); fd.append('id_eleve', idEleve); fd.append('photo_b64', dataUrl);
+    fd.append('csrf', csrf); fd.append('id_eleve', idEleve);
+    fd.append('photo_fichier', dataUrlVersBlob(dataUrl), 'photo.jpg');
     return poster(urlApi, fd);
   }
   // Suppression de la photo — résout { ok, message, url (avatar) }.

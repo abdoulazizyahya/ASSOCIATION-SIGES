@@ -414,6 +414,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         "INSERT INTO inscrire (id_eleve, IDClasses, val_annee, Date_Inscrire, Statut_elv) VALUES (?, ?, ?, CURDATE(), ?)",
                         [$id_eleve, $classe_trouvee['IDClasses'], $val_annee, $statut_norm]
                     );
+                    journaliser_mouvement_classe($id_eleve, $val_annee, null, (int) $classe_trouvee['IDClasses'], 'inscription');
                 }
                 $ok++;
             }

@@ -26,7 +26,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && post('action') === 'changer_role') 
     // (association/personnel/affecter.php) — jamais depuis cet écran école,
     // sauf le superadmin lui-même en visite écriture (fonctions_assignables()).
     $roles_ok  = fonctions_assignables();
-    if ($id_user && in_array($nouveau, $roles_ok, true)) {
+    $fct_cible = (string) db_val("SELECT e.id_fonction FROM user u JOIN enseignant e ON e.matricule_ens=u.matricule_ens WHERE u.id_user=?", [$id_user]);
+    if ($id_user && !compte_gerable($fct_cible, $id_user)) {
+        flash_set('erreur', refus_compte_non_gerable($fct_cible));
+    } elseif ($id_user === (int) ($_SESSION['user_id'] ?? 0) && role_connecte() === 'DIRECTEUR') {
+        flash_set('erreur', 'Vous ne pouvez pas changer votre propre rôle.');
+    } elseif ($id_user && in_array($nouveau, $roles_ok, true)) {
         $mat = db_val("SELECT matricule_ens FROM user WHERE id_user=?", [$id_user]);
         if ($mat && $nouveau === 'DIRECTEUR' && ($refus = refus_second_chef((int) $mat)) !== '') {
             flash_set('erreur', $refus);   // un seul directeur par école
@@ -56,6 +61,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && post('action') === 'toggle_actif') 
         flash_set('erreur', "Cette fonctionnalité nécessite la mise à jour de la base (colonne user.actif).");
     } elseif ($id_user === (int) ($_SESSION['user_id'] ?? 0)) {
         flash_set('erreur', 'Vous ne pouvez pas désactiver votre propre compte.');
+    } elseif ($id_user && !compte_gerable($fct = (string) db_val("SELECT e.id_fonction FROM user u JOIN enseignant e ON e.matricule_ens=u.matricule_ens WHERE u.id_user=?", [$id_user]), $id_user)) {
+        flash_set('erreur', refus_compte_non_gerable($fct));
     } elseif ($id_user) {
         $actuel = (int) db_val("SELECT actif FROM user WHERE id_user=?", [$id_user]);
         $nouveau = $actuel ? 0 : 1;
@@ -75,6 +82,10 @@ $utilisateurs = db_all(
      FROM user u JOIN enseignant e ON e.matricule_ens=u.matricule_ens
      ORDER BY e.id_fonction, e.nom_ens"
 );
+// Les comptes qu'il ne peut pas gérer (autre directeur, fondateur) ne sont
+// même pas affichés au directeur (demande du 01/10/2026).
+$utilisateurs = array_values(array_filter($utilisateurs,
+    fn($u) => compte_gerable((string) $u['id_fonction'], (int) $u['id_user'])));
 
 $titre_page = 'Utilisateurs';
 require_once __DIR__ . '/../../layout/header.php';
@@ -119,7 +130,21 @@ require_once __DIR__ . '/../../layout/header.php';
               <?php endif; ?>
             </td>
             <?php endif; ?>
+            <?php
+              $moi     = (int) $u['id_user'] === (int) ($_SESSION['user_id'] ?? 0);
+              $gerable = compte_gerable((string) $u['id_fonction'], (int) $u['id_user']);
+            ?>
             <td class="text-end">
+              <?php if (!$gerable): ?>
+                <span class="text-muted" style="font-size:.75rem" title="<?= h(refus_compte_non_gerable((string) $u['id_fonction'])) ?>">
+                  <i class="bi bi-lock me-1"></i>Géré par le fondateur / l'association
+                </span>
+              <?php elseif ($moi && role_connecte() === 'DIRECTEUR'): ?>
+              <a href="<?= APP_URL ?>/pages/utilisateurs/form.php?id=<?= (int)$u['id_user'] ?>"
+                 class="btn btn-sm btn-light" style="padding:3px 7px" title="Changer mon identifiant / mot de passe">
+                <i class="bi bi-key" style="font-size:.78rem"></i>
+              </a>
+              <?php else: ?>
               <button type="button" class="btn btn-sm btn-light" style="padding:3px 7px" title="Modifier le rôle (privilèges)"
                       onclick='ouvrirRole(<?= (int) $u['id_user'] ?>, <?= json_encode($u['id_fonction']) ?>, <?= json_encode(mb_strtoupper($u['nom_ens']) . ' ' . ($u['prenom_ens'] ?? '')) ?>)'>
                 <i class="bi bi-shield-lock" style="font-size:.78rem"></i>
@@ -150,6 +175,7 @@ require_once __DIR__ . '/../../layout/header.php';
                  onclick="return confirm('Supprimer ce compte ?')">
                 <i class="bi bi-trash" style="font-size:.78rem"></i>
               </a>
+              <?php endif; ?>
               <?php endif; ?>
             </td>
           </tr>

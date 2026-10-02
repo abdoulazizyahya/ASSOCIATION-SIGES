@@ -84,8 +84,11 @@ function est_fondateur(): bool {
 //
 // $role : rôle testé (défaut = rôle connecté). Renvoie true si l'écriture
 // est permise sur la page courante pour ce profil.
-function ecriture_module_permise(?string $role = null): bool {
+function ecriture_module_permise(?string $role = null, ?string $script = null, ?bool $secondaire = null): bool {
     $role   = $role ?? (function_exists('role_connecte') ? role_connecte() : '');
+    // $script / $secondaire : évaluer une AUTRE page / un autre type d'école
+    // que la requête en cours (association/acces.php, colonne « Défaut »).
+    $secondaire = $secondaire ?? (function_exists('type_enseignement_courant') && type_enseignement_courant() === 'secondaire');
     // École secondaire : rôles (ADMIN/PROVISEUR/CENSEUR/SG/SECRETAIRE/
     // ENSEIGNANT/INTENDANT) et pages (secondaire/pages/...) sans rapport avec
     // la matrice primaire ci-dessous (DIRECTEUR/FONDATEUR/COMPTABLE/
@@ -99,10 +102,10 @@ function ecriture_module_permise(?string $role = null): bool {
     // is_admin/is_ens dans secondaire/pages/notes/, etc.) — pas de
     // restriction supplémentaire ici, comme pour la « structure » primaire
     // (retour true en bas de fonction).
-    if (function_exists('type_enseignement_courant') && type_enseignement_courant() === 'secondaire') {
+    if ($secondaire) {
         return true;
     }
-    $script = str_replace('\\', '/', $_SERVER['SCRIPT_NAME'] ?? '');
+    $script = str_replace('\\', '/', $script ?? ($_SERVER['SCRIPT_NAME'] ?? ''));
     $base   = basename($script);
 
     // Toujours autorisées, quel que soit le module.
@@ -209,6 +212,24 @@ function est_lecture_seule(): bool {
     }
 
     return !ecriture_module_permise(role_connecte());
+}
+
+/**
+ * Niveau d'accès PAR DÉFAUT (sans règle « Privilèges ») d'un rôle sur une
+ * entrée de menu : 'masque' | 'lecture' | 'ecriture'. Reproduit la logique
+ * appliquée dans l'école — menu (layout/header.php : fondateur et visite
+ * association voient tout, sinon rôle listé dans l'entrée), puis
+ * est_lecture_seule() (visite association = lecture ; entrée hors du rôle =
+ * lecture ; modules argent / pédagogie, ecriture_module_permise()).
+ * Sert à afficher un « Défaut » explicite dans association/acces.php.
+ */
+function acces_niveau_defaut(string $role, array $roles_entree, string $url, bool $secondaire): string {
+    $dans_role = empty($roles_entree) || in_array($role, $roles_entree, true);
+    $voit_tout = in_array($role, ['FONDATEUR', 'MEMBRE_ASSOCIATION'], true);
+    if (!$dans_role && !$voit_tout) return 'masque';
+    if ($role === 'MEMBRE_ASSOCIATION') return 'lecture';     // visite en lecture seule par défaut
+    if (!$dans_role && $secondaire) return 'lecture';         // fondateur hors de son périmètre
+    return ecriture_module_permise($role, '/' . ltrim($url, '/'), $secondaire) ? 'ecriture' : 'lecture';
 }
 
 // ── Règles « Privilèges » centrales (association/acces.php) ──────────

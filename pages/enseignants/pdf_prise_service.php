@@ -37,7 +37,11 @@ $dl = ($_GET['dl'] ?? '0') === '1';
 $e = db_one("SELECT * FROM enseignant WHERE matricule_ens=?", [$mat]);
 if (!$e) die('Enseignant introuvable.');
 
-$etab = get_etablissement();
+// Colonnes du primaire (Nom_Etab_Fr…) ramenées aux clés communes des PDF :
+// sans cela, toutes les valeurs manquaient et le document retombait sur
+// les valeurs par défaut du Lycée technique de Mbé (LAM_ABZ).
+$etab = etab_pour_pdf(get_etablissement());
+[$titre_chef_fr, $titre_chef_en] = titres_chef_pdf($etab);
 if (!function_exists('ud')) {
     function ud(string $s): string {
         // Windows-1252 (pas ISO-8859-1 strict) : FPDF avec polices standard attend cet
@@ -81,9 +85,9 @@ $pdf->MultiCell($col3,4,ud(
     "REPUBLIQUE DU CAMEROUN\nPaix – Travail – Patrie\n**********\n".
     ($etab['region_fr']??"REGION DE L'ADAMAOUA")."\n**********\n".
     ($etab['departement_fr']??'DEPARTEMENT DE LA VINA')."\n**********\n".
-    ($etab['arrondissement_fr']??'ARRONDISSEMENT DE MBE')."\n**********\n".
-    strtoupper($etab['nom_fr']??'LYCEE TECHNIQUE DE MBE')."\n".
-    "BP ".($etab['boite_postale']??'32')." e-mail : ".($etab['email']??'lyceetechniquembe@yahoo.fr')
+    ($etab['arrondissement_fr']??'')."\n**********\n".
+    strtoupper($etab['nom_fr']??'')."\n".
+    trim((($etab['boite_postale']??'') !== '' ? "BP ".$etab['boite_postale']."  " : '').(($etab['email']??'') !== '' ? "e-mail : ".$etab['email'] : ''))
 ), 0,'C');
 $ycol = $pdf->GetY();
 
@@ -93,7 +97,7 @@ if ($logo_path && is_file($logo_path)) {
     $pdf->Image($logo_path,$logo_x,$y0,22);
 } else {
     $pdf->SetFont('Arial','B',10); $pdf->SetXY($logo_x,$y0+4);
-    $pdf->Cell(22,12,ud($etab['sigle']??'LTM'),1,0,'C');
+    $pdf->Cell(22,12,ud($etab['sigle']??''),1,0,'C');
 }
 
 $xr = $ml+$col3*2; $pdf->SetXY($xr,$y0); $pdf->SetFont('Arial','',7.5);
@@ -101,18 +105,18 @@ $pdf->MultiCell($col3,4,ud(
     "REPUBLIC OF CAMEROON\nPeace – Work – Fatherland\n**********\n".
     ($etab['region_en']??'ADAMAWA REGION')."\n**********\n".
     ($etab['division_en']??'VINA DIVISION')."\n**********\n".
-    ($etab['subdivision_en']??'MBE SUBDIVISION')."\n**********\n".
-    strtoupper($etab['nom_en']??'GTHS OF MBE')."\n".
-    "P.O. BOX ".($etab['boite_postale']??'32')."  e-mail : ".($etab['email']??'lyceetechniquembe@yahoo.fr')
+    ($etab['subdivision_en']??'')."\n**********\n".
+    strtoupper($etab['nom_en']??'')."\n".
+    trim((($etab['boite_postale']??'') !== '' ? "P.O. BOX ".$etab['boite_postale']."  " : '').(($etab['email']??'') !== '' ? "e-mail : ".$etab['email'] : ''))
 ), 0,'C');
 $ycol2 = $pdf->GetY();
 $pdf->SetY(max($ycol,$ycol2)+2);
 
 $pdf->SetX($ml); $pdf->SetFont('Arial','B',8);
-$pdf->Cell($uw,5,ud('MATRICULE : '.($etab['immatriculation']??'2JH1TEFD110316102')),0,1,'C');
+$pdf->Cell($uw,5,($etab['immatriculation']??'') !== '' ? ud('MATRICULE : '.$etab['immatriculation']) : '',0,1,'C');
 
 $pdf->Ln(2);$pdf->SetX($ml);$pdf->SetFont('Arial','',8);
-$pdf->Cell($uw,5,ud('N°_____________/CP-RS/H.52.03/LT-MBE'),0,1,'R');
+$pdf->Cell($uw,5,ud('N°_____________/CP-RS/H.52.03' . ($etab['sigle'] ? '/' . $etab['sigle'] : '')),0,1,'R');
 
 // ── TITRE ─────────────────────────────────────────────────────────
 $pdf->Ln(3);
@@ -124,12 +128,32 @@ $pdf->SetX($ml);$pdf->SetFont('Arial','B',9);
 $pdf->Cell($uw,5,'*********************************',0,1,'C');
 
 // ── CORPS ─────────────────────────────────────────────────────────
-$pdf->Ln(4);$pdf->SetFont('Arial','',9.5);
-$pdf->SetX($ml);
-$pdf->MultiCell($uw,6,ud("Le Proviseur du ".strtoupper($etab['nom_fr']??'LYCEE TECHNIQUE DE MBE').", soussigné\nThe principal of ".strtoupper($etab['nom_en']??'Government Technical High School MBE').", the undersigned"),0,'L');
+// Paires bilingues, même mise en forme que le certificat de scolarité
+// (pdf/certificat_scolarite.php) : ligne française, traduction anglaise
+// en italique plus petit JUSTE en dessous, puis un espace plus net avant
+// la paire suivante.
+$paire = function (string $fr, string $en, float $apres = 2.6) use ($pdf, $ml, $uw): void {
+    $pdf->SetX($ml); $pdf->SetFont('Arial', '', 9.5);
+    $pdf->MultiCell($uw, 4.8, ud($fr), 0, 'L');
+    $pdf->SetX($ml); $pdf->SetFont('Arial', 'I', 8);
+    $pdf->MultiCell($uw, 3.5, ud($en), 0, 'L');
+    $pdf->Ln($apres);
+    $pdf->SetFont('Arial', '', 9.5);
+};
 
-$pdf->Ln(3);$pdf->SetX($ml);
-$pdf->MultiCell($uw,6,ud("Atteste que M./Mme/Mlle : ".str_pad(strtoupper(($e['civilite_ens']??'').' '.($e['nom_ens']??'').' '.($e['prenom_ens']??'')),60,'_')."\nTestifies that Mr./Mme/Miss"),0,'L');
+$pdf->Ln(4);
+$paire($titre_chef_fr." de ".mb_strtoupper($etab['nom_fr']??'').", soussigné(e),",
+       $titre_chef_en." of ".mb_strtoupper($etab['nom_en']??'').", the undersigned,");
+
+// Nom de l'agent en gras, collé à son étiquette (comme le nom de l'élève).
+$pdf->SetX($ml); $pdf->SetFont('Arial', '', 9.5);
+$lbl = ud('Atteste que M./Mme/Mlle : ');
+$w_lbl = $pdf->GetStringWidth($lbl) + 1;
+$pdf->Cell($w_lbl, 4.8, $lbl, 0, 0, 'L');
+$pdf->Cell($uw - $w_lbl, 4.8, pdf_police_ajustee($pdf, ud(trim(mb_strtoupper(($e['civilite_ens']??'').' '.($e['nom_ens']??'')).' '.($e['prenom_ens']??''))), 'B', 9.5, $uw - $w_lbl), 0, 1, 'L');
+$pdf->SetX($ml); $pdf->SetFont('Arial', 'I', 8);
+$pdf->Cell($uw, 3.5, 'Testifies that Mr./Mrs./Miss', 0, 1, 'L');
+$pdf->SetFont('Arial', '', 9.5);
 
 $fmt_date = fn(?string $d): string => $d ? date('d/m/Y',strtotime($d)) : '____/____/________';
 $blank = fn(string $val='', int $len=40): string => $val ? str_pad($val,$len) : str_repeat('_',$len);
@@ -165,8 +189,8 @@ $pdf->Cell($uw,6,ud("Date d'entrée dans la Fonction Publique/Date of entry into
 $aff_type = match($e['type_affectation']??'') {
     'Arrete' => 'Arrêté', 'Note de service' => 'Note de service', 'Decision' => 'Décision', default => 'Arrêté, Note de service, Décision'
 };
-$pdf->SetX($ml);
-$pdf->MultiCell($uw,6,ud("Affecté(e)/Nommé(e)/Muté(e) par : $aff_type (*)\nPosted, Appointed, Transferred by service note, decision, order"),0,'L');
+$pdf->Ln(1);
+$paire("Affecté(e)/Nommé(e)/Muté(e) par : $aff_type (*)", 'Posted, Appointed, Transferred by service note, decision, order', 1);
 
 $pdf->SetX($ml);
 $pdf->Cell($uw/2,6,ud("N°/No. : ".$blank($e['num_note_affectation']??'',28)),0,0,'L');
@@ -174,11 +198,9 @@ $pdf->Cell($uw/2,6,ud("du/dated : ".$blank($fmt_date($e['date_note_affectation']
 
 $verb_fr = $type === 'reprise' ? 'repris(e)' : 'pris(e)';
 $verb_en = $type === 'reprise' ? 'resumed' : 'taken';
-$pdf->SetX($ml);
-$pdf->Cell($uw,6,ud("A effectivement $verb_fr (*) le : ".$blank($fmt_date($e['date_prise_service']??null),35)),0,1,'L');
-$pdf->SetX($ml);$pdf->SetFont('Arial','I',8);
-$pdf->Cell($uw,5,"Has effectively $verb_en (*) service on the",0,1,'L');
-$pdf->SetFont('Arial','',9.5);
+$pdf->Ln(1);
+$paire("A effectivement $verb_fr (*) le : ".$blank($fmt_date($e['date_prise_service']??null),35),
+       "Has effectively $verb_en (*) service on the", 1);
 
 $pdf->SetX($ml);
 $pdf->Cell($uw,6,ud("En qualité de/In the capacity of : ".$blank($e['qualite']??'',40)),0,1,'L');
@@ -196,15 +218,23 @@ $pdf->Cell($uw,6,ud("1ère prise de service (Étabt.)/1st entry into service (Sc
 $pdf->SetX($ml);
 $pdf->Cell($uw,6,ud("Matière effectivement enseignée/Subject actually taught : ".$blank($e['matiere_enseignee']??'',35)),0,1,'L');
 
-$pdf->Ln(4);$pdf->SetFont('Arial','',9);$pdf->SetX($ml);
-$pdf->MultiCell($uw,5.5,ud("En foi de quoi le présent certificat de prise/reprise de service lui est délivré pour servir et valoir ce que de droit.\nWitness whereof this certificate of assumption/resumption has been issued to serve where and when necessary."),0,'L');
+$pdf->Ln(4);
+$paire('En foi de quoi le présent certificat de prise/reprise de service lui est délivré pour servir et valoir ce que de droit.',
+       'Witness whereof this certificate of assumption/resumption has been issued to serve where and when necessary.', 0);
 
-$pdf->Ln(6);
+// Bloc signature : FR puis EN en italique dessous (comme le certificat).
+$pdf->Ln(5);
 $y_sig_block = $pdf->GetY();
-$pdf->SetX($ml+$uw*0.6);$pdf->SetFont('Arial','',9);
-$pdf->Cell($uw*0.35,5,ud('Mbé, le/on '.date('d/m/Y').'.'),0,1,'R');
-$pdf->SetX($ml+$uw*0.6);$pdf->SetFont('Arial','B',9);
-$pdf->Cell($uw*0.35,5,'Le Proviseur / The Principal',0,1,'C');
+$xs = $ml+$uw*0.6; $ws = $uw*0.35;
+$pdf->SetX($xs);$pdf->SetFont('Arial','',9.5);
+$pdf->Cell($ws,4.8,ud(lieu_signature_pdf($etab).'le '.date('d/m/Y').'.'),0,1,'C');
+$pdf->SetX($xs);$pdf->SetFont('Arial','I',8);
+$pdf->Cell($ws,3.5,'On '.date('d/m/Y'),0,1,'C');
+$pdf->Ln(2.6);
+$pdf->SetX($xs);$pdf->SetFont('Arial','B',9.5);
+$pdf->Cell($ws,4.8,ud(mb_strtoupper($titre_chef_fr).','),0,1,'C');
+$pdf->SetX($xs);$pdf->SetFont('Arial','I',8);
+$pdf->Cell($ws,3.5,ud($titre_chef_en),0,1,'C');
 // Signature numérique (uniquement si demandée à l'impression — jamais
 // automatique — et si l'admin en a configuré une dans les paramètres) :
 // placée dans l'espace blanc réservé à la signature manuscrite.
@@ -235,9 +265,7 @@ imagepng($qr_img, $qr_tmp);
 imagedestroy($qr_img);
 $pdf->Image($qr_tmp, $qr_x, $qr_y, $qr_size, $qr_size, 'PNG');
 unlink($qr_tmp);
-$pdf->SetFont('Arial', 'I', 6);
-$pdf->SetXY($qr_x, $qr_y + $qr_size + 0.5);
-$pdf->Cell($qr_size, 3, 'Scanner pour verifier', 0, 0, 'C');
+// (QR sans légende « Scanner pour vérifier », comme le certificat de scolarité.)
 
 $pdf->Output($dl?'D':'I', 'certificat_service_'.preg_replace('/\W/','_',$mat).'.pdf');
 } catch (Throwable $e) {

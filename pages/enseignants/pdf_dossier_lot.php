@@ -44,7 +44,7 @@ if (empty($enseignants)) {
     die('Aucun enseignant ne correspond aux critères sélectionnés.');
 }
 
-$etab      = get_etablissement();
+$etab      = etab_pour_pdf(get_etablissement());   // colonnes du primaire -> clés communes des PDF
 $annee_act = get_annee_active();
 $val_annee = $annee_act['libelle'] ?? '';
 
