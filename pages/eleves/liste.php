@@ -261,6 +261,28 @@ require_once __DIR__ . '/../../layout/header.php';
             </li>
           <?php endforeach; ?>
         </ul>
+        <div class="row g-2 mt-2 align-items-end">
+          <div class="col-7">
+            <label class="form-label mb-1" style="font-size:.75rem"><i class="bi bi-sort-alpha-down me-1"></i>Trier la liste par</label>
+            <select id="selTriPdf" class="form-select form-select-sm" style="font-size:.78rem">
+              <option value="nom" selected>Nom et prénoms</option>
+              <option value="matricule">Matricule</option>
+              <option value="classe">Classe (puis nom)</option>
+              <option value="sexe">Sexe (puis nom)</option>
+              <option value="date">Date de naissance</option>
+              <option value="lieu">Lieu de naissance</option>
+              <option value="niu">NIU</option>
+              <option value="statut">Nouveau / Redoublant (puis nom)</option>
+            </select>
+          </div>
+          <div class="col-5">
+            <label class="form-label mb-1" style="font-size:.75rem">Ordre</label>
+            <select id="selOrdrePdf" class="form-select form-select-sm" style="font-size:.78rem">
+              <option value="asc" selected>Croissant (A → Z)</option>
+              <option value="desc">Décroissant (Z → A)</option>
+            </select>
+          </div>
+        </div>
       </div>
       <div class="modal-footer py-2">
         <button class="btn btn-danger btn-sm" onclick="lancerPdfListe()">
@@ -413,7 +435,8 @@ function lancerPdfListe() {
   const cols  = lignes.map(li => li.dataset.col).join(',');
   const align = lignes.map(li => li.querySelector('[data-align]').value).join(',');
   afficherApercuApresFermeture('modalExport',
-    '<?= APP_URL ?>/pdf/liste_eleves.php?classe=' + etatListe.classe + '&cols=' + cols + '&align=' + align,
+    '<?= APP_URL ?>/pdf/liste_eleves.php?classe=' + etatListe.classe + '&cols=' + cols + '&align=' + align
+      + '&tri=' + document.getElementById('selTriPdf').value + '&ordre=' + document.getElementById('selOrdrePdf').value,
     'Liste des élèves', 'liste_eleves', 'portrait');
 }
 function lancerCartes() {

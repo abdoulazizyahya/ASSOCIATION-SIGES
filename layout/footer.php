@@ -512,6 +512,47 @@ function injecterHtmlDansZone(html, container) {
 // la page (sidebar, scroll, onglets déjà ouverts... tout est préservé).
 // Session expirée entre-temps (redirection vers login.php) : une vraie
 // navigation s'impose, comme pour chargerPartiel().
+// Message de résultat (#flash-zone) d'une réponse AJAX quand la page
+// d'arrivée n'a pas la même zone (ex. fiche élève enregistrée -> page
+// « voir ») : la réponse a déjà CONSOMMÉ le message côté serveur, une simple
+// re-navigation l'aurait perdu (« aucun message après changement de
+// classe », 02/10/2026). On le garde le temps de la navigation.
+function naviguerAvecFlash(html, url) {
+    try {
+        const f = new DOMParser().parseFromString(html, 'text/html').getElementById('flash-zone');
+        if (f && f.innerHTML.trim()) sessionStorage.setItem('flash_differe', f.innerHTML);
+    } catch (e) { /* stockage indisponible : navigation quand même */ }
+    window.location.href = url;
+}
+// Met le message en évidence : remonte en haut de page et le fait clignoter.
+function signalerFlash() {
+    const z = document.getElementById('flash-zone');
+    if (!z || !z.querySelector('.alert')) return;
+    z.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    z.querySelectorAll('.alert').forEach((a) => { a.classList.add('flash-attention'); });
+}
+function afficherErreurEnregistrement(statut) {
+    const msg = statut === 403
+        ? "L'enregistrement a été refusé par le serveur (erreur 403). Rien n'a été modifié. Réessayez ; si l'erreur persiste, signalez-la à l'administrateur."
+        : "L'enregistrement a échoué (erreur " + statut + " du serveur). Rien n'a été modifié. Réessayez dans un instant.";
+    const z = document.getElementById('flash-zone');
+    if (z) {
+        z.innerHTML = '<div class="alert alert-danger alert-dismissible fade show d-flex align-items-center gap-2 py-2" role="alert">'
+            + '<i class="bi bi-exclamation-triangle"></i><span></span>'
+            + '<button type="button" class="btn-close ms-auto" data-bs-dismiss="alert"></button></div>';
+        z.querySelector('span').textContent = msg;
+        signalerFlash();
+    }
+    alert(msg);
+}
+document.addEventListener('DOMContentLoaded', () => {
+    let differe = null;
+    try { differe = sessionStorage.getItem('flash_differe'); sessionStorage.removeItem('flash_differe'); } catch (e) {}
+    const z = document.getElementById('flash-zone');
+    if (differe && z && !z.innerHTML.trim()) z.innerHTML = differe;
+    signalerFlash();
+});
+
 function soumettreFormulaireAjax(form, containerId) {
     const container = document.getElementById(containerId);
     if (!container) { form.submit(); return; }
@@ -530,7 +571,7 @@ function soumettreFormulaireAjax(form, containerId) {
         .then((r) => {
             urlFinale = r.url; // POST déjà exécuté à ce stade — un secours ne doit plus jamais renvoyer le formulaire (double enregistrement), seulement RE-NAVIGUER vers cette URL.
             if (r.redirected && /\/login\.php(\?|$)/.test(r.url)) { window.location.href = r.url; return null; }
-            if (!r.ok) throw new Error('HTTP ' + r.status);
+            if (!r.ok) { const err = new Error('HTTP ' + r.status); err.http = r.status; throw err; }
             return r.text();
         })
         .then((html) => {
@@ -539,18 +580,23 @@ function soumettreFormulaireAjax(form, containerId) {
             // d'injection à partir de ce point ne doit plus jamais renvoyer le
             // formulaire (double enregistrement), seulement re-naviguer.
             try {
-                if (!injecterHtmlDansZone(html, container)) { window.location.href = urlFinale; return; }
+                if (!injecterHtmlDansZone(html, container)) { naviguerAvecFlash(html, urlFinale); return; }
                 container.style.opacity = '';
                 container.dispatchEvent(new CustomEvent('partielCharge', { bubbles: true }));
+                signalerFlash();
             } catch (e) {
-                window.location.href = urlFinale;
+                naviguerAvecFlash(html, urlFinale);
             }
         })
-        .catch(() => {
+        .catch((e) => {
+            container.style.opacity = '';
+            // Le serveur a RÉPONDU par une erreur (403 du pare-feu, 500…) :
+            // on l'annonce clairement au lieu de renvoyer le formulaire (qui
+            // affichait une page « Forbidden » brute).
+            if (e && e.http) { afficherErreurEnregistrement(e.http); return; }
             // Échec AVANT toute réponse serveur exploitable (réseau coupé...) :
             // seul cas où renvoyer le formulaire normalement est sûr, le POST
             // n'a alors jamais atteint le serveur.
-            container.style.opacity = '';
             form.submit();
         });
 }

@@ -150,6 +150,12 @@ if ($id_classe) {
     if ($classe_avant !== null) {
         db_exec("UPDATE inscrire SET IDClasses=?, Statut_elv=? WHERE id_eleve=? AND val_annee=?", [$id_classe, $statut_insc, $id, $val_annee]);
         journaliser_mouvement_classe($id, $val_annee, $classe_avant, (int) $id_classe, 'changement');
+        if ($classe_avant !== (int) $id_classe) {
+            // Confirmation explicite du changement de classe (02/10/2026).
+            $noms_cl = array_column(db_all("SELECT IDClasses, DesignationClasses FROM classe WHERE IDClasses IN (?, ?)",
+                                           [$classe_avant, (int) $id_classe]), 'DesignationClasses', 'IDClasses');
+            $msg .= ' Classe changée avec succès : ' . ($noms_cl[$classe_avant] ?? '?') . ' → ' . ($noms_cl[(int) $id_classe] ?? '?') . '.';
+        }
     } else {
         db_exec("INSERT INTO inscrire (id_eleve, IDClasses, val_annee, Date_Inscrire, Statut_elv) VALUES (?, ?, ?, CURDATE(), ?)", [$id, $id_classe, $val_annee, $statut_insc]);
         journaliser_mouvement_classe($id, $val_annee, null, (int) $id_classe, 'inscription');

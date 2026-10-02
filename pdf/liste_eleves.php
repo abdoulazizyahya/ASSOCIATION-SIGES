@@ -13,6 +13,20 @@ $cols      = explode(',', $_GET['cols'] ?? 'no,nom,date,lieu,sexe,matricule,niu'
 $aligns    = explode(',', $_GET['align'] ?? '');
 $dl        = ($_GET['dl'] ?? '0') === '1';
 $avec_sig  = ($_GET['signature'] ?? '0') === '1';
+// Ordre de tri choisi à l'impression (liste blanche — jamais de SQL venu
+// de l'URL) ; le nom départage toujours les égalités.
+$ordre_sql = ($_GET['ordre'] ?? 'asc') === 'desc' ? 'DESC' : 'ASC';
+$TRIS = [
+    'nom'       => "e.Nom_elv $ordre_sql, e.Prenom_elv $ordre_sql",
+    'matricule' => "e.Mat_elv $ordre_sql, e.Nom_elv, e.Prenom_elv",
+    'classe'    => "c.DesignationClasses $ordre_sql, e.Nom_elv, e.Prenom_elv",
+    'sexe'      => "e.Sexe_elv $ordre_sql, e.Nom_elv, e.Prenom_elv",
+    'date'      => "e.Date_naiss_elv $ordre_sql, e.Nom_elv, e.Prenom_elv",
+    'lieu'      => "e.Lieu_naiss_elv $ordre_sql, e.Nom_elv, e.Prenom_elv",
+    'niu'       => "e.niu $ordre_sql, e.Nom_elv, e.Prenom_elv",
+    'statut'    => "i.Statut_elv $ordre_sql, e.Nom_elv, e.Prenom_elv",
+];
+$order_by = $TRIS[$_GET['tri'] ?? 'nom'] ?? $TRIS['nom'];
 
 $annee     = get_annee_active();
 $val_annee = $annee['val_annee'] ?? '';
@@ -41,7 +55,7 @@ $eleves = db_all(
      JOIN inscrire i ON i.id_eleve = e.id_eleve
      LEFT JOIN classe c ON c.IDClasses = i.IDClasses
      $sql_where AND e.statut='actif'
-     ORDER BY e.Nom_elv, e.Prenom_elv", $params);
+     ORDER BY $order_by", $params);
 
 $etab_brut = get_etablissement();
 $etab      = etab_pour_pdf($etab_brut);
@@ -98,30 +112,47 @@ $sel[$derniere_cle][2] += $uw_tbl - array_sum(array_map(fn($c) => $c[2], $sel));
 pdf_entete($pdf, $etab, $pw);
 pdf_bandeau($pdf, 'LISTE DES ÉLÈVES', 'LIST OF STUDENTS', $pw);
 
+// Effectifs dans UN tableau (02/10/2026) : nouveaux / redoublants / total
+// croisés avec garçons / filles / total — remplace les lignes de texte
+// « Total : … Garçons : … Filles : … ». Statut_elv = « Redoublant ? » (Oui/Non).
+$eff = ['Non' => ['M' => 0, 'F' => 0], 'Oui' => ['M' => 0, 'F' => 0]];
+foreach ($eleves as $e) {
+    $st = ($e['Statut_elv'] ?? 'Non') === 'Oui' ? 'Oui' : 'Non';
+    $eff[$st][stripos((string) $e['Sexe_elv'], 'F') === 0 ? 'F' : 'M']++;
+}
+$y_info = $pdf->GetY();
 $pdf->SetFont('Arial', 'B', 8);
 $pdf->Cell(0, 3.8, pdf_u('Année scolaire : ' . $val_annee . '    Classe : ' . ($classe['DesignationClasses'] ?? 'Toutes')), 0, 1, 'L');
 $pdf->SetFont('Arial', 'I', 6.5);
 $pdf->Cell(0, 3, pdf_u('Academic year / Class'), 0, 1, 'L');
-$pdf->SetFont('Arial', 'B', 7.5);
-$pdf->Cell(0, 3.8, pdf_u("Total : $total élève(s)   Garçons : $nb_m   Filles : $nb_f"), 0, 1, 'L');
-$pdf->SetFont('Arial', 'I', 6.5);
-$pdf->Cell(0, 3, pdf_u("Total students : $total   Boys : $nb_m   Girls : $nb_f"), 0, 1, 'L');
+$y_apres_info = $pdf->GetY();
 
-// Effectif tableau (Nouveau/Redoublant/Total) — Statut_elv est un champ
-// historique Oui/Non (« Redoublant ? »), pas un statut à 4 valeurs.
-if ($id_classe) {
-    $par_statut = ['Non' => 0, 'Oui' => 0];
-    foreach ($eleves as $e) {
-        $par_statut[($e['Statut_elv'] ?? 'Non') === 'Oui' ? 'Oui' : 'Non']++;
-    }
-    $pdf->SetXY($pw - 28, $pdf->GetY() - 9);
-    $pdf->SetFont('Arial','B',6.5); $pdf->SetFillColor(214,234,248);
-    foreach (array_keys($par_statut) as $s) { $pdf->Cell(9,4,mb_substr(libelle_statut_insc($s),0,3),1,0,'C',true); }
-    $pdf->Cell(10,4,'Tot.',1,1,'C',true);
-    $pdf->SetX($pw-28); $pdf->SetFont('Arial','',7);
-    foreach ($par_statut as $n) { $pdf->Cell(9,4,(string)$n,1,0,'C'); }
-    $pdf->Cell(10,4,(string)$total,1,1,'C');
+// Tableau à droite, sa fin alignée sur le cadre de l'en-tête et du tableau
+// des élèves (marge droite de 10 mm).
+$w_lib = 31; $w_n = 19; $h_l = 4;
+$x_eff = $pw - 10 - ($w_lib + 3 * $w_n);
+$pdf->SetXY($x_eff, $y_info);
+$pdf->SetFillColor(214, 234, 248); $pdf->SetFont('Arial', 'B', 6.5);
+$pdf->Cell($w_lib, $h_l, pdf_u('Effectif / Enrolment'), 1, 0, 'C', true);
+foreach (['Garçons/Boys', 'Filles/Girls', 'Total'] as $t) $pdf->Cell($w_n, $h_l, pdf_u($t), 1, 0, 'C', true);
+$pdf->Ln();
+$lignes_eff = [
+    ['Nouveaux / New',        $eff['Non']['M'], $eff['Non']['F']],
+    ['Redoublants / Repeat.', $eff['Oui']['M'], $eff['Oui']['F']],
+    ['Total',                 $nb_m,            $nb_f],
+];
+foreach ($lignes_eff as $k => [$lib, $g, $fi]) {
+    $gras = $k === 2;
+    $pdf->SetX($x_eff);
+    $pdf->SetFont('Arial', 'B', 6.5);
+    $pdf->Cell($w_lib, $h_l, pdf_u($lib), 1, 0, 'L', $gras);
+    $pdf->SetFont('Arial', $gras ? 'B' : '', 7);
+    $pdf->Cell($w_n, $h_l, (string) $g, 1, 0, 'C', $gras);
+    $pdf->Cell($w_n, $h_l, (string) $fi, 1, 0, 'C', $gras);
+    $pdf->SetFont('Arial', 'B', 7);
+    $pdf->Cell($w_n, $h_l, (string) ($g + $fi), 1, 1, 'C', $gras);
 }
+$pdf->SetY(max($pdf->GetY(), $y_apres_info));
 $pdf->Ln(1);
 
 // ── Entête du tableau (FR au-dessus, EN en-dessous, interligne resserré) ──
