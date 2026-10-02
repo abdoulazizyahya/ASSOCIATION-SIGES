@@ -368,6 +368,13 @@ function ouvrirGenerer(d) {
       <button type="button" class="btn btn-success btn-sm" id="bp-btn-groupe" onclick="ouvrirPaiementGroupe()" disabled>
         <i class="bi bi-cash-coin me-1"></i>Marquer payés (<span id="bp-nb-selection">0</span>)
       </button>
+      <?php /* Impression / PDF de plusieurs bulletins cochés (02/10/2026). */ ?>
+      <button type="button" class="btn btn-outline-danger btn-sm" id="bp-btn-imprimer" onclick="imprimerSelection(false)" disabled title="Afficher / imprimer les bulletins cochés">
+        <i class="bi bi-printer me-1"></i>Imprimer (<span class="bp-nb-impr">0</span>)
+      </button>
+      <button type="button" class="btn btn-outline-secondary btn-sm" id="bp-btn-pdf" onclick="imprimerSelection(true)" disabled title="Enregistrer les bulletins cochés dans un seul PDF">
+        <i class="bi bi-download me-1"></i>PDF (<span class="bp-nb-impr">0</span>)
+      </button>
     </div>
   </div>
   <div class="table-responsive">
@@ -386,9 +393,7 @@ function ouvrirGenerer(d) {
         ?>
           <tr data-nom="<?= h(mb_strtolower($nom_b)) ?>" data-statut="<?= $b['statut'] === 'Payé' ? 'Payé' : 'En attente' ?>">
             <td>
-              <?php if ($b['statut'] !== 'Payé'): ?>
-                <input type="checkbox" class="bp-case" value="<?= (int) $b['id'] ?>" onchange="majSelection()">
-              <?php endif; ?>
+              <input type="checkbox" class="bp-case" value="<?= (int) $b['id'] ?>" data-paye="<?= $b['statut'] === 'Payé' ? '1' : '0' ?>" onchange="majSelection()">
             </td>
             <td class="text-muted"><?= h(numero_bulletin((int) $b['id'])) ?></td>
             <td class="fw-semibold"><?= h($nom_b) ?></td>
@@ -499,9 +504,28 @@ function toggleTout(cb) {
     majSelection();
 }
 function majSelection() {
-    var n = document.querySelectorAll('.bp-case:checked').length;
+    // Impression : tous les bulletins cochés ; paiement groupé : seulement
+    // ceux encore en attente (un bulletin payé ne se paie pas deux fois).
+    var tous = document.querySelectorAll('.bp-case:checked').length;
+    var n = document.querySelectorAll('.bp-case[data-paye="0"]:checked').length;
     document.getElementById('bp-nb-selection').textContent = n;
     document.getElementById('bp-btn-groupe').disabled = n === 0;
+    document.querySelectorAll('.bp-nb-impr').forEach(function (s) { s.textContent = tous; });
+    document.getElementById('bp-btn-imprimer').disabled = tous === 0;
+    document.getElementById('bp-btn-pdf').disabled = tous === 0;
+    var tout = document.getElementById('bp-tout');
+    var visibles = Array.from(document.querySelectorAll('#bp-table tbody .bp-case')).filter(function (c) { return c.closest('tr').offsetParent !== null; });
+    tout.checked = visibles.length > 0 && visibles.every(function (c) { return c.checked; });
+    tout.indeterminate = !tout.checked && visibles.some(function (c) { return c.checked; });
+}
+// Plusieurs bulletins dans un seul PDF (pdf/bulletins_paie_lot.php), dans
+// l'ordre du tableau.
+function imprimerSelection(telecharger) {
+    var ids = Array.from(document.querySelectorAll('.bp-case:checked')).map(function (c) { return c.value; });
+    if (!ids.length) return;
+    var url = '<?= APP_URL ?>/pdf/bulletins_paie_lot.php?ids=' + ids.join(',');
+    if (telecharger) { window.location.href = url + '&dl=1'; return; }
+    afficherApercu(url, ids.length + ' bulletin(s) de paie', null, 'portrait');
 }
 
 // ── Modale "Marquer payé" (individuel ou groupé) ───────────────────────
@@ -513,7 +537,7 @@ function ouvrirPaiement(idBulletin) {
     new bootstrap.Modal(document.getElementById('modalPaiement')).show();
 }
 function ouvrirPaiementGroupe() {
-    var ids = Array.from(document.querySelectorAll('.bp-case:checked')).map(function (c) { return c.value; });
+    var ids = Array.from(document.querySelectorAll('.bp-case[data-paye="0"]:checked')).map(function (c) { return c.value; });
     if (!ids.length) return;
     document.getElementById('mp-titre').innerHTML = '<i class="bi bi-cash-coin me-1 text-success"></i>Marquer ' + ids.length + ' bulletin(s) comme payés';
     document.getElementById('mp-action').value = 'marquer_payes_groupe';

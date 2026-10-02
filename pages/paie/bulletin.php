@@ -21,7 +21,7 @@ if (!$bulletin) { flash_set('erreur', 'Bulletin introuvable.'); rediriger('dashb
 $role = role_connecte();
 $mon_matricule = (int) (utilisateur_connecte()['matricule_ens'] ?? 0);
 $est_le_sien = $mon_matricule && $mon_matricule === (int) $bulletin['matricule_ens'];
-if ($role !== 'DIRECTEUR' && !$est_le_sien) {
+if (!in_array($role, ['DIRECTEUR', 'FONDATEUR', 'COMPTABLE'], true) && !$est_le_sien) {   // mêmes rôles que periode.php
     die('<div style="font-family:sans-serif;padding:2rem;color:red">Accès refusé. Vous n\'avez pas les droits nécessaires.</div>');
 }
 
