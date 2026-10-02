@@ -6,6 +6,35 @@
 // d'ABZ_MBE — ce sont deux systèmes différents (décision explicite, voir
 // prompt_continuite_jaynitaare_v2.md).
 
+// ── Champs de formulaire encodés (pare-feu de l'hébergeur) ────────────
+// Le pare-feu ModSecurity (OWASP CRS) de l'hébergeur mutualisé (Camoo)
+// rejetait en 403 des enregistrements ordinaires (fiche élève…) en prenant
+// un texte saisi pour une injection SQL (« SQLI=5 », constaté le
+// 02/10/2026). layout/footer.php regroupe donc, juste avant l'envoi, les
+// champs texte d'un formulaire POST dans UN champ `_formb64` (base64 d'une
+// liste [nom, valeur]) que le pare-feu ne sait pas interpréter ; on le
+// redéploie ici dans $_POST, exactement comme PHP l'aurait fait (parse_str
+// gère nom[], nom[cle]…). Les pages n'ont rien à changer. Sans JavaScript
+// ou pour un formulaire exclu (data-sans-encodage), rien ne change.
+if (!empty($_POST['_formb64']) && is_string($_POST['_formb64'])) {
+    $paires = json_decode((string) base64_decode($_POST['_formb64'], true), true);
+    unset($_POST['_formb64'], $_REQUEST['_formb64']);
+    if (is_array($paires)) {
+        $morceaux = [];
+        foreach ($paires as $p) {
+            if (is_array($p) && count($p) === 2 && is_string($p[0]) && $p[0] !== '' && is_scalar($p[1])) {
+                $morceaux[] = rawurlencode($p[0]) . '=' . rawurlencode((string) $p[1]);
+            }
+        }
+        parse_str(implode('&', $morceaux), $decode);
+        // Ce qui est arrivé EN CLAIR (csrf, bouton cliqué ajouté après coup
+        // par soumettreFormulaireAjax…) reste prioritaire.
+        $_POST    = array_replace_recursive($decode, $_POST);
+        $_REQUEST = array_replace_recursive($decode, $_REQUEST);
+    }
+    unset($paires, $morceaux, $decode, $p);
+}
+
 // Démarre la session si pas déjà démarrée
 // Nom de cookie + path dédiés à CETTE application : plusieurs projets PHP
 // indépendants tournent sur le même hôte (localhost/ABZ_MBE/, .../LAM_ABZ/,

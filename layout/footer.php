@@ -116,6 +116,40 @@
 <script src="<?= APP_URL ?>/assets/vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
 <script src="<?= APP_URL ?>/assets/vendor/pdfjs/pdf.min.js"></script>
 <script>
+// Pare-feu de l'hébergeur (ModSecurity / OWASP CRS, Camoo) : il rejetait en
+// 403 des enregistrements ordinaires en prenant un texte saisi pour une
+// injection SQL. Chaque fois que le navigateur construit les données d'un
+// formulaire POST (envoi classique OU new FormData(form) d'un envoi AJAX),
+// l'événement `formdata` permet de remplacer ses champs texte par UN champ
+// `_formb64` (base64 d'une liste [nom, valeur]) — sans toucher aux champs
+// de la page. Décodé côté serveur au début de fonctions.php. Restent en
+// clair : le jeton csrf et les fichiers. Exclure un formulaire : attribut
+// data-sans-encodage.
+(function () {
+  const versB64 = (s) => btoa(unescape(encodeURIComponent(s)));
+  document.addEventListener('formdata', (e) => {
+    const form = e.target;
+    if (!(form instanceof HTMLFormElement)) return;
+    if ((form.getAttribute('method') || 'get').toLowerCase() !== 'post') return;
+    if (form.hasAttribute('data-sans-encodage')) return;
+    const fd = e.formData, paires = [], noms = new Set();
+    for (const [nom, valeur] of fd.entries()) {
+      if (nom === 'csrf' || nom === '_formb64' || typeof valeur !== 'string') continue;   // fichiers : en clair
+      paires.push([nom, valeur]);
+      noms.add(nom);
+    }
+    if (!paires.length) return;
+    // Un nom porté à la fois par un fichier et du texte garde ses fichiers.
+    noms.forEach((nom) => {
+      const fichiers = fd.getAll(nom).filter((v) => typeof v !== 'string');
+      fd.delete(nom);
+      fichiers.forEach((f) => fd.append(nom, f));
+    });
+    fd.set('_formb64', versB64(JSON.stringify(paires)));
+  }, true);   // capture : reçu quel que soit le formulaire de la page
+})();
+</script>
+<script>
   pdfjsLib.GlobalWorkerOptions.workerSrc = '<?= APP_URL ?>/assets/vendor/pdfjs/pdf.worker.min.js';
 </script>
 <script>
