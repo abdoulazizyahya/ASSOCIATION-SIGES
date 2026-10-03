@@ -224,7 +224,7 @@ function bulletin_paie_page(FPDF $pdf, array $bulletin, int $id, array $etab): v
     // d'établissement aligné à gauche, ~10 px (2,6 mm) après le début de « Fait à ».
     $pdf->Ln(5);                      // une ligne vide entre « Fait à » et les signatures
     $y_sign  = $pdf->GetY();
-    $t_benef = pdf_u('LE BÉNÉFICIAIRE,');
+    $t_benef = pdf_u('BÉNÉFICIAIRE,');
     $pdf->SetXY($ML + $pdf->GetStringWidth($t_benef), $y_sign);
     $pdf->Cell($pdf->GetStringWidth($t_benef) + 2, 5, $t_benef, 0, 0, 'L');
     $pdf->SetXY($x_fait + 2.6 - 1, $y_sign);   // -1 : marge interne de la cellule

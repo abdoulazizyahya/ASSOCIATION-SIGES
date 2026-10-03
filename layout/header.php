@@ -189,18 +189,12 @@ function lien_actif(string $url): string {
     <nav class="abz-nav">
       <?php foreach ($menu as $groupe => $items): ?>
         <?php
-        $visibles = array_filter($items, function($it) use ($roles_effectifs, $menu_voit_tout, $groupe) {
+        // Règle de visibilité UNIQUE (fonctions.php::menu_entree_visible()),
+        // aussi utilisée par les tableaux de bord : rôle de l'entrée,
+        // fondateur / visite association, octroi ou masque « Privilèges ».
+        $visibles = array_filter($items, function($it) use ($groupe) {
             if ($it[0] === '--') return true;
-            // Règle « Privilèges » centrale : un octroi 'lecture'/'ecriture'
-            // révèle une entrée hors du périmètre de rôle par défaut ; un
-            // 'masque' est appliqué par menu_acces_autorise() ci-dessous.
-            $nc = function_exists('niveau_central') ? niveau_central($groupe, $it[1]) : null;
-            $par_role = $menu_voit_tout || empty($it[3])
-                || array_intersect($roles_effectifs, $it[3])
-                || in_array($nc, ['lecture', 'ecriture'], true);
-            if (!$par_role) return false;
-            // Privilèges par utilisateur (local) + 'masque' central.
-            return !function_exists('menu_acces_autorise') || menu_acces_autorise($groupe, $it[1]);
+            return menu_entree_visible($groupe, $it);
         });
         // Un séparateur seul (tous les liens qui le suivent masqués par les
         // rôles) ne doit pas afficher une section vide avec juste un titre —

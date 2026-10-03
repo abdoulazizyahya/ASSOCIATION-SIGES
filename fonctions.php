@@ -302,6 +302,60 @@ function menu_acces_autorise(string $groupe, string $url): bool {
     return true;
 }
 
+/**
+ * Une entrée de menu est-elle AFFICHÉE à l'utilisateur connecté ? Règle
+ * unique, partagée par le menu latéral (layout/header.php) et les tableaux
+ * de bord (dashboard.php, secondaire/dashboard_contenu.php) : rôle listé
+ * dans l'entrée (ou entrée ouverte à tous), fondateur / visite association
+ * (voient tout), octroi « Privilèges » central (lecture/écriture) qui
+ * révèle l'entrée, masque central qui la cache.
+ */
+function menu_entree_visible(string $groupe, array $it): bool {
+    if (($it[0] ?? '') === '--') return false;
+    static $ctx = null;
+    if ($ctx === null) {
+        $role = role_connecte();
+        $roles = [$role];
+        if ($role !== 'ENSEIGNANT' && function_exists('agent_est_aussi_enseignant') && agent_est_aussi_enseignant()) {
+            $roles[] = 'ENSEIGNANT';
+        }
+        $ctx = [
+            'roles'     => $roles,
+            'voit_tout' => (function_exists('est_visite_association') && est_visite_association())
+                        || (function_exists('est_fondateur') && est_fondateur()),
+        ];
+    }
+    $nc = function_exists('niveau_central') ? niveau_central($groupe, $it[1]) : null;
+    $par_role = $ctx['voit_tout'] || empty($it[3])
+        || array_intersect($ctx['roles'], $it[3])
+        || in_array($nc, ['lecture', 'ecriture'], true);
+    if (!$par_role) return false;
+    return menu_acces_autorise($groupe, $it[1]);
+}
+
+/**
+ * Au moins une entrée de menu visible parmi celles du groupe $groupe
+ * (null = tous) dont l'url commence par l'un des $prefixes (vide = toutes).
+ * Ex. menu_visible(null, ['pages/finances/']) : l'utilisateur voit-il le
+ * module Finances ? Sert à n'afficher sur le tableau de bord QUE ce que le
+ * menu montre (demande du 03/10/2026).
+ */
+function menu_visible(?string $groupe = null, array $prefixes = []): bool {
+    foreach (menu_definition() as $g => $items) {
+        if ($groupe !== null && $g !== $groupe) continue;
+        foreach ($items as $it) {
+            if (($it[0] ?? '') === '--') continue;
+            if ($prefixes) {
+                $ok = false;
+                foreach ($prefixes as $p) { if (str_starts_with($it[1], $p)) { $ok = true; break; } }
+                if (!$ok) continue;
+            }
+            if (menu_entree_visible($g, $it)) return true;
+        }
+    }
+    return false;
+}
+
 /** Chemin de la page courante relatif à la racine de l'app (ex. « pages/eleves/liste.php »). */
 function page_courante_relative(): string {
     $s    = str_replace('\\', '/', $_SERVER['SCRIPT_NAME'] ?? ($_SERVER['PHP_SELF'] ?? ''));

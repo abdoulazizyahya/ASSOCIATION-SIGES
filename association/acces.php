@@ -46,7 +46,19 @@ if ($etab) {
     }
 }
 
+// École secondaire : son menu garde PAIEMENT PRIVÉ ou PAIEMENT PUBLIQUE
+// selon SON statut (etablissement.statut dans sa base) — lu ici, puisque
+// aucune école n'est « ouverte » dans le portail.
+if ($secondaire && $etab) {
+    try {
+        $GLOBALS['statut_ecole_menu'] = (string) (avec_ecole($id_etab, fn($l) => ecole_one($l, "SELECT statut FROM etablissement LIMIT 1"))['statut'] ?? 'public');
+    } catch (\Throwable $e) {
+        $GLOBALS['statut_ecole_menu'] = 'public';
+    }
+}
 $menu = require __DIR__ . '/../layout/' . ($secondaire ? 'menu_secondaire.php' : 'menu.php');
+$statut_page = $GLOBALS['statut_ecole_menu'] ?? null;
+unset($GLOBALS['statut_ecole_menu']);
 
 // ── Enregistrement ──────────────────────────────────────────────────
 $msg = '';
@@ -161,7 +173,7 @@ asso_haut('Privilèges par école');
   <input type="hidden" name="cible"  value="<?= h($cible) ?>">
 
   <p class="small text-muted2 mb-2">
-    École <strong><?= h($etab['code']) ?></strong> (<?= $secondaire ? 'secondaire' : 'primaire' ?>) —
+    École <strong><?= h($etab['code']) ?></strong> (<?= $secondaire ? 'secondaire' . ($statut_page === 'prive' ? ', privé : PAIEMENT PRIVÉ' : ', public : PAIEMENT PUBLIQUE') : 'primaire' ?>) —
     <?= $portee === 'user' ? 'compte' : 'rôle' ?>
     <strong><?= h($portee === 'role' ? libelle_role($cible) : $cible . ($role_cible !== '' ? ' (' . libelle_role($role_cible) . ')' : '')) ?></strong>.
   </p>

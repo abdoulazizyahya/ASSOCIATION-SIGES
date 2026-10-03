@@ -18,13 +18,21 @@ $statut_ecole = get_etablissement()['statut'] ?? 'public';
 // Mêmes rôles que layout/menu_secondaire.php pour les groupes PAIEMENT
 // PUBLIQUE/PRIVÉ et Ressources humaines — pas de SECRETAIRE/COMPTABLE ici
 // (rôles primaire), ADMIN/PROVISEUR/FONDATEUR/CENSEUR/INTENDANT côté secondaire.
-$peut_voir_finances  = function_exists('capacite_finances') ? capacite_finances() : false;
-$peut_voir_paie      = in_array($role, ['ADMIN', 'PROVISEUR', 'FONDATEUR', 'INTENDANT'], true);
-// Pédagogie masquée pour un agent purement financier (INTENDANT) — même
-// principe que $peut_voir_pedagogie côté primaire (masqué pour COMPTABLE
-// seul). Pas de cloisonnement par classes visibles pour l'instant (pas
-// d'équivalent secondaire de classes_ids_visibles() — hors scope ici).
-$peut_voir_pedagogie = $role !== 'INTENDANT';
+// Depuis le 03/10/2026 : le tableau de bord n'affiche QUE ce que le menu
+// montre (fonctions.php::menu_visible() — même règle que le menu : rôle
+// par défaut, fondateur, règles « Privilèges » de l'association). Désactiver
+// le menu des paiements pour un rôle retire donc aussi la finance d'ici.
+// École PRIVÉE : groupe « PAIEMENT PRIVÉ » (encaissements + dépenses) ;
+// école PUBLIQUE : « PAIEMENT PUBLIQUE » (pas de dépenses dans ce schéma).
+if ($statut_ecole === 'prive') {
+    $peut_voir_finances = menu_visible('PAIEMENT PRIVÉ', ['secondaire/pages/paiements_prives/']);
+    $peut_voir_depenses = menu_visible('PAIEMENT PRIVÉ', ['secondaire/pages/depenses_privees/']);
+} else {
+    $peut_voir_finances = menu_visible('PAIEMENT PUBLIQUE');
+    $peut_voir_depenses = false;
+}
+$peut_voir_paie      = menu_visible(null, ['secondaire/pages/paie/index.php', 'secondaire/pages/paie/grille.php', 'secondaire/pages/paie/avances.php', 'secondaire/pages/paie/periode.php']);
+$peut_voir_pedagogie = menu_visible('Pédagogie');
 $is_admin = $peut_voir_finances;
 
 $annee    = get_annee_active();
@@ -199,20 +207,24 @@ if ($peut_voir_finances) {
 // école PUBLIQUE n'a pas d'équivalent "dépenses" dans ce schéma).
 $total_depenses = 0.0; $solde_caisse_val = 0.0; $depenses_par_categorie = [];
 $encaissements_par_mois = [];
-if ($peut_voir_finances && $id_annee) {
+if (($peut_voir_finances || $peut_voir_depenses) && $id_annee) {
     if ($statut_ecole === 'prive') {
-        $total_depenses   = (float) db_val("SELECT COALESCE(SUM(montant),0) FROM depense_privee WHERE id_annee=?", [$id_annee]);
-        $solde_caisse_val = prive_solde_caisse($id_annee);
-        $depenses_par_categorie = db_all(
-            "SELECT c.libelle, SUM(d.montant) AS total FROM depense_privee d
-             JOIN categorie_depense_privee c ON c.id=d.id_categorie
-             WHERE d.id_annee=? GROUP BY c.id ORDER BY total DESC", [$id_annee]
-        );
-        $encaissements_par_mois = db_all(
-            "SELECT DATE_FORMAT(date_paiement, '%Y-%m') AS mois, SUM(montant_paiement) AS total
-             FROM paiement_prive WHERE id_annee=? GROUP BY mois ORDER BY mois", [$id_annee]
-        );
-    } else {
+        if ($peut_voir_depenses) {
+            $total_depenses   = (float) db_val("SELECT COALESCE(SUM(montant),0) FROM depense_privee WHERE id_annee=?", [$id_annee]);
+            $solde_caisse_val = prive_solde_caisse($id_annee);
+            $depenses_par_categorie = db_all(
+                "SELECT c.libelle, SUM(d.montant) AS total FROM depense_privee d
+                 JOIN categorie_depense_privee c ON c.id=d.id_categorie
+                 WHERE d.id_annee=? GROUP BY c.id ORDER BY total DESC", [$id_annee]
+            );
+        }
+        if ($peut_voir_finances) {
+            $encaissements_par_mois = db_all(
+                "SELECT DATE_FORMAT(date_paiement, '%Y-%m') AS mois, SUM(montant_paiement) AS total
+                 FROM paiement_prive WHERE id_annee=? GROUP BY mois ORDER BY mois", [$id_annee]
+            );
+        }
+    } elseif ($peut_voir_finances) {
         $solde_caisse_val = $total_paye;
         $encaissements_par_mois = db_all(
             "SELECT DATE_FORMAT(date_paiement, '%Y-%m') AS mois, SUM(montant) AS total
@@ -329,15 +341,17 @@ require_once __DIR__ . '/../layout/header.php';
   <?php if ($is_admin): ?>
   <div class="hero-divider"></div>
   <div class="hero-zone hero-zone-finance">
-    <div class="hero-zone-head"><i class="bi bi-cash-coin"></i>Finances — Paiements &amp; Dépenses</div>
+    <div class="hero-zone-head"><i class="bi bi-cash-coin"></i>Finances — Paiements<?= $peut_voir_depenses ? ' &amp; Dépenses' : '' ?></div>
     <div class="hero-zone-nums">
       <div class="gauge-wrap gauge-wrap-sm"><canvas id="chartRecouvrementTop"></canvas><div class="gauge-val gauge-val-sm"><?= $taux_recouvrement ?>%</div></div>
       <div class="hn"><b><?= $fmt_f($total_du) ?></b><span>Total dû</span></div>
       <div class="hn"><b style="color:#7fe0ab"><?= $fmt_f($total_paye) ?></b><span>Encaissé</span></div>
-      <?php if ($statut_ecole === 'prive'): ?>
+      <?php if ($peut_voir_depenses): ?>
       <div class="hn"><b style="color:#ffcf8a"><?= $fmt_f($total_depenses) ?></b><span>Dépensé</span></div>
       <?php endif; ?>
+      <?php if ($statut_ecole !== 'prive' || $peut_voir_depenses): ?>
       <div class="hn"><b style="color:<?= $solde_caisse_val >= 0 ? '#7fe0ab' : '#ff9d9d' ?>"><?= $fmt_f($solde_caisse_val) ?></b><span>Solde de caisse</span></div>
+      <?php endif; ?>
     </div>
   </div>
   <?php endif; ?>
@@ -420,9 +434,12 @@ require_once __DIR__ . '/../layout/header.php';
   </div>
 </div>
 <?php endif; ?>
+<?php endif; /* fin finances (situation des élèves + top impayés) */ ?>
 
+<?php if ($peut_voir_finances || $peut_voir_depenses || $peut_voir_paie): ?>
 <!-- ── 2. Paiements et dépenses ── -->
 <div class="row g-2 mb-3">
+  <?php if ($peut_voir_finances): ?>
   <div class="col-lg-4">
     <div class="card h-100">
       <div class="card-header d-flex justify-content-between align-items-center" style="background:#f8faff">
@@ -440,8 +457,9 @@ require_once __DIR__ . '/../layout/header.php';
       </div>
     </div>
   </div>
+  <?php endif; ?>
 
-  <?php if ($statut_ecole === 'prive'): ?>
+  <?php if ($peut_voir_depenses): ?>
   <div class="col-lg-4">
     <div class="card h-100">
       <div class="card-header d-flex justify-content-between align-items-center" style="background:#f8faff">
@@ -488,7 +506,7 @@ require_once __DIR__ . '/../layout/header.php';
 </div>
 <?php endif; ?>
 
-<?php if ($peut_voir_finances && ($depenses_par_categorie || $encaissements_par_mois)): ?>
+<?php if ($depenses_par_categorie || $encaissements_par_mois): ?>
 <div class="row g-2 mb-3">
   <?php if ($depenses_par_categorie): ?>
   <div class="col-lg-5">
@@ -737,7 +755,9 @@ new Chart(document.getElementById('chartRecouvrementClasse'), {
 });
 <?php endif; ?>
 
-<?php if ($statut_ecole === 'prive'): ?>
+<?php endif; /* fin graphiques finances */ ?>
+
+<?php if ($peut_voir_depenses): ?>
 new Chart(document.getElementById('chartDepenses'), {
     type: 'bar',
     data: {
@@ -803,7 +823,6 @@ new Chart(document.getElementById('chartEncaissementsMois'), {
         },
     },
 });
-<?php endif; ?>
 <?php endif; ?>
 
 <?php if ($peut_voir_paie): ?>

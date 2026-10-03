@@ -31,12 +31,16 @@ $role      = role_connecte();
 // revient à l'agent financier / la secrétaire.
 // Pédagogie masquée pour COMPTABLE SAUF s'il est EN MÊME TEMPS affecté à
 // enseigner (agent_est_aussi_enseignant(), même règle que le menu).
-$peut_voir_finances  = function_exists('capacite_finances') ? capacite_finances()
-                     : in_array($role, ['SECRETAIRE', 'COMPTABLE'], true);
-$peut_voir_paie      = in_array($role, ['SECRETAIRE', 'COMPTABLE'], true)
-                     || (function_exists('est_fondateur') && est_fondateur())
-                     || (function_exists('est_visite_association') && est_visite_association());
-$peut_voir_pedagogie = $role !== 'COMPTABLE' || agent_est_aussi_enseignant();
+// Depuis le 03/10/2026 : le tableau de bord n'affiche QUE ce que le menu
+// montre à l'utilisateur (fonctions.php::menu_visible() — même règle que le
+// menu : rôle par défaut, fondateur, et règles « Privilèges » de
+// l'association, qui peuvent masquer ou accorder un module). Par défaut :
+// un directeur ne voit pas les finances ; si l'association lui ouvre le
+// menu Finances, le tableau de bord les affiche aussi.
+$peut_voir_finances  = menu_visible('Finances', ['pages/finances/']);   // groupe Finances seul : « Frais exigibles » (Paramètres) ne compte pas
+$peut_voir_depenses  = menu_visible('Finances', ['pages/depenses/']);   // idem « Catégories de dépenses »
+$peut_voir_paie      = menu_visible(null, ['pages/paie/index.php', 'pages/paie/grille.php', 'pages/paie/avances.php', 'pages/paie/periode.php']);
+$peut_voir_pedagogie = menu_visible('Pédagogie');
 $is_admin            = $peut_voir_finances; // alias conservé : encore utilisé plus bas pour Finances/Dépenses
 
 $annee     = get_annee_active();
@@ -209,7 +213,7 @@ if ($peut_voir_finances) {
 
 // Dépenses par catégorie (demande du 23/08/2026).
 $depenses_par_categorie = [];
-if ($peut_voir_finances) {
+if ($peut_voir_depenses) {
     $depenses_par_categorie = db_all(
         "SELECT c.libelle, SUM(d.montant) AS total FROM depense d
          JOIN categorie_depense c ON c.id_categorie=d.id_categorie
@@ -233,9 +237,9 @@ if ($peut_voir_finances) {
     }
 }
 
-// ── Dépenses — mêmes rôles que Finances (DIRECTEUR/SECRETAIRE/COMPTABLE) ──
+// ── Dépenses — affichées seulement si le menu Dépenses est visible ──
 $total_depenses = 0.0; $solde_caisse_val = 0.0;
-if ($peut_voir_finances) {
+if ($peut_voir_depenses) {
     $total_depenses   = (float) db_val("SELECT COALESCE(SUM(montant),0) FROM depense WHERE val_annee=?", [$val_annee]);
     $solde_caisse_val = solde_caisse($val_annee);
 }
@@ -355,13 +359,15 @@ require_once __DIR__ . '/layout/header.php';
   <?php if ($is_admin): ?>
   <div class="hero-divider"></div>
   <div class="hero-zone hero-zone-finance">
-    <div class="hero-zone-head"><i class="bi bi-cash-coin"></i>Finances — Paiements &amp; Dépenses</div>
+    <div class="hero-zone-head"><i class="bi bi-cash-coin"></i>Finances — Paiements<?= $peut_voir_depenses ? ' &amp; Dépenses' : '' ?></div>
     <div class="hero-zone-nums">
       <div class="gauge-wrap gauge-wrap-sm"><canvas id="chartRecouvrementTop"></canvas><div class="gauge-val gauge-val-sm"><?= $taux_recouvrement ?>%</div></div>
       <div class="hn"><b><?= $fmt_f($total_du) ?></b><span>Total dû</span></div>
       <div class="hn"><b style="color:#7fe0ab"><?= $fmt_f($total_paye) ?></b><span>Encaissé</span></div>
+      <?php if ($peut_voir_depenses): ?>
       <div class="hn"><b style="color:#ffcf8a"><?= $fmt_f($total_depenses) ?></b><span>Dépensé</span></div>
       <div class="hn"><b style="color:<?= $solde_caisse_val >= 0 ? '#7fe0ab' : '#ff9d9d' ?>"><?= $fmt_f($solde_caisse_val) ?></b><span>Solde de caisse</span></div>
+      <?php endif; ?>
     </div>
   </div>
   <?php endif; ?>
@@ -456,10 +462,13 @@ require_once __DIR__ . '/layout/header.php';
   </div>
 </div>
 <?php endif; ?>
+<?php endif; /* fin finances (situation des élèves + top impayés) */ ?>
 
+<?php if ($peut_voir_finances || $peut_voir_depenses || $peut_voir_paie): ?>
 <!-- ── 2. Paiements et dépenses ── -->
 <div class="row g-2 mb-3">
   <!-- ── Finances ── -->
+  <?php if ($peut_voir_finances): ?>
   <div class="col-lg-4">
     <div class="card h-100">
       <div class="card-header d-flex justify-content-between align-items-center" style="background:#f8faff">
@@ -481,8 +490,10 @@ require_once __DIR__ . '/layout/header.php';
       </div>
     </div>
   </div>
+  <?php endif; ?>
 
   <!-- ── Dépenses ── -->
+  <?php if ($peut_voir_depenses): ?>
   <div class="col-lg-4">
     <div class="card h-100">
       <div class="card-header d-flex justify-content-between align-items-center" style="background:#f8faff">
@@ -498,6 +509,7 @@ require_once __DIR__ . '/layout/header.php';
       </div>
     </div>
   </div>
+  <?php endif; ?>
 
   <?php if ($peut_voir_paie): ?>
   <!-- ── Paie / RH ── -->
@@ -529,7 +541,7 @@ require_once __DIR__ . '/layout/header.php';
 </div>
 <?php endif; ?>
 
-<?php if ($peut_voir_finances && ($depenses_par_categorie || $encaissements_par_mois)): ?>
+<?php if ($depenses_par_categorie || $encaissements_par_mois): ?>
 <!-- ── Dépenses par catégorie + Évolution des encaissements (demande du
      23/08/2026). ── -->
 <div class="row g-2 mb-3">
@@ -794,6 +806,9 @@ new Chart(document.getElementById('chartRecouvrementClasse'), {
 });
 <?php endif; ?>
 
+<?php endif; /* fin graphiques finances */ ?>
+
+<?php if ($peut_voir_depenses): ?>
 new Chart(document.getElementById('chartDepenses'), {
     type: 'bar',
     data: {
@@ -813,6 +828,7 @@ new Chart(document.getElementById('chartDepenses'), {
         },
     },
 });
+<?php endif; ?>
 
 <?php if ($depenses_par_categorie): ?>
 new Chart(document.getElementById('chartDepensesCategorie'), {
@@ -858,7 +874,6 @@ new Chart(document.getElementById('chartEncaissementsMois'), {
         },
     },
 });
-<?php endif; ?>
 <?php endif; ?>
 
 <?php if ($peut_voir_paie): ?>

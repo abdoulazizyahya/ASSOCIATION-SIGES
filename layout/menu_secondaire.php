@@ -23,7 +23,12 @@
 // statut de l'établissement (etablissement.statut, migration v4 secondaire)
 // tranche. Demande explicite du 22/09/2026 (jusqu'ici les deux groupes
 // étaient toujours visibles ensemble, quel que soit le statut réel).
-$statut_ecole = (function_exists('get_etablissement') ? get_etablissement()['statut'] ?? 'public' : 'public');
+// $GLOBALS['statut_ecole_menu'] : statut imposé par l'appelant quand le menu
+// d'une AUTRE école est construit hors de celle-ci (association/acces.php,
+// portail Privilèges — aucune école « ouverte », get_etablissement() vide :
+// une école privée y montrait PAIEMENT PUBLIQUE, 03/10/2026).
+$statut_ecole = $GLOBALS['statut_ecole_menu']
+    ?? (function_exists('get_etablissement') ? get_etablissement()['statut'] ?? 'public' : 'public');
 
 $menu = [
     'Principal' => [
