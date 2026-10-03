@@ -21,10 +21,56 @@ header('Cache-Control: no-store, no-cache, must-revalidate');
 require_once __DIR__ . '/../../../config.php';
 require_once __DIR__ . '/../../../connexion.php';
 require_once __DIR__ . '/../../../fonctions.php';
-exiger_role(['ENSEIGNANT']);
+// Ouvert à TOUT le personnel (03/10/2026) : chacun voit et complète SES
+// propres informations, même s'il n'enseigne pas (Proviseur/Principal,
+// Administrateur, Censeur, Surveillant général, Intendant, Secrétaire).
+exiger_role(['ADMIN', 'PROVISEUR', 'CENSEUR', 'SG', 'INTENDANT', 'SECRETAIRE', 'ENSEIGNANT']);
 
 $mat = matricule_ens_courant();
-if (!$mat) { flash_set('erreur', 'Aucune fiche enseignant n\'est liée à votre compte. Contactez l\'administration.'); rediriger('dashboard.php'); }
+
+// Compte sans fiche du personnel (fréquent au secondaire : utilisateur.
+// matricule_ens est facultatif) : la personne crée elle-même sa fiche,
+// pré-remplie depuis son compte, puis la complète ci-dessous.
+if (!$mat) {
+    $compte = db_one("SELECT id, nom, prenom, email, role FROM utilisateur WHERE id=?", [(int) ($_SESSION['user_id'] ?? 0)]);
+    if (!$compte) { flash_set('erreur', 'Compte introuvable.'); rediriger('dashboard.php'); }
+    if ($_SERVER['REQUEST_METHOD'] === 'POST' && post('form') === 'creer_fiche') {
+        csrf_verifier();
+        db_exec("INSERT INTO enseignant (nom_ens, prenom_ens, mail_ens, id_fonction) VALUES (?, ?, ?, ?)",
+                [mb_strtoupper(trim((string) $compte['nom']) ?: 'À COMPLÉTER'), $compte['prenom'] ?: null, $compte['email'] ?: null,
+                 str_replace('(e)', '', libelle_role((string) $compte['role']))]);
+        $mat = (int) db_last_id();
+        db_exec("UPDATE utilisateur SET matricule_ens=? WHERE id=?", [$mat, (int) $compte['id']]);
+        $_SESSION['user']['matricule_ens'] = $mat;
+        journaliser_action('fiche_personnel_creee', null, 'compte #' . $compte['id'] . ' → fiche ' . $mat);
+        flash_set('succes', 'Votre fiche du personnel a été créée. Complétez maintenant vos informations.');
+        rediriger('secondaire/pages/enseignants/mon_profil.php');
+    }
+    $titre_page = 'Mes informations';
+    require_once __DIR__ . '/../../../layout/header.php';
+    ?>
+    <div class="page-titre"><h4><i class="bi bi-person-vcard me-1 text-primary"></i>Mes informations</h4></div>
+    <div class="card" style="max-width:620px">
+      <div class="card-body">
+        <p class="mb-2">Votre compte n'est pas encore relié à une <strong>fiche du personnel</strong>.
+           Créez-la pour pouvoir consulter et compléter vos informations (identité, contact, carrière),
+           utilisées par les documents administratifs et la paie.</p>
+        <table class="table table-sm mb-3" style="font-size:.85rem">
+          <tr><th style="width:35%">Nom</th><td><?= h(mb_strtoupper((string) $compte['nom'])) ?> <?= h($compte['prenom'] ?? '') ?></td></tr>
+          <tr><th>Rôle</th><td><?= h(libelle_role((string) $compte['role'])) ?></td></tr>
+          <tr><th>E-mail</th><td><?= h($compte['email'] ?: '—') ?></td></tr>
+        </table>
+        <form method="post">
+          <?= csrf_champ() ?>
+          <input type="hidden" name="form" value="creer_fiche">
+          <button class="btn btn-primary btn-sm"><i class="bi bi-person-plus me-1"></i>Créer ma fiche du personnel</button>
+        </form>
+      </div>
+    </div>
+    <?php
+    require_once __DIR__ . '/../../../layout/footer.php';
+    exit;
+}
 
 $e = db_one("SELECT * FROM enseignant WHERE matricule_ens=?", [$mat]);
 if (!$e) { flash_set('erreur', 'Fiche enseignant introuvable.'); rediriger('dashboard.php'); }
@@ -34,8 +80,10 @@ $regions = db_all("SELECT id, nom FROM region ORDER BY nom");
 
 // Tous les champs éditables par l'enseignant lui-même (identité + carrière + affectation).
 // Seul le matricule (clé primaire) reste hors de cette liste : il ne peut pas être modifié.
+// Grade et fonction : JAMAIS modifiables par la personne elle-même (03/10/2026 —
+// un enseignant pouvait se déclarer « Principal ») ; affichés en lecture seule,
+// gérés par l'administration (Ressources humaines > Enseignants).
 $champs = ['nom_ens','prenom_ens','civilite_ens','sexe_ens','tel_ens','mail_ens',
-    'id_grade','id_fonction',
     'date_naiss','lieu_naiss','region_origine','departement_origine','arrondissement_origine',
     'tribu','ethnie','situation_matrimoniale',
     'poste_anterieur','lieu_anterieur',
@@ -234,13 +282,13 @@ require_once __DIR__ . '/../../../layout/header.php';
   <div class="col-12"><div class="section-title"><i class="bi bi-briefcase me-1"></i>Carrière professionnelle</div></div>
   <div class="col-md-4">
     <label class="form-label">Grade</label>
-    <input type="text" name="id_grade" value="<?= h($v('id_grade')) ?>" class="form-control form-control-sm"
-           placeholder="ex: PLEG, IPES…">
+    <input type="text" value="<?= h($v('id_grade')) ?>" class="form-control form-control-sm" disabled
+           title="Géré par l'administration">
   </div>
   <div class="col-md-4">
     <label class="form-label">Fonction</label>
-    <input type="text" name="id_fonction" value="<?= h($v('id_fonction')) ?>" class="form-control form-control-sm"
-           placeholder="ex: Enseignant, PP…">
+    <input type="text" value="<?= h($v('id_fonction')) ?>" class="form-control form-control-sm" disabled
+           title="Géré par l'administration">
   </div>
   <div class="col-md-4">
     <label class="form-label">Qualité / En qualité de</label>

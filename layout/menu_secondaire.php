@@ -100,7 +100,7 @@ $menu = [
         ['Grille salariale',      'secondaire/pages/paie/grille.php',           'table',              ['ADMIN','PROVISEUR', 'FONDATEUR','INTENDANT']],
         ['Paie',                  'secondaire/pages/paie/index.php',            'cash-stack',         ['ADMIN','PROVISEUR', 'FONDATEUR','INTENDANT']],
         ['Avances sur salaire',   'secondaire/pages/paie/avances.php',          'cash',               ['ADMIN','PROVISEUR', 'FONDATEUR','INTENDANT']],
-        ['Mes informations',      'secondaire/pages/enseignants/mon_profil.php','person-vcard',       ['ENSEIGNANT']],
+        ['Mes informations',      'secondaire/pages/enseignants/mon_profil.php','person-vcard',       ['ADMIN','PROVISEUR','CENSEUR','SG','INTENDANT','SECRETAIRE','ENSEIGNANT']],
         ['Mes bulletins de paie', 'secondaire/pages/paie/mes_bulletins.php',    'receipt',            ['ADMIN','PROVISEUR','CENSEUR','SG','INTENDANT','SECRETAIRE','ENSEIGNANT']],
         ['Demandes de documents', 'secondaire/pages/demandes/index.php',        'file-earmark-text',  ['ENSEIGNANT','CENSEUR','PROVISEUR', 'FONDATEUR','ADMIN']],
     ],
