@@ -32,10 +32,12 @@ $peut_importer = $asso_ecriture || in_array(role_connecte(), ['DIRECTEUR','SECRE
 // « photos » = onglet Photos par classe (_eleves_photos.php) — rôles qui
 // peuvent modifier une fiche élève ($peut_gerer).
 // « incompletes » = onglet Fiches incomplètes (_eleves_incompletes.php).
-$statut = in_array($_GET['statut'] ?? '', ['actif','desactive','outils','photos','incompletes'], true) ? $_GET['statut'] : 'actif';
-if ($statut === 'outils' && !$peut_importer) $statut = 'actif';
+// « matricules » = onglet Matricules (_eleves_matricules.php) : élèves sans
+// matricule + doublons — mêmes rôles que la configuration des matricules.
+$statut = in_array($_GET['statut'] ?? '', ['actif','desactive','outils','photos','incompletes','matricules'], true) ? $_GET['statut'] : 'actif';
+if (in_array($statut, ['outils', 'matricules'], true) && !$peut_importer) $statut = 'actif';
 if (in_array($statut, ['photos', 'incompletes'], true) && !$peut_gerer) $statut = 'actif';
-$vue_outils = in_array($statut, ['outils', 'photos', 'incompletes'], true);   // pas de liste paginée
+$vue_outils = in_array($statut, ['outils', 'photos', 'incompletes', 'matricules'], true);   // pas de liste paginée
 $tri       = in_array($_GET['tri'] ?? '', ['nom','mat','sexe','classe']) ? $_GET['tri'] : 'nom';
 $ordre     = ($_GET['ordre'] ?? 'asc') === 'desc' ? 'DESC' : 'ASC';
 $page      = max(1, (int)($_GET['page'] ?? 1));

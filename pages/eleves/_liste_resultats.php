@@ -23,6 +23,18 @@ $nb_pages = max(1, (int)ceil($total / $pp));
       <i class="bi bi-upc-scan me-1"></i>Import &amp; matricules
     </a>
   </li>
+  <?php
+    // Compteur des anomalies de matricule (élèves actifs sans matricule +
+    // élèves portant un matricule déjà utilisé) — 2 requêtes légères.
+    $nb_pb_mat = (int) db_val("SELECT COUNT(*) FROM eleve WHERE statut='actif' AND (Mat_elv IS NULL OR TRIM(Mat_elv)='')")
+               + (int) db_val("SELECT COALESCE(SUM(n - 1), 0) FROM (SELECT COUNT(*) n FROM eleve WHERE Mat_elv IS NOT NULL AND TRIM(Mat_elv)<>'' GROUP BY UPPER(REPLACE(TRIM(Mat_elv), ' ', '')) HAVING COUNT(*) > 1) d");
+  ?>
+  <li class="nav-item">
+    <a class="nav-link <?= $statut === 'matricules' ? 'active' : '' ?>" href="#" onclick="changerStatutListe('matricules');return false">
+      <i class="bi bi-hash me-1"></i>Matricules
+      <?php if ($nb_pb_mat): ?><span class="badge bg-danger ms-1" title="Élèves sans matricule ou en double"><?= $nb_pb_mat ?></span><?php endif; ?>
+    </a>
+  </li>
   <?php endif; ?>
   <?php if (!empty($peut_gerer)): ?>
   <li class="nav-item">
@@ -40,6 +52,8 @@ $nb_pages = max(1, (int)ceil($total / $pp));
 
 <?php if (($statut ?? '') === 'outils'): ?>
   <?php require __DIR__ . '/_eleves_outils.php'; ?>
+<?php elseif (($statut ?? '') === 'matricules'): ?>
+  <?php require __DIR__ . '/_eleves_matricules.php'; ?>
 <?php elseif (($statut ?? '') === 'photos'): ?>
   <?php require __DIR__ . '/_eleves_photos.php'; ?>
 <?php elseif (($statut ?? '') === 'incompletes'): ?>
