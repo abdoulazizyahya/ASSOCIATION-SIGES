@@ -224,6 +224,72 @@ $m11 = "-- =====================================================================
          preg_replace('/\A(?:--[^\n]*\n)+/', '', $seed_comp));
 file_put_contents($racine . 'bd/secondaire/migration_v11.sql', $m11);
 
+// ── 7. Migration v12 : école créée AVANT l'ajout des matières au seed ──
+// (24/09/2026) : aucune matière, donc ni compétence (v11 sans effet) ni
+// affectation par classe. Complète, sans rien écraser :
+//   a) sections, niveaux, groupes, séries, matières de référence (une
+//      matière déjà présente sous le même libellé ou le même id est gardée) ;
+//   b) trimestres + séquences de l'année active s'ils manquent ;
+//   c) compétences du gabarit (groupes matière/niveau/trimestre vides) ;
+//   d) matières de chaque classe qui n'en a AUCUNE, dérivées des compétences
+//      de son niveau (même règle que secondaire_deriver_matieres_competences()),
+//      coefficient/ordre de reference_coefficients.php, sinon 1.
+$ref_actuel = str_replace("\r\n", "\n", file_get_contents($f_ref));
+$ref_sql = [];
+foreach (preg_split('/;\n/', $ref_actuel) as $st) {
+    $st = trim(preg_replace('/^--[^\n]*\n/m', '', $st . "\n"));
+    if (preg_match('/^INSERT IGNORE INTO `(section_classe|niveau|groupe|serie)`/', $st)) { $ref_sql[] = $st . ';'; continue; }
+    if (preg_match("/^INSERT IGNORE INTO `matiere` (\(.*?\)) VALUES \((\d+),(NULL|'(?:[^'\\\\]|\\\\.)*'),('(?:[^'\\\\]|\\\\.)*'),(.*)\)$/s", $st, $mm)) {
+        $ref_sql[] = "INSERT INTO `matiere` $mm[1] SELECT $mm[2],$mm[3],$mm[4],$mm[5] FROM DUAL"
+                   . " WHERE NOT EXISTS (SELECT 1 FROM `matiere` WHERE `id` = $mm[2] OR `libelle` = $mm[4]);";
+    }
+}
+$coef_rows = [];
+foreach ($coefs as $k => [$coef, $ordre]) {
+    [$niv, $mat] = explode('|', $k, 2);
+    $coef_rows[] = 'ROW(' . $q($niv) . ',' . $q(nettoyer($mat, false)) . ',' . (int) $coef . ',' . $q((string) $ordre) . ')';
+}
+$annee_active = "(SELECT a.`id` FROM `annee_scolaire` a WHERE a.`active` = 1 ORDER BY a.`id` DESC LIMIT 1)";
+$m12 = "-- =====================================================================\n"
+     . "--  SIGES — Migration SECONDAIRE v12 : matières, compétences, affectations\n"
+     . "-- =====================================================================\n"
+     . "--  Pour une école secondaire créée AVANT l'ajout des matières au seed de\n"
+     . "--  référence (24/09/2026) : sans matière, ni compétence ni affectation par\n"
+     . "--  classe (menu Pédagogie > Matières vide, bulletins sans compétences).\n"
+     . "--  Complète sans rien écraser ni supprimer :\n"
+     . "--    1. sections, niveaux, groupes, séries, matières de référence ;\n"
+     . "--    2. trimestres et séquences de l'année active s'ils manquent ;\n"
+     . "--    3. compétences du gabarit (groupes matière/niveau/trimestre vides) ;\n"
+     . "--    4. matières des classes qui n'en ont AUCUNE (d'après les compétences\n"
+     . "--       de leur niveau), avec coefficient et ordre de référence.\n"
+     . "--  Rejouable. Généré par bd/secondaire/outils/generer_references.php.\n"
+     . "-- =====================================================================\n\n"
+     . "-- 1. Références\n" . implode("\n", $ref_sql) . "\n\n"
+     . "-- 2. Trimestres et séquences de l'année active\n"
+     . "INSERT INTO `trimestre` (`libelle`, `ordre`, `id_annee`, `active`)\n"
+     . "SELECT v.`libelle`, v.`ordre`, a.`id`, 0\n"
+     . "FROM (VALUES ROW('Trimestre 1',1), ROW('Trimestre 2',2), ROW('Trimestre 3',3)) AS v(`libelle`, `ordre`)\n"
+     . "JOIN `annee_scolaire` a ON a.`id` = $annee_active\n"
+     . "WHERE NOT EXISTS (SELECT 1 FROM `trimestre` t WHERE t.`id_annee` = a.`id`);\n"
+     . "INSERT INTO `sequence` (`libelle`, `ordre`, `active`, `id_trim`)\n"
+     . "SELECT v.`libelle`, v.`ordre`, 0, t.`id`\n"
+     . "FROM (VALUES ROW('Séquence 1',1), ROW('Séquence 2',2)) AS v(`libelle`, `ordre`)\n"
+     . "JOIN `trimestre` t ON t.`id_annee` = $annee_active\n"
+     . "WHERE NOT EXISTS (SELECT 1 FROM `sequence` s JOIN `trimestre` t2 ON t2.`id` = s.`id_trim` WHERE t2.`id_annee` = t.`id_annee`);\n\n"
+     . "-- 3. Compétences de l'année active\n"
+     . preg_replace('/\A(?:--[^\n]*\n)+\n?/', '', $m11) . "\n\n"
+     . "-- 4. Matières des classes qui n'en ont aucune\n"
+     . "INSERT IGNORE INTO `discipline` (`id_mat`, `IDClasses`, `id_groupe`, `coef`, `ordre`)\n"
+     . "SELECT DISTINCT m.`id`, cl.`id`, g.`id_groupe_comp`, COALESCE(r.`coef`, 1), COALESCE(r.`ordre`, '1')\n"
+     . "FROM `classe` cl\n"
+     . "JOIN `groupe` g ON g.`id_groupe_comp` = (SELECT g2.`id_groupe_comp` FROM `groupe` g2 WHERE g2.`id_section` = cl.`libelle_section` COLLATE utf8mb4_unicode_ci ORDER BY g2.`id_groupe_comp` LIMIT 1)\n"
+     . "JOIN `competence` c ON c.`code_niveau` = cl.`code_niveau`\n"
+     . "JOIN `matiere` m ON m.`id` = c.`id_matiere` AND m.`libelle_section` = cl.`libelle_section`\n"
+     . "LEFT JOIN (VALUES\n" . implode(",\n", $coef_rows) . "\n) AS r(`niveau`, `matiere`, `coef`, `ordre`) ON r.`niveau` = cl.`code_niveau` AND r.`matiere` = m.`libelle`\n"
+     . "WHERE cl.`archivee` = 0\n"
+     . "  AND NOT EXISTS (SELECT 1 FROM `discipline` d WHERE d.`IDClasses` = cl.`id`);\n";
+file_put_contents($racine . 'bd/secondaire/migration_v12.sql', $m12);
+
 printf("Matières nettoyées : %d\nCompétences : %d lues, %d textes corrigés (dont %d accents), %d doublons retirés, %d dans le gabarit\n"
      . "Géographie : %d régions, %d départements, %d arrondissements\nFichiers écrits : seed_competences_secondaire.sql, seed_ref_ecole_secondaire.sql, reference_coefficients.php, migration_v10.sql\n",
     count($maj_matieres), count($comps), $stats['modifiees'], $stats['accents'], $nb_doublons, count($lignes),
