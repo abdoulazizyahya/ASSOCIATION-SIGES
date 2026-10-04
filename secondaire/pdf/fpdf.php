@@ -1484,6 +1484,14 @@ protected function _parsegif($file)
 	return $info;
 }
 
+// Mode de rendu du texte (opérateur PDF « Tr ») : 0 = plein (défaut),
+// 1 = contour seul (lettres creuses). Sert au tampon « AUTHENTIQUE » posé
+// PAR-DESSUS un document dense sans en masquer le contenu (03/10/2026).
+public function ModeTexte(int $mode): void
+{
+	$this->_out(max(0, min(7, $mode)) . ' Tr');
+}
+
 protected function _out($s)
 {
 	// Add a line to the current page

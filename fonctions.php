@@ -2515,9 +2515,11 @@ function matricule_exemple(string $format, int $lseq, string $val_annee = '2025/
 //  année seule, ou global. Repli aléatoire en cas de collision (2
 //  enregistrements simultanés). Mode 'manuel' -> chaîne vide (le matricule
 //  est alors saisi, ou laissé vide, dans le formulaire).
-function gen_matricule(string $val_annee, string $niveau): string {
+// $forcer : génère selon le format configuré même en mode 'manuel' (onglet
+// « Matricules » — attribuer un matricule aux élèves restés sans, 03/10/2026).
+function gen_matricule(string $val_annee, string $niveau, bool $forcer = false): string {
     $cfg = matricule_config();
-    if ($cfg['mode'] === 'manuel') return '';
+    if ($cfg['mode'] === 'manuel' && !$forcer) return '';
 
     $an   = explode('/', $val_annee)[0] ?: $val_annee;
     $aa   = substr($an, -2);
@@ -3143,6 +3145,77 @@ function eleve_absence_annuelle(string $matricule, int $id_classe, int $id_annee
         $tot_jus += $a['jus']; $tot_non_jus += $a['non_jus'];
     }
     return ['par_trimestre' => $par_trim, 'jus' => $tot_jus, 'non_jus' => $tot_non_jus, 'total' => $tot_jus + $tot_non_jus];
+}
+
+// ── Photos des élèves du SECONDAIRE, stockées EN BASE (migration secondaire
+//    v9, 03/10/2026) — même principe que le primaire (eleve.Photo_elv) :
+//    eleve.photo_bin = l'image ; eleve.photo = 'bd' quand elle est en base,
+//    ou l'ancien nom de fichier (assets/uploads/eleves/) tant qu'elle n'est
+//    pas convertie. Conversion automatique au premier accès. ──────────────
+
+/** La colonne eleve.photo_bin existe-t-elle (migration v9 appliquée) ? */
+function photo_sec_en_base(): bool {
+    static $c = [];
+    $k = db_cache_cle('photo_bin');
+    if (!isset($c[$k])) {
+        try { $c[$k] = (bool) db_val("SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'eleve' AND column_name = 'photo_bin'"); }
+        catch (\Throwable $e) { $c[$k] = false; }
+    }
+    return $c[$k];
+}
+
+/**
+ * Image (binaire) de la photo d'un élève du secondaire, ou null. Une photo
+ * encore en fichier est copiée en base au passage, puis son fichier supprimé
+ * (jamais bloquant : en lecture seule ou si l'écriture échoue, on renvoie
+ * simplement l'image du fichier).
+ */
+function photo_sec_binaire(int $id): ?string {
+    $en_base = photo_sec_en_base();
+    $r = db_one($en_base ? "SELECT photo, photo_bin FROM eleve WHERE id=?" : "SELECT photo FROM eleve WHERE id=?", [$id]);
+    if (!$r) return null;
+    if ($en_base && !empty($r['photo_bin'])) return $r['photo_bin'];
+    $nom = (string) ($r['photo'] ?? '');
+    if ($nom === '' || $nom === 'bd' || basename($nom) !== $nom || !is_file(UPLOAD_DIR . $nom)) return null;
+    $bin = (string) @file_get_contents(UPLOAD_DIR . $nom);
+    if ($bin === '') return null;
+    if ($en_base) {
+        try {
+            db_exec("UPDATE eleve SET photo_bin=?, photo='bd' WHERE id=?", [$bin, $id]);
+            if ((int) db_val("SELECT COUNT(*) FROM eleve WHERE photo=?", [$nom]) === 0) @unlink(UPLOAD_DIR . $nom);
+        } catch (\Throwable $e) { /* conversion reportée au prochain accès */ }
+    }
+    return $bin;
+}
+
+/** L'élève (ligne avec la colonne `photo`) a-t-il une photo ? Sans requête supplémentaire. */
+function photo_sec_presente(?string $photo): bool {
+    $photo = (string) $photo;
+    return $photo === 'bd' || ($photo !== '' && basename($photo) === $photo && is_file(UPLOAD_DIR . $photo));
+}
+
+/** URL d'affichage (page protégée par connexion) ou avatar générique. */
+function url_photo_eleve_sec(int $id, bool $a_photo, string $sexe): string {
+    if ($a_photo) return APP_URL . '/secondaire/pages/eleves/photo.php?id=' . $id;
+    return APP_URL . '/assets/img/avatars/' . (stripos($sexe, 'F') === 0 ? 'fille.png' : 'garcon.png');
+}
+
+/**
+ * Chemin d'un fichier TEMPORAIRE contenant la photo (pour les PDF : FPDF
+ * attend un fichier), supprimé en fin de requête ; '' si pas de photo.
+ */
+function photo_sec_fichier_tmp(int $id): string {
+    $bin = photo_sec_binaire($id);
+    if ($bin === null) return '';
+    $info = @getimagesizefromstring($bin);
+    $ext = ($info && $info[2] === IMAGETYPE_PNG) ? 'png' : 'jpg';
+    $tmp = tempnam(sys_get_temp_dir(), 'phsec_');
+    if ($tmp === false) return '';
+    @unlink($tmp);
+    $tmp .= '.' . $ext;
+    if (@file_put_contents($tmp, $bin) === false) return '';
+    register_shutdown_function(fn() => @unlink($tmp));
+    return $tmp;
 }
 
 // ==== sauver_photo ====

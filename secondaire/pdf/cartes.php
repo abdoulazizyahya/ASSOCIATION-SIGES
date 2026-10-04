@@ -273,7 +273,7 @@ function dessiner_carte_1(FPDF $pdf, array $el, array $etab, array $annee,
 // repli que les bulletins/tableau d'honneur), utilisée à la fois pour la
 // photo affichée sur la carte et pour celle incrustée dans le QR.
 function carte_photo_path(array $el): string {
-    $photo_path = !empty($el['photo']) ? __DIR__ . '/../../assets/uploads/eleves/' . $el['photo'] : '';
+    $photo_path = !empty($el['photo']) ? photo_sec_fichier_tmp((int) $el['id']) : '';
     if ($photo_path && is_file($photo_path)) return $photo_path;
     $avatar = (strtoupper($el['sexe'] ?? '') === 'F') ? 'fille.png' : 'garcon.png';
     return __DIR__ . '/../../assets/img/avatars/' . $avatar;

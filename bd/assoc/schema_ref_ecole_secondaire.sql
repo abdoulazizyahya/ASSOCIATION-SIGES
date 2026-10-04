@@ -284,6 +284,7 @@ CREATE TABLE `eleve` (
   `telephone` varchar(50) DEFAULT NULL,
   `niu` varchar(30) DEFAULT NULL,
   `photo` varchar(255) DEFAULT NULL,
+  `photo_bin` mediumblob,
   `statut` enum('actif','desactive') NOT NULL DEFAULT 'actif',
   `cree_le` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),

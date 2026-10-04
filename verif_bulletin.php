@@ -14,8 +14,38 @@
 require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/connexion.php';
 require_once __DIR__ . '/fonctions.php';
-require_once __DIR__ . '/pdf/verif_lib.php';
+require_once __DIR__ . '/pdf/verif_commun.php';
+
+// QR de bulletin SECONDAIRE imprimé avant le 03/10/2026 : il ne porte pas
+// &ec=. On retrouve son école en recalculant la signature dans chaque école
+// secondaire (élève + période + matricule) : une seule correspond, on
+// relance alors la page avec le bon &ec=. Les QR du primaire portent déjà
+// le code d'école en multi-établissement.
+if (empty($_GET['ec']) && verif_multi_ecoles() && in_array($_GET['v'] ?? '', ['trim', 'seq'], true)) {
+    $e_q = (int) ($_GET['e'] ?? 0); $p_q = (int) ($_GET['p'] ?? 0); $h_q = (string) ($_GET['h'] ?? '');
+    $secret = defined('BULLETIN_VERIF_SECRET') ? BULLETIN_VERIF_SECRET : 'CHANGE_ME_ABZ_MBE_INSECURE_DEFAULT_SECRET';
+    if ($e_q > 0 && $p_q > 0 && $h_q !== '') {
+        foreach (assoc_all("SELECT id, code FROM etablissement WHERE actif=1 AND type_enseignement='secondaire'") as $ec_cand) {
+            try {
+                $mat = avec_ecole((int) $ec_cand['id'], fn($l) => ecole_one($l, "SELECT matricule FROM eleve WHERE id=?", [$e_q]))['matricule'] ?? null;
+            } catch (\Throwable $x) { $mat = null; }
+            if ($mat === null) continue;
+            $attendu = substr(hash_hmac('sha256', $e_q . '|' . $_GET['v'] . '|' . $p_q . '|' . $mat, $secret), 0, 20);
+            if (hash_equals($attendu, $h_q)) {
+                header('Location: ' . APP_URL . '/verif_bulletin.php?' . http_build_query($_GET + ['ec' => $ec_cand['code']]));
+                exit;
+            }
+        }
+    }
+}
 verif_exiger_ecole_publique();  // multi-école : URL sans &ec= -> page neutre
+
+// École SECONDAIRE : tables et générateur de bulletin distincts du primaire.
+if (function_exists('type_enseignement_courant') && type_enseignement_courant() === 'secondaire') {
+    require __DIR__ . '/secondaire/verif_bulletin_contenu.php';
+    exit;
+}
+require_once __DIR__ . '/pdf/verif_lib.php';
 
 $id_eleve   = (int) ($_GET['e'] ?? 0);
 $vue_recue  = (string) ($_GET['v'] ?? '');

@@ -61,7 +61,11 @@ function pdf_texte_ajuste(FPDF $pdf, float $x, float $y, float $w, string $texte
 // vérification (le document vient d'être authentifié par le serveur).
 // À appeler juste après pdf_filigrane() pour qu'il reste DERRIÈRE le texte
 // (dessiné avant, le texte s'imprime par-dessus).
-function pdf_tampon_authentique(FPDF $pdf, float $cx, float $cy, float $largeur, string $mention = 'AUTHENTIQUE'): void {
+// $par_dessus : tampon posé APRÈS le contenu (document dense aux cases
+// remplies, ex. bulletin, qui masquaient le tampon dessiné en fond) —
+// lettres en contour seul pour ne rien cacher du texte en dessous.
+function pdf_tampon_authentique(FPDF $pdf, float $cx, float $cy, float $largeur, string $mention = 'AUTHENTIQUE', bool $par_dessus = false): void {
+    $contour = $par_dessus && method_exists($pdf, 'ModeTexte');
     $angle = 28;
     // Taille de police calculée pour que le mot occupe ~80 % de $largeur
     // (page entière, exemplaire de reçu ou carte : même rendu, à l'échelle).
@@ -84,7 +88,9 @@ function pdf_tampon_authentique(FPDF $pdf, float $cx, float $cy, float $largeur,
     $pdf->SetLineWidth(max(0.15, 0.6 * $k));
     $m = 2 * $k;
     if (method_exists($pdf, 'RoundedRect')) $pdf->RoundedRect($x + $m, $y + $m, $w - 2 * $m, $h - 2 * $m, 3 * $k, 'D'); else $pdf->Rect($x + $m, $y + $m, $w - 2 * $m, $h - 2 * $m, 'D');
+    if ($contour) { $pdf->SetLineWidth(max(0.2, 0.9 * $k)); $pdf->ModeTexte(1); }
     $pdf->Text($cx - $w_txt / 2, $cy + 4 * $k, $mention);
+    if ($contour) { $pdf->ModeTexte(0); }
     $pdf->SetFont('Arial', 'B', max(4, 10 * $k));
     $sous = pdf_u(pdf_tampon_mention());
     $pdf->Text($cx - $pdf->GetStringWidth($sous) / 2, $cy + 12 * $k, $sous);

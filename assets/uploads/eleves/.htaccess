@@ -1,0 +1,12 @@
+# Photos des élèves (anciens fichiers du secondaire) : JAMAIS servies
+# directement — ni fichier, ni liste du dossier. Les photos sont désormais
+# en base et servies après connexion (secondaire/pages/eleves/photo.php),
+# qui lit aussi ces anciens fichiers côté serveur pour les convertir.
+Options -Indexes
+<IfModule mod_authz_core.c>
+    Require all denied
+</IfModule>
+<IfModule !mod_authz_core.c>
+    Order allow,deny
+    Deny from all
+</IfModule>

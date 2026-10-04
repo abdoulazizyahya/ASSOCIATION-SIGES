@@ -62,7 +62,7 @@ function fiches_eleves(string $niveau = '', int $id_classe = 0): array {
              JOIN classe c ON c.id=i.id_classe LEFT JOIN niveau n ON n.code_niveau=c.code_niveau
              WHERE " . implode(' AND ', $w) . "
              ORDER BY n.ordre_niveau + 0, c.ordre, c.designation, e.nom, e.prenom", $p);
-        $a_photo = fn($r) => !empty($r['photo']) && is_file(UPLOAD_DIR . $r['photo']);
+        $a_photo = fn($r) => photo_sec_presente($r['photo'] ?? null);   // en base ('bd') ou ancien fichier
     } else {
         $w = ["e.statut='actif'"]; $p = [$annee['val_annee'] ?? ''];
         if ($niveau !== '') { $w[] = 'c.Niveau=?';    $p[] = $niveau; }

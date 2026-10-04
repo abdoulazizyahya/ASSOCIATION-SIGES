@@ -135,7 +135,7 @@ if (function_exists('type_enseignement_courant')) {
                                 'pages/eleves/photos_seance.php', 'secondaire/pages/eleves/photos_seance.php',
                                 // Vérification publique du certificat de scolarité (QR) : type-aware
                                 // — sans cela, un QR d'école secondaire tombait sur « En construction ».
-                                'verif_scolarite.php'], true) || str_starts_with($_rel, 'ajax/');
+                                'verif_scolarite.php', 'verif_bulletin.php'], true) || str_starts_with($_rel, 'ajax/');
     if (!$_commun) {
         $_secondaire = type_enseignement_courant() === 'secondaire';
         if ($_secondaire && !str_starts_with($_rel, 'secondaire/')) {
@@ -161,12 +161,25 @@ if (function_exists('type_enseignement_courant')) {
 function _db_stmt(string $sql, array $params) {
     global $link;
     $t0   = microtime(true);
-    $stmt = mysqli_prepare($link, $sql);
-    if ($params) {
-        $types = str_repeat('s', count($params));
-        mysqli_stmt_bind_param($stmt, $types, ...$params);
+    // Erreur MySQL 1615 « Prepared statement needs to be re-prepared » :
+    // avec de nombreuses bases d'écoles, MySQL évince des définitions de
+    // tables de son cache (table_definition_cache) entre la préparation et
+    // l'exécution — aléatoire, sans gravité. On prépare et on exécute de
+    // nouveau (3 essais au plus) au lieu d'interrompre la page (03/10/2026).
+    for ($essai = 1; ; $essai++) {
+        $stmt = mysqli_prepare($link, $sql);
+        if ($params) {
+            $types = str_repeat('s', count($params));
+            mysqli_stmt_bind_param($stmt, $types, ...$params);
+        }
+        try {
+            mysqli_stmt_execute($stmt);
+            break;
+        } catch (\mysqli_sql_exception $e) {
+            if ($e->getCode() !== 1615 || $essai >= 3) throw $e;
+            mysqli_stmt_close($stmt);
+        }
     }
-    mysqli_stmt_execute($stmt);
     // Compteur de requêtes / temps SQL de la page — affiché en local
     // uniquement (layout/footer.php, db_stats_html()) pour repérer les
     // pages les plus lourdes. Coût négligeable en production.

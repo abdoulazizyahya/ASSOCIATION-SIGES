@@ -718,7 +718,7 @@ $w_info  = $uw - $photo_w;
 // Photo de l'élève si disponible en base, sinon avatar par défaut selon le
 // sexe (masculin/féminin) qui indique visuellement l'emplacement réservé à
 // la photo — plus de case grise vide "PHOTO" (demande explicite).
-$photo_path  = !empty($eleve['photo']) ? __DIR__ . '/../../../assets/uploads/eleves/' . $eleve['photo'] : '';
+$photo_path  = !empty($eleve['photo']) ? photo_sec_fichier_tmp((int) $eleve['id']) : '';
 $photo_reelle = $photo_path && is_file($photo_path);
 if (!$photo_reelle) {
     $avatar_fichier = (strtoupper($eleve['sexe'] ?? '') === 'F') ? 'fille.png' : 'garcon.png';

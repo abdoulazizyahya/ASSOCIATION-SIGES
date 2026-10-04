@@ -6,7 +6,9 @@
 // — les pages secondaire/pages/eleves/ du même nom ne font que les inclure.
 // Deux stockages différents :
 //   primaire   : BLOB eleve.Photo_elv (servi par pages/eleves/photo.php) ;
-//   secondaire : fichier assets/uploads/eleves/<eleve.photo> (UPLOAD_DIR),
+//   secondaire : BLOB eleve.photo_bin (migration secondaire v9, photo='bd'),
+//                servi par secondaire/pages/eleves/photo.php — ancien fichier
+//                assets/uploads/eleves/<eleve.photo> converti au premier accès ;
 //                lu tel quel par les bulletins/cartes du secondaire.
 // À inclure après config.php / connexion.php / fonctions.php.
 
@@ -55,13 +57,15 @@ function photos_eleves_classe(int $id_classe): array {
              WHERE i.id_classe=? AND e.statut='actif' ORDER BY e.nom, e.prenom",
             [(int) ($annee['id'] ?? 0), $id_classe]);
         return array_map(function ($e) {
-            $a = !empty($e['photo']) && is_file(UPLOAD_DIR . $e['photo']);
+            // Photo en base (photo='bd') ou ancien fichier pas encore converti :
+            // toujours servie par la page protégée (secondaire/pages/eleves/photo.php).
+            $a = photo_sec_presente($e['photo'] ?? null);
             return [
                 'id'    => (int) $e['id'],
                 'mat'   => (string) ($e['mat'] ?? ''),
                 'nom'   => trim(mb_strtoupper((string) $e['nom']) . ' ' . ($e['prenom'] ?? '')),
                 'photo' => $a,
-                'url'   => $a ? APP_URL . '/assets/uploads/eleves/' . rawurlencode($e['photo']) : photos_avatar((string) $e['sexe']),
+                'url'   => $a ? url_photo_eleve_sec((int) $e['id'], true, (string) $e['sexe']) . '&v=' . substr(md5((string) $e['photo'] . $e['id']), 0, 6) : photos_avatar((string) $e['sexe']),
             ];
         }, $rows);
     }
@@ -94,6 +98,13 @@ function photo_eleve_enregistrer(int $id, string $bin, int $type_image): string 
         return APP_URL . '/pages/eleves/photo.php?id=' . $id . '&v=' . time();
     }
     $ancien = (string) (db_val("SELECT photo FROM eleve WHERE id=?", [$id]) ?? '');
+    // Secondaire, migration v9 appliquée : photo EN BASE (plus de fichier
+    // public dans assets/uploads/eleves/, incluse dans les sauvegardes).
+    if (photo_sec_en_base()) {
+        db_exec("UPDATE eleve SET photo_bin=?, photo='bd' WHERE id=?", [$bin, $id]);
+        photos_supprimer_fichier($ancien);
+        return url_photo_eleve_sec($id, true, '') . '&v=' . time();
+    }
     $ext = $type_image === IMAGETYPE_PNG ? 'png' : ($type_image === IMAGETYPE_WEBP ? 'webp' : 'jpg');
     $nom = 'elv_' . bin2hex(random_bytes(8)) . '.' . $ext;
     if (!is_dir(UPLOAD_DIR)) @mkdir(UPLOAD_DIR, 0755, true);
@@ -116,7 +127,7 @@ function photo_eleve_supprimer(int $id): string {
     if (!photos_est_secondaire()) {
         db_exec("UPDATE eleve SET Photo_elv=NULL WHERE id_eleve=?", [$id]);
     } else {
-        db_exec("UPDATE eleve SET photo=NULL WHERE id=?", [$id]);
+        db_exec(photo_sec_en_base() ? "UPDATE eleve SET photo=NULL, photo_bin=NULL WHERE id=?" : "UPDATE eleve SET photo=NULL WHERE id=?", [$id]);
         photos_supprimer_fichier((string) ($el['photo'] ?? ''));
     }
     return photos_avatar((string) ($el['sexe'] ?? ''));
@@ -125,7 +136,7 @@ function photo_eleve_supprimer(int $id): string {
 // Supprime un ancien fichier photo du secondaire — uniquement un nom simple
 // (jamais de chemin) et seulement s'il n'est plus référencé par aucun élève.
 function photos_supprimer_fichier(string $nom): void {
-    if ($nom === '' || basename($nom) !== $nom) return;
+    if ($nom === '' || $nom === 'bd' || basename($nom) !== $nom) return;
     if ((int) db_val("SELECT COUNT(*) FROM eleve WHERE photo=?", [$nom]) > 0) return;
     if (is_file(UPLOAD_DIR . $nom)) @unlink(UPLOAD_DIR . $nom);
 }

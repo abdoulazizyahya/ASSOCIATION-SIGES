@@ -314,7 +314,7 @@ if (($_GET['signature'] ?? '0') === '1') {
 // fonctions dupliquées ici par convention du projet (pas de dépendance
 // croisée entre les différents types de documents).
 function photo_eleve_cs(array $eleve): string {
-    $photo_path = !empty($eleve['photo']) ? __DIR__ . '/../../assets/uploads/eleves/' . $eleve['photo'] : '';
+    $photo_path = !empty($eleve['photo']) ? photo_sec_fichier_tmp((int) $eleve['id']) : '';
     if ($photo_path && is_file($photo_path)) return $photo_path;
     $avatar = (strtoupper($eleve['sexe'] ?? '') === 'F') ? 'fille.png' : 'garcon.png';
     return __DIR__ . '/../../assets/img/avatars/' . $avatar;

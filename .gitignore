@@ -11,7 +11,8 @@
 
 # ── Données personnelles élèves (photos, dossiers) — jamais en dépôt,
 # même privé : à restaurer depuis un backup séparé si besoin ──────────
-/assets/uploads/eleves/
+/assets/uploads/eleves/*
+!/assets/uploads/eleves/.htaccess
 /assets/uploads/dossiers_eleves/
 /assets/uploads/profils/
 

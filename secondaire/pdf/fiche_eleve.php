@@ -38,7 +38,7 @@ pdf_bandeau($pdf, 'FICHE ÉLÈVE', 'STUDENT RECORD', $pw, 12);
 $y_body = $pdf->GetY();
 
 // ── Photo ──────────────────────────────────────────────────────
-$photo_path = !empty($eleve['photo']) ? __DIR__ . '/../../assets/uploads/eleves/' . $eleve['photo'] : '';
+$photo_path = !empty($eleve['photo']) ? photo_sec_fichier_tmp((int) $eleve['id']) : '';
 if ($photo_path && is_file($photo_path)) {
     $pdf->Image($photo_path, 12, $y_body, 28, 34);
 } else {

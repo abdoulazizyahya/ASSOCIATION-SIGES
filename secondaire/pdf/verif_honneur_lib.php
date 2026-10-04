@@ -23,7 +23,7 @@ function honneur_verif_base_url(): string {
     }
     $https  = !empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off';
     $scheme = $https ? 'https' : 'http';
-    $host   = $_SERVER['HTTP_HOST'] ?? 'localhost';
+    $host   = function_exists('hote_verif_reseau') ? hote_verif_reseau() : ($_SERVER['HTTP_HOST'] ?? 'localhost');   // adresse réseau, pas « localhost » (03/10/2026)
     return $scheme . '://' . $host . APP_URL;
 }
 

@@ -708,7 +708,7 @@ foreach ($eleves as $el) {
 
     // Photo de l'élève si disponible, sinon avatar par défaut selon le sexe —
     // identique à secondaire/pages/bulletins/pdf.php (demande explicite).
-    $photo_path_c  = !empty($eleve['photo']) ? __DIR__ . '/../../../assets/uploads/eleves/' . $eleve['photo'] : '';
+    $photo_path_c  = !empty($eleve['photo']) ? photo_sec_fichier_tmp((int) $eleve['id']) : '';
     $photo_reelle_c = $photo_path_c && is_file($photo_path_c);
     if (!$photo_reelle_c) {
         $avatar_fichier_c = (strtoupper($eleve['sexe'] ?? '') === 'F') ? 'fille.png' : 'garcon.png';

@@ -248,7 +248,7 @@ function titre_multicolore(FPDF $pdf, float $cx, float $y, string $texte, float 
 // Photo de l'élève (chemin réel ou avatar par défaut selon le sexe — même
 // repli que les bulletins).
 function photo_eleve_th(array $el): string {
-    $photo_path = !empty($el['photo']) ? __DIR__ . '/../../../assets/uploads/eleves/' . $el['photo'] : '';
+    $photo_path = !empty($el['photo']) ? photo_sec_fichier_tmp((int) $el['id']) : '';
     if ($photo_path && is_file($photo_path)) return $photo_path;
     $avatar = (strtoupper($el['sexe'] ?? '') === 'F') ? 'fille.png' : 'garcon.png';
     return __DIR__ . '/../../../assets/img/avatars/' . $avatar;

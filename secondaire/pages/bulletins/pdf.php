@@ -613,7 +613,7 @@ $w_info  = $uw - $photo_w;
 // Photo de l'élève si disponible en base, sinon avatar par défaut selon le
 // sexe (masculin/féminin) qui indique visuellement l'emplacement réservé à
 // la photo — plus de case grise vide "PHOTO" (demande explicite).
-$photo_path  = !empty($eleve['photo']) ? __DIR__ . '/../../../assets/uploads/eleves/' . $eleve['photo'] : '';
+$photo_path  = !empty($eleve['photo']) ? photo_sec_fichier_tmp((int) $eleve['id']) : '';
 $photo_reelle = $photo_path && is_file($photo_path);
 if (!$photo_reelle) {
     $avatar_fichier = (strtoupper($eleve['sexe'] ?? '') === 'F') ? 'fille.png' : 'garcon.png';
@@ -1240,6 +1240,13 @@ $pdf->SetY($y_dec2 + $h_obs_box);
 $pdf->SetFont('Arial', '', 6.5);
 $pdf->SetXY($ml, $ph - 9);
 $pdf->Cell($uw, 4, u('Copyright © SIGES ABZ   , E-mail: abdoulazizyahya@gmail.com'), 0, 1, 'C');
+
+// Ouvert depuis le scan du QR code : tampon « AUTHENTIQUE » comme sur les
+// reçus, mais redessiné PAR-DESSUS le bulletin (lettres creuses) — celui
+// posé en fond par pdf_filigrane() était caché par les cases remplies.
+if ($acces_public) {
+    pdf_tampon_authentique($pdf, $pw / 2, $ph * 0.52, $pw * 0.80, 'AUTHENTIQUE', true);
+}
 
 // ── Sortie ────────────────────────────────────────────────────────
 $mode     = ($_GET['dl'] ?? '') === '1' ? 'D' : 'I';
