@@ -182,7 +182,7 @@ function charger_schema_ecole(mysqli &$l, array $seed, string $type = 'primaire'
         throw new RuntimeException('Schéma de référence introuvable (' . basename($fichier) . ').');
     }
     if (mysqli_multi_query($l, $schema)) {
-        do { /* consommer tous les jeux de résultats */ } while (mysqli_next_result($l));
+        do { if ($r = mysqli_store_result($l)) mysqli_free_result($r); } while (mysqli_more_results($l) && mysqli_next_result($l));
     }
     if (mysqli_errno($l)) {
         throw new RuntimeException('Chargement du schéma : ' . mysqli_error($l));
@@ -362,7 +362,7 @@ function charger_seed_ref_ecole(mysqli $l): int {
     $sql = @file_get_contents($f);
     if ($sql === false || trim($sql) === '') return 0;
     if (mysqli_multi_query($l, $sql)) {
-        do { /* consommer */ } while (mysqli_next_result($l));
+        do { if ($r = mysqli_store_result($l)) mysqli_free_result($r); } while (mysqli_more_results($l) && mysqli_next_result($l));
     }
     if (mysqli_errno($l)) {
         // Non bloquant : l'école reste utilisable, la référence sera
@@ -386,7 +386,7 @@ function charger_seed_ref_ecole_secondaire(mysqli $l): int {
     $sql = @file_get_contents($f);
     if ($sql === false || trim($sql) === '') return 0;
     if (mysqli_multi_query($l, $sql)) {
-        do { /* consommer */ } while (mysqli_next_result($l));
+        do { if ($r = mysqli_store_result($l)) mysqli_free_result($r); } while (mysqli_more_results($l) && mysqli_next_result($l));
     }
     if (mysqli_errno($l)) {
         error_log('charger_seed_ref_ecole_secondaire: ' . mysqli_error($l));
@@ -1696,7 +1696,7 @@ function assoc_migrer_ecole(int $id, bool $backup = true): array {
         $sql = file_get_contents($dispo[$v]);
         try {
             if (mysqli_multi_query($l, $sql)) {
-                do { /* consommer */ } while (mysqli_next_result($l));
+                do { if ($r = mysqli_store_result($l)) mysqli_free_result($r); } while (mysqli_more_results($l) && mysqli_next_result($l));
             }
             if (mysqli_errno($l)) throw new RuntimeException(mysqli_error($l));
             assoc_exec(

@@ -1,11 +1,14 @@
--- bd/assoc/seed_competences_secondaire.sql
--- Gabarit des COMPÉTENCES (groupes = matières) par niveau et par trimestre
--- d'une école secondaire — repris de LAM_ABZ et NETTOYÉ le 04/10/2026
--- (bd/secondaire/outils/generer_references.php : caractères mal convertis,
--- espaces, apostrophes, accents, doublons). Indexé par libellé de matière +
--- code niveau + ORDRE du trimestre (1..3), donc indépendant de toute année :
--- appliquer_competences_ref_secondaire() (fonctions.php) le rejoue sur les
--- trimestres de chaque année créée, en remplaçant :ID_ANNEE:. Idempotent.
+-- =====================================================================
+--  SIGES — Migration SECONDAIRE v11 : compétences de l'année active
+-- =====================================================================
+--  Le gabarit (bd/assoc/seed_competences_secondaire.sql) n'est appliqué
+--  qu'à la création des trimestres : une année créée avant lui n'a aucune
+--  compétence et ses bulletins sortent vides. Complète, pour l'année ACTIVE,
+--  chaque groupe matière + niveau + trimestre qui n'a AUCUNE compétence.
+--  Les groupes déjà remplis ne sont pas touchés. Rejouable.
+--  Généré par bd/secondaire/outils/generer_references.php.
+-- =====================================================================
+
 INSERT INTO `competence` (`id_matiere`, `code_niveau`, `id_trim`, `libelle`, `libelle_en`, `ordre`)
 SELECT m.`id`, v.`code_niveau`, t.`id`, v.`libelle`, v.`libelle_en`, v.`ordre`
 FROM (VALUES
@@ -1662,9 +1665,9 @@ ROW('HOME ECONOMICS','FORM 2',3,'Produce embroidery items e.g. back race and apr
 ) AS v(`matiere`, `code_niveau`, `ordre_trim`, `libelle`, `libelle_en`, `ordre`)
 JOIN `matiere` m ON m.`libelle` = v.`matiere`
 JOIN `niveau`  n ON n.`code_niveau` = v.`code_niveau`
-JOIN `trimestre` t ON t.`id_annee` = :ID_ANNEE: AND t.`ordre` = v.`ordre_trim`
+JOIN `trimestre` t ON t.`id_annee` = (SELECT a.`id` FROM `annee_scolaire` a WHERE a.`active` = 1 ORDER BY a.`id` DESC LIMIT 1) AND t.`ordre` = v.`ordre_trim`
 WHERE NOT EXISTS (
   SELECT 1 FROM `competence` c
   WHERE c.`id_matiere` = m.`id` AND c.`code_niveau` = v.`code_niveau`
-    AND c.`id_trim` = t.`id` AND c.`libelle` = v.`libelle`
+    AND c.`id_trim` = t.`id`
 );

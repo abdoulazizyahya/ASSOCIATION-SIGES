@@ -89,7 +89,7 @@ foreach ($ecoles as $e) {
     }
 
     if (mysqli_multi_query($l, $seed)) {
-        do { /* consommer */ } while (mysqli_next_result($l));
+        do { if ($r = mysqli_store_result($l)) mysqli_free_result($r); } while (mysqli_more_results($l) && mysqli_next_result($l));
     }
     if (mysqli_errno($l)) {
         echo "  ERREUR : " . mysqli_error($l) . "\n"; $echecs++; mysqli_close($l); continue;

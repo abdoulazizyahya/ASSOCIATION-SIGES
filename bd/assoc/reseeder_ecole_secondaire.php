@@ -34,7 +34,7 @@ mysqli_set_charset($l, 'utf8mb4');
 
 $seed = file_get_contents(__DIR__ . '/seed_ref_ecole_secondaire.sql');
 if (mysqli_multi_query($l, $seed)) {
-    do { /* consommer */ } while (mysqli_next_result($l));
+    do { if ($r = mysqli_store_result($l)) mysqli_free_result($r); } while (mysqli_more_results($l) && mysqli_next_result($l));
 }
 if (mysqli_errno($l)) { fwrite(STDERR, "Seed de référence : " . mysqli_error($l) . "\n"); exit(1); }
 echo "Données de référence chargées.\n";

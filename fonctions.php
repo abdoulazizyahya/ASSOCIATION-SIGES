@@ -595,7 +595,7 @@ function secondaire_deriver_matieres_competences(int $id_classe, ?string $code_n
     $matieres = db_all($sql, $params);
     $reference = secondaire_reference_coefficients();
     foreach ($matieres as $m) {
-        [$coef, $ordre] = $reference[$code_niveau . '|' . $m['libelle']] ?? [1, 1];
+        [$coef, $ordre] = $reference[$code_niveau . '|' . trim($m['libelle'])] ?? [1, 1];   // clés sans espaces superflus (04/10/2026)
         db_exec(
             "INSERT IGNORE INTO discipline (id_mat, IDClasses, id_groupe, coef, ordre) VALUES (?,?,?,?,?)",
             [$m['id_matiere'], $id_classe, (int) $id_groupe, $coef, (string) $ordre]

@@ -63,7 +63,7 @@ foreach (assoc_all("SELECT id, code, nom, db_name, type_enseignement FROM etabli
         $sql = file_get_contents($dispo[$v]);
         try {
             if (mysqli_multi_query($l, $sql)) {
-                do { /* consommer */ } while (mysqli_next_result($l));
+                do { if ($r = mysqli_store_result($l)) mysqli_free_result($r); } while (mysqli_more_results($l) && mysqli_next_result($l));
             }
             // erreur eventuelle du dernier statement
             if (mysqli_errno($l)) throw new RuntimeException(mysqli_error($l));

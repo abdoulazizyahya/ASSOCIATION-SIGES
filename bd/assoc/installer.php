@@ -104,7 +104,7 @@ if ($sql === false) { out('ERREUR : schema_assoc.sql introuvable.'); exit(1); }
 $sql = str_replace('{{DB_NAME_ASSOC}}', DB_NAME_ASSOC, $sql);
 
 if (mysqli_multi_query($srv, $sql)) {
-    do { /* consommer tous les jeux de résultats */ } while (mysqli_next_result($srv));
+    do { if ($r = mysqli_store_result($srv)) mysqli_free_result($r); } while (mysqli_more_results($srv) && mysqli_next_result($srv));
 }
 out('OK  Base + tables créées (schema_assoc.sql).');
 
