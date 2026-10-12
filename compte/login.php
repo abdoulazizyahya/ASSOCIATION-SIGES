@@ -120,8 +120,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             // disponible sur les autres pages tant que ce n'est pas fait
             // (noyau/layout/header.php + compte/questions_securite_reporter.php).
             $dest = (function_exists('utilisateur_a_questions') && !utilisateur_a_questions($u_id))
-                ? '/configurer_securite.php'
-                : '/dashboard.php';
+                ? '/compte/configurer_securite.php'
+                : '/noyau/dashboard.php';
             // Retour vers la page demandée avant connexion — posé uniquement
             // par primaire/pages/eleves/photos_seance.php (QR code de la séance photo
             // au téléphone, primaire ou secondaire). Chemin interne à

@@ -25,23 +25,23 @@
 <IfModule mod_rewrite.c>
     RewriteEngine On
     RewriteCond $0#%{REQUEST_URI} ^([^#]*)#(.*)\1$
-    RewriteRule ^secondaire/pages/(notes|bulletins)/(.*)$ %2secondaire/general/pages/$1/$2 [R=301,L]
+    RewriteRule ^secondaire/pages/(notes|bulletins)/(.*)$ %2secondaire/general/pages/$1/$2 [R=308,L]
     RewriteCond $0#%{REQUEST_URI} ^([^#]*)#(.*)\1$
-    RewriteRule ^secondaire/pages/(.*)$ %2secondaire/commun/pages/$1 [R=301,L]
+    RewriteRule ^secondaire/pages/(.*)$ %2secondaire/commun/pages/$1 [R=308,L]
     RewriteCond $0#%{REQUEST_URI} ^([^#]*)#(.*)\1$
-    RewriteRule ^secondaire/pdf/(.*)$ %2secondaire/commun/pdf/$1 [R=301,L]
+    RewriteRule ^secondaire/pdf/(.*)$ %2secondaire/commun/pdf/$1 [R=308,L]
     RewriteCond $0#%{REQUEST_URI} ^([^#]*)#(.*)\1$
-    RewriteRule ^(pages|pdf)/(.*)$ %2primaire/$1/$2 [R=301,L]
+    RewriteRule ^(pages|pdf)/(.*)$ %2primaire/$1/$2 [R=308,L]
     RewriteCond $0#%{REQUEST_URI} ^([^#]*)#(.*)\1$
-    RewriteRule ^(notes_apc|notes_apc_arabe)\.php$ %2primaire/$1.php [R=301,L]
+    RewriteRule ^(notes_apc|notes_apc_arabe)\.php$ %2primaire/$1.php [R=308,L]
     RewriteCond $0#%{REQUEST_URI} ^([^#]*)#(.*)\1$
     RewriteRule ^ajax/(.*)$ %2noyau/ajax/$1 [R=307,L]
     # Racine réduite à index.php (12/10/2026). QR IMPRIMÉS : verif_X.php -> verif/X.php
     # (ne jamais retirer cette règle — les documents papier en circulation en dépendent).
     RewriteCond $0#%{REQUEST_URI} ^([^#]*)#(.*)\1$
-    RewriteRule ^verif_(attestation|bulletin|carte|honneur|paiement|recu|scolarite)\.php$ %2verif/$1.php [R=301,L]
+    RewriteRule ^verif_(attestation|bulletin|carte|honneur|paiement|recu|scolarite)\.php$ %2verif/$1.php [R=308,L]
     RewriteCond $0#%{REQUEST_URI} ^([^#]*)#(.*)\1$
-    RewriteRule ^verif_bulletin_hors_ligne\.html$ %2verif/bulletin_hors_ligne.html [R=301,L]
+    RewriteRule ^verif_bulletin_hors_ligne\.html$ %2verif/bulletin_hors_ligne.html [R=308,L]
     RewriteCond $0#%{REQUEST_URI} ^([^#]*)#(.*)\1$
     RewriteRule ^(login|logout|mot_de_passe_oublie|configurer_securite|questions_securite_reporter|profil)\.php$ %2compte/$1.php [R=307,L]
     RewriteCond $0#%{REQUEST_URI} ^([^#]*)#(.*)\1$
