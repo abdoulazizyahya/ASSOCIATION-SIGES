@@ -4005,6 +4005,19 @@ function stat_jointures_notes_periode(string $in_t): array {
  * @return array{moy: ?float, nb_evalues: int}
  */
 function pv_moy_annuelle_comp(array $par_trim): array {
+    // Technique (règle d'ABZ_MBE, celle de son bulletin annuel et de son
+    // résultat annuel) : moyenne des SEULS trimestres où l'élève est classé
+    // — un élève arrivé en cours d'année n'est pas divisé par 3 ; aucun
+    // trimestre classé = pas de moyenne annuelle (non classé), jamais 0.
+    // Sans cela, conseil de classe / résultat annuel contredisaient le
+    // bulletin annuel (ex. 8,66 au bulletin, 2,89 au conseil).
+    if (function_exists('est_technique') && est_technique()) {
+        $vals = [];
+        foreach ($par_trim as $t) {
+            if (empty($t['annule']) && !empty($t['classable']) && $t['moy'] !== null) $vals[] = (float) $t['moy'];
+        }
+        return ['moy' => $vals ? array_sum($vals) / count($vals) : null, 'nb_evalues' => count($vals)];
+    }
     $somme = 0.0; $diviseur = 0;
     foreach ($par_trim as $t) {
         if (!empty($t['annule']) || empty($t['evalue'])) continue;
