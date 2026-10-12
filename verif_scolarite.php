@@ -4,11 +4,11 @@
 // vérifier son authenticité. Type-aware (primaire/secondaire) depuis le
 // 26/09/2026 : partagée par primaire/pdf/certificat_scolarite.php (primaire) et
 // secondaire/commun/pdf/certificat_scolarite.php (même bibliothèque hash/URL,
-// primaire/pdf/verif_scolarite_lib.php — voir son en-tête).
+// noyau/partage/verif/verif_scolarite_lib.php — voir son en-tête).
 require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/noyau/connexion.php';
 require_once __DIR__ . '/noyau/fonctions.php';
-require_once __DIR__ . '/primaire/pdf/verif_scolarite_lib.php';
+require_once __DIR__ . '/noyau/partage/verif/verif_scolarite_lib.php';
 verif_exiger_ecole_publique();  // multi-école : URL sans &ec= -> page neutre
 
 $id_eleve   = (int)($_GET['e'] ?? 0);

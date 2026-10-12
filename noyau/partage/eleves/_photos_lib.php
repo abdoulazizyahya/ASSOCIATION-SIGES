@@ -1,5 +1,5 @@
 <?php
-// primaire/pages/eleves/_photos_lib.php — Photos par classe (primaire ET secondaire).
+// noyau/partage/eleves/_photos_lib.php — Photos par classe (primaire ET secondaire).
 // Adaptateur unique utilisé par l'onglet « Photos par classe »
 // (_eleves_photos.php + _photos_outils.php), la séance photo au téléphone
 // (photos_seance.php) et l'enregistrement/suppression (photo_enregistrer.php)

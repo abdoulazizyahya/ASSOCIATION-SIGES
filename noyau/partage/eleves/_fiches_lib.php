@@ -1,5 +1,5 @@
 <?php
-// primaire/pages/eleves/_fiches_lib.php — « Fiches incomplètes » (primaire ET
+// noyau/partage/eleves/_fiches_lib.php — « Fiches incomplètes » (primaire ET
 // secondaire) : élèves actifs de l'année dont il manque le matricule, le
 // NIU, la photo, la date / le lieu de naissance ou le nom arabe (primaire
 // seulement — pas de colonne au secondaire). Utilisé par l'onglet

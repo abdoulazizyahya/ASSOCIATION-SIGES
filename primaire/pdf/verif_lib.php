@@ -12,7 +12,7 @@ if (!defined('BULLETIN_VERIF_SECRET')) {
     // forger un QR "authentique" : la vérification n'est alors pas fiable.
     define('BULLETIN_VERIF_SECRET', 'CHANGE_ME_ABZ_MBE_INSECURE_DEFAULT_SECRET');
 }
-require_once __DIR__ . '/verif_commun.php';
+require_once __DIR__ . '/../../noyau/partage/verif/verif_commun.php';
 
 /**
  * Calcule la signature d'un bulletin (élève + période + matricule + piste).

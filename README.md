@@ -22,6 +22,8 @@ SIGES/
 │  ├─ connexion.php, connexion_assoc.php, ecole_contexte.php
 │  ├─ fonctions.php, paie_fonctions.php, chemins_historiques.php
 │  ├─ accueil.php    vitrine publique (rendue par index.php)
+│  ├─ partage/       code commun au primaire et au secondaire (vérification
+│  │                 des QR, photos et fiches des élèves, bulletins de paie)
 │  ├─ layout/        en-tête, pied de page, menus (primaire / secondaire)
 │  └─ ajax/          points d'accès AJAX partagés
 │

@@ -14,12 +14,12 @@ $id_annee = (int) ($annee['id'] ?? 0);
 $q         = trim($_GET['q'] ?? '');
 $id_classe = (int) ($_GET['classe'] ?? 0);
 $id_serie  = (int) ($_GET['serie'] ?? 0);
-require_once __DIR__ . '/../../../../primaire/pages/eleves/_photos_lib.php';
+require_once __DIR__ . '/../../../../noyau/partage/eleves/_photos_lib.php';
 // Onglet « Photos par classe » (commun primaire/secondaire,
-// primaire/pages/eleves/_eleves_photos.php) — mêmes rôles que la fiche élève.
+// noyau/partage/eleves/_eleves_photos.php) — mêmes rôles que la fiche élève.
 $peut_gerer = in_array(role_connecte(), photos_roles(), true)
            && !(function_exists('est_lecture_seule') && est_lecture_seule());
-// « incompletes » = onglet Fiches incomplètes (primaire/pages/eleves/_eleves_incompletes.php).
+// « incompletes » = onglet Fiches incomplètes (noyau/partage/eleves/_eleves_incompletes.php).
 $statut    = in_array($_GET['statut'] ?? '', ['desactive', 'photos', 'incompletes'], true) ? $_GET['statut'] : 'actif';
 if (in_array($statut, ['photos', 'incompletes'], true) && !$peut_gerer) $statut = 'actif';
 $vue_incompletes = $statut === 'incompletes';
@@ -182,9 +182,9 @@ require_once __DIR__ . '/../../../../noyau/layout/header.php';
 </div>
 
 <?php if ($vue_incompletes): ?>
-  <?php require __DIR__ . '/../../../../primaire/pages/eleves/_eleves_incompletes.php'; ?>
+  <?php require __DIR__ . '/../../../../noyau/partage/eleves/_eleves_incompletes.php'; ?>
 <?php elseif ($vue_photos): ?>
-  <?php require __DIR__ . '/../../../../primaire/pages/eleves/_eleves_photos.php'; ?>
+  <?php require __DIR__ . '/../../../../noyau/partage/eleves/_eleves_photos.php'; ?>
 <?php else: ?>
 
 <!-- Barre d'actions groupées (démasquée par JS dès qu'une case est cochée) -->
@@ -312,7 +312,7 @@ require_once __DIR__ . '/../../../../noyau/layout/header.php';
 
 <?php endif; // fin liste vs. onglet « Photos par classe » ?>
 
-<?php if ($peut_gerer) require __DIR__ . '/../../../../primaire/pages/eleves/_photos_outils.php'; ?>
+<?php if ($peut_gerer) require __DIR__ . '/../../../../noyau/partage/eleves/_photos_outils.php'; ?>
 
 <script>
 // Actions groupées (sélection multiple) — secondaire/commun/pages/eleves/liste.php.

@@ -1,5 +1,5 @@
 <?php
-// primaire/pages/eleves/_photos_outils.php — fenêtres (revue, planche scannée, QR de
+// noyau/partage/eleves/_photos_outils.php — fenêtres (revue, planche scannée, QR de
 // la séance photo), styles et JavaScript de l'onglet « Photos par classe ».
 // Inclus UNE fois par la page liste (primaire : primaire/pages/eleves/liste.php ;
 // secondaire : secondaire/commun/pages/eleves/liste.php), jamais par le fragment

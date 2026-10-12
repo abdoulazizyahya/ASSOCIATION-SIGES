@@ -1,12 +1,12 @@
 <?php
 // ── PDF : Certificat de scolarité ────────────────────────────
 // QR de vérification publique (même fonctionnement que les bulletins) —
-// voir primaire/pdf/verif_scolarite_lib.php / verif_scolarite.php. Demande explicite
+// voir noyau/partage/verif/verif_scolarite_lib.php / verif_scolarite.php. Demande explicite
 // du 26/09/2026.
 require_once __DIR__ . '/../../config.php';
 require_once __DIR__ . '/../../noyau/connexion.php';
 require_once __DIR__ . '/../../noyau/fonctions.php';
-require_once __DIR__ . '/verif_scolarite_lib.php';
+require_once __DIR__ . '/../../noyau/partage/verif/verif_scolarite_lib.php';
 
 function u(string $s): string {
     return mb_convert_encoding($s, 'Windows-1252', 'UTF-8');

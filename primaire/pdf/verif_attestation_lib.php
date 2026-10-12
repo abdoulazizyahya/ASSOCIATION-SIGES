@@ -12,7 +12,7 @@
 if (!defined('BULLETIN_VERIF_SECRET')) {
     define('BULLETIN_VERIF_SECRET', 'CHANGE_ME_ABZ_MBE_INSECURE_DEFAULT_SECRET');
 }
-require_once __DIR__ . '/verif_commun.php';
+require_once __DIR__ . '/../../noyau/partage/verif/verif_commun.php';
 
 function attestation_verif_hash(string $type, string $matricule, ?string $secret = null): string {
     $payload = 'attestation|' . $type . '|' . $matricule;

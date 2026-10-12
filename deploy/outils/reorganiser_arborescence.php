@@ -21,7 +21,7 @@ chdir($racine);
 
 // Table de correspondance (dossier = clé terminée par « / »). Le préfixe le
 // plus long l'emporte (secondaire/pages/notes/ avant secondaire/pages/).
-const CORRESPONDANCE = [
+$CORR_DEFAUT = [
     'secondaire/pages/notes/'            => 'secondaire/general/pages/notes/',
     'secondaire/pages/bulletins/'        => 'secondaire/general/pages/bulletins/',
     'secondaire/pages/'                  => 'secondaire/commun/pages/',
@@ -50,9 +50,15 @@ const CORRESPONDANCE = [
     'save.bat'                           => 'deploy/save.bat',
 ];
 
+// --table=fichier.php : autre table de correspondance (déplacements ultérieurs) ;
+// le fichier retourne ['correspondance' => […], 'prefixes_url' => […], 'fichiers_racine' => […]].
+$TABLE = null;
+foreach ($argv as $a) if (strncmp($a, '--table=', 8) === 0) $TABLE = require substr($a, 8);
+$GLOBALS['CORR'] = $TABLE['correspondance'] ?? $CORR_DEFAUT;
+
 function mapper(string $p): ?string {
     $meilleur = null; $lg = -1;
-    foreach (CORRESPONDANCE as $a => $n) {
+    foreach ($GLOBALS['CORR'] as $a => $n) {
         $dossier = substr($a, -1) === '/';
         $ok = $dossier ? ($p === rtrim($a, '/') || strncmp($p, $a, strlen($a)) === 0) : $p === $a;
         if ($ok && strlen($a) > $lg) { $meilleur = [$a, $n]; $lg = strlen($a); }
@@ -91,6 +97,7 @@ foreach ($suivis as $f) $nouveau[$f] = mapper($f) ?? $f;
 $prefixes_url = ['secondaire/pages/', 'secondaire/pdf/', 'secondaire/dashboard_contenu.php', 'secondaire/profil_contenu.php',
                  'secondaire/verif_bulletin_contenu.php', 'pages/', 'pdf/', 'layout/', 'ajax/', 'notes_apc.php', 'notes_apc_arabe.php'];
 $fichiers_racine = ['accueil.php', 'secondaire_en_construction.php'];
+if ($TABLE) { $prefixes_url = $TABLE['prefixes_url']; $fichiers_racine = $TABLE['fichiers_racine'] ?? []; }
 
 $journal = []; $contenus = [];
 foreach ($suivis as $f) {
@@ -137,7 +144,7 @@ foreach ($suivis as $f) {
     }, $s);
     // Fichiers déplacés depuis la racine : seulement en position d'URL.
     $alt2 = implode('|', array_map(function ($p) { return preg_quote($p, '~'); }, $fichiers_racine));
-    $s = preg_replace_callback('~(APP_URL\s*\.\s*[\'"]/|APP_URL\s*\?>/|rediriger\(\s*[\'"])(' . $alt2 . ')~', function ($m) use ($note) {
+    if ($alt2 !== '') $s = preg_replace_callback('~(APP_URL\s*\.\s*[\'"]/|APP_URL\s*\?>/|rediriger\(\s*[\'"])(' . $alt2 . ')~', function ($m) use ($note) {
         $n = mapper($m[2]);
         $note('R2', $m[2], $n);
         return $m[1] . $n;

@@ -14,7 +14,7 @@
 require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/noyau/connexion.php';
 require_once __DIR__ . '/noyau/fonctions.php';
-require_once __DIR__ . '/primaire/pdf/verif_commun.php';
+require_once __DIR__ . '/noyau/partage/verif/verif_commun.php';
 
 // QR de bulletin SECONDAIRE imprimé avant le 03/10/2026 : il ne porte pas
 // &ec=. On retrouve son école en recalculant la signature dans chaque école

@@ -11,7 +11,7 @@
 if (!defined('BULLETIN_VERIF_SECRET')) {
     define('BULLETIN_VERIF_SECRET', 'CHANGE_ME_ABZ_MBE_INSECURE_DEFAULT_SECRET');
 }
-require_once __DIR__ . '/verif_commun.php';
+require_once __DIR__ . '/../../noyau/partage/verif/verif_commun.php';
 
 // $val_annee (ex. "2025/2026"), PAS un identifiant numérique — ce fichier
 // avait été porté depuis ABZ_MBE avec un `int $id_annee` qui ne correspond

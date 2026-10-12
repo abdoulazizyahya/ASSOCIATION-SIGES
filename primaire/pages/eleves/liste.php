@@ -340,7 +340,7 @@ require_once __DIR__ . '/../../../noyau/layout/header.php';
   </div>
 </div>
 
-<?php if ($peut_gerer) require __DIR__ . '/_photos_outils.php'; ?>
+<?php if ($peut_gerer) require __DIR__ . '/../../../noyau/partage/eleves/_photos_outils.php'; ?>
 
 <script>
 // ═══ Recherche instantanée façon Google : aucun rechargement de page, aucun

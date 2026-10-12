@@ -13,4 +13,4 @@ exiger_role(['DIRECTEUR', 'ENSEIGNANT', 'SECRETAIRE', 'COMPTABLE']);
 $url_vue  = APP_URL . '/primaire/pages/paie/bulletin.php';
 $url_pdf  = APP_URL . '/primaire/pdf/bulletin_paie.php';
 $url_page = APP_URL . '/primaire/pages/paie/mes_bulletins.php';
-require __DIR__ . '/_mes_bulletins_contenu.php';
+require __DIR__ . '/../../../noyau/partage/paie/_mes_bulletins_contenu.php';

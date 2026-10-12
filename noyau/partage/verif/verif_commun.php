@@ -1,5 +1,5 @@
 <?php
-// primaire/pdf/verif_commun.php — helpers multi-établissement partagés par les
+// noyau/partage/verif/verif_commun.php — helpers multi-établissement partagés par les
 // 7 familles de documents vérifiables (bulletin, reçu, honneur, scolarité,
 // paiement, attestation, carte).
 //

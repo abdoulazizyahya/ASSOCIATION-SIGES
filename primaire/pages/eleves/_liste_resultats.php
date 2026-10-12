@@ -55,9 +55,9 @@ $nb_pages = max(1, (int)ceil($total / $pp));
 <?php elseif (($statut ?? '') === 'matricules'): ?>
   <?php require __DIR__ . '/_eleves_matricules.php'; ?>
 <?php elseif (($statut ?? '') === 'photos'): ?>
-  <?php require __DIR__ . '/_eleves_photos.php'; ?>
+  <?php require __DIR__ . '/../../../noyau/partage/eleves/_eleves_photos.php'; ?>
 <?php elseif (($statut ?? '') === 'incompletes'): ?>
-  <?php require __DIR__ . '/_eleves_incompletes.php'; ?>
+  <?php require __DIR__ . '/../../../noyau/partage/eleves/_eleves_incompletes.php'; ?>
 <?php else: ?>
 
 <div class="text-muted mb-1" style="font-size:.78rem"><?= $total ?> élève(s) <?= $statut === 'actif' ? 'actif(s)' : 'désactivé(s)' ?><?= $q !== '' ? ' — recherche « ' . h($q) . ' »' : '' ?></div>

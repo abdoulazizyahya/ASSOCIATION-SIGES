@@ -1,5 +1,5 @@
 <?php
-// primaire/pages/paie/_mes_bulletins_contenu.php — « Mes bulletins de paie » en
+// noyau/partage/paie/_mes_bulletins_contenu.php — « Mes bulletins de paie » en
 // libre-service, PARTAGÉ primaire / secondaire (mêmes tables bulletin_paie,
 // periode_paie, avance_salaire — paie_fonctions.php). Tout membre du
 // personnel connecté (compte lié à une fiche, matricule_ens) y consulte
@@ -69,7 +69,7 @@ foreach ($tous as $b) {
 }
 
 $titre_page = 'Mes bulletins de paie';
-require_once __DIR__ . '/../../../noyau/layout/header.php';
+require_once __DIR__ . '/../../layout/header.php';
 ?>
 
 <div class="page-titre d-flex justify-content-between align-items-center flex-wrap gap-2">
@@ -186,4 +186,4 @@ require_once __DIR__ . '/../../../noyau/layout/header.php';
 
 <?php endif; ?>
 
-<?php require_once __DIR__ . '/../../../noyau/layout/footer.php'; ?>
+<?php require_once __DIR__ . '/../../layout/footer.php'; ?>

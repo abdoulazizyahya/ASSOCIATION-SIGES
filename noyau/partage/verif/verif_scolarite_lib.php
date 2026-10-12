@@ -1,5 +1,5 @@
 <?php
-// primaire/pdf/verif_scolarite_lib.php — signature et vérification d'authenticité des
+// noyau/partage/verif/verif_scolarite_lib.php — signature et vérification d'authenticité des
 // certificats de scolarité. Fichier séparé des autres primaire/pdf/verif_*_lib.php
 // (bulletins, cartes, tableau d'honneur, paiements) : un QR de certificat de
 // scolarité ne doit jamais valider un autre type de document.

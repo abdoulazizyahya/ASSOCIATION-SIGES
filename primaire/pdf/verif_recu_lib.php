@@ -11,7 +11,7 @@ if (!defined('RECU_VERIF_SECRET')) {
     // dans config.php, ex. define('RECU_VERIF_SECRET', bin2hex(random_bytes(32)));
     define('RECU_VERIF_SECRET', 'CHANGE_ME_RECU_INSECURE_DEFAULT_SECRET');
 }
-require_once __DIR__ . '/verif_commun.php';
+require_once __DIR__ . '/../../noyau/partage/verif/verif_commun.php';
 
 /**
  * Signature d'un reçu (élève + année scolaire + numéro affiché) — le numéro

@@ -5,7 +5,7 @@
 // Multi-établissement : verif_ajout_ec() / verif_base_url_ecole() (partagés
 // avec le primaire) — le QR porte désormais &ec=CODE de l'école (03/10/2026 ;
 // sans lui, la page de vérification ne savait pas quelle école interroger).
-require_once __DIR__ . '/../../../primaire/pdf/verif_commun.php';
+require_once __DIR__ . '/../../../noyau/partage/verif/verif_commun.php';
 
 if (!defined('BULLETIN_VERIF_SECRET')) {
     // ⚠️ IMPORTANT — À FAIRE AVANT MISE EN PRODUCTION :

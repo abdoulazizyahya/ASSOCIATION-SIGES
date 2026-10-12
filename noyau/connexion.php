@@ -128,7 +128,7 @@ if (function_exists('type_enseignement_courant')) {
     if ($_app !== '' && strpos($_rel, $_app . '/') === 0) $_rel = substr($_rel, strlen($_app) + 1);
     $_rel = ltrim($_rel, '/');
     // Séance photo au téléphone (QR code) : page type-aware
-    // (primaire/pages/eleves/_photos_lib.php) — commune aux deux types, sinon un
+    // (noyau/partage/eleves/_photos_lib.php) — commune aux deux types, sinon un
     // téléphone pas encore connecté (contexte primaire par défaut) serait
     // renvoyé au tableau de bord avant d'atteindre la connexion.
     $_commun = in_array($_rel, ['login.php', 'logout.php', 'dashboard.php', 'profil.php', 'configurer_securite.php', 'mot_de_passe_oublie.php', 'questions_securite_reporter.php',

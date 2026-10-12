@@ -11,7 +11,7 @@ if (!defined('HONNEUR_VERIF_SECRET')) {
     // définir dans config.php avant mise en production.
     define('HONNEUR_VERIF_SECRET', 'CHANGE_ME_JAYNITAARE_INSECURE_DEFAULT_SECRET_HONNEUR');
 }
-require_once __DIR__ . '/verif_commun.php';
+require_once __DIR__ . '/../../noyau/partage/verif/verif_commun.php';
 
 /**
  * $vue = 'trim' ou 'annee' ; $id_periode = id_trim ou année (voir

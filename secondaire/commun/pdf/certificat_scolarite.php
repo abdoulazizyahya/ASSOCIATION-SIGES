@@ -9,7 +9,7 @@ require_once __DIR__ . '/../../../noyau/fonctions.php';
 // &ec= dans l'URL du QR (verif_ajout_ec(), manquant dans l'ancien duplicata
 // secondaire/commun/pdf/verif_scolarite_lib.php, supprimé) — cassait la
 // vérification en multi-établissement. Demande explicite du 26/09/2026.
-require_once __DIR__ . '/../../../primaire/pdf/verif_scolarite_lib.php';
+require_once __DIR__ . '/../../../noyau/partage/verif/verif_scolarite_lib.php';
 
 function u(string $s): string {
     return mb_convert_encoding($s, 'Windows-1252', 'UTF-8');
