@@ -675,6 +675,14 @@ foreach ($eleves as $el) {
     0, 'C');
 
     $pdf->SetY(max($pdf->GetY(), 33)-2.5);
+    // Logo ajusté automatiquement dans l'espace libre entre le haut de l'en-tête
+    // et l'immatriculation (proportions conservées) : il ne touche jamais
+    // l'immatriculation, même si les noms FR/EN prennent plus de lignes.
+    if ($logo_path && is_file($logo_path)) {
+        $y_immat = $pdf->GetY();
+        pdf_logo_cadre($pdf, $logo_path, $ml + $col3 + ($col3 - 34) / 2, $y0 + 0.5, 34, $y_immat - $y0 - 1.5);
+        $pdf->SetY($y_immat);
+    }
     $pdf->SetFont('Arial', 'I', 7);
     $pdf->SetX($ml);
     $pdf->Cell($uw, 4, uc('IMMATRICULATION : ' . ($etab['immatriculation'] ?? '')), 0, 1, 'C');

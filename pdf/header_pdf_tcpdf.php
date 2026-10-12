@@ -22,6 +22,8 @@
 // En pratique : SetRTL(true, false) → SetXY($x_gauche + $w, $y, true) →
 // Cell($w, ...) → SetRTL(false, false).
 
+require_once __DIR__ . '/../bd/lib/pdf_outils.php';   // pdf_logo_cadre()
+
 function tcpdf_filigrane(TCPDF $pdf, array $etab, float $page_w, float $page_h): void {
     $chemin = pdf_filigrane_chemin($etab); // réutilise le cache PNG déjà généré côté FPDF
     if ($chemin) {
@@ -110,7 +112,7 @@ function tcpdf_entete(TCPDF $pdf, array $etab, ?array $etab_ar, float $page_w, f
     $logo_path = !empty($etab['logo']) ? __DIR__ . '/../assets/uploads/' . $etab['logo'] : '';
     $logo_x = $marge + $col + ($col - $taille_logo) / 2;
     if ($logo_path && is_file($logo_path)) {
-        $pdf->Image($logo_path, $logo_x, $y0, $taille_logo);
+        pdf_logo_cadre($pdf, $logo_path, $logo_x, $y0, $taille_logo, $taille_logo);   // proportions conservées, jamais sur l'immatriculation
     } else {
         $pdf->SetFont('helvetica', 'B', 9);
         $pdf->SetXY($logo_x, $y0 + 3);

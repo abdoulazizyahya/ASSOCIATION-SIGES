@@ -180,7 +180,7 @@ function dessiner_bulletin_trimestriel(
     pdf_filigrane($pdf, $etab, $pw, $ph);
     if (!empty($etab['logo'])) {
         $logo_path = __DIR__ . '/../assets/uploads/' . $etab['logo'];
-        if (is_file($logo_path)) $pdf->Image($logo_path, 90, 7, 25, 25);
+        if (is_file($logo_path)) pdf_logo_cadre($pdf, $logo_path, 90, 7, 25, 25);
     }
     pdf_fill($pdf, 'groupe_competence');
 

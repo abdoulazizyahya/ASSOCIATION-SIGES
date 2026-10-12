@@ -57,7 +57,7 @@ pdf_filigrane($pdf, $etab, $pw, $ph);
 $y0 = 10;
 if (!empty($etab['logo'])) {
     $logo_path = __DIR__ . '/../../assets/uploads/' . $etab['logo'];
-    if (is_file($logo_path)) $pdf->Image($logo_path, $ML, $y0, 16, 16);
+    if (is_file($logo_path)) pdf_logo_cadre($pdf, $logo_path, $ML, $y0, 16, 16);
 }
 $pdf->SetXY($ML + 19, $y0);
 $pdf->SetFont('Arial', 'B', 10);

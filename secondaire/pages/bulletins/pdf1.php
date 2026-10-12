@@ -314,7 +314,7 @@ $pdf->MultiCell($col3, 3.5, u(
 $logo_path = !empty($etab['logo']) ? __DIR__ . '/../../../assets/uploads/' . $etab['logo'] : '';
 $logo_x = $ml + $col3 + ($col3 - 20) / 2;
 if ($logo_path && is_file($logo_path)) {
-    $pdf->Image($logo_path, $logo_x, $y0, 20);
+    pdf_logo_cadre($pdf, $logo_path, $logo_x, $y0, 20, 20);
 } else {
     $pdf->SetFont('Arial', 'B', 10);
     $pdf->SetXY($logo_x, $y0 + 2);

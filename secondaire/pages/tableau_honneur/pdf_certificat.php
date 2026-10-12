@@ -404,7 +404,7 @@ foreach ($qualifies as $q) {
         if ($logo_src_path && is_file($logo_src_path)) {
             $dim = @getimagesize($logo_src_path);
             if ($dim && $dim[0] > 0) $logo_h = $logo_w * $dim[1] / $dim[0];
-            $pdf->Image($logo_src_path, $ml + $col3 + ($col3 - $logo_w) / 2, $y0, $logo_w);
+            pdf_logo_cadre($pdf, $logo_src_path, $ml + $col3 + ($col3 - $logo_w) / 2, $y0, $logo_w, $logo_w);
         }
 
         $xr = $ml + $col3 * 2;

@@ -1,6 +1,7 @@
 <?php
 // ── Fonctions communes pour les PDF ─────────────────────────
 // Inclure après require_once fpdf.php
+require_once __DIR__ . '/../../bd/lib/pdf_outils.php';   // pdf_logo_cadre(), pdf_lignes_ajustees()
 
 // Encodage commun pour tous les PDF du projet : FPDF (polices standard
 // Arial/Helvetica) n'affiche correctement que du Windows-1252/ISO-8859-1,
@@ -244,7 +245,7 @@ function pdf_entete(FPDF $pdf, array $etab, float $page_w, float $marge = 10, ?f
         ? __DIR__ . '/../../assets/uploads/' . $etab['logo'] : '';
     $logo_x = $marge + $col + ($col - $taille_logo) / 2;
     if ($logo_path && is_file($logo_path)) {
-        $pdf->Image($logo_path, $logo_x, $y0, $taille_logo);
+        pdf_logo_cadre($pdf, $logo_path, $logo_x, $y0, $taille_logo, $taille_logo);   // proportions conservées, jamais sur l'immatriculation
     } else {
         $pdf->SetFont('Arial', 'B', 9 * $echelle);
         $pdf->SetXY($logo_x, $y0 + 3);

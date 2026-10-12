@@ -52,7 +52,7 @@ class FPDF_Dossier extends FPDF {
 
             $logo = !empty($etab['logo']) ? __DIR__.'/../../assets/uploads/'.$etab['logo'] : '';
             $lx = $ml + $col3 + ($col3 - 22)/2;
-            if ($logo && is_file($logo)) { $this->Image($logo, $lx, $y0, 22); }
+            if ($logo && is_file($logo)) { pdf_logo_cadre($this, $logo, $lx, $y0, 22, 22); }
             else { $this->SetFont('Arial','B',9); $this->SetXY($lx, $y0+4); $this->Cell(22,10,ud($etab['sigle'] ?? ''),1,0,'C'); }
 
             $xr = $ml + $col3*2;

@@ -125,7 +125,7 @@ function dessiner_bulletin_annuel_arabe(
     $pdf->SetRTL(false, false);
     if (!empty($etab['logo'])) {
         $logo_path = __DIR__ . '/../assets/uploads/' . $etab['logo'];
-        if (is_file($logo_path)) $pdf->Image($logo_path, 92, 19, 26, 26);
+        if (is_file($logo_path)) pdf_logo_cadre($pdf, $logo_path, 92, 19, 26, 26);
     }
 
     // En-tête FR/AR — colonnes réelles de `etablissement`.

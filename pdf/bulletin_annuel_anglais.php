@@ -187,7 +187,7 @@ function dessiner_bulletin_annuel_anglais(
 
     if (!empty($etab['logo'])) {
         $logo_path = __DIR__ . '/../assets/uploads/' . $etab['logo'];
-        if (is_file($logo_path)) $pdf->Image($logo_path, 92, 7, 22, 22);
+        if (is_file($logo_path)) pdf_logo_cadre($pdf, $logo_path, 92, 7, 22, 22);
     }
 
     // Titre — PERMUTÉ (mesuré : " ANNUAL REPORT CARD" tient à 20pt dans la

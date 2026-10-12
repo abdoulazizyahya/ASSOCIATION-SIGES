@@ -218,7 +218,7 @@ function entete_releve(FPDF $pdf, array $etab, float $ml, float $uw): void {
     if ($logo_path && is_file($logo_path)) {
         $dim = @getimagesize($logo_path);
         if ($dim && $dim[0] > 0) $logo_h = $logo_w * $dim[1] / $dim[0];
-        $pdf->Image($logo_path, $ml + $col3 + ($col3 - $logo_w) / 2, $y0, $logo_w);
+        pdf_logo_cadre($pdf, $logo_path, $ml + $col3 + ($col3 - $logo_w) / 2, $y0, $logo_w, $logo_w);
     }
     $pdf->SetY(max($pdf->GetY(), $y0 + 22));
 }

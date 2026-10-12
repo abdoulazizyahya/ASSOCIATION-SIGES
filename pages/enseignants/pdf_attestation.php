@@ -92,7 +92,7 @@ $ycol = $pdf->GetY();
 $logo_x = $ml+$col3+($col3-22)/2;
 $logo_path = !empty($etab['logo']) ? __DIR__.'/../../assets/uploads/'.$etab['logo'] : '';
 if ($logo_path && is_file($logo_path)) {
-    $pdf->Image($logo_path,$logo_x,$y0,22);
+    pdf_logo_cadre($pdf, $logo_path, $logo_x, $y0, 22, 22);
 } else {
     $pdf->SetFont('Arial','B',10); $pdf->SetXY($logo_x,$y0+4);
     $pdf->Cell(22,12,ud($etab['sigle']??''),1,0,'C');

@@ -5,6 +5,7 @@
 // jaynitaare_v2_bd (colonnes Mat_elv/IDClasses/val_annee...), pas sur celui
 // d'ABZ_MBE — ce sont deux systèmes différents (décision explicite, voir
 // prompt_continuite_jaynitaare_v2.md).
+require_once __DIR__ . '/bd/lib/pdf_outils.php';   // pdf_logo_cadre(), pdf_lignes_ajustees()
 
 // ── Champs de formulaire encodés (pare-feu de l'hébergeur) ────────────
 // Le pare-feu ModSecurity (OWASP CRS) de l'hébergeur mutualisé (Camoo)

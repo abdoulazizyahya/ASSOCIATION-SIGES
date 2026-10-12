@@ -188,7 +188,7 @@ function dessiner_bulletin_annuel(
 
     if (!empty($etab['logo'])) {
         $logo_path = __DIR__ . '/../assets/uploads/' . $etab['logo'];
-        if (is_file($logo_path)) $pdf->Image($logo_path, 92, 7, 22, 22);
+        if (is_file($logo_path)) pdf_logo_cadre($pdf, $logo_path, 92, 7, 22, 22);
     }
 
     $pdf->RoundedRect(50, 30.5, 108, 11.5, 11.5, 'DF');

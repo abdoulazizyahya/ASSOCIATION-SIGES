@@ -213,7 +213,7 @@ if ($logo_src_path && is_file($logo_src_path)) {
 $logo_x = $ml + $col3 + ($col3 - $logo_w) / 2;
 $logo_y = $y0 + (25 - $logo_h) / 2;
 if ($logo_src_path && is_file($logo_src_path)) {
-    $pdf->Image($logo_src_path, $logo_x, $logo_y, $logo_w);
+    pdf_logo_cadre($pdf, $logo_src_path, $logo_x, $logo_y, $logo_w, $logo_w);
 }
 
 $xr = $ml + $col3 * 2;

@@ -265,7 +265,7 @@ function dessiner_bulletin_trimestriel_arabe(
    // $pdf->SetRTL(false, false);
     if (!empty($etab['logo'])) {
         $logo_path = __DIR__ . '/../assets/uploads/' . $etab['logo'];
-        if (is_file($logo_path)) $pdf->Image($logo_path, 92, 18, 26, 25);
+        if (is_file($logo_path)) pdf_logo_cadre($pdf, $logo_path, 92, 18, 26, 25);
     }
 
     // ── En-tête bilingue complet (République/Devise/Ministère/Délégations/École) ──

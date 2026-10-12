@@ -80,7 +80,7 @@ function finances_dessiner_recu_eleve(FPDF $pdf, int $id_eleve, int $id_classe, 
         pdf_filigrane($pdf, $etab_pdf, 210, 297, 66, 72, 29 + $offY);
         $logo_path = !empty($etab_brut['logo']) ? __DIR__ . '/../assets/uploads/' . $etab_brut['logo'] : '';
         if ($logo_path && is_file($logo_path)) {
-            $pdf->Image($logo_path, 95, 4.3 + $offY, 20, 18);
+            pdf_logo_cadre($pdf, $logo_path, 95, 4.3 + $offY, 20, 18);
         }
 
         // En-tête bilingue (3 lignes FR gauche / EN droite).
