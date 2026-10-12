@@ -5,7 +5,7 @@
 //      http://localhost/ABZ_MBE/bd/run_migration_v11.php
 //
 //  1) Ajoute `utilisateur.email` (colonne manquante, référencée par
-//     pages/utilisateurs/form.php et profil.php mais absente en base).
+//     primaire/pages/utilisateurs/form.php et profil.php mais absente en base).
 //  2) Crée `question_secrete` (catalogue, 10 questions) et
 //     `utilisateur_question_secrete` (2 réponses hashées par utilisateur).
 //  3) Hache tous les mots de passe encore en clair dans `utilisateur`
@@ -13,7 +13,7 @@
 //     hashé (détecté via password_get_info) n'est jamais re-haché.
 // =====================================================================
 require_once __DIR__ . '/../config.php';
-require_once __DIR__ . '/../connexion.php';   // fournit $link + helpers db_*
+require_once __DIR__ . '/../noyau/connexion.php';   // fournit $link + helpers db_*
 
 header('Content-Type: text/plain; charset=utf-8');
 echo "=== Migration v11 — ABZ_MBE (mysqli) ===\n\n";

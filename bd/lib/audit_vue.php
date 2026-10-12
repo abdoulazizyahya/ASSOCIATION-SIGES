@@ -1,7 +1,7 @@
 <?php
 // bd/lib/audit_vue.php — libellés et rendu HTML des lignes du journal
 // d'audit. Partagé par association/journal.php (réseau) et
-// pages/utilisateurs/journal.php (vue directeur / fondateur).
+// primaire/pages/utilisateurs/journal.php (vue directeur / fondateur).
 // Suppose h() disponible (fonctions.php).
 
 function audit_vue_evenement(string $e): string

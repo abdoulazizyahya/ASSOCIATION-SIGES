@@ -24,7 +24,7 @@
 // =====================================================================
 
 require_once __DIR__ . '/../../config.php';
-require_once __DIR__ . '/../../connexion_assoc.php';
+require_once __DIR__ . '/../../noyau/connexion_assoc.php';
 
 @set_time_limit(0);
 mysqli_report(MYSQLI_REPORT_OFF);

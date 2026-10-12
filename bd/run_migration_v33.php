@@ -6,7 +6,7 @@
 //  Voir bd/migration_v33.sql pour le détail.
 // =====================================================================
 require_once __DIR__ . '/../config.php';
-require_once __DIR__ . '/../connexion.php';
+require_once __DIR__ . '/../noyau/connexion.php';
 
 header('Content-Type: text/plain; charset=utf-8');
 echo "=== Migration v33 — jaynitaare_v2 (mysqli) ===\n\n";

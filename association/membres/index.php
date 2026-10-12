@@ -2,8 +2,8 @@
 // association/membres/index.php — liste des membres de l'association +
 // création. Édition d'un membre et de ses accès : membres/voir.php.
 require_once __DIR__ . '/../../config.php';
-require_once __DIR__ . '/../../connexion.php';
-require_once __DIR__ . '/../../fonctions.php';
+require_once __DIR__ . '/../../noyau/connexion.php';
+require_once __DIR__ . '/../../noyau/fonctions.php';
 require_once __DIR__ . '/../_layout.php';
 exiger_superadmin_association();
 

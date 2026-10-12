@@ -9,7 +9,7 @@
 //  Voir bd/migration_v5.sql pour le détail des 3 changements.
 // =====================================================================
 require_once __DIR__ . '/../config.php';
-require_once __DIR__ . '/../connexion.php';
+require_once __DIR__ . '/../noyau/connexion.php';
 
 header('Content-Type: text/plain; charset=utf-8');
 echo "=== Migration v5 — jaynitaare_v2 (mysqli) ===\n\n";

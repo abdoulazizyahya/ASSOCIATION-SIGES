@@ -13,7 +13,7 @@
 // =====================================================================
 
 require_once __DIR__ . '/../../config.php';
-require_once __DIR__ . '/../../connexion_assoc.php';
+require_once __DIR__ . '/../../noyau/connexion_assoc.php';
 
 if (PHP_SAPI !== 'cli') header('Content-Type: text/plain; charset=utf-8');
 if (!annuaire_dispo()) { die("Annuaire absent — rien à mettre à jour.\n"); }
@@ -186,7 +186,7 @@ if (!table_existe('geo_ip_cache')) {
 // ── Secondaire : etablissement.type_enseignement (primaire/secondaire) ──
 //  Figé à la création de l'établissement — détermine le schéma école
 //  chargé (bd/assoc/schema_ref_ecole.sql vs schema_ref_ecole_secondaire.sql)
-//  et le module de pages utilisé (pages/ vs secondaire/). Toutes les écoles
+//  et le module de pages utilisé (primaire/pages/ vs secondaire/). Toutes les écoles
 //  existantes restent 'primaire' (comportement inchangé).
 if (!col_existe('etablissement', 'type_enseignement')) {
     mysqli_query($link_assoc,

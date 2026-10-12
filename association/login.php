@@ -3,8 +3,8 @@
 // Limitation de débit (login_echec) + double authentification TOTP
 // optionnelle (membre.totp_actif) — voir bd/lib/totp.php.
 require_once __DIR__ . '/../config.php';
-require_once __DIR__ . '/../connexion.php';
-require_once __DIR__ . '/../fonctions.php';
+require_once __DIR__ . '/../noyau/connexion.php';
+require_once __DIR__ . '/../noyau/fonctions.php';
 require_once __DIR__ . '/_layout.php';
 ecole_session_demarrer();
 

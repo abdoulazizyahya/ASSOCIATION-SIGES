@@ -13,7 +13,7 @@
 //    suppression d'une école (regenerer_portail_accueil(), best-effort).
 // ─────────────────────────────────────────────────────────────────────
 require_once __DIR__ . '/../../config.php';
-require_once __DIR__ . '/../../connexion_assoc.php';
+require_once __DIR__ . '/../../noyau/connexion_assoc.php';
 
 if (!function_exists('regenerer_portail_accueil')) {
     /**
@@ -24,7 +24,7 @@ if (!function_exists('regenerer_portail_accueil')) {
     function regenerer_portail_accueil(): ?string
     {
         $racine   = dirname(__DIR__, 2);                 // .../SIGES
-        $accueil  = $racine . '/accueil.php';
+        $accueil  = $racine . '/noyau/accueil.php';
         $cible    = $racine . '/promeducamsiges.html';
         if (!is_file($accueil)) return null;
 

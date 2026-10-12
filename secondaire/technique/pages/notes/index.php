@@ -2,14 +2,14 @@
 // secondaire/technique/pages/notes/index.php — module Notes d'une école
 // secondaire TECHNIQUE (etablissement.ordre_enseignement='technique'), porté
 // d'ABZ_MBE/pages/notes/index.php : saisie par SÉQUENCE (note.id_seq), pas
-// de compétences APC. On y arrive par secondaire/pages/notes/index.php
+// de compétences APC. On y arrive par secondaire/general/pages/notes/index.php
 // (redirection selon l'ordre d'enseignement de l'école).
 header('Cache-Control: no-store, no-cache, must-revalidate');
 require_once __DIR__ . '/../../../../config.php';
-require_once __DIR__ . '/../../../../connexion.php';
-require_once __DIR__ . '/../../../../fonctions.php';
+require_once __DIR__ . '/../../../../noyau/connexion.php';
+require_once __DIR__ . '/../../../../noyau/fonctions.php';
 exiger_role(['ADMIN', 'PROVISEUR', 'FONDATEUR', 'CENSEUR', 'ENSEIGNANT']);
-if (!est_technique()) rediriger('secondaire/pages/notes/index.php');
+if (!est_technique()) rediriger('secondaire/general/pages/notes/index.php');
 
 auto_activer_sequences();
 
@@ -419,8 +419,8 @@ if ($onglet === 'non_saisis' && $seq_active) {
 $id_cl_rv = (int)($_GET['classe_rv'] ?? 0);
 
 // Mode "partiel" (AJAX) : réponse limitée au contenu de #notes-zone, sans
-// layout/header.php ni layout/footer.php — voir initAjaxZone()/chargerPartiel()
-// dans layout/footer.php. Changement d'onglet et sélecteurs classe/matière/
+// noyau/layout/header.php ni noyau/layout/footer.php — voir initAjaxZone()/chargerPartiel()
+// dans noyau/layout/footer.php. Changement d'onglet et sélecteurs classe/matière/
 // élève/évaluation passent par ce mécanisme — jamais les formulaires POST
 // (enregistrement des notes, copie), qui continuent de recharger normalement
 // après leur redirection.
@@ -428,7 +428,7 @@ $es_partiel = isset($_GET['partiel']);
 
 $titre_page = 'Notes';
 if (!$es_partiel) {
-    require_once __DIR__ . '/../../../../layout/header.php';
+    require_once __DIR__ . '/../../../../noyau/layout/header.php';
 } else {
     header('Content-Type: text/html; charset=utf-8');
 }
@@ -1331,11 +1331,11 @@ document.addEventListener('DOMContentLoaded', function(){
     </form>
     <div class="mt-3">
       <a class="btn btn-sm" style="background:#1a2744;color:#fff" target="_blank"
-         href="<?= APP_URL ?>/secondaire/pages/notes/pdf_releve_vierge.php?classe=<?= $id_cl_rv ?>&dl=1">
+         href="<?= APP_URL ?>/secondaire/general/pages/notes/pdf_releve_vierge.php?classe=<?= $id_cl_rv ?>&dl=1">
         <i class="bi bi-file-earmark-pdf me-1"></i>Télécharger en PDF
       </a>
       <a class="btn btn-sm btn-outline-success ms-2"
-         href="<?= APP_URL ?>/secondaire/pages/notes/excel_releve_vierge.php?classe=<?= $id_cl_rv ?>">
+         href="<?= APP_URL ?>/secondaire/general/pages/notes/excel_releve_vierge.php?classe=<?= $id_cl_rv ?>">
         <i class="bi bi-file-earmark-excel me-1"></i>Télécharger en Excel
       </a>
     </div>
@@ -1356,7 +1356,7 @@ document.addEventListener('DOMContentLoaded', function(){
     </span>
   </div>
   <div class="card-body p-0">
-    <iframe src="<?= APP_URL ?>/secondaire/pages/notes/pdf_releve_vierge.php?classe=<?= $id_cl_rv ?>"
+    <iframe src="<?= APP_URL ?>/secondaire/general/pages/notes/pdf_releve_vierge.php?classe=<?= $id_cl_rv ?>"
             style="width:100%;height:80vh;border:none;display:block" title="Aperçu relevé vierge"></iframe>
   </div>
 </div>
@@ -1369,5 +1369,5 @@ document.addEventListener('DOMContentLoaded', function(){
 
 <?php
 if ($es_partiel) exit; // rien de plus dans une réponse AJAX partielle.
-$ajax_zone_id = 'notes-zone'; // voir layout/footer.php — initAjaxZone() y est appelé après sa propre définition
-require_once __DIR__ . '/../../../../layout/footer.php'; ?>
+$ajax_zone_id = 'notes-zone'; // voir noyau/layout/footer.php — initAjaxZone() y est appelé après sa propre définition
+require_once __DIR__ . '/../../../../noyau/layout/footer.php'; ?>

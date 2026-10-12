@@ -243,7 +243,7 @@ body {
   transition: background .15s, transform .2s;
 }
 /* Affiché UNIQUEMENT quand la sidebar est réellement en état "ouvert"
-   (classe .open, posée par le clic sur le burger — voir layout/footer.php),
+   (classe .open, posée par le clic sur le burger — voir noyau/layout/footer.php),
    jamais juste "parce que la fenêtre est étroite" : sinon le bouton peut
    apparaître sans que la sidebar ait la classe .open (fenêtre non maximisée,
    zoom navigateur...) et le clic ne fait alors rien puisqu'il n'y a rien à

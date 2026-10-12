@@ -1,0 +1,15 @@
+<?php
+// secondaire/commun/pages/matieres/supprimer.php — suppression d'une matière du
+// catalogue (porté de LAM_ABZ/pages/matieres/supprimer.php).
+require_once __DIR__ . '/../../../../config.php';
+require_once __DIR__ . '/../../../../noyau/connexion.php';
+require_once __DIR__ . '/../../../../noyau/fonctions.php';
+exiger_role(['ADMIN', 'PROVISEUR', 'FONDATEUR', 'CENSEUR']);
+csrf_verifier();
+
+$id = (int) ($_GET['id'] ?? 0);
+if ($id) {
+    db_exec("DELETE FROM matiere WHERE id=?", [$id]);
+    flash_set('succes', 'Matière supprimée.');
+}
+rediriger('secondaire/commun/pages/matieres/liste.php?onglet=catalogue');

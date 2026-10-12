@@ -5,8 +5,8 @@
 // L'établissement doit être inactif. Un backup de sécurité est écrit avant
 // (bd/sauvegardes/avant_vidage_<db>_<horo>.sql[.gz]).
 require_once __DIR__ . '/../config.php';
-require_once __DIR__ . '/../connexion.php';
-require_once __DIR__ . '/../fonctions.php';
+require_once __DIR__ . '/../noyau/connexion.php';
+require_once __DIR__ . '/../noyau/fonctions.php';
 require_once __DIR__ . '/_layout.php';
 require_once __DIR__ . '/../bd/lib/ecole_maintenance.php';
 exiger_proprietaire_association();  // opérations lourdes : propriétaire uniquement (admin simple = sauvegarde seule)

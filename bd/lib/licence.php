@@ -239,7 +239,7 @@ function licence_ecriture_bloquee(): bool {
     if (function_exists('est_proprietaire_association') && est_proprietaire_association()) return false;
     $script = basename($_SERVER['SCRIPT_NAME'] ?? '');
     if (in_array($script, ['configurer_securite.php', 'mot_de_passe_oublie.php'], true)) return false;
-    if (function_exists('page_courante_relative') && page_courante_relative() === 'pages/parametres/licence.php') return false;
+    if (function_exists('page_courante_relative') && page_courante_relative() === 'primaire/pages/parametres/licence.php') return false;
 
     global $link;
     if (!($link instanceof mysqli)) return false;

@@ -318,6 +318,31 @@ opérations d'admin des §8.3‑8.5). Créer + rendre inscriptibles
 `assets/uploads/{eleves,dossiers_eleves,profils,etab}`. Transférer les fichiers uploads des
 3 écoles.
 
+### 8.6 bis Mise à jour vers la nouvelle arborescence (réorganisation du 12/10/2026)
+
+Les fichiers ont changé de dossier (`pages/` → `primaire/pages/`, `secondaire/pages/` →
+`secondaire/commun|general/pages/`, `connexion.php`/`fonctions.php`/`layout/`/`ajax/` →
+`noyau/`… — voir `README.md`). Un envoi FTP **ajoute** les nouveaux fichiers mais **laisse**
+les anciens sur le serveur. Dans l'ordre :
+
+1. Sauvegarder (`/bd/assoc/sauvegarder_toutes_ecoles.php`) et noter la version en ligne.
+2. Envoyer **tout** le code (pas seulement les fichiers modifiés).
+3. Remplacer `.htaccess` par `deploy/htaccess-prod.txt` (il contient les redirections des
+   anciennes adresses vers les nouvelles).
+4. **Supprimer** sur le serveur les anciens emplacements :
+   `pages/`, `pdf/`, `layout/`, `ajax/`, `secondaire/pages/`, `secondaire/pdf/`,
+   `secondaire/dashboard_contenu.php`, `secondaire/profil_contenu.php`,
+   `secondaire/verif_bulletin_contenu.php`, et à la racine `connexion.php`,
+   `connexion_assoc.php`, `ecole_contexte.php`, `fonctions.php`, `paie_fonctions.php`,
+   `accueil.php`, `notes_apc.php`, `notes_apc_arabe.php`, `secondaire_en_construction.php`.
+   (Rester, s'ils existent : `assets/uploads/` et ses sous-dossiers, `config.local.php`.)
+5. Lancer `/bd/assoc/migrer_chemins_arborescence.php?token=…` (aperçu) puis `&go=1` :
+   réécrit les chemins de pages stockés en base (privilèges, notifications). Facultatif — le
+   code convertit déjà les anciennes valeurs — mais recommandé.
+6. Migrations (`/bd/assoc/migrer_toutes_ecoles.php`, puis portail > Migrations pour les écoles
+   secondaires : v13 = ordre d'enseignement général / technique).
+7. Tester : connexion d'une école de chaque type, un bulletin PDF, un QR imprimé.
+
 ### 8.7 Mise en service
 
 `https://promeducam.beero.cm/` → `login.php` avec sélecteur (EC1/EC2/MH). Puis

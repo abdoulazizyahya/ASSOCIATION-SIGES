@@ -11,7 +11,7 @@
 //  Idempotent : si déjà corrigé, les UPDATE n'ont simplement aucun effet.
 // =====================================================================
 require_once __DIR__ . '/../config.php';
-require_once __DIR__ . '/../connexion.php';
+require_once __DIR__ . '/../noyau/connexion.php';
 
 header('Content-Type: text/plain; charset=utf-8');
 echo "=== Migration v15 — ABZ_MBE (mysqli) ===\n\n";

@@ -3,9 +3,9 @@
 // scanne le QR imprimé sur une attestation de présence ou un certificat de
 // prise/reprise de service arrive ici pour vérifier son authenticité.
 require_once __DIR__ . '/config.php';
-require_once __DIR__ . '/connexion.php';
-require_once __DIR__ . '/fonctions.php';
-require_once __DIR__ . '/pdf/verif_attestation_lib.php';
+require_once __DIR__ . '/noyau/connexion.php';
+require_once __DIR__ . '/noyau/fonctions.php';
+require_once __DIR__ . '/primaire/pdf/verif_attestation_lib.php';
 verif_exiger_ecole_publique();  // multi-école : URL sans &ec= -> page neutre
 
 $type_recu = (string)($_GET['t'] ?? '');
@@ -31,9 +31,9 @@ if ($e && $type && $h_recu !== '') {
 // vérifié ci-dessus) permet à pdf_attestation.php / pdf_prise_service.php de
 // servir ce document précis sans exiger de connexion.
 $pdf_urls = [
-    'attestation' => '/pages/enseignants/pdf_attestation.php?id=' . urlencode($mat) . '&vh=' . urlencode($h_recu),
-    'prise'       => '/pages/enseignants/pdf_prise_service.php?type=prise&id=' . urlencode($mat) . '&vh=' . urlencode($h_recu),
-    'reprise'     => '/pages/enseignants/pdf_prise_service.php?type=reprise&id=' . urlencode($mat) . '&vh=' . urlencode($h_recu),
+    'attestation' => '/primaire/pages/enseignants/pdf_attestation.php?id=' . urlencode($mat) . '&vh=' . urlencode($h_recu),
+    'prise'       => '/primaire/pages/enseignants/pdf_prise_service.php?type=prise&id=' . urlencode($mat) . '&vh=' . urlencode($h_recu),
+    'reprise'     => '/primaire/pages/enseignants/pdf_prise_service.php?type=reprise&id=' . urlencode($mat) . '&vh=' . urlencode($h_recu),
 ];
 // verif_ajout_ec() : en multi-établissement, propage &ec=CODE — sinon le
 // générateur (accès public par « vh ») reste pointé sur l'annuaire.

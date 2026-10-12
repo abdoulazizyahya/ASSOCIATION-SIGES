@@ -1,7 +1,7 @@
 <?php
 // configurer_securite.php — 2 questions secrètes par compte (mot_de_passe_
 // oublie.php s'en sert pour réinitialiser un mot de passe sans passer par le
-// Directeur). PROPOSÉE dès la 1ère connexion (bandeau, voir layout/header.php
+// Directeur). PROPOSÉE dès la 1ère connexion (bandeau, voir noyau/layout/header.php
 // et exiger_connexion()) mais pas bloquante : un compte peut la reporter et
 // continuer à utiliser l'application (demande explicite du 24/09/2026 — avant
 // cette date, obligatoire côté primaire et totalement absente côté
@@ -12,8 +12,8 @@
 // lieu de id_user) — voir bd/migration_v45.sql (primaire) et
 // bd/secondaire/migration_v6.sql (secondaire).
 require_once __DIR__ . '/config.php';
-require_once __DIR__ . '/connexion.php';
-require_once __DIR__ . '/fonctions.php';
+require_once __DIR__ . '/noyau/connexion.php';
+require_once __DIR__ . '/noyau/fonctions.php';
 exiger_connexion();
 
 $secondaire  = function_exists('type_enseignement_courant') && type_enseignement_courant() === 'secondaire';
@@ -63,7 +63,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 $titre_page = 'Questions de sécurité';
-require_once __DIR__ . '/layout/header.php';
+require_once __DIR__ . '/noyau/layout/header.php';
 ?>
 <div class="page-titre d-flex justify-content-between align-items-center">
   <h4><i class="bi bi-shield-lock me-1 text-primary"></i><?= h($titre_page) ?></h4>
@@ -109,4 +109,4 @@ require_once __DIR__ . '/layout/header.php';
     </form>
   </div>
 </div>
-<?php require_once __DIR__ . '/layout/footer.php'; ?>
+<?php require_once __DIR__ . '/noyau/layout/footer.php'; ?>

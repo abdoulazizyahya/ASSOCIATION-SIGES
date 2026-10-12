@@ -10,11 +10,11 @@
 // Pas de QR imprimé sur la carte physique pour l'instant (décision
 // explicite de l'utilisateur) — ce fichier reste donc inatteignable en
 // pratique, mais est maintenant correct et utilisable si ce lien est
-// généré un jour (voir pdf/verif_carte_lib.php::carte_verif_url()).
+// généré un jour (voir primaire/pdf/verif_carte_lib.php::carte_verif_url()).
 require_once __DIR__ . '/config.php';
-require_once __DIR__ . '/connexion.php';
-require_once __DIR__ . '/fonctions.php';
-require_once __DIR__ . '/pdf/verif_carte_lib.php';
+require_once __DIR__ . '/noyau/connexion.php';
+require_once __DIR__ . '/noyau/fonctions.php';
+require_once __DIR__ . '/primaire/pdf/verif_carte_lib.php';
 verif_exiger_ecole_publique();  // multi-école : URL sans &ec= -> page neutre
 
 $id_eleve  = (int) ($_GET['e'] ?? 0);
@@ -29,12 +29,12 @@ $insc        = $authentique
 
 // URL de la carte réelle, ouverte uniquement si l'utilisateur clique sur le
 // bouton "Ouvrir la carte" (jamais automatiquement). Le jeton "vh" (= le
-// hash déjà vérifié ci-dessus) permet à pdf/cartes.php de servir cette
+// hash déjà vérifié ci-dessus) permet à primaire/pdf/cartes.php de servir cette
 // carte précise, pour ce seul élève, sans exiger de connexion.
 // verif_ajout_ec() : en multi-établissement, propage &ec=CODE — sinon
-// pdf/cartes.php (accès public par « vh ») reste pointé sur l'annuaire.
+// primaire/pdf/cartes.php (accès public par « vh ») reste pointé sur l'annuaire.
 $pdf_url = $authentique
-    ? verif_ajout_ec(APP_URL . '/pdf/cartes.php?eleve=' . $id_eleve . '&annee=' . urlencode($val_annee) . '&vh=' . urlencode($h_recu))
+    ? verif_ajout_ec(APP_URL . '/primaire/pdf/cartes.php?eleve=' . $id_eleve . '&annee=' . urlencode($val_annee) . '&vh=' . urlencode($h_recu))
     : '';
 ?>
 <!DOCTYPE html>

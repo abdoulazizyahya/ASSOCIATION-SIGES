@@ -10,8 +10,8 @@
 // PROPRIÉTAIRE de l'association (membre.proprietaire). Le propriétaire a
 // tous les droits et voit tous les comptes.
 require_once __DIR__ . '/../config.php';
-require_once __DIR__ . '/../connexion.php';
-require_once __DIR__ . '/../fonctions.php';
+require_once __DIR__ . '/../noyau/connexion.php';
+require_once __DIR__ . '/../noyau/fonctions.php';
 require_once __DIR__ . '/_layout.php';
 require_once __DIR__ . '/../bd/lib/totp.php';
 exiger_membre_association();
@@ -144,7 +144,7 @@ if ($fa_dispo && !$actif) {
     $issuer = (defined('ASSOC_NOM') && ASSOC_NOM !== '') ? ASSOC_NOM
             : (defined('APP_NOM') ? APP_NOM : 'SIGES');
     $uri    = totp_uri($secret, $m['login'], $issuer);
-    $qr_src = APP_URL . '/pdf/qrcode.php?s=6&e=M&d=' . urlencode($uri);
+    $qr_src = APP_URL . '/primaire/pdf/qrcode.php?s=6&e=M&d=' . urlencode($uri);
 }
 
 // Liste des comptes (onglet « Comptes ») — le propriétaire est masqué pour

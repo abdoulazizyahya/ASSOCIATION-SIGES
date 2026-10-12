@@ -19,7 +19,7 @@
 // =====================================================================
 
 require_once __DIR__ . '/../../config.php';
-require_once __DIR__ . '/../../connexion_assoc.php';   // charger_schema_ecole()
+require_once __DIR__ . '/../../noyau/connexion_assoc.php';   // charger_schema_ecole()
 
 $est_cli = (PHP_SAPI === 'cli');
 if (!$est_cli) header('Content-Type: text/plain; charset=utf-8');

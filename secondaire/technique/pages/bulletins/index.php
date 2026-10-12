@@ -1,13 +1,13 @@
 <?php
 header('Cache-Control: no-store, no-cache, must-revalidate');
 require_once __DIR__ . '/../../../../config.php';
-require_once __DIR__ . '/../../../../connexion.php';
-require_once __DIR__ . '/../../../../fonctions.php';
+require_once __DIR__ . '/../../../../noyau/connexion.php';
+require_once __DIR__ . '/../../../../noyau/fonctions.php';
 exiger_connexion();
 
 // Mode "partiel" (AJAX) : réponse limitée au contenu de #bull-zone, sans
-// layout/header.php ni layout/footer.php — voir initAjaxZone()/chargerPartiel()
-// dans layout/footer.php. Choix de classe/période/ordre, retour à la liste,
+// noyau/layout/header.php ni noyau/layout/footer.php — voir initAjaxZone()/chargerPartiel()
+// dans noyau/layout/footer.php. Choix de classe/période/ordre, retour à la liste,
 // aperçu d'un élève ou de toute la classe passent par ce mécanisme — jamais
 // les liens "Télécharger" (déclenchent un téléchargement de fichier, pas un
 // changement d'affichage de cette page).
@@ -41,9 +41,9 @@ if ($is_ens && $mat_ens) {
         $message = '<div class="alert alert-warning mt-3 mx-3"><i class="bi bi-lock me-2"></i>Accès réservé aux professeurs principaux et à l\'administration.</div>';
         if ($es_partiel) { echo $message; exit; }
         $titre_page = 'Bulletins';
-        require_once __DIR__ . '/../../../../layout/header.php';
+        require_once __DIR__ . '/../../../../noyau/layout/header.php';
         echo $message;
-        require_once __DIR__ . '/../../../../layout/footer.php';
+        require_once __DIR__ . '/../../../../noyau/layout/footer.php';
         exit;
     }
 }
@@ -231,9 +231,9 @@ $peut_configurer_sig_bull = signature_role_autorisee('chef_etablissement', role_
 
 function pdf_url_bull(int $id_eleve, string $vue, int $id_trim, int $id_seq, int $id_annee, bool $dl=false): string {
     if ($vue === 'annee') {
-        $base = APP_URL.'/pages/bulletins/pdf_annuel.php?eleve='.$id_eleve.'&annee='.$id_annee;
+        $base = APP_URL.'/primaire/pages/bulletins/pdf_annuel.php?eleve='.$id_eleve.'&annee='.$id_annee;
     } else {
-        $base = APP_URL.'/pages/bulletins/pdf.php?eleve='.$id_eleve.'&annee='.$id_annee;
+        $base = APP_URL.'/primaire/pages/bulletins/pdf.php?eleve='.$id_eleve.'&annee='.$id_annee;
         $base .= $vue === 'trim' ? '&trim='.$id_trim : '&seq='.$id_seq;
     }
     if ($dl) $base .= '&dl=1';
@@ -241,9 +241,9 @@ function pdf_url_bull(int $id_eleve, string $vue, int $id_trim, int $id_seq, int
 }
 function url_classe_bull(int $id_classe, string $vue, int $id_trim, int $id_seq, int $id_annee, string $ordre, bool $dl=false): string {
     if ($vue === 'annee') {
-        $base = APP_URL.'/pages/bulletins/pdf_annuel_classe.php?classe='.$id_classe.'&annee='.$id_annee.'&ordre='.$ordre;
+        $base = APP_URL.'/primaire/pages/bulletins/pdf_annuel_classe.php?classe='.$id_classe.'&annee='.$id_annee.'&ordre='.$ordre;
     } else {
-        $base = APP_URL.'/pages/bulletins/pdf_classe.php?classe='.$id_classe.'&annee='.$id_annee.'&ordre='.$ordre;
+        $base = APP_URL.'/primaire/pages/bulletins/pdf_classe.php?classe='.$id_classe.'&annee='.$id_annee.'&ordre='.$ordre;
         $base .= $vue === 'trim' ? '&trim='.$id_trim : '&seq='.$id_seq;
     }
     if ($dl) $base .= '&dl=1';
@@ -252,7 +252,7 @@ function url_classe_bull(int $id_classe, string $vue, int $id_trim, int $id_seq,
 
 if (!$es_partiel) {
     $titre_page = 'Bulletins';
-    require_once __DIR__ . '/../../../../layout/header.php';
+    require_once __DIR__ . '/../../../../noyau/layout/header.php';
     ?>
     <style>
     .btn-abz-primary   { background:#1a3c6b;color:#fff;border:none; }
@@ -542,5 +542,5 @@ function appliquerSigEl() {
 
 <?php
 if ($es_partiel) exit; // rien de plus dans une réponse AJAX partielle.
-$ajax_zone_id = 'bull-zone'; // voir layout/footer.php — initAjaxZone() y est appelé après sa propre définition
-require_once __DIR__ . '/../../../../layout/footer.php'; ?>
+$ajax_zone_id = 'bull-zone'; // voir noyau/layout/footer.php — initAjaxZone() y est appelé après sa propre définition
+require_once __DIR__ . '/../../../../noyau/layout/footer.php'; ?>

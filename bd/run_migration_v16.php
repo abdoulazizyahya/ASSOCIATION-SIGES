@@ -10,7 +10,7 @@
 //  comportement d'origine — code_niveau devient nullable en conséquence).
 // =====================================================================
 require_once __DIR__ . '/../config.php';
-require_once __DIR__ . '/../connexion.php';
+require_once __DIR__ . '/../noyau/connexion.php';
 
 header('Content-Type: text/plain; charset=utf-8');
 echo "=== Migration v16 — ABZ_MBE (mysqli) ===\n\n";

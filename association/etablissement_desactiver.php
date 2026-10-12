@@ -10,8 +10,8 @@
 // la liste déroulante de connexion). Réactiver reste sans mot de passe,
 // comme la case à cocher déjà existante d'etablissement_modifier.php.
 require_once __DIR__ . '/../config.php';
-require_once __DIR__ . '/../connexion.php';
-require_once __DIR__ . '/../fonctions.php';
+require_once __DIR__ . '/../noyau/connexion.php';
+require_once __DIR__ . '/../noyau/fonctions.php';
 require_once __DIR__ . '/_layout.php';
 exiger_membre_association();
 

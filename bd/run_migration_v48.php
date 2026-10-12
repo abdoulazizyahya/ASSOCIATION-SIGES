@@ -4,8 +4,8 @@
 //  php bd/run_migration_v48.php   (ou via navigateur)
 // =====================================================================
 require_once __DIR__ . '/../config.php';
-require_once __DIR__ . '/../connexion.php';
-require_once __DIR__ . '/../fonctions.php';
+require_once __DIR__ . '/../noyau/connexion.php';
+require_once __DIR__ . '/../noyau/fonctions.php';
 
 header('Content-Type: text/plain; charset=utf-8');
 echo "=== Migration v48 — jaynitaare_v2 (mysqli) ===\n\n";

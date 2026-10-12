@@ -4,9 +4,9 @@
  * GET : eleve=ID, trim=ID_TRIMESTRE, annee=ID_ANNEE, seq=ID_SEQ (optionnel)
  */
 require_once __DIR__ . '/../../../../config.php';
-require_once __DIR__ . '/../../../../connexion.php';
-require_once __DIR__ . '/../../../../fonctions.php';
-require_once __DIR__ . '/../../../pdf/verif_lib.php';
+require_once __DIR__ . '/../../../../noyau/connexion.php';
+require_once __DIR__ . '/../../../../noyau/fonctions.php';
+require_once __DIR__ . '/../../../commun/pdf/verif_lib.php';
 
 // Accès public via le QR code du bulletin (jeton "vh" = hash de vérification
 // déjà calculé pour CE bulletin précis) : la personne qui scanne n'a pas de
@@ -29,8 +29,8 @@ if (!$acces_public) {
     // (un identifiant d'élève modifié à la main dans l'adresse est refusé).
     exiger_acces_bulletin_secondaire((int) ($_GET['eleve'] ?? 0));
 }
-require_once __DIR__ . '/../../../pdf/fpdf.php';
-require_once __DIR__ . '/../../../pdf/header_pdf.php';
+require_once __DIR__ . '/../../../commun/pdf/fpdf.php';
+require_once __DIR__ . '/../../../commun/pdf/header_pdf.php';
 
 //function u(string $s): string { return utf8_decode($s); }
 function u(string $s): string {
@@ -317,7 +317,7 @@ function mention_gen_b(float $a): string {
 // Blame_Conduite_eleve() ont été déplacées dans fonctions.php (préfixe
 // bulletin_*), avec leurs seuils désormais lus dans
 // reglage_mention_bulletin (configurable par l'administrateur, voir
-// secondaire/pages/parametres/index.php onglet "Mentions") au lieu d'être codés en
+// secondaire/commun/pages/parametres/index.php onglet "Mentions") au lieu d'être codés en
 // dur — voir section 5 plus bas pour l'appel (get_reglage_mention_bulletin()
 // + $heur_jus/$heur_nj lus via eleve_absence_trimestre()).
 function rang_eleve_b(float $avg, array $avgs_sorted): int {
@@ -1000,13 +1000,13 @@ $wB_right = $uw - $wB_left - $wB_mid; // 70, inchangé
 
 // Heures d'absence RÉELLES du trimestre, lues dans la table `absence`
 // (fonctions.php::eleve_absence_trimestre(), alimentée par
-// secondaire/pages/discipline/index.php).
+// secondaire/commun/pages/discipline/index.php).
 $abs_reelle = eleve_absence_trimestre($eleve['matricule'] ?? '', $id_trim, $insc['id_classe'], $val_annee);
 $heur_jus   = (int) $abs_reelle['jus'];
 $heur_nj    = (int) $abs_reelle['non_jus'];
 
 // Seuils des mentions automatiques : configurables par l'administrateur
-// (secondaire/pages/parametres/index.php, onglet "Mentions") au lieu d'être codés en dur.
+// (secondaire/commun/pages/parametres/index.php, onglet "Mentions") au lieu d'être codés en dur.
 $reglage_mention = get_reglage_mention_bulletin($id_annee);
 $tab_honneur = bulletin_tableau_honneur($moy_generale ?? 0, $heur_nj, $reglage_mention) === 'Oui';
 $encourag    = bulletin_encouragement($moy_generale ?? 0, $heur_nj, $reglage_mention) === 'Oui';
@@ -1232,8 +1232,8 @@ if ($h_rempli > 0.01) {
 // (le niveau de correction d'erreur qr-h tolère ~30% de perte, une photo
 // centrée sur ~20% de la surface reste donc scannable). Plus de légende
 // "Scannez..." sous le QR (supprimée, demande explicite).
-require_once __DIR__ . '/../../../pdf/verif_lib.php';
-require_once __DIR__ . '/../../../pdf/qrcode.php';
+require_once __DIR__ . '/../../../commun/pdf/verif_lib.php';
+require_once __DIR__ . '/../../../commun/pdf/qrcode.php';
 
 if ($h_rempli > 15) {
     $verif_url = bulletin_verif_url(

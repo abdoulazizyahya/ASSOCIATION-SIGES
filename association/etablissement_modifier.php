@@ -4,8 +4,8 @@
 // `db_name` (immuables — liés à la base MySQL de l'école) ni la clé de
 // signature (générée par bd/assoc/generer_cles_verif_ecoles.php).
 require_once __DIR__ . '/../config.php';
-require_once __DIR__ . '/../connexion.php';
-require_once __DIR__ . '/../fonctions.php';
+require_once __DIR__ . '/../noyau/connexion.php';
+require_once __DIR__ . '/../noyau/fonctions.php';
 require_once __DIR__ . '/_layout.php';
 exiger_superadmin_association();
 

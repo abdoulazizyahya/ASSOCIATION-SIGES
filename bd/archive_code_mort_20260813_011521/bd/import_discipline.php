@@ -60,7 +60,7 @@ require_once __DIR__ . '/../layout/header.php';
 
 <div class="page-titre">
   <h4><i class="bi bi-database-up me-1 text-primary"></i>Import Discipline &amp; Dispenser</h4>
-  <a href="<?= APP_URL ?>/pages/matieres/liste.php?onglet=affectations" class="btn btn-sm btn-light">
+  <a href="<?= APP_URL ?>/primaire/pages/matieres/liste.php?onglet=affectations" class="btn btn-sm btn-light">
     <i class="bi bi-arrow-left me-1"></i>Retour
   </a>
 </div>
@@ -115,7 +115,7 @@ require_once __DIR__ . '/../layout/header.php';
 <?php if ($done && !array_filter($messages, fn($m)=>$m[0]==='err')): ?>
 <div class="alert alert-success">
   <i class="bi bi-check-circle me-1"></i>Import terminé avec succès !
-  <a href="<?= APP_URL ?>/pages/matieres/liste.php?onglet=affectations" class="alert-link ms-2">
+  <a href="<?= APP_URL ?>/primaire/pages/matieres/liste.php?onglet=affectations" class="alert-link ms-2">
     Aller aux affectations →
   </a>
 </div>

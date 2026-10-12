@@ -29,8 +29,8 @@ if (PHP_SAPI !== 'cli') {
 }
 
 require __DIR__ . '/../config.php';
-require __DIR__ . '/../connexion.php';
-require __DIR__ . '/../fonctions.php';
+require __DIR__ . '/../noyau/connexion.php';
+require __DIR__ . '/../noyau/fonctions.php';
 
 $options   = getopt('', ['appliquer', 'annee::']);
 $appliquer = array_key_exists('appliquer', $options);

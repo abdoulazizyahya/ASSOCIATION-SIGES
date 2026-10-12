@@ -17,6 +17,27 @@
     RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
 </IfModule>
 
+# ── Anciennes adresses → nouvelle arborescence (réorganisation du 12/10/2026) ──
+#  Favoris et liens anciens : redirection permanente vers le nouvel
+#  emplacement. Le motif est relatif au dossier de ce .htaccess ; la
+#  condition calcule la base de l'application (/SIGES/ en LAN, / en
+#  production) dans %2. Les QR imprimés (verif_*.php) n'ont pas bougé.
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteCond $0#%{REQUEST_URI} ^([^#]*)#(.*)\1$
+    RewriteRule ^secondaire/pages/(notes|bulletins)/(.*)$ %2secondaire/general/pages/$1/$2 [R=301,L]
+    RewriteCond $0#%{REQUEST_URI} ^([^#]*)#(.*)\1$
+    RewriteRule ^secondaire/pages/(.*)$ %2secondaire/commun/pages/$1 [R=301,L]
+    RewriteCond $0#%{REQUEST_URI} ^([^#]*)#(.*)\1$
+    RewriteRule ^secondaire/pdf/(.*)$ %2secondaire/commun/pdf/$1 [R=301,L]
+    RewriteCond $0#%{REQUEST_URI} ^([^#]*)#(.*)\1$
+    RewriteRule ^(pages|pdf)/(.*)$ %2primaire/$1/$2 [R=301,L]
+    RewriteCond $0#%{REQUEST_URI} ^([^#]*)#(.*)\1$
+    RewriteRule ^(notes_apc|notes_apc_arabe)\.php$ %2primaire/$1.php [R=301,L]
+    RewriteCond $0#%{REQUEST_URI} ^([^#]*)#(.*)\1$
+    RewriteRule ^ajax/(.*)$ %2noyau/ajax/$1 [R=307,L]
+</IfModule>
+
 # ── PHP : pas d'affichage d'erreurs, journalisation active ──────────
 #  (si le serveur utilise PHP-FPM, régler plutôt via cPanel → MultiPHP INI Editor)
 <IfModule mod_php.c>

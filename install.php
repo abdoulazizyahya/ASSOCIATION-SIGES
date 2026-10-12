@@ -31,7 +31,7 @@
 // =====================================================================
 
 require_once __DIR__ . '/config.php';
-require_once __DIR__ . '/connexion_assoc.php';            // slug_base_ecole(), charger_schema_ecole(), annuaire_dispo()
+require_once __DIR__ . '/noyau/connexion_assoc.php';            // slug_base_ecole(), charger_schema_ecole(), annuaire_dispo()
 require_once __DIR__ . '/bd/lib/lieux_normalisation.php'; // lieu_normaliser() : accents -> ASCII (table manuelle, fiable Windows)
 require_once __DIR__ . '/bd/lib/licence.php';             // licence_signature() : essai 60 jours posé par charger_schema_ecole() — sans lui, école neuve en lecture seule
 

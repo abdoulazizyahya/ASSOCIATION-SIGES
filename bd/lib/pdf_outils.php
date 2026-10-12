@@ -2,8 +2,8 @@
 // bd/lib/pdf_outils.php — petits outils de mise en page communs aux PDF
 // (FPDF comme TCPDF : seules les méthodes Image()/SetFont()/Cell() communes
 // aux deux sont utilisées). Chargé par fonctions.php et par les en-têtes
-// partagés (pdf/header_pdf.php, secondaire/pdf/header_pdf.php,
-// pdf/header_pdf_tcpdf.php).
+// partagés (primaire/pdf/header_pdf.php, secondaire/commun/pdf/header_pdf.php,
+// primaire/pdf/header_pdf_tcpdf.php).
 
 // Logo (ou toute image) ajusté DANS un cadre $w × $h : proportions
 // conservées, centré dans le cadre, sans jamais en sortir — un logo haut ne

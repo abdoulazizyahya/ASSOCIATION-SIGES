@@ -4,25 +4,25 @@
 // (demande explicite du 22/08/2026 : menu Paramètres visible à tous, en
 // libre-service pour tout rôle hors Directeur). La gestion complète des
 // comptes (création, rôle, suppression) reste un module séparé réservé au
-// Directeur — voir pages/utilisateurs/liste.php, ne PAS dupliquer ici.
+// Directeur — voir primaire/pages/utilisateurs/liste.php, ne PAS dupliquer ici.
 // Remplace un ancien profil.php copié tel quel d'un autre projet (table
 // `utilisateur`/colonnes `id`/`role`/`login`/`mot_de_passe` inexistantes
 // dans ce schéma — jamais fonctionnel, jamais lié au menu).
 require_once __DIR__ . '/config.php';
-require_once __DIR__ . '/connexion.php';
-require_once __DIR__ . '/fonctions.php';
+require_once __DIR__ . '/noyau/connexion.php';
+require_once __DIR__ . '/noyau/fonctions.php';
 exiger_connexion();
 
 // École secondaire : table `utilisateur` (login/mot_de_passe/role directement
 // dessus, pas de jointure enseignant obligatoire) — même principe que
 // dashboard.php, séparé tôt avant la moindre requête primaire.
 if (function_exists('type_enseignement_courant') && type_enseignement_courant() === 'secondaire') {
-    require __DIR__ . '/secondaire/profil_contenu.php';
+    require __DIR__ . '/secondaire/commun/profil_contenu.php';
     exit;
 }
 
 $user_id = (int) $_SESSION['user_id'];
-// $compte (pas $user) : layout/header.php écrase $user avec la session
+// $compte (pas $user) : noyau/layout/header.php écrase $user avec la session
 // ($_SESSION['user'] : clés nom/prenom/role, PAS nom_ens/id_fonction…).
 $compte  = db_one(
     "SELECT u.id_user, u.login_user, u.matricule_ens, e.nom_ens, e.prenom_ens, e.id_fonction
@@ -37,13 +37,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $mdp   = post('mot_de_passe');
     $conf  = post('confirmer_mdp');
 
-    if (!$login) { flash_set('erreur', 'Le login est obligatoire.'); rediriger('profil.php'); }
+    if (!$login) { flash_set('erreur', 'Le login est obligatoire.'); rediriger('noyau/compte/profil.php'); }
 
     $existe = db_val("SELECT id_user FROM user WHERE login_user=? AND id_user!=?", [$login, $user_id]);
-    if ($existe) { flash_set('erreur', 'Ce login est déjà utilisé.'); rediriger('profil.php'); }
+    if ($existe) { flash_set('erreur', 'Ce login est déjà utilisé.'); rediriger('noyau/compte/profil.php'); }
 
     if ($mdp !== '') {
-        if ($mdp !== $conf) { flash_set('erreur', 'Les mots de passe ne correspondent pas.'); rediriger('profil.php'); }
+        if ($mdp !== $conf) { flash_set('erreur', 'Les mots de passe ne correspondent pas.'); rediriger('noyau/compte/profil.php'); }
         db_exec("UPDATE user SET login_user=?, pwd_user=? WHERE id_user=?",
                 [$login, password_hash($mdp, PASSWORD_DEFAULT), $user_id]);
         if (function_exists('journaliser_action')) journaliser_action('mot_de_passe_change');
@@ -52,7 +52,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
     $_SESSION['user']['login'] = $login;
     flash_set('succes', 'Profil mis à jour.');
-    rediriger('profil.php');
+    rediriger('noyau/compte/profil.php');
 }
 
 // ── Mes appareils (renommage) ─────────────────────────────────────────
@@ -65,13 +65,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && post('action') === 'appareil_renomm
     csrf_verifier();
     $ok = appareil_connu_renommer((int) post('id_appareil'), 'user', $user_id, (string) post('nom_appareil'));
     flash_set($ok ? 'succes' : 'erreur', $ok ? 'Appareil renommé.' : 'Appareil introuvable.');
-    rediriger('profil.php');
+    rediriger('noyau/compte/profil.php');
 }
 $mes_appareils     = appareil_connu_lister('user', $user_id);
 $mon_appareil_actu = appareil_device_id();
 
 $titre_page = 'Mon compte';
-require_once __DIR__ . '/layout/header.php';
+require_once __DIR__ . '/noyau/layout/header.php';
 
 $initiales = mb_strtoupper(mb_substr($compte['nom_ens'] ?? '?', 0, 1)) . mb_strtoupper(mb_substr($compte['prenom_ens'] ?? '', 0, 1));
 $role_colors = [
@@ -131,7 +131,7 @@ $rc = $role_colors[$compte['id_fonction'] ?? ''] ?? ['bg' => '#f3f4f6', 'txt' =>
 
         <div class="mt-2 pt-2 border-top" style="font-size:.75rem;color:#6b7280">
           <i class="bi bi-person-badge me-1"></i>Fiche liée : matricule <?= h((string) $compte['matricule_ens']) ?>
-          <a href="<?= APP_URL ?>/pages/enseignants/mon_profil.php" class="d-block mt-1" style="font-size:.72rem">
+          <a href="<?= APP_URL ?>/primaire/pages/enseignants/mon_profil.php" class="d-block mt-1" style="font-size:.72rem">
             <i class="bi bi-pencil-square me-1"></i>Modifier mes informations
           </a>
         </div>
@@ -192,7 +192,7 @@ $rc = $role_colors[$compte['id_fonction'] ?? ''] ?? ['bg' => '#f3f4f6', 'txt' =>
       <div class="card-body">
         <p class="text-muted" style="font-size:.75rem;margin-top:-4px">
           Donne un nom à un appareil pour le reconnaître facilement dans le
-          <a href="<?= APP_URL ?>/pages/utilisateurs/journal.php">journal d'audit</a> (ex. « PC du bureau »,
+          <a href="<?= APP_URL ?>/primaire/pages/utilisateurs/journal.php">journal d'audit</a> (ex. « PC du bureau »,
           « Mon téléphone ») — à la place du type générique.
         </p>
         <?php if (!$mes_appareils): ?>
@@ -232,4 +232,4 @@ $rc = $role_colors[$compte['id_fonction'] ?? ''] ?? ['bg' => '#f3f4f6', 'txt' =>
   </div>
 </div>
 
-<?php require_once __DIR__ . '/layout/footer.php'; ?>
+<?php require_once __DIR__ . '/noyau/layout/footer.php'; ?>

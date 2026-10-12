@@ -5,7 +5,7 @@
 //      http://localhost/ABZ_MBE/bd/run_migration_v25.php
 // =====================================================================
 require_once __DIR__ . '/../config.php';
-require_once __DIR__ . '/../connexion.php';
+require_once __DIR__ . '/../noyau/connexion.php';
 
 header('Content-Type: text/plain; charset=utf-8');
 echo "=== Migration v25 — ABZ_MBE (mysqli) ===\n\n";

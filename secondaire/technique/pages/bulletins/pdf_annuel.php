@@ -7,9 +7,9 @@
  * (en-tête, photo, décision/observations, QR, copyright) — identiques ici.
  */
 require_once __DIR__ . '/../../../../config.php';
-require_once __DIR__ . '/../../../../connexion.php';
-require_once __DIR__ . '/../../../../fonctions.php';
-require_once __DIR__ . '/../../../pdf/verif_lib.php';
+require_once __DIR__ . '/../../../../noyau/connexion.php';
+require_once __DIR__ . '/../../../../noyau/fonctions.php';
+require_once __DIR__ . '/../../../commun/pdf/verif_lib.php';
 
 // Accès public via le QR code du bulletin (jeton "vh") — voir pdf.php pour
 // l'explication ; ici la "période" est toujours l'année scolaire elle-même.
@@ -27,8 +27,8 @@ if (!$acces_public) {
     // (un identifiant d'élève modifié à la main dans l'adresse est refusé).
     exiger_acces_bulletin_secondaire((int) ($_GET['eleve'] ?? 0));
 }
-require_once __DIR__ . '/../../../pdf/fpdf.php';
-require_once __DIR__ . '/../../../pdf/header_pdf.php';
+require_once __DIR__ . '/../../../commun/pdf/fpdf.php';
+require_once __DIR__ . '/../../../commun/pdf/header_pdf.php';
 
 //function u(string $s): string { return utf8_decode($s); }
 function u(string $s): string {
@@ -379,7 +379,7 @@ function mention_gen_b(float $a): string {
 // Blame_Conduite_eleve() ont été déplacées dans fonctions.php (préfixe
 // bulletin_*), avec leurs seuils désormais lus dans
 // reglage_mention_bulletin (configurable par l'administrateur, voir
-// secondaire/pages/parametres/index.php onglet "Mentions") au lieu d'être codés en
+// secondaire/commun/pages/parametres/index.php onglet "Mentions") au lieu d'être codés en
 // dur — voir section 5 plus bas pour l'appel (get_reglage_mention_bulletin()
 // + $heur_jus/$heur_nj lus via eleve_absence_trimestre()).
 function rang_eleve_b(float $avg, array $avgs_sorted): int {
@@ -1290,7 +1290,7 @@ $pdf->MultiCell($w_dec, 4, u($appreciation_annuelle ?: '-'), 0, 'C');
 // DECISION DU CONSEIL DE CLASSE — promotion/redoublement/exclusion, cochée
 // et complétée AUTOMATIQUEMENT (demande explicite) si le conseil de classe
 // annuel a déjà été saisi et enregistré pour cet élève (module
-// pages/conseil_classe/, table decision_conseil : decision='Admis'/
+// primaire/pages/conseil_classe/, table decision_conseil : decision='Admis'/
 // 'Redoublement'/'Exclu'/'Abandon', type='annee', id_trim=0). Si aucune
 // décision n'est enregistrée, tout reste vide/décoché — à remplir à la main
 // comme avant.
@@ -1387,8 +1387,8 @@ if (($_GET['signature'] ?? '0') === '1') {
 // page, tout en bas, à 2-3mm au-dessus du copyright (demande explicite,
 // déplacé hors du cadre OBSERVATIONS), avec la photo de l'élève incrustée
 // au centre.
-require_once __DIR__ . '/../../../pdf/verif_lib.php';
-require_once __DIR__ . '/../../../pdf/qrcode.php';
+require_once __DIR__ . '/../../../commun/pdf/verif_lib.php';
+require_once __DIR__ . '/../../../commun/pdf/qrcode.php';
 
 $verif_url = bulletin_verif_url($id_eleve, 'annee', $id_annee, id_affichage_eleve($eleve));
 $qr_tmp = tempnam(sys_get_temp_dir(), 'abzqr_') . '.png';

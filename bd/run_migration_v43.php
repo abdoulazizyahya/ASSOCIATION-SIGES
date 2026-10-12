@@ -6,7 +6,7 @@
 //  Mobile Money, Virement bancaire, Autre). Voir bd/migration_v43.sql.
 // =====================================================================
 require_once __DIR__ . '/../config.php';
-require_once __DIR__ . '/../connexion.php';
+require_once __DIR__ . '/../noyau/connexion.php';
 
 header('Content-Type: text/plain; charset=utf-8');
 echo "=== Migration v43 — jaynitaare_v2 (mysqli) ===\n\n";

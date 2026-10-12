@@ -4,8 +4,8 @@
 // d'action. Lisible par tout membre ; les liens d'action supposent le
 // superadmin (les pages cibles le vérifient).
 require_once __DIR__ . '/../config.php';
-require_once __DIR__ . '/../connexion.php';
-require_once __DIR__ . '/../fonctions.php';
+require_once __DIR__ . '/../noyau/connexion.php';
+require_once __DIR__ . '/../noyau/fonctions.php';
 require_once __DIR__ . '/_layout.php';
 exiger_membre_association();
 

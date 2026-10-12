@@ -3,8 +3,8 @@
 // école qui n'ont PAS encore de compte de connexion (JSON). Alimente le
 // formulaire « Créer un compte » de l'onglet Comptes (personnel/liste.php).
 require_once __DIR__ . '/../../config.php';
-require_once __DIR__ . '/../../connexion.php';
-require_once __DIR__ . '/../../fonctions.php';
+require_once __DIR__ . '/../../noyau/connexion.php';
+require_once __DIR__ . '/../../noyau/fonctions.php';
 exiger_superadmin_association();
 header('Content-Type: application/json; charset=utf-8');
 

@@ -2,13 +2,13 @@
 // verif_scolarite.php — page publique (pas de exiger_connexion) : quiconque
 // scanne le QR imprimé sur un certificat de scolarité arrive ici pour
 // vérifier son authenticité. Type-aware (primaire/secondaire) depuis le
-// 26/09/2026 : partagée par pdf/certificat_scolarite.php (primaire) et
-// secondaire/pdf/certificat_scolarite.php (même bibliothèque hash/URL,
-// pdf/verif_scolarite_lib.php — voir son en-tête).
+// 26/09/2026 : partagée par primaire/pdf/certificat_scolarite.php (primaire) et
+// secondaire/commun/pdf/certificat_scolarite.php (même bibliothèque hash/URL,
+// primaire/pdf/verif_scolarite_lib.php — voir son en-tête).
 require_once __DIR__ . '/config.php';
-require_once __DIR__ . '/connexion.php';
-require_once __DIR__ . '/fonctions.php';
-require_once __DIR__ . '/pdf/verif_scolarite_lib.php';
+require_once __DIR__ . '/noyau/connexion.php';
+require_once __DIR__ . '/noyau/fonctions.php';
+require_once __DIR__ . '/primaire/pdf/verif_scolarite_lib.php';
 verif_exiger_ecole_publique();  // multi-école : URL sans &ec= -> page neutre
 
 $id_eleve   = (int)($_GET['e'] ?? 0);
@@ -46,13 +46,13 @@ if ($authentique) {
 
 // URL du certificat réel, ouverte uniquement si l'utilisateur clique sur le
 // bouton "Ouvrir le certificat" (jamais automatiquement). Le jeton "vh" (=
-// le hash déjà vérifié ci-dessus) permet à pdf/certificat_scolarite.php de
+// le hash déjà vérifié ci-dessus) permet à primaire/pdf/certificat_scolarite.php de
 // servir ce certificat précis sans exiger de connexion.
 // verif_ajout_ec() : en multi-établissement, propage &ec=CODE — sinon
-// pdf/certificat_scolarite.php (accès public par « vh ») reste pointé sur
+// primaire/pdf/certificat_scolarite.php (accès public par « vh ») reste pointé sur
 // l'annuaire.
 // Générateur du TYPE de l'école : une école secondaire renvoyée vers
-// pdf/certificat_scolarite.php (primaire) tombait sur la page « en
+// primaire/pdf/certificat_scolarite.php (primaire) tombait sur la page « en
 // construction » (garde primaire/secondaire de connexion.php).
 $pdf_url = $authentique
     ? verif_ajout_ec(APP_URL . ($secondaire ? '/secondaire/pdf' : '/pdf') . '/certificat_scolarite.php?id=' . $id_eleve . '&vh=' . urlencode($h_recu))

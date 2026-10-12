@@ -62,3 +62,12 @@ if (!function_exists('compat_match_echec')) {
         throw new \RuntimeException('Valeur non prévue : ' . (is_scalar($valeur) ? var_export($valeur, true) : gettype($valeur)));
     }
 }
+
+// Filigrane (logo éclairci) en fond d'une feuille Excel : setBackgroundImage()
+// n'existe qu'à partir de PhpSpreadsheet 2.x, or la version installée est
+// 1.30 (dernière compatible PHP 7.4, voir composer.json). Sans cette
+// méthode, l'export se fait sans filigrane au lieu de planter.
+function excel_filigrane($sheet, string $chemin): void {
+    if ($chemin === '' || !is_file($chemin) || !method_exists($sheet, 'setBackgroundImage')) return;
+    $sheet->setBackgroundImage(file_get_contents($chemin));
+}

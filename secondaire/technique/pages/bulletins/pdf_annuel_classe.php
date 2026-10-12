@@ -6,8 +6,8 @@
  * GET : classe, annee, ordre (alpha|merite), dl (0|1)
  */
 require_once __DIR__ . '/../../../../config.php';
-require_once __DIR__ . '/../../../../connexion.php';
-require_once __DIR__ . '/../../../../fonctions.php';
+require_once __DIR__ . '/../../../../noyau/connexion.php';
+require_once __DIR__ . '/../../../../noyau/fonctions.php';
 exiger_connexion();
 
 function uc(string $s): string {
@@ -267,8 +267,8 @@ $nb_seqs = count($seq_ids);
 $in_ph_s = $nb_seqs > 0 ? implode(',', array_fill(0, $nb_seqs, '?')) : '0';
 $titre_bull = 'BILAN ANNUEL';
 
-require_once __DIR__ . '/../../../pdf/fpdf.php';
-require_once __DIR__ . '/../../../pdf/header_pdf.php'; // pour pdf_filigrane()
+require_once __DIR__ . '/../../../commun/pdf/fpdf.php';
+require_once __DIR__ . '/../../../commun/pdf/header_pdf.php'; // pour pdf_filigrane()
 
 // Sous-classe FPDF ajoutant les rectangles à coins arrondis (cadre de page,
 // bandeau du titre) — voir secondaire/technique/pages/bulletins/pdf.php pour le jumeau (même
@@ -638,7 +638,7 @@ $decisions_par_eleve_c = [];
 if ($ids_eleves_c) {
     $in_ph_e = implode(',', array_fill(0, count($ids_eleves_c), '?'));
     // ORDER BY id : même choix "premier tuteur" que l'ancien "LIMIT 1" sans
-    // ORDER BY (convention déjà utilisée par pdf/cartes.php).
+    // ORDER BY (convention déjà utilisée par primaire/pdf/cartes.php).
     foreach (db_all("SELECT * FROM tuteur WHERE id_eleve IN ($in_ph_e) ORDER BY id", $ids_eleves_c) as $t) {
         $eid_t = (int)$t['id_eleve'];
         if (!isset($tuteur_par_eleve_c[$eid_t])) $tuteur_par_eleve_c[$eid_t] = $t;
@@ -1220,7 +1220,7 @@ foreach ($eleves as $el) {
 
     // DECISION DU CONSEIL DE CLASSE — cochée et complétée AUTOMATIQUEMENT
     // pour CET élève (demande explicite) si le conseil de classe annuel a
-    // déjà été saisi et enregistré (module pages/conseil_classe/, table
+    // déjà été saisi et enregistré (module primaire/pages/conseil_classe/, table
     // decision_conseil) — voir secondaire/technique/pages/bulletins/pdf_annuel.php pour le détail
     // (même logique). Sinon tout reste vide/décoché.
     $decision_row_c = $decisions_par_eleve_c[$id_eleve] ?? null;
@@ -1306,8 +1306,8 @@ foreach ($eleves as $el) {
     // page, tout en bas, à 2-3mm au-dessus du copyright (demande explicite,
     // déplacé hors du cadre OBSERVATIONS), avec la photo de l'élève incrustée
     // au centre.
-    require_once __DIR__ . '/../../../pdf/verif_lib.php';
-    require_once __DIR__ . '/../../../pdf/qrcode.php';
+    require_once __DIR__ . '/../../../commun/pdf/verif_lib.php';
+    require_once __DIR__ . '/../../../commun/pdf/qrcode.php';
 
     $verif_url_c = bulletin_verif_url($id_eleve, 'annee', $id_annee, id_affichage_eleve($eleve));
     // Cache disque déterministe (au lieu d'un tempnam() régénéré puis

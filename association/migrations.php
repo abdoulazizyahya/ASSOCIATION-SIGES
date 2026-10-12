@@ -4,8 +4,8 @@
 // (avec sauvegarde de sécurité préalable). Superadmin uniquement.
 // Équivalent UI de bd/assoc/migrer_toutes_ecoles.php.
 require_once __DIR__ . '/../config.php';
-require_once __DIR__ . '/../connexion.php';
-require_once __DIR__ . '/../fonctions.php';
+require_once __DIR__ . '/../noyau/connexion.php';
+require_once __DIR__ . '/../noyau/fonctions.php';
 require_once __DIR__ . '/_layout.php';
 exiger_proprietaire_association();   // migrations de schéma (modifie les bases) : propriétaire seul
 

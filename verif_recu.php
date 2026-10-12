@@ -3,9 +3,9 @@
 // scanne le QR imprimé sur un reçu de paiement arrive ici pour vérifier son
 // authenticité. Même pattern que verif_bulletin.php.
 require_once __DIR__ . '/config.php';
-require_once __DIR__ . '/connexion.php';
-require_once __DIR__ . '/fonctions.php';
-require_once __DIR__ . '/pdf/verif_recu_lib.php';
+require_once __DIR__ . '/noyau/connexion.php';
+require_once __DIR__ . '/noyau/fonctions.php';
+require_once __DIR__ . '/primaire/pdf/verif_recu_lib.php';
 verif_exiger_ecole_publique();  // multi-école : URL sans &ec= -> page neutre
 
 $id_eleve  = (int) ($_GET['e'] ?? 0);
@@ -17,16 +17,16 @@ $authentique = $eleve !== null;
 
 // URL du reçu réel, ouverte uniquement si l'utilisateur clique sur le bouton
 // "Ouvrir le reçu" (jamais automatiquement). Le jeton "vh" (= le hash déjà
-// vérifié ci-dessus) permet à pages/finances/recu.php de servir CE reçu
+// vérifié ci-dessus) permet à primaire/pages/finances/recu.php de servir CE reçu
 // précis sans exiger de connexion — même mécanisme que les bulletins.
 $pdf_url = '';
 if ($authentique) {
     $id_classe = (int) db_val("SELECT IDClasses FROM inscrire WHERE id_eleve=? AND val_annee=? LIMIT 1", [$id_eleve, $val_annee]);
     // verif_ajout_ec() : en multi-établissement, propage &ec=CODE — sans lui
-    // pages/finances/recu.php (accès public) ne sait pas dans quelle base
+    // primaire/pages/finances/recu.php (accès public) ne sait pas dans quelle base
     // chercher et connexion.php reste pointé sur l'annuaire (erreur SQL
     // « table annee_scolaire n'existe pas »).
-    $pdf_url = verif_ajout_ec(APP_URL . '/pages/finances/recu.php?eleve=' . $id_eleve . '&classe=' . $id_classe . '&vh=' . urlencode($h_recu));
+    $pdf_url = verif_ajout_ec(APP_URL . '/primaire/pages/finances/recu.php?eleve=' . $id_eleve . '&classe=' . $id_classe . '&vh=' . urlencode($h_recu));
 }
 ?>
 <!DOCTYPE html>

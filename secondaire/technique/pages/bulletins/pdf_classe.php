@@ -4,8 +4,8 @@
  * GET : classe, trim|seq, annee, ordre (alpha|merite), dl (0|1)
  */
 require_once __DIR__ . '/../../../../config.php';
-require_once __DIR__ . '/../../../../connexion.php';
-require_once __DIR__ . '/../../../../fonctions.php';
+require_once __DIR__ . '/../../../../noyau/connexion.php';
+require_once __DIR__ . '/../../../../noyau/fonctions.php';
 exiger_connexion();
 
 function uc(string $s): string {
@@ -246,8 +246,8 @@ $nb_seqs = count($seqs_trim);
 $seq_ids = array_column($seqs_trim, 'id');
 $in_ph_s = $nb_seqs > 0 ? implode(',', array_fill(0, $nb_seqs, '?')) : '0';
 
-require_once __DIR__ . '/../../../pdf/fpdf.php';
-require_once __DIR__ . '/../../../pdf/header_pdf.php'; // pour pdf_filigrane()
+require_once __DIR__ . '/../../../commun/pdf/fpdf.php';
+require_once __DIR__ . '/../../../commun/pdf/header_pdf.php'; // pour pdf_filigrane()
 
 // Sous-classe FPDF ajoutant les rectangles à coins arrondis (cadre de page,
 // bandeau du titre) — voir secondaire/technique/pages/bulletins/pdf.php pour le jumeau (même
@@ -531,7 +531,7 @@ $tuteur_par_eleve_c = [];
 if ($ids_eleves_c) {
     $in_ph_e = implode(',', array_fill(0, count($ids_eleves_c), '?'));
     // ORDER BY id : même choix "premier tuteur" que l'ancien
-    // "LIMIT 1" sans ORDER BY (convention déjà utilisée par pdf/cartes.php
+    // "LIMIT 1" sans ORDER BY (convention déjà utilisée par primaire/pdf/cartes.php
     // pour ce même regroupement).
     foreach (db_all("SELECT * FROM tuteur WHERE id_eleve IN ($in_ph_e) ORDER BY id", $ids_eleves_c) as $t) {
         $eid_t = (int)$t['id_eleve'];
@@ -971,7 +971,7 @@ foreach ($eleves as $el) {
     $heur_nj_c    = (int) $abs_reelle_c['non_jus'];
 
     // Mentions automatiques — seuils configurables par l'administrateur
-    // (secondaire/pages/parametres/index.php, onglet "Mentions"), mêmes fonctions
+    // (secondaire/commun/pages/parametres/index.php, onglet "Mentions"), mêmes fonctions
     // partagées que secondaire/technique/pages/bulletins/pdf.php (fonctions.php::bulletin_*).
     $reglage_mention_c = get_reglage_mention_bulletin($id_annee);
     $tab_honneur_c = bulletin_tableau_honneur($moy_gen ?? 0, $heur_nj_c, $reglage_mention_c) === 'Oui';
@@ -1179,8 +1179,8 @@ foreach ($eleves as $el) {
     // QR code de vérification d'authenticité — dans la dernière cellule de
     // DECISION, aligné à droite, avec la photo de l'élève incrustée au
     // centre. Plus de légende "Scannez..." sous le QR (supprimée, demande explicite).
-    require_once __DIR__ . '/../../../pdf/verif_lib.php';
-    require_once __DIR__ . '/../../../pdf/qrcode.php';
+    require_once __DIR__ . '/../../../commun/pdf/verif_lib.php';
+    require_once __DIR__ . '/../../../commun/pdf/qrcode.php';
 
     if ($h_rempli_c > 15) {
         $verif_url_c = bulletin_verif_url(
@@ -1199,7 +1199,7 @@ foreach ($eleves as $el) {
         // requêtes ne l'aurait jamais révélé (aucune requête SQL ici).
         // Nom dérivé du contenu exact encodé dans le QR ($verif_url_c, déjà
         // déterministe : id_eleve+vue+période+matricule+secret HMAC — voir
-        // pdf/verif_lib.php::bulletin_verif_url()) + de la date de
+        // primaire/pdf/verif_lib.php::bulletin_verif_url()) + de la date de
         // modification de la photo incrustée, pour qu'un changement de photo
         // invalide automatiquement l'ancien cache (garde-fou : jamais servir
         // un QR périmé).

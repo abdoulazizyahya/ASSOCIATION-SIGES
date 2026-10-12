@@ -6,13 +6,13 @@
 // Finances (inscriptions/paiements, cas sociaux), Dépenses, Paie/RH. Les 3
 // dernières sections sont sensibles (argent/salaires) et restent réservées
 // à DIRECTEUR/SECRETAIRE — mêmes rôles que les menus Finances/Dépenses/Paie
-// eux-mêmes (voir layout/header.php) : ce n'est pas parce que c'est sur le
+// eux-mêmes (voir noyau/layout/header.php) : ce n'est pas parce que c'est sur le
 // dashboard que ça doit être visible plus largement que le menu d'origine.
 require_once __DIR__ . '/config.php';
-require_once __DIR__ . '/connexion.php';
-require_once __DIR__ . '/fonctions.php';
-require_once __DIR__ . '/notes_apc.php';
-require_once __DIR__ . '/paie_fonctions.php'; // solde_avance()
+require_once __DIR__ . '/noyau/connexion.php';
+require_once __DIR__ . '/noyau/fonctions.php';
+require_once __DIR__ . '/primaire/notes_apc.php';
+require_once __DIR__ . '/noyau/paie_fonctions.php'; // solde_avance()
 exiger_connexion();
 
 // École secondaire : tout le reste de ce fichier interroge des tables
@@ -20,7 +20,7 @@ exiger_connexion();
 // schéma secondaire — bloc dédié, séparé tôt, avant la moindre requête
 // primaire (même principe que secondaire_en_construction.php/connexion.php).
 if (function_exists('type_enseignement_courant') && type_enseignement_courant() === 'secondaire') {
-    require __DIR__ . '/secondaire/dashboard_contenu.php';
+    require __DIR__ . '/secondaire/commun/dashboard_contenu.php';
     exit;
 }
 
@@ -37,9 +37,9 @@ $role      = role_connecte();
 // l'association, qui peuvent masquer ou accorder un module). Par défaut :
 // un directeur ne voit pas les finances ; si l'association lui ouvre le
 // menu Finances, le tableau de bord les affiche aussi.
-$peut_voir_finances  = menu_visible('Finances', ['pages/finances/']);   // groupe Finances seul : « Frais exigibles » (Paramètres) ne compte pas
-$peut_voir_depenses  = menu_visible('Finances', ['pages/depenses/']);   // idem « Catégories de dépenses »
-$peut_voir_paie      = menu_visible(null, ['pages/paie/index.php', 'pages/paie/grille.php', 'pages/paie/avances.php', 'pages/paie/periode.php']);
+$peut_voir_finances  = menu_visible('Finances', ['primaire/pages/finances/']);   // groupe Finances seul : « Frais exigibles » (Paramètres) ne compte pas
+$peut_voir_depenses  = menu_visible('Finances', ['primaire/pages/depenses/']);   // idem « Catégories de dépenses »
+$peut_voir_paie      = menu_visible(null, ['primaire/pages/paie/index.php', 'primaire/pages/paie/grille.php', 'primaire/pages/paie/avances.php', 'primaire/pages/paie/periode.php']);
 $peut_voir_pedagogie = menu_visible('Pédagogie');
 $is_admin            = $peut_voir_finances; // alias conservé : encore utilisé plus bas pour Finances/Dépenses
 
@@ -143,7 +143,7 @@ if ($id_trim) {
 //    unique, déjà utilisée par Impayés/État par classe/Statistiques — voir
 //    fonctions.php) : une SEULE passe sur les élèves, jamais 2 définitions
 //    différentes de "qui doit quoi" qui pourraient diverger. Seuil de 0.009
-//    F pour les égalités flottantes (même tolérance que pages/finances/
+//    F pour les égalités flottantes (même tolérance que primaire/pages/finances/
 //    impayes.php).
 $total_du = 0.0; $total_normal = 0.0; $total_paye = 0.0; $nb_cas_sociaux = 0;
 $nb_payes_integral = 0; $nb_avance = 0; $montant_avance = 0.0;
@@ -156,7 +156,7 @@ $nb_insolvables = 0; $montant_insolvables = 0.0;
 $finance_par_classe = [];
 // Top débiteurs (demande explicite du 23/08/2026 : liste actionnable des
 // plus gros soldes impayés, directement sur le dashboard) — même seuil
-// (0.009 F) et même logique que pages/finances/impayes.php, construite dans
+// (0.009 F) et même logique que primaire/pages/finances/impayes.php, construite dans
 // la MÊME passe que le reste (pas de requête supplémentaire).
 $tous_soldes = [];
 if ($peut_voir_finances) {
@@ -273,12 +273,12 @@ $fmt_f   = fn(float $v): string => number_format($v, 0, ',', ' ') . ' F';
 // sa légende ET son chiffre en texte, jamais la couleur seule.
 
 $titre_page = 'Tableau de bord';
-require_once __DIR__ . '/layout/header.php';
+require_once __DIR__ . '/noyau/layout/header.php';
 ?>
 <style>
 /* ── Tableau de bord : cellules plus compactes (portée à cette page
    uniquement, via .dash-page — ne touche pas .stat-card ailleurs, ex.
-   pages/notes_arabe/classement.php qui réutilise la même classe globale). */
+   primaire/pages/notes_arabe/classement.php qui réutilise la même classe globale). */
 .dash-page .stat-card{padding:.55rem .7rem;gap:.6rem}
 .dash-page .stat-icon{width:34px;height:34px;font-size:1rem}
 .dash-page .stat-val{font-size:1.2rem}
@@ -398,7 +398,7 @@ require_once __DIR__ . '/layout/header.php';
     <div class="card">
       <div class="card-header d-flex justify-content-between align-items-center" style="background:#f8faff">
         <span class="fw-semibold" style="font-size:.85rem"><i class="bi bi-people-fill me-1" style="color:var(--ok)"></i>Situation financière des élèves</span>
-        <a href="<?= APP_URL ?>/pages/finances/impayes.php" class="btn btn-sm btn-abz-outline" style="font-size:.7rem">Impayés <i class="bi bi-arrow-right ms-1"></i></a>
+        <a href="<?= APP_URL ?>/primaire/pages/finances/impayes.php" class="btn btn-sm btn-abz-outline" style="font-size:.7rem">Impayés <i class="bi bi-arrow-right ms-1"></i></a>
       </div>
       <div class="card-body">
         <div class="pedago-chips">
@@ -436,7 +436,7 @@ require_once __DIR__ . '/layout/header.php';
     <div class="card">
       <div class="card-header d-flex justify-content-between align-items-center" style="background:#f8faff">
         <span class="fw-semibold" style="font-size:.85rem"><i class="bi bi-exclamation-diamond me-1" style="color:var(--danger)"></i>Top élèves à relancer</span>
-        <a href="<?= APP_URL ?>/pages/finances/impayes.php" class="btn btn-sm btn-abz-outline" style="font-size:.7rem">Voir tous les impayés <i class="bi bi-arrow-right ms-1"></i></a>
+        <a href="<?= APP_URL ?>/primaire/pages/finances/impayes.php" class="btn btn-sm btn-abz-outline" style="font-size:.7rem">Voir tous les impayés <i class="bi bi-arrow-right ms-1"></i></a>
       </div>
       <div class="table-responsive">
         <table class="table table-abz table-hover align-middle mb-0" style="font-size:.82rem">
@@ -446,7 +446,7 @@ require_once __DIR__ . '/layout/header.php';
             <tr>
               <td class="text-muted"><?= $i + 1 ?></td>
               <td class="fw-semibold">
-                <a href="<?= APP_URL ?>/pages/eleves/voir.php?id=<?= $e['id_eleve'] ?>" class="text-decoration-none">
+                <a href="<?= APP_URL ?>/primaire/pages/eleves/voir.php?id=<?= $e['id_eleve'] ?>" class="text-decoration-none">
                   <?= h(mb_strtoupper($e['nom'])) ?> <?= h($e['prenom'] ?? '') ?>
                 </a>
               </td>
@@ -473,7 +473,7 @@ require_once __DIR__ . '/layout/header.php';
     <div class="card h-100">
       <div class="card-header d-flex justify-content-between align-items-center" style="background:#f8faff">
         <span class="fw-semibold" style="font-size:.85rem"><i class="bi bi-cash-coin me-1" style="color:var(--ok)"></i>Finances</span>
-        <a href="<?= APP_URL ?>/pages/finances/statistiques.php" class="btn btn-sm btn-abz-outline" style="font-size:.7rem"><i class="bi bi-arrow-right"></i></a>
+        <a href="<?= APP_URL ?>/primaire/pages/finances/statistiques.php" class="btn btn-sm btn-abz-outline" style="font-size:.7rem"><i class="bi bi-arrow-right"></i></a>
       </div>
       <div class="card-body">
         <div class="d-flex align-items-center gap-2 mb-2">
@@ -498,7 +498,7 @@ require_once __DIR__ . '/layout/header.php';
     <div class="card h-100">
       <div class="card-header d-flex justify-content-between align-items-center" style="background:#f8faff">
         <span class="fw-semibold" style="font-size:.85rem"><i class="bi bi-cart-dash me-1" style="color:var(--warn)"></i>Dépenses</span>
-        <a href="<?= APP_URL ?>/pages/depenses/journal.php" class="btn btn-sm btn-abz-outline" style="font-size:.7rem"><i class="bi bi-arrow-right"></i></a>
+        <a href="<?= APP_URL ?>/primaire/pages/depenses/journal.php" class="btn btn-sm btn-abz-outline" style="font-size:.7rem"><i class="bi bi-arrow-right"></i></a>
       </div>
       <div class="card-body">
         <div style="height:60px"><canvas id="chartDepenses"></canvas></div>
@@ -517,7 +517,7 @@ require_once __DIR__ . '/layout/header.php';
     <div class="card h-100">
       <div class="card-header d-flex justify-content-between align-items-center" style="background:#f8faff">
         <span class="fw-semibold" style="font-size:.85rem"><i class="bi bi-wallet2 me-1" style="color:var(--purple)"></i>Paie</span>
-        <a href="<?= APP_URL ?>/pages/paie/index.php" class="btn btn-sm btn-abz-outline" style="font-size:.7rem"><i class="bi bi-arrow-right"></i></a>
+        <a href="<?= APP_URL ?>/primaire/pages/paie/index.php" class="btn btn-sm btn-abz-outline" style="font-size:.7rem"><i class="bi bi-arrow-right"></i></a>
       </div>
       <div class="card-body">
         <?php if ($derniere_periode): ?>
@@ -574,7 +574,7 @@ require_once __DIR__ . '/layout/header.php';
 <div class="card">
   <div class="card-header d-flex justify-content-between align-items-center" style="background:#f8faff">
     <span class="fw-semibold" style="font-size:.85rem"><i class="bi bi-mortarboard me-1" style="color:var(--info)"></i>Pédagogie — détail</span>
-    <a href="<?= APP_URL ?>/pages/statistiques/index.php" class="btn btn-sm btn-abz-outline" style="font-size:.72rem">Statistiques <i class="bi bi-arrow-right ms-1"></i></a>
+    <a href="<?= APP_URL ?>/primaire/pages/statistiques/index.php" class="btn btn-sm btn-abz-outline" style="font-size:.72rem">Statistiques <i class="bi bi-arrow-right ms-1"></i></a>
   </div>
   <div class="card-body">
     <?php if (!$id_trim): ?>
@@ -898,4 +898,4 @@ new Chart(document.getElementById('chartEffectifsPie'), {
 });
 </script>
 
-<?php require_once __DIR__ . '/layout/footer.php'; ?>
+<?php require_once __DIR__ . '/noyau/layout/footer.php'; ?>

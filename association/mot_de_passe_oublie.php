@@ -5,8 +5,8 @@
 //   • identifiant + réponses aux 2 questions secrètes.
 // Rate-limité comme la connexion (login_echec).
 require_once __DIR__ . '/../config.php';
-require_once __DIR__ . '/../connexion.php';
-require_once __DIR__ . '/../fonctions.php';
+require_once __DIR__ . '/../noyau/connexion.php';
+require_once __DIR__ . '/../noyau/fonctions.php';
 require_once __DIR__ . '/_layout.php';
 ecole_session_demarrer();
 

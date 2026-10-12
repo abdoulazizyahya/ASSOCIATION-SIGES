@@ -134,7 +134,7 @@ defined('UPLOAD_URL') || define('UPLOAD_URL', APP_URL . '/assets/uploads/eleves/
 
 // Clé privée ECDSA P-256 pour la signature offline des QR de bulletins
 // (verif_bulletin_hors_ligne.html vérifie avec la clé publique correspondante,
-// embarquée dans ce fichier — voir pdf/verif_lib.php::bulletin_verif_signature_offline()).
+// embarquée dans ce fichier — voir primaire/pdf/verif_lib.php::bulletin_verif_signature_offline()).
 // Générée une fois via bd/generer_cles_verif_offline.php.
 // ⚠ Garder la MÊME clé sur tous les environnements (LAN + prod) : en changer
 // invaliderait la vérification hors-ligne des bulletins déjà imprimés.

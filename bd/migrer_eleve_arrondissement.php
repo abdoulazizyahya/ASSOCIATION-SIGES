@@ -32,7 +32,7 @@ if (PHP_SAPI !== 'cli') {
 }
 
 require __DIR__ . '/../config.php';
-require __DIR__ . '/../connexion.php';
+require __DIR__ . '/../noyau/connexion.php';
 require __DIR__ . '/lib/lieux_normalisation.php';
 
 $options   = getopt('', ['appliquer', 'seuil::']);

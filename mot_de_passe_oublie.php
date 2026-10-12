@@ -11,8 +11,8 @@
 // clés que le primaire (id_user, login_user…) pour que tout le reste du
 // fichier (sessions, affichage) reste inchangé.
 require_once __DIR__ . '/config.php';
-require_once __DIR__ . '/connexion.php';
-require_once __DIR__ . '/fonctions.php';
+require_once __DIR__ . '/noyau/connexion.php';
+require_once __DIR__ . '/noyau/fonctions.php';
 session_init();
 $secondaire = function_exists('type_enseignement_courant') && type_enseignement_courant() === 'secondaire';
 

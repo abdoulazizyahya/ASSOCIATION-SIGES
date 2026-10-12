@@ -10,7 +10,7 @@ if (!in_array($role, ['ADMIN','PROVISEUR','CENSEUR'])) { flash_set('erreur','Acc
 
 $mat = $_GET['id'] ?? '';
 $e   = db_one("SELECT * FROM enseignant WHERE matricule_ens=?", [$mat]);
-if (!$e) { flash_set('erreur','Enseignant introuvable.'); rediriger('pages/enseignants/index.php'); }
+if (!$e) { flash_set('erreur','Enseignant introuvable.'); rediriger('primaire/pages/enseignants/index.php'); }
 
 $annee_act = get_annee_active();
 $val_annee = $annee_act['libelle'] ?? '';

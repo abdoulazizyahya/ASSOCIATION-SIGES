@@ -12,7 +12,7 @@
 // page ni bloquer une connexion.
 
 if (!function_exists('assoc_exec')) {
-    require_once __DIR__ . '/../../connexion_assoc.php';
+    require_once __DIR__ . '/../../noyau/connexion_assoc.php';
 }
 
 // ─────────────────────────────────────────────────────────────────────

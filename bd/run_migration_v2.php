@@ -8,7 +8,7 @@
 //  existantes) et `discipline.actif`. Aucune autre donnée n'est modifiée.
 // =====================================================================
 require_once __DIR__ . '/../config.php';
-require_once __DIR__ . '/../connexion.php';   // fournit $link + helpers db_*
+require_once __DIR__ . '/../noyau/connexion.php';   // fournit $link + helpers db_*
 
 header('Content-Type: text/plain; charset=utf-8');
 echo "=== Migration v2 — jaynitaare_v2 (mysqli) ===\n\n";

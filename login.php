@@ -1,7 +1,7 @@
 <?php
 require_once __DIR__ . '/config.php';
-require_once __DIR__ . '/connexion.php';
-require_once __DIR__ . '/fonctions.php';
+require_once __DIR__ . '/noyau/connexion.php';
+require_once __DIR__ . '/noyau/fonctions.php';
 session_init();
 
 // Si déjà connecté → dashboard
@@ -118,17 +118,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             // cette page) renvoie vers le tableau de bord. Jamais bloquant
             // (demande explicite du 24/09/2026) : un bandeau reste ensuite
             // disponible sur les autres pages tant que ce n'est pas fait
-            // (layout/header.php + questions_securite_reporter.php).
+            // (noyau/layout/header.php + questions_securite_reporter.php).
             $dest = (function_exists('utilisateur_a_questions') && !utilisateur_a_questions($u_id))
                 ? '/configurer_securite.php'
                 : '/dashboard.php';
             // Retour vers la page demandée avant connexion — posé uniquement
-            // par pages/eleves/photos_seance.php (QR code de la séance photo
+            // par primaire/pages/eleves/photos_seance.php (QR code de la séance photo
             // au téléphone, primaire ou secondaire). Chemin interne à
             // l'application seulement.
             $retour = (string) ($_SESSION['retour_apres_login'] ?? '');
             unset($_SESSION['retour_apres_login'], $_SESSION['ecole_suggeree']);
-            if ($retour !== '' && (str_starts_with($retour, APP_URL . '/pages/') || str_starts_with($retour, APP_URL . '/secondaire/pages/')) &&!str_contains($retour, '//') && !str_contains($retour, '\\')) {
+            if ($retour !== '' && (str_starts_with($retour, APP_URL . '/primaire/pages/') || str_starts_with($retour, APP_URL . '/secondaire/')) &&!str_contains($retour, '//') && !str_contains($retour, '\\')) {
                 header('Location: ' . $retour); exit;
             }
             header('Location: ' . APP_URL . $dest); exit;
@@ -152,7 +152,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 // Contexte neutre (annuaire présent, plusieurs écoles, aucune choisie) :
 // get_etablissement() renvoie [] -> habillage GÉNÉRIQUE (aucun logo ni nom
 // d'école). L'identité d'un établissement n'apparaît qu'après sélection dans
-// la liste (fetch ajax/ecole_identite.php) ou après un POST avec école
+// la liste (fetch noyau/ajax/ecole_identite.php) ou après un POST avec école
 // valide (basculer_base_ecole() déjà appelé plus haut).
 $etab = get_etablissement();
 $neutre = function_exists('est_contexte_neutre') && est_contexte_neutre() && empty($etab);
@@ -283,7 +283,7 @@ if (preg_match_all('/\b[\p{L}]/u', $marque_defaut, $mm) && count($mm[0]) > 1) {
   var sigleDefaut = <?= json_encode($sigle_defaut) ?>;
   function appliquer(code) {
     if (!code) { logo.textContent = sigleDefaut; nom.textContent = nomDefaut; return; }
-    fetch('<?= APP_URL ?>/ajax/ecole_identite.php?code=' + encodeURIComponent(code))
+    fetch('<?= APP_URL ?>/noyau/ajax/ecole_identite.php?code=' + encodeURIComponent(code))
       .then(function (r) { return r.json(); })
       .then(function (d) {
         if (!d) { logo.textContent = sigleDefaut; nom.textContent = nomDefaut; return; }

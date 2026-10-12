@@ -11,7 +11,7 @@
 //  qui provoquait un « Internal Server Error / DirectoryIndex not allowed ».
 // ─────────────────────────────────────────────────────────────────────
 require_once __DIR__ . '/config.php';
-require_once __DIR__ . '/fonctions.php';
+require_once __DIR__ . '/noyau/fonctions.php';
 session_init();
 
 $aller_login = isset($_GET['login']) || isset($_GET['connexion']) || isset($_GET['app']);
@@ -26,4 +26,4 @@ if ($aller_login) {
 }
 
 // Visiteur non connecté sur la racine → vitrine publique.
-require __DIR__ . '/accueil.php';
+require __DIR__ . '/noyau/accueil.php';

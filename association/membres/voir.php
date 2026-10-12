@@ -8,8 +8,8 @@
 // membres et les accès par école, mais pas le tier superadmin, et ne peut
 // pas modifier le compte du propriétaire.
 require_once __DIR__ . '/../../config.php';
-require_once __DIR__ . '/../../connexion.php';
-require_once __DIR__ . '/../../fonctions.php';
+require_once __DIR__ . '/../../noyau/connexion.php';
+require_once __DIR__ . '/../../noyau/fonctions.php';
 require_once __DIR__ . '/../_layout.php';
 exiger_superadmin_association();
 

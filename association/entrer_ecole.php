@@ -12,8 +12,8 @@
 //     Utilisateurs/Paramètres école masqués par défaut (configurable depuis
 //     association/acces.php, rôle « MEMBRE_ASSOCIATION »).
 require_once __DIR__ . '/../config.php';
-require_once __DIR__ . '/../connexion.php';
-require_once __DIR__ . '/../fonctions.php';
+require_once __DIR__ . '/../noyau/connexion.php';
+require_once __DIR__ . '/../noyau/fonctions.php';
 exiger_membre_association();
 
 $id = (int) ($_GET['id'] ?? 0);
