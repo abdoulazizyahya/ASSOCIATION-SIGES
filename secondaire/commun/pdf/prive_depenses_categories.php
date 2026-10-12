@@ -2,7 +2,7 @@
 // secondaire/commun/pdf/prive_depenses_categories.php — Catalogue PDF des
 // catégories de dépenses PRIVÉES — porté de primaire/pdf/depenses_categories.php
 // (primaire), adapté au schéma secondaire.
-require_once __DIR__ . '/../../../config.php';
+require_once __DIR__ . '/../../../config/config.php';
 require_once __DIR__ . '/../../../noyau/connexion.php';
 require_once __DIR__ . '/../../../noyau/fonctions.php';
 exiger_role(['ADMIN', 'PROVISEUR', 'INTENDANT']);

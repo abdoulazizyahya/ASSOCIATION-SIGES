@@ -11,7 +11,7 @@
 // sa 1ère ligne comme en-têtes ; 2) correspondance des colonnes du fichier
 // avec les champs élève, puis import. Chaque ligne crée un NOUVEL élève
 // (jamais de mise à jour d'un élève existant).
-require_once __DIR__ . '/../../../../config.php';
+require_once __DIR__ . '/../../../../config/config.php';
 require_once __DIR__ . '/../../../../noyau/connexion.php';
 require_once __DIR__ . '/../../../../noyau/fonctions.php';
 require_once __DIR__ . '/../../../../vendor/autoload.php';

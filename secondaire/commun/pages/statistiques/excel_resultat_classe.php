@@ -5,7 +5,7 @@
  * rendu partagé dans excel_resultat_commun.php.
  * GET : annee, classe, filtre (admis|redoublement|exclu|tous), cols, align
  */
-require_once __DIR__ . '/../../../../config.php';
+require_once __DIR__ . '/../../../../config/config.php';
 require_once __DIR__ . '/../../../../noyau/connexion.php';
 require_once __DIR__ . '/../../../../noyau/fonctions.php';
 require_once __DIR__ . '/../../../../vendor/autoload.php';

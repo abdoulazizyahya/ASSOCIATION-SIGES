@@ -7,7 +7,7 @@
 // Remplacement complet des affectations de l'année postée par l'ensemble
 // coché (une case décochée supprime l'affectation) — même principe que
 // primaire/pages/matieres_arabe/liste.php pour matiere_niveau_arabe.
-require_once __DIR__ . '/../../../config.php';
+require_once __DIR__ . '/../../../config/config.php';
 require_once __DIR__ . '/../../../noyau/connexion.php';
 require_once __DIR__ . '/../../../noyau/fonctions.php';
 exiger_role(['DIRECTEUR']);

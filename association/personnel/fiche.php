@@ -1,6 +1,6 @@
 <?php
 // association/personnel/fiche.php — identité d'un agent + historique d'affectations
-require_once __DIR__ . '/../../config.php';
+require_once __DIR__ . '/../../config/config.php';
 require_once __DIR__ . '/../../noyau/connexion.php';
 require_once __DIR__ . '/../../noyau/fonctions.php';
 require_once __DIR__ . '/../_layout.php';

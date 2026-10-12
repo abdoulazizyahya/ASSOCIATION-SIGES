@@ -7,7 +7,7 @@
 // une dépense qui le ferait passer sous zéro déclenche un AVERTISSEMENT
 // (pas un blocage — l'établissement peut avoir d'autres ressources non
 // suivies ici, mais doit le voir clairement avant de confirmer).
-require_once __DIR__ . '/../../../config.php';
+require_once __DIR__ . '/../../../config/config.php';
 require_once __DIR__ . '/../../../noyau/connexion.php';
 require_once __DIR__ . '/../../../noyau/fonctions.php';
 exiger_role(['DIRECTEUR', 'SECRETAIRE', 'COMPTABLE']);

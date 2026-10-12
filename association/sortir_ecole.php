@@ -1,6 +1,6 @@
 <?php
 // association/sortir_ecole.php — fin de visite, retour au portail
-require_once __DIR__ . '/../config.php';
+require_once __DIR__ . '/../config/config.php';
 require_once __DIR__ . '/../noyau/connexion.php';
 require_once __DIR__ . '/../noyau/fonctions.php';
 ecole_session_demarrer();

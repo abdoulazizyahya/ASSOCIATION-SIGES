@@ -1,7 +1,7 @@
 <?php
 // ── Classement d'une classe pour un trimestre — piste arabe ─────────
 // Miroir de primaire/pages/notes/classement.php (piste française).
-require_once __DIR__ . '/../../../config.php';
+require_once __DIR__ . '/../../../config/config.php';
 require_once __DIR__ . '/../../../noyau/connexion.php';
 require_once __DIR__ . '/../../../noyau/fonctions.php';
 require_once __DIR__ . '/../../notes_apc.php';

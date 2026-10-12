@@ -1,6 +1,6 @@
 <?php
 // secondaire/commun/pages/eleves/save.php — POST handler de secondaire/commun/pages/eleves/form.php.
-require_once __DIR__ . '/../../../../config.php';
+require_once __DIR__ . '/../../../../config/config.php';
 require_once __DIR__ . '/../../../../noyau/connexion.php';
 require_once __DIR__ . '/../../../../noyau/fonctions.php';
 exiger_role(['ADMIN', 'PROVISEUR', 'FONDATEUR', 'CENSEUR', 'SG', 'SECRETAIRE']);

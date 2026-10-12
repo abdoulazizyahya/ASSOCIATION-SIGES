@@ -4,7 +4,7 @@
 // periode.php (02/10/2026). GET : ids=1,2,3 (ids de bulletin_paie),
 // dl=1 pour télécharger au lieu d'afficher. Même rendu que le bulletin
 // seul (primaire/pdf/bulletin_paie_lib.php).
-require_once __DIR__ . '/../../config.php';
+require_once __DIR__ . '/../../config/config.php';
 require_once __DIR__ . '/../../noyau/connexion.php';
 require_once __DIR__ . '/../../noyau/fonctions.php';
 require_once __DIR__ . '/../../noyau/paie_fonctions.php';

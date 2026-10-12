@@ -42,7 +42,7 @@ $CORR_DEFAUT = [
     'fonctions.php'                      => 'noyau/fonctions.php',
     'paie_fonctions.php'                 => 'noyau/paie_fonctions.php',
     'accueil.php'                        => 'noyau/accueil.php',
-    // profil.php reste à la racine (parcours de compte, clé de privilège 'profil.php').
+    // compte/profil.php reste à la racine (parcours de compte, clé de privilège 'compte/profil.php').
     'Guide_utilisation_SIGES.docx'       => 'docs/Guide_utilisation_SIGES.docx',
     'SIGES_Presentation_Jaynitaare.pptx' => 'docs/SIGES_Presentation_Jaynitaare.pptx',
     'prompt_continuite_jaynitaare_v2.md' => 'docs/prompt_continuite_jaynitaare_v2.md',

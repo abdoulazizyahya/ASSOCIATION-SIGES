@@ -1,6 +1,6 @@
 <?php
 // secondaire/commun/dashboard_contenu.php — tableau de bord secondaire, COPIE
-// CONFORME de dashboard.php (primaire) : même CSS, même structure HTML,
+// CONFORME de noyau/dashboard.php (primaire) : même CSS, même structure HTML,
 // mêmes widgets (bandeau héros, situation financière, top impayés,
 // Finances/Dépenses/Paie, dépenses par catégorie + évolution encaissements,
 // Pédagogie détail avec palmarès, effectifs & finances par classe,
@@ -9,7 +9,7 @@
 // niveau des données affichées". Seule la SOURCE des données change (tables
 // secondaire, statut public/privé pour Finances/Dépenses — voir
 // noyau/layout/menu_secondaire.php), jamais le design/CSS/disposition.
-// Inclus par dashboard.php (racine) quand type_enseignement_courant() ===
+// Inclus par noyau/dashboard.php (racine) quand type_enseignement_courant() ===
 // 'secondaire', APRÈS exiger_connexion() — connexion.php/fonctions.php
 // déjà chargés par l'appelant.
 
@@ -269,7 +269,7 @@ $titre_page = 'Tableau de bord';
 require_once __DIR__ . '/../../noyau/layout/header.php';
 ?>
 <style>
-/* ── Copié à l'identique de dashboard.php (primaire) — ne pas laisser
+/* ── Copié à l'identique de noyau/dashboard.php (primaire) — ne pas laisser
    diverger sans re-synchroniser les deux fichiers. ── */
 .dash-page .stat-card{padding:.55rem .7rem;gap:.6rem}
 .dash-page .stat-icon{width:34px;height:34px;font-size:1rem}

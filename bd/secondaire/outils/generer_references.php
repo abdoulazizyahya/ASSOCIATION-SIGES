@@ -20,7 +20,7 @@
 //  Demande du 04/10/2026.
 // =====================================================================
 if (PHP_SAPI !== 'cli') { http_response_code(403); exit("Outil en ligne de commande uniquement.\n"); }
-require_once __DIR__ . '/../../../config.php';
+require_once __DIR__ . '/../../../config/config.php';
 
 $base_lam  = $argv[1] ?? 'lam_abz';
 $base_prim = $argv[2] ?? 'promeducam_poussins_de_jaynitaare';

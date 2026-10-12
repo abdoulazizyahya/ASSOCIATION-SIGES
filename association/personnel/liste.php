@@ -4,7 +4,7 @@
 //   • « Comptes »    : (superadmin) tous les comptes de connexion `user` de
 //     toutes les écoles — réinitialiser le mot de passe, activer/désactiver
 //     (user.actif, migration v54), changer le rôle, supprimer, créer.
-require_once __DIR__ . '/../../config.php';
+require_once __DIR__ . '/../../config/config.php';
 require_once __DIR__ . '/../../noyau/connexion.php';
 require_once __DIR__ . '/../../noyau/fonctions.php';
 require_once __DIR__ . '/../_layout.php';

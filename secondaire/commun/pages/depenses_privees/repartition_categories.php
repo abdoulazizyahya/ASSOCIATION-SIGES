@@ -3,7 +3,7 @@
 // PRIVÉ > Répartition par catégorie : porté de
 // primaire/pages/depenses/repartition_categories.php (primaire), adapté au schéma
 // secondaire.
-require_once __DIR__ . '/../../../../config.php';
+require_once __DIR__ . '/../../../../config/config.php';
 require_once __DIR__ . '/../../../../noyau/connexion.php';
 require_once __DIR__ . '/../../../../noyau/fonctions.php';
 exiger_role(['ADMIN', 'PROVISEUR', 'SECRETAIRE', 'INTENDANT']);

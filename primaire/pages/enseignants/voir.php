@@ -5,7 +5,7 @@
 // colonne dit bien "arrondissement") ; traité maintenant exactement comme
 // eleve.id_arrondissement (cascade complète région→département→arrondissement,
 // voir primaire/pages/eleves/voir.php, même requête).
-require_once __DIR__ . '/../../../config.php';
+require_once __DIR__ . '/../../../config/config.php';
 require_once __DIR__ . '/../../../noyau/connexion.php';
 require_once __DIR__ . '/../../../noyau/fonctions.php';
 require_once __DIR__ . '/../../../noyau/paie_fonctions.php';

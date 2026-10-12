@@ -3,7 +3,7 @@
 // plusieurs élèves (année scolaire active) vers une autre classe de la même
 // école. Un élève sans inscription cette année (rien à déplacer) est
 // ignoré. Demande explicite du 17/09/2026.
-require_once __DIR__ . '/../../../../config.php';
+require_once __DIR__ . '/../../../../config/config.php';
 require_once __DIR__ . '/../../../../noyau/connexion.php';
 require_once __DIR__ . '/../../../../noyau/fonctions.php';
 exiger_role(['ADMIN', 'PROVISEUR', 'FONDATEUR', 'CENSEUR', 'SG', 'SECRETAIRE']);

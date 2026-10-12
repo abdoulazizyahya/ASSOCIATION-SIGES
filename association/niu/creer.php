@@ -1,6 +1,6 @@
 <?php
 // association/niu/creer.php — frappe manuelle d'un NIU par un membre
-require_once __DIR__ . '/../../config.php';
+require_once __DIR__ . '/../../config/config.php';
 require_once __DIR__ . '/../../noyau/connexion.php';
 require_once __DIR__ . '/../../noyau/fonctions.php';
 require_once __DIR__ . '/../_layout.php';

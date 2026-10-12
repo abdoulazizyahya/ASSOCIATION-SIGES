@@ -6,7 +6,7 @@
  * génère un classeur avec UN ONGLET PAR CLASSE.
  * GET : classe (0 = toutes les classes)
  */
-require_once __DIR__ . '/../../../../config.php';
+require_once __DIR__ . '/../../../../config/config.php';
 require_once __DIR__ . '/../../../../noyau/connexion.php';
 require_once __DIR__ . '/../../../../noyau/fonctions.php';
 require_once __DIR__ . '/../../../../vendor/autoload.php';

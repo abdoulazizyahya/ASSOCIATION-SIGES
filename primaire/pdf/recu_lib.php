@@ -7,7 +7,7 @@
 // demande du 13/09/2026) SANS dupliquer la reconstruction pixel-exacte du
 // modèle de référence (voir l'en-tête de recu.php pour son origine).
 //
-// À inclure APRÈS : config.php, connexion.php, fonctions.php, primaire/pdf/fpdf.php,
+// À inclure APRÈS : config/config.php, connexion.php, fonctions.php, primaire/pdf/fpdf.php,
 // primaire/pdf/header_pdf.php, primaire/pdf/verif_recu_lib.php.
 //
 // Fournit finances_dessiner_recu_eleve() : ajoute UNE page à $pdf (3 copies

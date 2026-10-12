@@ -5,7 +5,7 @@
 // pas de colonne `enseignant.statut_ens` côté secondaire (aucun concept
 // d'enseignant "inactif" dans ce module pour l'instant) — tout le
 // personnel de la table `enseignant` est considéré éligible à la paie.
-require_once __DIR__ . '/../../../../config.php';
+require_once __DIR__ . '/../../../../config/config.php';
 require_once __DIR__ . '/../../../../noyau/connexion.php';
 require_once __DIR__ . '/../../../../noyau/fonctions.php';
 require_once __DIR__ . '/../../../../noyau/paie_fonctions.php';

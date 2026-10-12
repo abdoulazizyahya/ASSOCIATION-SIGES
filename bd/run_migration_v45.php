@@ -6,7 +6,7 @@
 //  2 questions secrètes (question_secrete + user_question_secrete). Voir
 //  bd/migration_v45.sql.
 // =====================================================================
-require_once __DIR__ . '/../config.php';
+require_once __DIR__ . '/../config/config.php';
 require_once __DIR__ . '/../noyau/connexion.php';
 require_once __DIR__ . '/../noyau/fonctions.php';
 

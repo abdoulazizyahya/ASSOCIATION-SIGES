@@ -2,7 +2,7 @@
 // primaire/pages/depenses/statistiques.php — Dépenses > Statistiques : vue
 // d'ensemble du solde de caisse (encaissé - dépensé) et répartition des
 // dépenses par catégorie et par mois, pour l'année scolaire active.
-require_once __DIR__ . '/../../../config.php';
+require_once __DIR__ . '/../../../config/config.php';
 require_once __DIR__ . '/../../../noyau/connexion.php';
 require_once __DIR__ . '/../../../noyau/fonctions.php';
 exiger_role(['DIRECTEUR', 'COMPTABLE']);

@@ -3,7 +3,7 @@
 // PRIVÉES PDF (encaissé/dépensé/solde + par catégorie + évolution
 // mensuelle) — porté de primaire/pdf/depenses_statistiques.php (primaire), adapté
 // au schéma secondaire.
-require_once __DIR__ . '/../../../config.php';
+require_once __DIR__ . '/../../../config/config.php';
 require_once __DIR__ . '/../../../noyau/connexion.php';
 require_once __DIR__ . '/../../../noyau/fonctions.php';
 exiger_role(['ADMIN', 'PROVISEUR', 'INTENDANT']);

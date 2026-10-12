@@ -8,7 +8,7 @@
 // français ; les matières arabe (matiere_arabe.matiere_fr) n'en ont pas —
 // un code de 3 lettres est dérivé du nom pour l'en-tête de colonne, la
 // légende en dessous donne le nom complet (même principe que la version FR).
-require_once __DIR__ . '/../../config.php';
+require_once __DIR__ . '/../../config/config.php';
 require_once __DIR__ . '/../../noyau/connexion.php';
 require_once __DIR__ . '/../../noyau/fonctions.php';
 require_once __DIR__ . '/../notes_apc_arabe.php';

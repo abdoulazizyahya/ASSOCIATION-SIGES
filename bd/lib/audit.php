@@ -188,7 +188,7 @@ function _audit_http_get(string $url): ?string
 //  de la machine (jamais transmis par un navigateur à un site, quelle que
 //  soit la techno : vie privée). Sert uniquement à RECONNAÎTRE le même
 //  navigateur d'une connexion à l'autre, pour que le compte puisse lui
-//  donner un nom depuis « Mon compte » (profil.php > Mes appareils) — voir
+//  donner un nom depuis « Mon compte » (compte/profil.php > Mes appareils) — voir
 //  appareil_connu (connexion_assoc.php).
 // ─────────────────────────────────────────────────────────────────────
 function appareil_device_id(): string

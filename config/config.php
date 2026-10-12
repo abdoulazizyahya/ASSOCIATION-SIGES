@@ -17,11 +17,21 @@ if (version_compare(PHP_VERSION, '7.4.0', '<')) {
        . '(PHP 8.3 recommandé) — version installée : <b>' . PHP_VERSION . '</b>.<br>'
        . 'WampServer : clic sur l’icône → PHP → Version → choisir 7.4 ou plus.</p>');
 }
-require_once __DIR__ . '/bd/lib/compat_php74.php';   // fonctions PHP 8 absentes de PHP 7.4
+require_once __DIR__ . '/../bd/lib/compat_php74.php';   // fonctions PHP 8 absentes de PHP 7.4
 
-if (is_file(__DIR__ . '/config.local.php')) {
-    require __DIR__ . '/config.local.php';
+// config/config.local.php (emplacement actuel) ; repli sur l'ancien
+// emplacement à la racine de l'application (installations antérieures à la
+// réorganisation du 12/10/2026, dont la production) — sans ce repli, le
+// site tomberait dès l'envoi du nouveau code.
+foreach ([__DIR__ . '/config.local.php', dirname(__DIR__) . '/config.local.php'] as $__cfg_local) {
+    if (is_file($__cfg_local)) {
+        require $__cfg_local;
+        defined('CONFIG_LOCAL_FICHIER') || define('CONFIG_LOCAL_FICHIER', $__cfg_local);
+        break;
+    }
 }
+unset($__cfg_local);
+defined('CONFIG_LOCAL_FICHIER') || define('CONFIG_LOCAL_FICHIER', '');
 
 defined('DB_HOST') || define('DB_HOST', '127.0.0.1');
 defined('DB_NAME') || define('DB_NAME', 'promeducam_jaynitaare');   // repli « école n°1 » si l'annuaire association est absent
@@ -50,7 +60,7 @@ defined('ECOLE_POOL_ACTIF') || define('ECOLE_POOL_ACTIF', false);
 // Type pédagogique en installation MONO-ÉCOLE (sans annuaire association) :
 // 'primaire' (historique, défaut) ou 'secondaire'. Sans effet dès qu'un
 // annuaire existe (le type vient alors de etablissement.type_enseignement).
-// Posé automatiquement par install.php en mode « école unique ».
+// Posé automatiquement par installation/install.php en mode « école unique ».
 // Voir ecole_contexte.php::type_enseignement_courant().
 defined('ECOLE_TYPE_SOLO') || define('ECOLE_TYPE_SOLO', 'primaire');
 
@@ -62,7 +72,7 @@ defined('APP_NOM') || define('APP_NOM', 'SIGES · Gestion scolaire');
 // Valeur par défaut ci-dessous VOLONTAIREMENT insécure (pour que l'appli
 // fonctionne « out of the box » en LAN) — À SURCHARGER dans
 // config.local.php pour toute installation réelle (voir
-// config.local.php.example) avec une vraie valeur aléatoire, générée une
+// config/config.local.php.example) avec une vraie valeur aléatoire, générée une
 // fois pour toutes via :
 //   php -r "echo bin2hex(random_bytes(32));"
 // ⚠ Ne JAMAIS changer cette valeur après la première licence générée sur
@@ -89,13 +99,14 @@ defined('AUDIT_RETENTION_MOIS') || define('AUDIT_RETENTION_MOIS', 12);
 // app à la racine du domaine → ''), la définir dans config.local.php.
 if (!defined('APP_URL')) {
     $__app_url = null;
-    $__dir = str_replace('\\', '/', __DIR__);
+    $__racine_app = dirname(__DIR__);   // config/ est un sous-dossier de l'application
+    $__dir = str_replace('\\', '/', $__racine_app);
     if (!empty($_SERVER['DOCUMENT_ROOT'])) {
         $__docroot = str_replace('\\', '/', rtrim($_SERVER['DOCUMENT_ROOT'], '/\\'));
         $__real_docroot = realpath($__docroot);
         if ($__real_docroot !== false) {
             $__real_docroot = str_replace('\\', '/', $__real_docroot);
-            $__real_dir = str_replace('\\', '/', realpath(__DIR__));
+            $__real_dir = str_replace('\\', '/', realpath($__racine_app));
             if ($__real_dir !== '' && strpos($__real_dir . '/', $__real_docroot . '/') === 0) {
                 $__app_url = rtrim(substr($__real_dir, strlen($__real_docroot)), '/');
             }
@@ -106,10 +117,10 @@ if (!defined('APP_URL')) {
     }
     if ($__app_url === null) {
         // CLI ou racine web introuvable : nom du dossier courant.
-        $__app_url = '/' . basename(__DIR__);
+        $__app_url = '/' . basename($__racine_app);
     }
     define('APP_URL', $__app_url);
-    unset($__app_url, $__dir, $__docroot, $__real_docroot, $__real_dir);
+    unset($__app_url, $__racine_app, $__dir, $__docroot, $__real_docroot, $__real_dir);
 }
 // URL publique complète (schéma+hôte) pour les QR codes de vérification
 // (bulletins/reçus/attestations/relevés) — à définir seulement si elle
@@ -129,11 +140,11 @@ if (!defined('APP_URL')) {
 // automatique (detecter_ip_lan() dans fonctions.php) suit alors le réseau
 // courant, et les QR se régénèrent tout seuls au changement d'adresse.
 // define('SERVEUR_LAN_HOST', '192.168.1.50');
-defined('UPLOAD_DIR') || define('UPLOAD_DIR', __DIR__ . '/assets/uploads/eleves/');
+defined('UPLOAD_DIR') || define('UPLOAD_DIR', __DIR__ . '/../assets/uploads/eleves/');
 defined('UPLOAD_URL') || define('UPLOAD_URL', APP_URL . '/assets/uploads/eleves/');
 
 // Clé privée ECDSA P-256 pour la signature offline des QR de bulletins
-// (verif_bulletin_hors_ligne.html vérifie avec la clé publique correspondante,
+// (verif/bulletin_hors_ligne.html vérifie avec la clé publique correspondante,
 // embarquée dans ce fichier — voir primaire/pdf/verif_lib.php::bulletin_verif_signature_offline()).
 // Générée une fois via bd/generer_cles_verif_offline.php.
 // ⚠ Garder la MÊME clé sur tous les environnements (LAN + prod) : en changer

@@ -7,7 +7,7 @@
 // hash inclut $type pour qu'un QR d'attestation ne valide jamais un
 // certificat de prise/reprise de service, et inversement.
 // Inclus par primaire/pages/enseignants/pdf_attestation.php et pdf_prise_service.php
-// (génération du QR), et verif_attestation.php (vérification lors du scan).
+// (génération du QR), et verif/attestation.php (vérification lors du scan).
 
 if (!defined('BULLETIN_VERIF_SECRET')) {
     define('BULLETIN_VERIF_SECRET', 'CHANGE_ME_ABZ_MBE_INSECURE_DEFAULT_SECRET');
@@ -40,5 +40,5 @@ function attestation_verif_base_url(): string {
 
 function attestation_verif_url(string $type, string $matricule): string {
     $h = attestation_verif_hash($type, $matricule);
-    return verif_ajout_ec(attestation_verif_base_url() . '/verif_attestation.php?t=' . urlencode($type) . '&m=' . urlencode($matricule) . '&h=' . $h);
+    return verif_ajout_ec(attestation_verif_base_url() . '/verif/attestation.php?t=' . urlencode($type) . '&m=' . urlencode($matricule) . '&h=' . $h);
 }

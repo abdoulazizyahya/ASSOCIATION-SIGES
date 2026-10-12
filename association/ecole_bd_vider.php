@@ -4,7 +4,7 @@
 // de référence (état « école neuve »). Superadmin association uniquement.
 // L'établissement doit être inactif. Un backup de sécurité est écrit avant
 // (bd/sauvegardes/avant_vidage_<db>_<horo>.sql[.gz]).
-require_once __DIR__ . '/../config.php';
+require_once __DIR__ . '/../config/config.php';
 require_once __DIR__ . '/../noyau/connexion.php';
 require_once __DIR__ . '/../noyau/fonctions.php';
 require_once __DIR__ . '/_layout.php';

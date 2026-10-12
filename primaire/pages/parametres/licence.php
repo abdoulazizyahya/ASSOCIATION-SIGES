@@ -13,7 +13,7 @@
 //     pas de compte local) : reçoivent la clé du propriétaire et la
 //     SAISISSENT ici — 5 échecs consécutifs bloquent tous les comptes de
 //     cette école, seul le propriétaire débloque (bouton ci-dessous).
-require_once __DIR__ . '/../../../config.php';
+require_once __DIR__ . '/../../../config/config.php';
 require_once __DIR__ . '/../../../noyau/connexion.php';
 require_once __DIR__ . '/../../../noyau/fonctions.php';
 exiger_connexion();

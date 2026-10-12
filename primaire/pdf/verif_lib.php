@@ -1,11 +1,11 @@
 <?php
 // primaire/pdf/verif_lib.php — signature et vérification d'authenticité des bulletins.
-// Inclus à la fois par bulletins/pdf.php (génération du QR) et verif_bulletin.php
+// Inclus à la fois par bulletins/pdf.php (génération du QR) et verif/bulletin.php
 // (vérification lors du scan). Garder ces deux usages synchronisés.
 
 if (!defined('BULLETIN_VERIF_SECRET')) {
     // ⚠️ IMPORTANT — À FAIRE AVANT MISE EN PRODUCTION :
-    // Définir une vraie valeur secrète et aléatoire dans config.php, par ex. :
+    // Définir une vraie valeur secrète et aléatoire dans config/config.php, par ex. :
     //   define('BULLETIN_VERIF_SECRET', 'colle_ici_une_chaine_aleatoire_longue');
     // (générable une fois avec : php -r "echo bin2hex(random_bytes(32));")
     // Tant que ce fallback est utilisé, n'importe qui lisant ce fichier peut
@@ -20,7 +20,7 @@ require_once __DIR__ . '/../../noyau/partage/verif/verif_commun.php';
  * $piste = 'fr' ou 'ar' — jaynitaare_v2 a 2 pistes de bulletins distinctes
  * pour un même élève (id_eleve partagé entre les 2, voir eleve/eleve_arabe) ;
  * absent du modèle ABZ_MBE d'origine (une seule piste), ajouté ici pour que
- * verif_bulletin.php sache vers quel générateur PDF rediriger. Paramètre
+ * verif/bulletin.php sache vers quel générateur PDF rediriger. Paramètre
  * optionnel (défaut 'fr') pour ne pas casser les QR déjà en cache disque
  * générés avant son ajout.
  * $secret : forcé à la vérification pour tester le hash legacy (sans école).
@@ -37,7 +37,7 @@ function b64url_encode(string $bin): string {
 // Signature ECDSA P-256/SHA-256 → r||s brut sur 64 octets (format WebCrypto/
 // IEEE P1363), PAS le DER que renvoie openssl_sign() nativement (ASN.1
 // SEQUENCE{INTEGER r, INTEGER s}, longueur variable ~70-72 octets) —
-// crypto.subtle.verify() de la piste offline (verif_bulletin_hors_ligne.html)
+// crypto.subtle.verify() de la piste offline (verif/bulletin_hors_ligne.html)
 // exige le format brut, d'où cette conversion.
 function der_vers_raw_ecdsa(string $der, int $taille = 32): string {
     $pos = 0;
@@ -60,9 +60,9 @@ function der_vers_raw_ecdsa(string $der, int $taille = 32): string {
 
 /**
  * Signe les données clés d'un bulletin (nom/matricule/période/moyenne/rang)
- * avec la clé privée ECDSA P-256 (config.php::BULLETIN_VERIF_PRIVATE_KEY_PEM)
+ * avec la clé privée ECDSA P-256 (config/config.php::BULLETIN_VERIF_PRIVATE_KEY_PEM)
  * — vérifiable HORS LIGNE avec la clé publique correspondante, embarquée
- * dans verif_bulletin_hors_ligne.html (voir ce fichier). Contrairement à
+ * dans verif/bulletin_hors_ligne.html (voir ce fichier). Contrairement à
  * bulletin_verif_hash() (HMAC symétrique, nécessite de recontacter le
  * serveur), une signature asymétrique se vérifie sans réseau — c'est le
  * but recherché. N'affecte jamais bulletin_verif_hash()/bulletin_verif_valider()
@@ -88,7 +88,7 @@ function bulletin_verif_signature_offline(array $champs): string {
  * un QR code : contrairement à un lien HTML classique, un lecteur de QR code
  * externe (téléphone d'un parent, etc.) n'a pas de page de référence pour
  * résoudre une URL relative comme APP_URL ('/ABZ_MBE') — il lui faut l'adresse
- * complète. Définir BULLETIN_VERIF_BASE_URL dans config.php si le nom
+ * complète. Définir BULLETIN_VERIF_BASE_URL dans config/config.php si le nom
  * d'hôte public diffère de celui de la requête courante (ex. reverse proxy) ;
  * sinon déduit automatiquement de la requête en cours.
  */
@@ -118,12 +118,12 @@ function bulletin_verif_base_url(): string {
  * $chiffres_ar : préférence d'affichage (chiffres arabe oriental ٠١٢٣...,
  * bouton "Convertir" de primaire/pages/bulletins_arabe/index.php) — pas une donnée
  * de sécurité, non signée, juste reportée sur le lien "Ouvrir le bulletin"
- * de verif_bulletin.php pour que le PDF rouvert depuis le QR garde la même
+ * de verif/bulletin.php pour que le PDF rouvert depuis le QR garde la même
  * préférence que celui imprimé/exporté.
  */
 function bulletin_verif_url(int $id_eleve, string $vue, int $id_periode, string $matricule, string $piste = 'fr', array $donnees_offline = [], bool $chiffres_ar = false): string {
     $h = bulletin_verif_hash($id_eleve, $vue, $id_periode, $matricule, $piste);
-    $url = verif_ajout_ec(bulletin_verif_base_url() . '/verif_bulletin.php?e=' . $id_eleve . '&v=' . $vue . '&p=' . $id_periode . '&t=' . $piste . '&h=' . $h);
+    $url = verif_ajout_ec(bulletin_verif_base_url() . '/verif/bulletin.php?e=' . $id_eleve . '&v=' . $vue . '&p=' . $id_periode . '&t=' . $piste . '&h=' . $h);
     if ($donnees_offline) {
         $d = bulletin_verif_signature_offline($donnees_offline);
         if ($d !== '') $url .= '&d=' . $d;
@@ -207,7 +207,7 @@ function bulletin_qr_fichier_temp(array $eleve, string $vue, int $id_periode, st
     $cle_cache = hash('crc32b', verif_secret(BULLETIN_VERIF_SECRET)) . '_' . $id_eleve . '_' . $piste . '_' . $vue . '_' . $id_periode
         // Hash de la base URL (schéma + hôte réseau + chemin appli) : sans lui,
         // un QR déjà en cache gardait indéfiniment l'ANCIENNE adresse IP même
-        // après un changement de réseau ou de SERVEUR_LAN_HOST dans config.php
+        // après un changement de réseau ou de SERVEUR_LAN_HOST dans config/config.php
         // (cause réelle d'échec de scan : le téléphone visait une IP qui
         // n'existait plus sur le réseau). Change automatiquement le fichier de
         // cache dès que l'adresse du serveur change — aucune purge manuelle.
@@ -246,7 +246,7 @@ function bulletin_qr_fichier_temp(array $eleve, string $vue, int $id_periode, st
 
 /**
  * Vérifie un jeton de bulletin reçu (scan QR ou lien "vh" copié) — utilisée
- * à la fois par verif_bulletin.php (page publique de vérification) et par
+ * à la fois par verif/bulletin.php (page publique de vérification) et par
  * les 4 générateurs de bulletin eux-mêmes (bypass exiger_connexion() pour
  * la personne qui scanne, jeton "vh" — voir leur en-tête). Recharge
  * toujours l'élève depuis la BD (jamais fait confiance à un $eleve fourni

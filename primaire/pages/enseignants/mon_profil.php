@@ -13,16 +13,16 @@
 // recrutement... inexistantes dans ce schéma — jamais fonctionnel, jamais
 // lié au menu).
 header('Cache-Control: no-store, no-cache, must-revalidate');
-require_once __DIR__ . '/../../../config.php';
+require_once __DIR__ . '/../../../config/config.php';
 require_once __DIR__ . '/../../../noyau/connexion.php';
 require_once __DIR__ . '/../../../noyau/fonctions.php';
 exiger_connexion();
 
 $mat = matricule_ens_courant();
-if (!$mat) { flash_set('erreur', 'Aucune fiche liée à votre compte. Contactez le Directeur.'); rediriger('dashboard.php'); }
+if (!$mat) { flash_set('erreur', 'Aucune fiche liée à votre compte. Contactez le Directeur.'); rediriger('noyau/dashboard.php'); }
 
 $e = db_one("SELECT * FROM enseignant WHERE matricule_ens=?", [$mat]);
-if (!$e) { flash_set('erreur', 'Fiche introuvable.'); rediriger('dashboard.php'); }
+if (!$e) { flash_set('erreur', 'Fiche introuvable.'); rediriger('noyau/dashboard.php'); }
 
 $v = fn(string $k) => $e[$k] ?? '';
 
@@ -61,7 +61,7 @@ require_once __DIR__ . '/../../../noyau/layout/header.php';
 
 <div class="page-titre d-flex align-items-center justify-content-between flex-wrap gap-2">
   <h4><i class="bi bi-person-vcard me-2" style="color:#1a3c6b"></i>Mes informations</h4>
-  <a href="<?= APP_URL ?>/profil.php" class="btn btn-sm btn-light"><i class="bi bi-arrow-left me-1"></i>Mon compte</a>
+  <a href="<?= APP_URL ?>/compte/profil.php" class="btn btn-sm btn-light"><i class="bi bi-arrow-left me-1"></i>Mon compte</a>
 </div>
 
 <?= flash_html() ?>

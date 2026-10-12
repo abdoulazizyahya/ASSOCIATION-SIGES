@@ -5,7 +5,7 @@
 // niveau. Tables : groupe_matiere_arabe/matiere_arabe/matiere_niveau_arabe
 // (voir primaire/notes_apc_arabe.php::matieres_classe_arabe()) — plus d'affectation
 // par classe : une classe a exactement les matières de son niveau.
-require_once __DIR__ . '/../../../config.php';
+require_once __DIR__ . '/../../../config/config.php';
 require_once __DIR__ . '/../../../noyau/connexion.php';
 require_once __DIR__ . '/../../../noyau/fonctions.php';
 exiger_acces_pedagogie();

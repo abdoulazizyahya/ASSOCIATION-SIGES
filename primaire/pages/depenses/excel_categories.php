@@ -1,7 +1,7 @@
 <?php
 // primaire/pages/depenses/excel_categories.php — Export Excel du catalogue des
 // catégories de dépenses, miroir de primaire/pages/finances/excel_obligations.php.
-require_once __DIR__ . '/../../../config.php';
+require_once __DIR__ . '/../../../config/config.php';
 require_once __DIR__ . '/../../../noyau/connexion.php';
 require_once __DIR__ . '/../../../noyau/fonctions.php';
 require_once __DIR__ . '/../../../vendor/autoload.php';

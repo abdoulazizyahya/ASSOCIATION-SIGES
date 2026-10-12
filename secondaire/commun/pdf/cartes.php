@@ -1,6 +1,6 @@
 <?php
 // ── PDF : Cartes scolaires ────────────────────────────────────
-require_once __DIR__ . '/../../../config.php';
+require_once __DIR__ . '/../../../config/config.php';
 require_once __DIR__ . '/../../../noyau/connexion.php';
 require_once __DIR__ . '/../../../noyau/fonctions.php';
 require_once __DIR__ . '/verif_carte_lib.php';
@@ -16,7 +16,7 @@ $verso     = ($_GET['verso'] ?? '0') === '1';
 // Accès public via le QR code de la carte (jeton "vh" = hash de vérification
 // déjà calculé pour cette carte précise) : uniquement en mode mono-élève —
 // la personne qui scanne n'a pas forcément de compte dans le système (voir
-// verif_carte.php). En dehors de ce cas, connexion normale exigée.
+// verif/carte.php). En dehors de ce cas, connexion normale exigée.
 $vh_verif = (string)($_GET['vh'] ?? '');
 $acces_public = $vh_verif !== '' && $id_eleve > 0 && $id_annee > 0
     && hash_equals(carte_verif_hash($id_eleve, $id_annee), $vh_verif);

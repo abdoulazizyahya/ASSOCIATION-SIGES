@@ -21,6 +21,10 @@ if (!function_exists('chemin_actuel')) {
             'notes_apc.php'               => 'primaire/notes_apc.php',
             'notes_apc_arabe.php'         => 'primaire/notes_apc_arabe.php',
         ];
+        // Pages autrefois à la racine (réorganisation du 12/10/2026, 2e étape).
+        static $exactes = ['dashboard.php' => 'noyau/dashboard.php', 'profil.php' => 'compte/profil.php',
+                           'login.php' => 'compte/login.php', 'configurer_securite.php' => 'compte/configurer_securite.php'];
+        if (isset($exactes[$p])) return $exactes[$p];
         foreach ($table as $ancien => $neuf) {      // ordre : du plus précis au plus général
             if (strncmp($p, $ancien, strlen($ancien)) === 0) return $neuf . substr($p, strlen($ancien));
         }

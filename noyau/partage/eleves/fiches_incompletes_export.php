@@ -3,7 +3,7 @@
 // Excel) de l'onglet « Fiches incomplètes », mêmes filtres que l'écran
 // (_eleves_incompletes.php). Primaire ET secondaire
 // (secondaire/commun/pages/eleves/fiches_incompletes_export.php inclut ce fichier).
-require_once __DIR__ . '/../../../config.php';
+require_once __DIR__ . '/../../../config/config.php';
 require_once __DIR__ . '/../../connexion.php';
 require_once __DIR__ . '/../../fonctions.php';
 require_once __DIR__ . '/_fiches_lib.php';

@@ -10,7 +10,7 @@
 // Modèle : un niveau (code_niveau) peut avoir PLUSIEURS obligations
 // (INSCRIPTION/SCOLARITÉ/APEE...) ; le total dû par un élève est la somme
 // de toutes les obligations de son niveau.
-require_once __DIR__ . '/../../../../config.php';
+require_once __DIR__ . '/../../../../config/config.php';
 require_once __DIR__ . '/../../../../noyau/connexion.php';
 require_once __DIR__ . '/../../../../noyau/fonctions.php';
 exiger_role(['ADMIN', 'PROVISEUR', 'SECRETAIRE', 'INTENDANT']);

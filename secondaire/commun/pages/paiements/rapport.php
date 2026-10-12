@@ -6,7 +6,7 @@
 // désormais ici), Statistiques (nouveau). Tous les PDF passent par la
 // modale d'aperçu partagée (noyau/layout/footer.php::afficherApercu()) — jamais
 // de téléchargement direct — avec signature Intendant optionnelle.
-require_once __DIR__ . '/../../../../config.php';
+require_once __DIR__ . '/../../../../config/config.php';
 require_once __DIR__ . '/../../../../noyau/connexion.php';
 require_once __DIR__ . '/../../../../noyau/fonctions.php';
 exiger_role(['ADMIN', 'PROVISEUR', 'FONDATEUR', 'CENSEUR', 'INTENDANT']);

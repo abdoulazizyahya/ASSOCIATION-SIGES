@@ -1,7 +1,7 @@
 <?php
 // secondaire/commun/pages/eleves/dossier_upload.php — Ajout d'un document au dossier de
 // l'élève (secondaire/commun/pages/eleves/voir.php, carte "Dossier de l'élève").
-require_once __DIR__ . '/../../../../config.php';
+require_once __DIR__ . '/../../../../config/config.php';
 require_once __DIR__ . '/../../../../noyau/connexion.php';
 require_once __DIR__ . '/../../../../noyau/fonctions.php';
 exiger_role(['ADMIN', 'PROVISEUR', 'FONDATEUR', 'CENSEUR', 'SG', 'SECRETAIRE']);

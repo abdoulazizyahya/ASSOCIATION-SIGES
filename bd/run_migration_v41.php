@@ -4,7 +4,7 @@
 //  php bd/run_migration_v41.php   (ou via navigateur)
 //  Section anglophone (bulletin en anglais). Voir bd/migration_v41.sql.
 // =====================================================================
-require_once __DIR__ . '/../config.php';
+require_once __DIR__ . '/../config/config.php';
 require_once __DIR__ . '/../noyau/connexion.php';
 
 header('Content-Type: text/plain; charset=utf-8');

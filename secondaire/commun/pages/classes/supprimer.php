@@ -2,7 +2,7 @@
 // secondaire/commun/pages/classes/supprimer.php — archive une classe (pas de
 // suppression réelle : archivee=1, exclue des listes actives). Porté de
 // LAM_ABZ, aligné sur la convention csrf_verifier() du reste de SIGES.
-require_once __DIR__ . '/../../../../config.php';
+require_once __DIR__ . '/../../../../config/config.php';
 require_once __DIR__ . '/../../../../noyau/connexion.php';
 require_once __DIR__ . '/../../../../noyau/fonctions.php';
 exiger_role(['ADMIN', 'PROVISEUR', 'FONDATEUR']);

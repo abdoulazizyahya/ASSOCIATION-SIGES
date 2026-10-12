@@ -18,7 +18,7 @@
  * toutes les classes, même politique que le reste du module Pédagogie.
  */
 header('Cache-Control: no-store, no-cache, must-revalidate');
-require_once __DIR__ . '/../../../config.php';
+require_once __DIR__ . '/../../../config/config.php';
 require_once __DIR__ . '/../../../noyau/connexion.php';
 require_once __DIR__ . '/../../../noyau/fonctions.php';
 require_once __DIR__ . '/../../notes_apc_arabe.php';
@@ -49,12 +49,12 @@ if ($ids_visibles !== null) {
     $classes_access = array_values(array_filter($classes_access, fn($c) => in_array((int) $c['id'], $ids_visibles, true)));
     if (!$classes_access) {
         flash_set('erreur', "Vous n'êtes affecté(e) à aucune classe de la piste arabe cette année.");
-        rediriger('dashboard.php');
+        rediriger('noyau/dashboard.php');
     }
 }
 if (!array_filter($classes_access, fn($c) => (int) $c['nb_eleves'] > 0)) {
     flash_set('erreur', 'Aucun élève inscrit cette année — impossible d\'utiliser le Conseil de classe.');
-    rediriger('dashboard.php');
+    rediriger('noyau/dashboard.php');
 }
 $ids_classes_ok = array_column(array_filter($classes_access, fn($c) => (int) $c['nb_eleves'] > 0), 'id');
 $toutes_classes = $classes_access;

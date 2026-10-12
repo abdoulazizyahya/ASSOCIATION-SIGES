@@ -7,7 +7,7 @@
  * fin d'année (decision_conseil, type='annee', id_trim=0).
  * GET : classe, annee, dl (0|1)
  */
-require_once __DIR__ . '/../../../../config.php';
+require_once __DIR__ . '/../../../../config/config.php';
 require_once __DIR__ . '/../../../../noyau/connexion.php';
 require_once __DIR__ . '/../../../../noyau/fonctions.php';
 exiger_connexion();

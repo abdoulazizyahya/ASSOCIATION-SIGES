@@ -3,7 +3,7 @@
  * Bulletin scolaire — modèle LTM
  * GET : eleve=ID, trim=ID_TRIMESTRE, annee=ID_ANNEE, seq=ID_SEQ (optionnel)
  */
-require_once __DIR__ . '/../../../../config.php';
+require_once __DIR__ . '/../../../../config/config.php';
 require_once __DIR__ . '/../../../../noyau/connexion.php';
 require_once __DIR__ . '/../../../../noyau/fonctions.php';
 exiger_connexion();

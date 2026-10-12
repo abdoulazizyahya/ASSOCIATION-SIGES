@@ -7,7 +7,7 @@
 // chaque migration, logique partagée bd/lib/recalage_versions.php), et
 // corrige l'enregistrement. Ne modifie JAMAIS les bases écoles : seule la
 // ligne schema_version_etab de l'annuaire est écrite.
-require_once __DIR__ . '/../config.php';
+require_once __DIR__ . '/../config/config.php';
 require_once __DIR__ . '/../noyau/connexion.php';
 require_once __DIR__ . '/../noyau/fonctions.php';
 require_once __DIR__ . '/../bd/lib/recalage_versions.php';

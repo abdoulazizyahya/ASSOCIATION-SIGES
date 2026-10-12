@@ -6,11 +6,11 @@
 //
 // Pas de QR imprimé sur la carte (décision explicite de l'utilisateur,
 // 15/08/2026 — la carte physique reste telle quelle) MAIS l'accès public via
-// jeton "vh" est quand même accepté ci-dessous, pour que verif_carte.php
+// jeton "vh" est quand même accepté ci-dessous, pour que verif/carte.php
 // (qui existait déjà, construit sur ce mécanisme) ne pointe plus vers une
 // impasse (redirection login) si jamais un lien de ce type est utilisé —
 // cohérence interne, même si rien ne génère ce lien pour l'instant.
-require_once __DIR__ . '/../../config.php';
+require_once __DIR__ . '/../../config/config.php';
 require_once __DIR__ . '/../../noyau/connexion.php';
 require_once __DIR__ . '/../../noyau/fonctions.php';
 require_once __DIR__ . '/verif_carte_lib.php';

@@ -6,7 +6,7 @@
 //   t=fiche   fiche de présence vierge   (secondaire/commun/pages/discipline/pdf_fiche_presence.php)
 //   t=releve  relevé de notes vierge     (secondaire/technique/pages/notes/pdf_releve_vierge.php)
 // Paramètres : c = id classe, a = id année, h = signature, ec = code école.
-require_once __DIR__ . '/../../../config.php';
+require_once __DIR__ . '/../../../config/config.php';
 require_once __DIR__ . '/../../../noyau/connexion.php';
 require_once __DIR__ . '/../../../noyau/fonctions.php';
 require_once __DIR__ . '/../pdf/verif_fiche_presence_lib.php';

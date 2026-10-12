@@ -12,7 +12,7 @@
  * lui, imprime TOUS les élèves qualifiés de la classe/période, une page
  * chacun), dl (0|1)
  */
-require_once __DIR__ . '/../../../../config.php';
+require_once __DIR__ . '/../../../../config/config.php';
 require_once __DIR__ . '/../../../../noyau/connexion.php';
 require_once __DIR__ . '/../../../../noyau/fonctions.php';
 require_once __DIR__ . '/../../pdf/verif_honneur_lib.php';
@@ -39,7 +39,7 @@ if (!$is_annee_mode && !$id_trim && !$id_seq) die('Periode manquante.');
 // mono-élève (eleve filtré) — jamais pour imprimer toute la classe. Cela
 // court-circuite entièrement le contrôle de rôle ci-dessous, la personne qui
 // scanne n'ayant pas forcément de compte dans le système (voir
-// verif_honneur.php).
+// verif/honneur.php).
 $acces_public = false;
 if ($vh_verif !== '' && $id_eleve_filtre > 0) {
     if ($is_annee_mode) {

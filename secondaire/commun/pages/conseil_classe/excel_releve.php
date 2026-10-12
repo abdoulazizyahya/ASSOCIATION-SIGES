@@ -7,7 +7,7 @@
  * excel_releve_annuel.php pour la version annuelle.
  * GET : classe, trim|seq, annee
  */
-require_once __DIR__ . '/../../../../config.php';
+require_once __DIR__ . '/../../../../config/config.php';
 require_once __DIR__ . '/../../../../noyau/connexion.php';
 require_once __DIR__ . '/../../../../noyau/fonctions.php';
 require_once __DIR__ . '/../../../../vendor/autoload.php';

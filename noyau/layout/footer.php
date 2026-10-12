@@ -417,8 +417,8 @@ function chargerPartiel(url, containerId) {
     container.style.opacity = '.5';
     fetch(url + sep + 'partiel=1', { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
         .then(r => {
-            // Session expirée entre-temps (redirigée vers login.php) : une
-            // vraie navigation s'impose, injecter le HTML de login.php dans
+            // Session expirée entre-temps (redirigée vers compte/login.php) : une
+            // vraie navigation s'impose, injecter le HTML de compte/login.php dans
             // la zone n'aurait aucun sens.
             if (r.redirected) { window.location.href = r.url; return null; }
             if (!r.ok) throw new Error('HTTP ' + r.status);
@@ -510,7 +510,7 @@ function injecterHtmlDansZone(html, container) {
 // GET, comme le ferait un navigateur), on en extrait la zone
 // #<containerId> et #flash-zone, et on les réinjecte SANS jamais recharger
 // la page (sidebar, scroll, onglets déjà ouverts... tout est préservé).
-// Session expirée entre-temps (redirection vers login.php) : une vraie
+// Session expirée entre-temps (redirection vers compte/login.php) : une vraie
 // navigation s'impose, comme pour chargerPartiel().
 // Message de résultat (#flash-zone) d'une réponse AJAX quand la page
 // d'arrivée n'a pas la même zone (ex. fiche élève enregistrée -> page

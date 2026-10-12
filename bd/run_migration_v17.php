@@ -7,7 +7,7 @@
 //  Ajoute operateur_paiement.logo (nom de fichier dans
 //  assets/uploads/operateurs/), géré depuis primaire/pages/paiements/operateurs.php.
 // =====================================================================
-require_once __DIR__ . '/../config.php';
+require_once __DIR__ . '/../config/config.php';
 require_once __DIR__ . '/../noyau/connexion.php';
 
 header('Content-Type: text/plain; charset=utf-8');

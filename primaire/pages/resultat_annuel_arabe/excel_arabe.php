@@ -1,7 +1,7 @@
 <?php
 // ── Excel : Résultat annuel (piste arabe, par classe OU établissement) ──
 // Miroir de primaire/pages/resultat_annuel/excel.php.
-require_once __DIR__ . '/../../../config.php';
+require_once __DIR__ . '/../../../config/config.php';
 require_once __DIR__ . '/../../../noyau/connexion.php';
 require_once __DIR__ . '/../../../noyau/fonctions.php';
 require_once __DIR__ . '/../../../vendor/autoload.php';

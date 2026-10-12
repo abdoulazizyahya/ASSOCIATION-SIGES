@@ -1,15 +1,15 @@
 <?php
-// verif_paiement.php — page publique (pas de exiger_connexion) : quiconque
+// verif/paiement.php — page publique (pas de exiger_connexion) : quiconque
 // scanne le QR imprimé sur un reçu de paiement du SECONDAIRE (module
 // « Paiement public ») arrive ici pour en vérifier l'authenticité. Porté
 // d'ABZ_MBE : la page n'existait pas dans SIGES, les QR des reçus déjà
 // imprimés menaient donc à une erreur 404 (corrigé le 12/10/2026).
 // Ne montre qu'un résumé non sensible (pas l'historique de l'élève).
 // Adresse figée par les QR imprimés : ne pas déplacer ce fichier.
-require_once __DIR__ . '/config.php';
-require_once __DIR__ . '/noyau/connexion.php';
-require_once __DIR__ . '/noyau/fonctions.php';
-require_once __DIR__ . '/secondaire/commun/pdf/verif_paiement_lib.php';
+require_once __DIR__ . '/../config/config.php';
+require_once __DIR__ . '/../noyau/connexion.php';
+require_once __DIR__ . '/../noyau/fonctions.php';
+require_once __DIR__ . '/../secondaire/commun/pdf/verif_paiement_lib.php';
 
 $id_paiement = (int) ($_GET['p'] ?? 0);
 $h_recu      = (string) ($_GET['h'] ?? '');

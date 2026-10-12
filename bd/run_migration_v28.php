@@ -4,7 +4,7 @@
 //  php bd/run_migration_v28.php   (ou via navigateur)
 //  Ajoute la PRIMARY KEY manquante sur obligation.id_obligation.
 // =====================================================================
-require_once __DIR__ . '/../config.php';
+require_once __DIR__ . '/../config/config.php';
 require_once __DIR__ . '/../noyau/connexion.php';
 
 header('Content-Type: text/plain; charset=utf-8');

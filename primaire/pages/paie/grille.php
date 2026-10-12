@@ -6,7 +6,7 @@
 // voir paie_fonctions.php::calculer_apercu_bulletin(). Modifier un montant
 // ici change le calcul des PROCHAINS bulletins générés, jamais ceux déjà
 // émis (valeurs figées dans bulletin_paie/ligne_bulletin_paie).
-require_once __DIR__ . '/../../../config.php';
+require_once __DIR__ . '/../../../config/config.php';
 require_once __DIR__ . '/../../../noyau/connexion.php';
 require_once __DIR__ . '/../../../noyau/fonctions.php';
 require_once __DIR__ . '/../../../noyau/paie_fonctions.php';

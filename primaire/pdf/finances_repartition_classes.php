@@ -2,7 +2,7 @@
 // primaire/pdf/finances_repartition_classes.php — Répartition des encaissements par
 // classe PDF (apport et % du total), mêmes calculs que
 // primaire/pages/finances/repartition_classes.php.
-require_once __DIR__ . '/../../config.php';
+require_once __DIR__ . '/../../config/config.php';
 require_once __DIR__ . '/../../noyau/connexion.php';
 require_once __DIR__ . '/../../noyau/fonctions.php';
 exiger_role(['DIRECTEUR', 'SECRETAIRE', 'COMPTABLE']);

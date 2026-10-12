@@ -4,19 +4,19 @@
  * Bloque la soumission tant que les informations identitaires ne sont pas complètes.
  */
 header('Cache-Control: no-store, no-cache, must-revalidate');
-require_once __DIR__ . '/../../../../config.php';
+require_once __DIR__ . '/../../../../config/config.php';
 require_once __DIR__ . '/../../../../noyau/connexion.php';
 require_once __DIR__ . '/../../../../noyau/fonctions.php';
 exiger_connexion();
 
 $role = role_connecte();
-if ($role !== 'ENSEIGNANT') { flash_set('erreur', 'Cette page est réservée aux enseignants.'); rediriger('dashboard.php'); }
+if ($role !== 'ENSEIGNANT') { flash_set('erreur', 'Cette page est réservée aux enseignants.'); rediriger('noyau/dashboard.php'); }
 
 $mat = matricule_ens_courant();
-if (!$mat) { flash_set('erreur', 'Aucune fiche enseignant liée à votre compte.'); rediriger('dashboard.php'); }
+if (!$mat) { flash_set('erreur', 'Aucune fiche enseignant liée à votre compte.'); rediriger('noyau/dashboard.php'); }
 
 $e = db_one("SELECT * FROM enseignant WHERE matricule_ens=?", [$mat]);
-if (!$e) { flash_set('erreur', 'Fiche enseignant introuvable.'); rediriger('dashboard.php'); }
+if (!$e) { flash_set('erreur', 'Fiche enseignant introuvable.'); rediriger('noyau/dashboard.php'); }
 
 $manquants = identite_ens_manquants($e);
 if (!empty($manquants)) {

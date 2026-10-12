@@ -21,7 +21,7 @@
 // Toujours sur la piste de données 'fr' (bulletin_verif_valider(..., 'fr',
 // ...), QR, discipline/composer_sequence) : « anglais » est ici une
 // préférence d'AFFICHAGE, pas une piste de données distincte comme l'arabe.
-require_once __DIR__ . '/../../config.php';
+require_once __DIR__ . '/../../config/config.php';
 require_once __DIR__ . '/../../noyau/connexion.php';
 require_once __DIR__ . '/../../noyau/fonctions.php';
 require_once __DIR__ . '/../notes_apc.php';
@@ -573,7 +573,7 @@ function dessiner_bulletin_annuel_anglais(
     }
 
     // Piste 'fr' inchangée (voir commentaire en tête de fichier) ;
-    // verif_bulletin.php choisit le bon fichier de réouverture selon la
+    // verif/bulletin.php choisit le bon fichier de réouverture selon la
     // section du niveau de l'élève.
     $qr_tmp = bulletin_qr_fichier_temp($eleve, 'annee', $id_annee);
     if ($qr_tmp) {

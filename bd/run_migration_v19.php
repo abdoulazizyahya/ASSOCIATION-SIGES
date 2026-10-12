@@ -9,7 +9,7 @@
 //  Blâme travail, Avertissement/Blâme conduite), configurables par
 //  l'administrateur (primaire/pages/parametres/index.php, onglet "Mentions").
 // =====================================================================
-require_once __DIR__ . '/../config.php';
+require_once __DIR__ . '/../config/config.php';
 require_once __DIR__ . '/../noyau/connexion.php';
 
 header('Content-Type: text/plain; charset=utf-8');

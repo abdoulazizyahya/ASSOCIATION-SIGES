@@ -3,7 +3,7 @@
 // dossier de l'élève (fichier physique + ligne en base). Porté d'ABZ_MBE ;
 // POST + csrf_verifier() (et non un lien GET) : la vérification CSRF standard
 // applique aussi la lecture seule des visites association.
-require_once __DIR__ . '/../../../../config.php';
+require_once __DIR__ . '/../../../../config/config.php';
 require_once __DIR__ . '/../../../../noyau/connexion.php';
 require_once __DIR__ . '/../../../../noyau/fonctions.php';
 exiger_role(['ADMIN', 'PROVISEUR', 'FONDATEUR', 'CENSEUR', 'SG', 'SECRETAIRE']);

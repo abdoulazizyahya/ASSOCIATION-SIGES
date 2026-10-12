@@ -3,7 +3,7 @@
  * Attestation de Présence Effective au Poste
  * GET : id=matricule_ens, dl=1 pour téléchargement
  */
-require_once __DIR__ . '/../../../config.php';
+require_once __DIR__ . '/../../../config/config.php';
 require_once __DIR__ . '/../../../noyau/connexion.php';
 require_once __DIR__ . '/../../../noyau/fonctions.php';
 require_once __DIR__ . '/../../pdf/verif_attestation_lib.php';
@@ -11,7 +11,7 @@ require_once __DIR__ . '/../../pdf/verif_attestation_lib.php';
 // Accès public via le QR code de l'attestation (jeton "vh" = hash de
 // vérification déjà calculé pour ce document précis) : la personne qui
 // scanne n'a pas forcément de compte dans le système (voir
-// verif_attestation.php). En dehors de ce cas, connexion normale exigée.
+// verif/attestation.php). En dehors de ce cas, connexion normale exigée.
 $vh_verif     = (string)($_GET['vh'] ?? '');
 $mat_public   = (string)($_GET['id'] ?? '');
 $acces_public = $vh_verif !== '' && $mat_public !== '' && hash_equals(attestation_verif_hash('attestation', $mat_public), $vh_verif);

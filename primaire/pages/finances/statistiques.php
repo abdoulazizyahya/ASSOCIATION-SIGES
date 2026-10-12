@@ -3,7 +3,7 @@
 // d'ensemble du recouvrement (totaux, par niveau, par type de frais,
 // insolvables). Le montant dû par élève = somme de toutes les obligations
 // de son niveau (voir primaire/pages/finances/obligations.php).
-require_once __DIR__ . '/../../../config.php';
+require_once __DIR__ . '/../../../config/config.php';
 require_once __DIR__ . '/../../../noyau/connexion.php';
 require_once __DIR__ . '/../../../noyau/fonctions.php';
 exiger_role(['DIRECTEUR', 'COMPTABLE']);

@@ -7,7 +7,7 @@
 // mensuelle), Par frais, Par opérateur, Recouvrement par classe. Les 3
 // premiers partagent les mêmes filtres classe/période ; le 4e n'a qu'un
 // filtre classe (le montant "dû théorique" n'est pas borné dans le temps).
-require_once __DIR__ . '/../../../../config.php';
+require_once __DIR__ . '/../../../../config/config.php';
 require_once __DIR__ . '/../../../../noyau/connexion.php';
 require_once __DIR__ . '/../../../../noyau/fonctions.php';
 exiger_role(['ADMIN', 'PROVISEUR', 'CENSEUR', 'INTENDANT']);

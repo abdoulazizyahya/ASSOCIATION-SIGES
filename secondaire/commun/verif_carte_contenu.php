@@ -1,7 +1,7 @@
 <?php
 // secondaire/commun/verif_carte_contenu.php — vérification publique d'une
 // carte scolaire d'école SECONDAIRE (QR imprimé par secondaire/commun/pdf/
-// cartes.php). Inclus par verif_carte.php (racine) une fois l'école résolue
+// cartes.php). Inclus par verif/carte.php (racine) une fois l'école résolue
 // et reconnue comme secondaire — même principe que verif_bulletin_contenu.php.
 // Paramètres : e = id élève, a = id de l'année scolaire, h = signature.
 require_once __DIR__ . '/pdf/verif_carte_lib.php';

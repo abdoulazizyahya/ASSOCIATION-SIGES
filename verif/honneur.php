@@ -1,15 +1,15 @@
 <?php
-// verif_honneur.php — page publique (pas de exiger_connexion) : quiconque
+// verif/honneur.php — page publique (pas de exiger_connexion) : quiconque
 // scanne le QR imprimé sur un certificat de tableau d'honneur (Modèle 2 —
 // « Orné », seul modèle qui porte un QR) arrive ici pour vérifier son
-// authenticité. Miroir de verif_bulletin.php, clé/hash séparés (voir
+// authenticité. Miroir de verif/bulletin.php, clé/hash séparés (voir
 // primaire/pdf/verif_honneur_lib.php) — un QR de certificat ne valide jamais un
 // bulletin, et inversement.
-require_once __DIR__ . '/config.php';
-require_once __DIR__ . '/noyau/connexion.php';
-require_once __DIR__ . '/noyau/fonctions.php';
-require_once __DIR__ . '/primaire/pdf/verif_lib.php';
-require_once __DIR__ . '/primaire/pdf/verif_honneur_lib.php';
+require_once __DIR__ . '/../config/config.php';
+require_once __DIR__ . '/../noyau/connexion.php';
+require_once __DIR__ . '/../noyau/fonctions.php';
+require_once __DIR__ . '/../primaire/pdf/verif_lib.php';
+require_once __DIR__ . '/../primaire/pdf/verif_honneur_lib.php';
 verif_exiger_ecole_publique();  // multi-école : URL sans &ec= -> page neutre
 
 $id_eleve   = (int) ($_GET['e'] ?? 0);
@@ -24,7 +24,7 @@ $authentique = $eleve !== null;
 
 // Retrouve la classe actuelle de l'élève pour reconstruire l'URL du
 // certificat (le QR n'encode que élève/période/piste, pas la classe —
-// comme pour les bulletins, voir verif_bulletin.php).
+// comme pour les bulletins, voir verif/bulletin.php).
 $pdf_url = '';
 if ($authentique) {
     $annee_act = get_annee_active();

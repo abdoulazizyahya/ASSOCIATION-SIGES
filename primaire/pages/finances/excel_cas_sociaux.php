@@ -1,7 +1,7 @@
 <?php
 // primaire/pages/finances/excel_cas_sociaux.php — Export Excel des cas sociaux,
 // mêmes filtres et mêmes calculs que primaire/pages/finances/cas_sociaux.php.
-require_once __DIR__ . '/../../../config.php';
+require_once __DIR__ . '/../../../config/config.php';
 require_once __DIR__ . '/../../../noyau/connexion.php';
 require_once __DIR__ . '/../../../noyau/fonctions.php';
 require_once __DIR__ . '/../../../vendor/autoload.php';

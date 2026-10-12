@@ -2,7 +2,7 @@
 // primaire/pdf/depenses_statistiques.php — Bilan des dépenses PDF (encaissé/dépensé/
 // solde + par catégorie + évolution mensuelle), mêmes calculs que
 // primaire/pages/depenses/statistiques.php. Miroir de primaire/pdf/finances_statistiques.php.
-require_once __DIR__ . '/../../config.php';
+require_once __DIR__ . '/../../config/config.php';
 require_once __DIR__ . '/../../noyau/connexion.php';
 require_once __DIR__ . '/../../noyau/fonctions.php';
 exiger_role(['DIRECTEUR', 'COMPTABLE']);

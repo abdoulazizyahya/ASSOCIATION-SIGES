@@ -3,7 +3,7 @@
 // du document MANWI annexé) : toujours basé sur le paiement APEE réel de
 // l'élève pour l'année active (obligation_frais.code_fixe='APEE'), peu
 // importe les cases cochées dans le tableau historique de index.php.
-require_once __DIR__ . '/../../../../config.php';
+require_once __DIR__ . '/../../../../config/config.php';
 require_once __DIR__ . '/../../../../noyau/connexion.php';
 require_once __DIR__ . '/../../../../noyau/fonctions.php';
 exiger_role(['ADMIN', 'PROVISEUR', 'FONDATEUR', 'CENSEUR', 'INTENDANT']);

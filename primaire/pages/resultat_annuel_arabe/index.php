@@ -9,7 +9,7 @@
 // Écart assumé (identique à la piste française, même raison) : colonnes
 // FIXES pour le PDF/Excel — pas de modale de personnalisation des colonnes.
 header('Cache-Control: no-store, no-cache, must-revalidate');
-require_once __DIR__ . '/../../../config.php';
+require_once __DIR__ . '/../../../config/config.php';
 require_once __DIR__ . '/../../../noyau/connexion.php';
 require_once __DIR__ . '/../../../noyau/fonctions.php';
 require_once __DIR__ . '/commun_arabe.php';

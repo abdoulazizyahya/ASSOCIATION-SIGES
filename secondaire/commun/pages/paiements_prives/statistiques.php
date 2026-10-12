@@ -2,7 +2,7 @@
 // secondaire/commun/pages/paiements_prives/statistiques.php — PAIEMENT PRIVÉ >
 // Statistiques : porté de primaire/pages/finances/statistiques.php (primaire),
 // adapté au schéma secondaire. Pas de "Cas social" (absent du schéma).
-require_once __DIR__ . '/../../../../config.php';
+require_once __DIR__ . '/../../../../config/config.php';
 require_once __DIR__ . '/../../../../noyau/connexion.php';
 require_once __DIR__ . '/../../../../noyau/fonctions.php';
 exiger_role(['ADMIN', 'PROVISEUR', 'INTENDANT']);

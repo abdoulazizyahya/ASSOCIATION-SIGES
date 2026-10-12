@@ -3,7 +3,7 @@
 // de caisse : porté de primaire/pages/finances/journal.php (primaire), adapté au
 // schéma secondaire (paiement_prive, id_annee/id_classe entiers). Voir
 // versement.php pour le détail de l'adaptation.
-require_once __DIR__ . '/../../../../config.php';
+require_once __DIR__ . '/../../../../config/config.php';
 require_once __DIR__ . '/../../../../noyau/connexion.php';
 require_once __DIR__ . '/../../../../noyau/fonctions.php';
 exiger_role(['ADMIN', 'PROVISEUR', 'SECRETAIRE', 'INTENDANT']);

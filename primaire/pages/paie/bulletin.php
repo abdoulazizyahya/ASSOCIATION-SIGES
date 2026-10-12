@@ -4,7 +4,7 @@
 // bulletin (lecture seule, choix confirmé par l'utilisateur — self-service
 // sans droit de modification). $_SESSION['user']['matricule_ens'] identifie
 // l'enseignant connecté (voir fonctions.php, en-tête "Authentification").
-require_once __DIR__ . '/../../../config.php';
+require_once __DIR__ . '/../../../config/config.php';
 require_once __DIR__ . '/../../../noyau/connexion.php';
 require_once __DIR__ . '/../../../noyau/fonctions.php';
 require_once __DIR__ . '/../../../noyau/paie_fonctions.php';
@@ -16,7 +16,7 @@ $bulletin = db_one(
      FROM bulletin_paie b JOIN enseignant e ON e.matricule_ens=b.matricule_ens JOIN periode_paie p ON p.id=b.id_periode
      WHERE b.id=?", [$id]
 );
-if (!$bulletin) { flash_set('erreur', 'Bulletin introuvable.'); rediriger('dashboard.php'); }
+if (!$bulletin) { flash_set('erreur', 'Bulletin introuvable.'); rediriger('noyau/dashboard.php'); }
 
 $role = role_connecte();
 $mon_matricule = (int) (utilisateur_connecte()['matricule_ens'] ?? 0);

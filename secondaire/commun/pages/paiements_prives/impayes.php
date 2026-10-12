@@ -1,7 +1,7 @@
 <?php
 // secondaire/commun/pages/paiements_prives/impayes.php — PAIEMENT PRIVÉ > Impayés :
 // porté de primaire/pages/finances/impayes.php (primaire), adapté au schéma secondaire.
-require_once __DIR__ . '/../../../../config.php';
+require_once __DIR__ . '/../../../../config/config.php';
 require_once __DIR__ . '/../../../../noyau/connexion.php';
 require_once __DIR__ . '/../../../../noyau/fonctions.php';
 exiger_role(['ADMIN', 'PROVISEUR', 'SECRETAIRE', 'INTENDANT']);

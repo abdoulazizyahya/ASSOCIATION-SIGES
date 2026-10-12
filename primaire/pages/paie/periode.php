@@ -3,7 +3,7 @@
 // enseignant, génération des bulletins, validation, marquage "Payé"
 // (crée une ligne dans `depense`, catégorie "Salaires" — cohérence avec
 // solde_caisse(), fonctions.php).
-require_once __DIR__ . '/../../../config.php';
+require_once __DIR__ . '/../../../config/config.php';
 require_once __DIR__ . '/../../../noyau/connexion.php';
 require_once __DIR__ . '/../../../noyau/fonctions.php';
 require_once __DIR__ . '/../../../noyau/paie_fonctions.php';

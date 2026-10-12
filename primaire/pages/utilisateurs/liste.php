@@ -1,5 +1,5 @@
 <?php
-require_once __DIR__ . '/../../../config.php';
+require_once __DIR__ . '/../../../config/config.php';
 require_once __DIR__ . '/../../../noyau/connexion.php';
 require_once __DIR__ . '/../../../noyau/fonctions.php';
 exiger_role(['DIRECTEUR']);
@@ -48,7 +48,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && post('action') === 'changer_role') 
 }
 
 // Activer/désactiver un compte (colonne user.actif, migration_v54) — un
-// compte désactivé ne peut plus se connecter (voir login.php). Ouvert à
+// compte désactivé ne peut plus se connecter (voir compte/login.php). Ouvert à
 // DIRECTEUR et FONDATEUR (même accès que le reste de cette page), sans
 // restriction de rôle : le fondateur peut désactiver n'importe quel compte,
 // y compris Comptable (demande explicite du 21/09/2026). Autodésactivation

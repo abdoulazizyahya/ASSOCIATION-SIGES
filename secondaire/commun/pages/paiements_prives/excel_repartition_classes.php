@@ -3,7 +3,7 @@
 // Excel de la répartition des encaissements PRIVÉS par classe — porté de
 // primaire/pages/finances/excel_repartition_classes.php (primaire), adapté au
 // schéma secondaire.
-require_once __DIR__ . '/../../../../config.php';
+require_once __DIR__ . '/../../../../config/config.php';
 require_once __DIR__ . '/../../../../noyau/connexion.php';
 require_once __DIR__ . '/../../../../noyau/fonctions.php';
 require_once __DIR__ . '/../../../../vendor/autoload.php';

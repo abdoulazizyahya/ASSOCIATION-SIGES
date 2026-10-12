@@ -2,7 +2,7 @@
 // secondaire/commun/pages/paie/avances.php — Avances sur salaire, porté de
 // primaire/pages/paie/avances.php (primaire) à l'identique — voir secondaire/commun/pages/
 // paie/index.php pour la note sur paie_fonctions.php.
-require_once __DIR__ . '/../../../../config.php';
+require_once __DIR__ . '/../../../../config/config.php';
 require_once __DIR__ . '/../../../../noyau/connexion.php';
 require_once __DIR__ . '/../../../../noyau/fonctions.php';
 require_once __DIR__ . '/../../../../noyau/paie_fonctions.php';

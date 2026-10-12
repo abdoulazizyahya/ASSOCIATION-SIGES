@@ -3,7 +3,7 @@
 // cartes scolaires. Même principe que primaire/pdf/verif_lib.php (bulletins) et
 // primaire/pdf/verif_recu_lib.php (reçus), gardé dans un fichier séparé pour ne
 // jamais risquer de désynchroniser les différents usages.
-// Inclus par primaire/pdf/cartes.php (accès public via jeton) et verif_carte.php
+// Inclus par primaire/pdf/cartes.php (accès public via jeton) et verif/carte.php
 // (vérification lors du scan) — pas de QR imprimé sur la carte physique
 // pour l'instant (décision explicite de l'utilisateur, 15/08/2026), mais le
 // mécanisme reste correct et utilisable si un lien de ce type est généré.
@@ -29,7 +29,7 @@ function carte_verif_url(int $id_eleve, string $val_annee): string {
     // hote_verif_reseau() (fonctions.php) remplace "localhost" par l'adresse
     // réseau réelle du serveur — indispensable pour qu'un téléphone qui
     // scanne puisse effectivement joindre le serveur.
-    return verif_ajout_ec($scheme . '://' . hote_verif_reseau() . APP_URL . '/verif_carte.php?e=' . $id_eleve . '&a=' . urlencode($val_annee) . '&h=' . $h);
+    return verif_ajout_ec($scheme . '://' . hote_verif_reseau() . APP_URL . '/verif/carte.php?e=' . $id_eleve . '&a=' . urlencode($val_annee) . '&h=' . $h);
 }
 
 /**

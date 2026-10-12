@@ -2,7 +2,7 @@
 // primaire/pages/eleves/matricule_config.php — enregistrement du format de matricule
 // de l'école (table matricule_config, migration v52). Appelé par le
 // formulaire de l'onglet « Import & matricules » (primaire/pages/eleves/_eleves_outils.php).
-require_once __DIR__ . '/../../../config.php';
+require_once __DIR__ . '/../../../config/config.php';
 require_once __DIR__ . '/../../../noyau/connexion.php';
 require_once __DIR__ . '/../../../noyau/fonctions.php';
 exiger_role(['DIRECTEUR', 'SECRETAIRE']);

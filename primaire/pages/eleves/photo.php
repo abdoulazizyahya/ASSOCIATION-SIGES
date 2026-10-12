@@ -1,7 +1,7 @@
 <?php
 // Sert la photo d'un élève stockée en BLOB (Photo_elv) — héritage de
 // l'ancien système, jamais migrée en fichier pour l'instant.
-require_once __DIR__ . '/../../../config.php';
+require_once __DIR__ . '/../../../config/config.php';
 require_once __DIR__ . '/../../../noyau/connexion.php';
 require_once __DIR__ . '/../../../noyau/fonctions.php';
 exiger_connexion();

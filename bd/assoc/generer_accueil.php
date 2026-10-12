@@ -2,7 +2,7 @@
 // ─────────────────────────────────────────────────────────────────────
 //  bd/assoc/generer_accueil.php
 //  Fabrique une COPIE STATIQUE autonome du portail d'accueil
-//  (accueil.php) → promeducamsiges.html à la racine de l'application.
+//  (noyau/accueil.php) → docs/promeducamsiges.html (copie de partage).
 //
 //  La page accueil.php est déjà DYNAMIQUE (elle relit l'annuaire à chaque
 //  affichage) : ce fichier statique ne sert qu'à être PARTAGÉ hors serveur
@@ -12,7 +12,7 @@
 //  - Appelé aussi automatiquement à la création / modification /
 //    suppression d'une école (regenerer_portail_accueil(), best-effort).
 // ─────────────────────────────────────────────────────────────────────
-require_once __DIR__ . '/../../config.php';
+require_once __DIR__ . '/../../config/config.php';
 require_once __DIR__ . '/../../noyau/connexion_assoc.php';
 
 if (!function_exists('regenerer_portail_accueil')) {
@@ -25,7 +25,7 @@ if (!function_exists('regenerer_portail_accueil')) {
     {
         $racine   = dirname(__DIR__, 2);                 // .../SIGES
         $accueil  = $racine . '/noyau/accueil.php';
-        $cible    = $racine . '/promeducamsiges.html';
+        $cible    = $racine . '/docs/promeducamsiges.html';
         if (!is_file($accueil)) return null;
 
         // Base publique pour les liens (le fichier statique peut circuler

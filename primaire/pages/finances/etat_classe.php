@@ -5,7 +5,7 @@
 // du niveau de la classe (voir primaire/pages/finances/obligations.php) ; le montant
 // payé = somme de tous les versements de l'élève, ventilés ou non
 // (`paiement_frais`, voir primaire/pages/finances/versement.php pour le détail).
-require_once __DIR__ . '/../../../config.php';
+require_once __DIR__ . '/../../../config/config.php';
 require_once __DIR__ . '/../../../noyau/connexion.php';
 require_once __DIR__ . '/../../../noyau/fonctions.php';
 exiger_role(['DIRECTEUR', 'SECRETAIRE', 'COMPTABLE']);

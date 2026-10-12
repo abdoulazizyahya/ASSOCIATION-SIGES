@@ -13,7 +13,7 @@
  * le sont) sont remplacées par l'équivalent coeur le plus proche
  * (Arial/Times selon le cas), à la MÊME taille mesurée dans le modèle.
  */
-require_once __DIR__ . '/../../../../config.php';
+require_once __DIR__ . '/../../../../config/config.php';
 require_once __DIR__ . '/../../../../noyau/connexion.php';
 require_once __DIR__ . '/../../../../noyau/fonctions.php';
 require_once __DIR__ . '/../../pdf/verif_attestation_lib.php';
@@ -23,7 +23,7 @@ $type = ($_GET['type'] ?? 'prise') === 'reprise' ? 'reprise' : 'prise';
 // Accès public via le QR code du certificat (jeton "vh" = hash de
 // vérification déjà calculé pour ce document précis, discriminé par $type)
 // : la personne qui scanne n'a pas forcément de compte dans le système
-// (voir verif_attestation.php). En dehors de ce cas, connexion normale exigée.
+// (voir verif/attestation.php). En dehors de ce cas, connexion normale exigée.
 $vh_verif     = (string)($_GET['vh'] ?? '');
 $mat_public   = (string)($_GET['id'] ?? '');
 $acces_public = $vh_verif !== '' && $mat_public !== '' && hash_equals(attestation_verif_hash($type, $mat_public), $vh_verif);

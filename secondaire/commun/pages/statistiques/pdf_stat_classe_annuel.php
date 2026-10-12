@@ -7,7 +7,7 @@
  * pondérées des 3 trimestres (même méthode que secondaire/general/pages/bulletins/pdf_annuel.php).
  * GET : classe, annee, dl (0|1)
  */
-require_once __DIR__ . '/../../../../config.php';
+require_once __DIR__ . '/../../../../config/config.php';
 require_once __DIR__ . '/../../../../noyau/connexion.php';
 require_once __DIR__ . '/../../../../noyau/fonctions.php';
 exiger_connexion();

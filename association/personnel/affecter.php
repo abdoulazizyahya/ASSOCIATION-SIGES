@@ -2,7 +2,7 @@
 // association/personnel/affecter.php — affecter un agent à une école
 //  Source : soit un agent existant du registre (?m=matricule), soit un
 //  agent choisi dans une école source (identité copiée).
-require_once __DIR__ . '/../../config.php';
+require_once __DIR__ . '/../../config/config.php';
 require_once __DIR__ . '/../../noyau/connexion.php';
 require_once __DIR__ . '/../../noyau/fonctions.php';
 require_once __DIR__ . '/../_layout.php';

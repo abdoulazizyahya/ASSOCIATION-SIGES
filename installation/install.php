@@ -1,6 +1,6 @@
 <?php
 // =====================================================================
-//  install.php — Assistant de PREMIÈRE INSTALLATION (aucune base encore).
+//  installation/install.php — Assistant de PREMIÈRE INSTALLATION (aucune base encore).
 //
 //  Deux modes :
 //   - « école » (par défaut) : UNE SEULE école, primaire OU secondaire,
@@ -8,7 +8,7 @@
 //     normal pour un établissement isolé qui ne gère pas de réseau
 //     d'écoles : pas de base « _assoc » créée, aucun besoin de passer par
 //     /association/ ensuite (voir ecole_contexte.php::type_enseignement_courant()
-//     + config.php::ECOLE_TYPE_SOLO — l'app tourne en mono-école dès que
+//     + config/config.php::ECOLE_TYPE_SOLO — l'app tourne en mono-école dès que
 //     l'annuaire est absent, connexion.php).
 //   - « réseau » (association) : demande le nom de l'ASSOCIATION + le 1er
 //     établissement + un compte administrateur, puis :
@@ -30,15 +30,15 @@
 //  annuaire ou une base école opérationnelle.
 // =====================================================================
 
-require_once __DIR__ . '/config.php';
-require_once __DIR__ . '/noyau/connexion_assoc.php';            // slug_base_ecole(), charger_schema_ecole(), annuaire_dispo()
-require_once __DIR__ . '/bd/lib/lieux_normalisation.php'; // lieu_normaliser() : accents -> ASCII (table manuelle, fiable Windows)
-require_once __DIR__ . '/bd/lib/licence.php';             // licence_signature() : essai 60 jours posé par charger_schema_ecole() — sans lui, école neuve en lecture seule
+require_once __DIR__ . '/../config/config.php';
+require_once __DIR__ . '/../noyau/connexion_assoc.php';            // slug_base_ecole(), charger_schema_ecole(), annuaire_dispo()
+require_once __DIR__ . '/../bd/lib/lieux_normalisation.php'; // lieu_normaliser() : accents -> ASCII (table manuelle, fiable Windows)
+require_once __DIR__ . '/../bd/lib/licence.php';             // licence_signature() : essai 60 jours posé par charger_schema_ecole() — sans lui, école neuve en lecture seule
 
 mysqli_report(MYSQLI_REPORT_OFF);                // on gère les erreurs à la main ici
 
 // ── Déjà installé ? ───────────────────────────────────────────────────
-if (is_file(__DIR__ . '/config.local.php')) {
+if (CONFIG_LOCAL_FICHIER !== '') {   // config/config.local.php (ou ancien emplacement racine)
     // Mode réseau déjà installé : annuaire joignable.
     $c = @mysqli_connect(DB_HOST, DB_USER, DB_PASS, DB_NAME_ASSOC);
     if ($c && @mysqli_query($c, "SELECT 1 FROM membre LIMIT 1")) {
@@ -48,7 +48,7 @@ if (is_file(__DIR__ . '/config.local.php')) {
     // Mode école unique déjà installé : pas d'annuaire, mais la base école existe.
     $c2 = @mysqli_connect(DB_HOST, DB_USER, DB_PASS, DB_NAME);
     if ($c2 && @mysqli_query($c2, "SELECT 1 FROM etablissement LIMIT 1")) {
-        header('Location: ' . APP_URL . '/login.php');
+        header('Location: ' . APP_URL . '/compte/login.php');
         exit;
     }
 }
@@ -110,7 +110,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         try { $srv = mysqli_connect(DB_HOST, DB_USER, DB_PASS); mysqli_set_charset($srv, 'utf8mb4'); }
         catch (\Throwable $e) {
             $err[] = "Connexion MySQL impossible : " . $e->getMessage()
-                   . " — si MySQL a un mot de passe, créez d'abord à la racine un fichier config.local.php contenant"
+                   . " — si MySQL a un mot de passe, créez d'abord un fichier config/config.local.php contenant"
                    . " define('DB_USER', 'root'); define('DB_PASS', 'votre_mot_de_passe'); puis rechargez cette page.";
         }
     }
@@ -150,7 +150,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         try {
             if ($reseau) {
                 // 1. Annuaire
-                $sql = @file_get_contents(__DIR__ . '/bd/assoc/schema_assoc.sql');
+                $sql = @file_get_contents(__DIR__ . '/../bd/assoc/schema_assoc.sql');
                 if ($sql === false) throw new RuntimeException("bd/assoc/schema_assoc.sql introuvable.");
                 $sql = str_replace('{{DB_NAME_ASSOC}}', $db_assoc, $sql);
                 if (mysqli_multi_query($srv, $sql)) { do { if ($r = mysqli_store_result($srv)) mysqli_free_result($r); } while (mysqli_more_results($srv) && mysqli_next_result($srv)); }
@@ -213,7 +213,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             // 5. config.local.php — la config de CET environnement.
             if ($reseau) {
                 $conf = "<?php\n"
-                    . "// Généré par install.php le " . date('Y-m-d H:i') . " — installation RÉSEAU (association), spécifique à ce serveur, NE PAS versionner.\n"
+                    . "// Généré par installation/install.php le " . date('Y-m-d H:i') . " — installation RÉSEAU (association), spécifique à ce serveur, NE PAS versionner.\n"
                     . "define('DB_NAME_ASSOC',    " . var_export($db_assoc, true) . ");\n"
                     . "define('DB_PREFIXE_ECOLE', " . var_export(substr($slug, 0, 24), true) . ");\n"
                     . "define('DB_NAME',          " . var_export($db_ec1, true) . ");\n"
@@ -225,7 +225,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     . "define('ASSOC_2FA_SUPERADMIN_OBLIGATOIRE', false);\n";
             } else {
                 $conf = "<?php\n"
-                    . "// Généré par install.php le " . date('Y-m-d H:i') . " — installation ÉCOLE UNIQUE (sans annuaire association), spécifique à ce serveur, NE PAS versionner.\n"
+                    . "// Généré par installation/install.php le " . date('Y-m-d H:i') . " — installation ÉCOLE UNIQUE (sans annuaire association), spécifique à ce serveur, NE PAS versionner.\n"
                     . "define('DB_NAME',          " . var_export($db_ec1, true) . ");\n"
                     . "define('DB_NAME_ASSOC',    '');   // pas d'annuaire association\n"
                     . "define('APP_NOM',          " . var_export($val['nom_ecole'] . ' · Gestion scolaire', true) . ");\n"
@@ -241,7 +241,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $conf .= "define(" . var_export($k, true) . ", " . str_repeat(' ', 16 - strlen($k)) . var_export(constant($k), true) . ");\n";
                 }
             }
-            if (@file_put_contents(__DIR__ . '/config.local.php', $conf) === false) {
+            if (@file_put_contents(__DIR__ . '/../config/config.local.php', $conf) === false) {
                 $conf_manuel = $conf;
                 throw new RuntimeException("Base créée, mais impossible d'écrire config.local.php (droits). Créez-le manuellement avec le contenu ci-dessous, puis connectez-vous.");
             }
@@ -336,9 +336,9 @@ $exemple_slug = install_slug(($val['mode'] === 'reseau' ? $val['nom_association'
     <?php endif; ?>
     <?php if ($val['mode'] === 'reseau'): ?>
       <a class="btn" href="<?= htmlspecialchars(APP_URL) ?>/association/login.php">Ouvrir l'Espace association →</a>
-      <p class="hint" style="margin-top:1rem">Le compte DIRECTEUR ci-dessus sert aussi à la connexion à l'école : <code><?= htmlspecialchars(APP_URL) ?>/login.php</code>.</p>
+      <p class="hint" style="margin-top:1rem">Le compte DIRECTEUR ci-dessus sert aussi à la connexion à l'école : <code><?= htmlspecialchars(APP_URL) ?>/compte/login.php</code>.</p>
     <?php else: ?>
-      <a class="btn" href="<?= htmlspecialchars(APP_URL) ?>/login.php">Se connecter →</a>
+      <a class="btn" href="<?= htmlspecialchars(APP_URL) ?>/compte/login.php">Se connecter →</a>
     <?php endif; ?>
 
   <?php else: ?>
@@ -347,7 +347,7 @@ $exemple_slug = install_slug(($val['mode'] === 'reseau' ? $val['nom_association'
     <?php endforeach; ?>
     <?php if ($conf_manuel): ?>
       <pre><?= htmlspecialchars($conf_manuel) ?></pre>
-      <a class="btn" href="<?= htmlspecialchars(APP_URL) ?>/<?= $val['mode'] === 'reseau' ? 'association/login.php' : 'login.php' ?>">Continuer →</a>
+      <a class="btn" href="<?= htmlspecialchars(APP_URL) ?>/<?= $val['mode'] === 'reseau' ? 'association/login.php' : 'compte/login.php' ?>">Continuer →</a>
     <?php else: ?>
 
     <form method="post" autocomplete="off">

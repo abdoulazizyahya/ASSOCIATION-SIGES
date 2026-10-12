@@ -8,7 +8,7 @@
 //    écrans de pédagogie (primaire/pages/competences/liste.php, onglets « Groupes
 //    par niveau »/« Barème par niveau ») — les classes déjà rattachées ne
 //    sont pas affectées.
-require_once __DIR__ . '/../../../config.php';
+require_once __DIR__ . '/../../../config/config.php';
 require_once __DIR__ . '/../../../noyau/connexion.php';
 require_once __DIR__ . '/../../../noyau/fonctions.php';
 exiger_connexion();

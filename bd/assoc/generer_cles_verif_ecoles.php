@@ -6,11 +6,11 @@
 //  (jaynitaare_assoc.etablissement.verif_cle_privee_pem).
 //
 //  Sans clé par école, toutes les écoles retombent sur la clé globale de
-//  config.php (BULLETIN_VERIF_PRIVATE_KEY_PEM) → un bulletin d'une école
+//  config/config.php (BULLETIN_VERIF_PRIVATE_KEY_PEM) → un bulletin d'une école
 //  pourrait être présenté comme celui d'une autre en mode hors ligne.
 //
 //  Après exécution : coller le bloc « CLES_PUBLIQUES » affiché dans
-//  verif_bulletin_hors_ligne.html (map code_école -> {x, y}).
+//  verif/bulletin_hors_ligne.html (map code_école -> {x, y}).
 //
 //  Idempotent : une école qui a déjà une clé est ignorée (--force pour
 //  la régénérer — invalide alors les QR offline déjà imprimés par cette
@@ -19,7 +19,7 @@
 //  Usage :  php bd/assoc/generer_cles_verif_ecoles.php [--force] [--only=CODE]
 // =====================================================================
 
-require_once __DIR__ . '/../../config.php';
+require_once __DIR__ . '/../../config/config.php';
 require_once __DIR__ . '/../../noyau/connexion_assoc.php';
 
 if (PHP_SAPI !== 'cli') { header('Content-Type: text/plain; charset=utf-8'); }
@@ -77,12 +77,12 @@ foreach ($rows as $e) {
 }
 
 echo "\n" . str_repeat('=', 70) . "\n";
-echo "À COLLER dans verif_bulletin_hors_ligne.html (remplace le bloc CLES_PUBLIQUES) :\n";
+echo "À COLLER dans verif/bulletin_hors_ligne.html (remplace le bloc CLES_PUBLIQUES) :\n";
 echo str_repeat('=', 70) . "\n\n";
 echo "const CLES_PUBLIQUES = {\n";
 foreach ($pub_map as $code => $xy) {
     echo "  " . json_encode((string) $code) . ": { x: '" . $xy['x'] . "', y: '" . $xy['y'] . "' },\n";
 }
-echo "  // '' = clé GLOBALE de config.php (repli pour les QR d'avant la clé par école) — NE PAS retirer :\n";
+echo "  // '' = clé GLOBALE de config/config.php (repli pour les QR d'avant la clé par école) — NE PAS retirer :\n";
 echo "  '': { x: 'hPC5CrHa4YngnX8t-CbNGcUMATIGJ1DsUNb7u7k_04c', y: 'n9UQ58tKtuzwvHyY9HCXaUghMwKU84qbg0R9s7_SCeQ' }\n";
 echo "};\n";

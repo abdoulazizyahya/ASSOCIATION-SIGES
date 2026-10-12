@@ -6,7 +6,7 @@
 // pas de colonne enseignant.situation_ens (secondaire a situation_matrimoniale,
 // même usage) et enseignant.id_fonction est un intitulé libre (pas un code
 // de rôle à traduire via libelle_role()).
-require_once __DIR__ . '/../../../config.php';
+require_once __DIR__ . '/../../../config/config.php';
 require_once __DIR__ . '/../../../noyau/connexion.php';
 require_once __DIR__ . '/../../../noyau/fonctions.php';
 require_once __DIR__ . '/../../../noyau/paie_fonctions.php';

@@ -4,7 +4,7 @@
 // Réservée à l'Administrateur (superadmin) — un Membre/Superviseur ne voit
 // plus cette synthèse (finances agrégées, effectifs…), il peut seulement
 // « Ouvrir » l'école selon son attribution. Demande explicite du 23/09/2026.
-require_once __DIR__ . '/../config.php';
+require_once __DIR__ . '/../config/config.php';
 require_once __DIR__ . '/../noyau/connexion.php';
 require_once __DIR__ . '/../noyau/fonctions.php';
 require_once __DIR__ . '/_layout.php';

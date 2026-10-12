@@ -17,7 +17,7 @@
 // (ecole_contexte.php::est_lecture_seule() + fondateur_ecriture_permise()) ;
 // cette page est dans sa liste blanche.
 header('Cache-Control: no-store, no-cache, must-revalidate');
-require_once __DIR__ . '/../../../../config.php';
+require_once __DIR__ . '/../../../../config/config.php';
 require_once __DIR__ . '/../../../../noyau/connexion.php';
 require_once __DIR__ . '/../../../../noyau/fonctions.php';
 exiger_role(['FONDATEUR']);

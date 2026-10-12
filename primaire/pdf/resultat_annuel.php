@@ -5,7 +5,7 @@
 // primaire/pages/resultat_annuel/commun.php (decision_conseil_annuel, cohérent avec
 // le Conseil de classe et l'écran). GET : scope=classe|etablissement,
 // classe (si classe), filtre (si classe), limite (si etablissement), ordre.
-require_once __DIR__ . '/../../config.php';
+require_once __DIR__ . '/../../config/config.php';
 require_once __DIR__ . '/../../noyau/connexion.php';
 require_once __DIR__ . '/../../noyau/fonctions.php';
 require_once __DIR__ . '/../pages/resultat_annuel/commun.php';

@@ -17,7 +17,7 @@
 //  Demande du 12/10/2026.
 // =====================================================================
 if (PHP_SAPI !== 'cli') { http_response_code(403); exit("Outil en ligne de commande uniquement.\n"); }
-require_once __DIR__ . '/../../../config.php';
+require_once __DIR__ . '/../../../config/config.php';
 
 $base   = $argv[1] ?? 'abz_mbe';
 $racine = realpath(__DIR__ . '/../../..') . '/';

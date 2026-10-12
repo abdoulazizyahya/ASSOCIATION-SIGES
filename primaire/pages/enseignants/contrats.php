@@ -3,7 +3,7 @@
 // personnel : ajout + clôture (un seul contrat "actif" à la fois, au sens
 // métier — rien n'empêche techniquement d'en avoir plusieurs, mais la
 // clôture automatique de l'ancien à l'ajout d'un nouveau évite l'oubli).
-require_once __DIR__ . '/../../../config.php';
+require_once __DIR__ . '/../../../config/config.php';
 require_once __DIR__ . '/../../../noyau/connexion.php';
 require_once __DIR__ . '/../../../noyau/fonctions.php';
 require_once __DIR__ . '/../../../noyau/paie_fonctions.php';

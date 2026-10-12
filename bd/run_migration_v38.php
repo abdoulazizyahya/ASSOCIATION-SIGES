@@ -5,7 +5,7 @@
 //  Notes justifiées (absences lors d'une évaluation) — piste FR + AR.
 //  Voir bd/migration_v38.sql pour le détail.
 // =====================================================================
-require_once __DIR__ . '/../config.php';
+require_once __DIR__ . '/../config/config.php';
 require_once __DIR__ . '/../noyau/connexion.php';
 
 header('Content-Type: text/plain; charset=utf-8');

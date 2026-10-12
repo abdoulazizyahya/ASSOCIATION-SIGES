@@ -69,7 +69,7 @@ $questions_a_proposer = !$visite_asso && !empty($_SESSION['user_id'])
     && empty($_SESSION['questions_securite_reportees'])
     && function_exists('utilisateur_a_questions')
     && !utilisateur_a_questions((int) $_SESSION['user_id'])
-    && !str_ends_with(page_courante_relative(), 'configurer_securite.php');
+    && !str_ends_with(page_courante_relative(), 'compte/configurer_securite.php');
 
 // Année RÉELLEMENT active (Etat_annee_scolaire=1), pas juste le repli de
 // get_annee_active() sur l'année la plus récente — demande explicite du
@@ -180,7 +180,7 @@ function lien_actif(string $url): string {
       <?php else: ?>
         <?php
           // Sans sigle (école fraîchement installée) : initiales du nom de
-          // l'école (3 max), même règle que login.php — jamais un « JN » figé.
+          // l'école (3 max), même règle que compte/login.php — jamais un « JN » figé.
           $sigle_logo = $etab['Initial_Etab'] ?? '';
           if ($sigle_logo === '') {
               $nom_logo = (string) ($etab['Nom_Etab_Fr'] ?? APP_NOM);
@@ -246,7 +246,7 @@ function lien_actif(string $url): string {
     </nav>
 
     <div class="abz-sidebar-footer">
-      <a href="<?= APP_URL ?>/logout.php" class="nav-lien text-danger-light">
+      <a href="<?= APP_URL ?>/compte/logout.php" class="nav-lien text-danger-light">
         <i class="bi bi-box-arrow-right"></i><span>Déconnexion</span>
       </a>
     </div>
@@ -419,10 +419,10 @@ function lien_actif(string $url): string {
         <strong>Questions de sécurité non configurées</strong>
         — permettent de récupérer votre mot de passe en cas d'oubli, sans passer par le Directeur.
       </span>
-      <a href="<?= APP_URL ?>/configurer_securite.php" class="ms-auto btn btn-sm btn-primary py-0 px-2" style="font-size:.78rem">
+      <a href="<?= APP_URL ?>/compte/configurer_securite.php" class="ms-auto btn btn-sm btn-primary py-0 px-2" style="font-size:.78rem">
         <i class="bi bi-check2-circle me-1"></i>Configurer
       </a>
-      <a href="<?= APP_URL ?>/questions_securite_reporter.php?retour=<?= urlencode(page_courante_relative()) ?>"
+      <a href="<?= APP_URL ?>/compte/questions_securite_reporter.php?retour=<?= urlencode(page_courante_relative()) ?>"
          class="btn btn-sm btn-outline-secondary py-0 px-2" style="font-size:.78rem">
         Plus tard
       </a>
@@ -469,7 +469,7 @@ function lien_actif(string $url): string {
               </span>
             </li>
             <li><hr class="dropdown-divider my-1"></li>
-            <li><a class="dropdown-item text-danger" href="<?= APP_URL ?>/logout.php">
+            <li><a class="dropdown-item text-danger" href="<?= APP_URL ?>/compte/logout.php">
               <i class="bi bi-box-arrow-right me-2"></i>Déconnexion
             </a></li>
           </ul>

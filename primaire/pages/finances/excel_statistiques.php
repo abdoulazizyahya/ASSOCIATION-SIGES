@@ -2,7 +2,7 @@
 // primaire/pages/finances/excel_statistiques.php — Export Excel du bilan financier
 // (totaux + par niveau + par type + évolution mensuelle), mêmes calculs que
 // primaire/pages/finances/statistiques.php et primaire/pdf/finances_statistiques.php.
-require_once __DIR__ . '/../../../config.php';
+require_once __DIR__ . '/../../../config/config.php';
 require_once __DIR__ . '/../../../noyau/connexion.php';
 require_once __DIR__ . '/../../../noyau/fonctions.php';
 require_once __DIR__ . '/../../../vendor/autoload.php';

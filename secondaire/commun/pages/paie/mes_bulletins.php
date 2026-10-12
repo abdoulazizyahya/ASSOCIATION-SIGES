@@ -4,7 +4,7 @@
 // téléchargement des bulletins PDF. Ouvert à TOUT le personnel payé de
 // l'école (01/10/2026). Contenu partagé avec le primaire :
 // noyau/partage/paie/_mes_bulletins_contenu.php (mêmes tables de paie).
-require_once __DIR__ . '/../../../../config.php';
+require_once __DIR__ . '/../../../../config/config.php';
 require_once __DIR__ . '/../../../../noyau/connexion.php';
 require_once __DIR__ . '/../../../../noyau/fonctions.php';
 require_once __DIR__ . '/../../../../noyau/paie_fonctions.php';

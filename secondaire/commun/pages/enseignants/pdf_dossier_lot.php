@@ -12,7 +12,7 @@
  * Le rendu de chaque dossier est délégué à _dossier_lib.php (identique à
  * l'export unitaire pdf_dossier.php).
  */
-require_once __DIR__ . '/../../../../config.php';
+require_once __DIR__ . '/../../../../config/config.php';
 require_once __DIR__ . '/../../../../noyau/connexion.php';
 require_once __DIR__ . '/../../../../noyau/fonctions.php';
 exiger_connexion();

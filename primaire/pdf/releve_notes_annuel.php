@@ -5,7 +5,7 @@
 // vérifiée) et classement annuel (classement_annuel_classe()), avec la
 // décision de fin d'année si le conseil a déjà statué
 // (decision_conseil_annuel, migration_v8).
-require_once __DIR__ . '/../../config.php';
+require_once __DIR__ . '/../../config/config.php';
 require_once __DIR__ . '/../../noyau/connexion.php';
 require_once __DIR__ . '/../../noyau/fonctions.php';
 require_once __DIR__ . '/../notes_apc.php';

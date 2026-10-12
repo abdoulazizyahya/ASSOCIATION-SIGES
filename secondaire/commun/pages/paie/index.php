@@ -8,7 +8,7 @@
 // vue/écriture séparée — ecriture_module_permise() ne restreint rien côté
 // secondaire, chaque page gère son propre exiger_role()). Demande
 // explicite du 21/09/2026.
-require_once __DIR__ . '/../../../../config.php';
+require_once __DIR__ . '/../../../../config/config.php';
 require_once __DIR__ . '/../../../../noyau/connexion.php';
 require_once __DIR__ . '/../../../../noyau/fonctions.php';
 require_once __DIR__ . '/../../../../noyau/paie_fonctions.php';

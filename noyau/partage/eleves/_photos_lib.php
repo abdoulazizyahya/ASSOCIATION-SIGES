@@ -10,7 +10,7 @@
 //                servi par secondaire/commun/pages/eleves/photo.php — ancien fichier
 //                assets/uploads/eleves/<eleve.photo> converti au premier accès ;
 //                lu tel quel par les bulletins/cartes du secondaire.
-// À inclure après config.php / connexion.php / fonctions.php.
+// À inclure après config/config.php / connexion.php / fonctions.php.
 
 function photos_est_secondaire(): bool {
     return function_exists('type_enseignement_courant') && type_enseignement_courant() === 'secondaire';

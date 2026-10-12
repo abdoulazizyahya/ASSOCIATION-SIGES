@@ -3,7 +3,7 @@
 // GET : annee, classe (classe CIBLE), cols, align, dl (0|1). Voir
 // secondaire/commun/pages/statistiques/resultat_annuel.php (onglet "Liste provisoire") et
 // fonctions.php::calc_liste_provisoire_comp().
-require_once __DIR__ . '/../../../config.php';
+require_once __DIR__ . '/../../../config/config.php';
 require_once __DIR__ . '/../../../noyau/connexion.php';
 require_once __DIR__ . '/../../../noyau/fonctions.php';
 exiger_connexion();

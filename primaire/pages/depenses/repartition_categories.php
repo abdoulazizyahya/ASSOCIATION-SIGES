@@ -4,7 +4,7 @@
 // (montant dépensé) et le % du total dépensé de chacune — miroir, côté
 // décaissements, de primaire/pages/finances/repartition_classes.php (apport et %
 // par classe côté encaissements).
-require_once __DIR__ . '/../../../config.php';
+require_once __DIR__ . '/../../../config/config.php';
 require_once __DIR__ . '/../../../noyau/connexion.php';
 require_once __DIR__ . '/../../../noyau/fonctions.php';
 exiger_role(['DIRECTEUR', 'SECRETAIRE', 'COMPTABLE']);

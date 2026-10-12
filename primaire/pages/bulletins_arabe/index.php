@@ -8,7 +8,7 @@
 // (déjà construits — acceptent ?id= et ?classe= en lot, mêmes conventions
 // GET que leurs équivalents FPDF français).
 header('Cache-Control: no-store, no-cache, must-revalidate');
-require_once __DIR__ . '/../../../config.php';
+require_once __DIR__ . '/../../../config/config.php';
 require_once __DIR__ . '/../../../noyau/connexion.php';
 require_once __DIR__ . '/../../../noyau/fonctions.php';
 require_once __DIR__ . '/../../notes_apc_arabe.php';

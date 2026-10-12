@@ -2,7 +2,7 @@
 // secondaire/commun/pages/paie/grille.php — Grille salariale, porté de
 // primaire/pages/paie/grille.php (primaire) à l'identique — voir secondaire/commun/pages/
 // paie/index.php pour la note sur la réutilisation de paie_fonctions.php.
-require_once __DIR__ . '/../../../../config.php';
+require_once __DIR__ . '/../../../../config/config.php';
 require_once __DIR__ . '/../../../../noyau/connexion.php';
 require_once __DIR__ . '/../../../../noyau/fonctions.php';
 require_once __DIR__ . '/../../../../noyau/paie_fonctions.php';

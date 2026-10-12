@@ -1,7 +1,7 @@
 <?php
 // secondaire/commun/pdf/prive_impayes.php — Liste PDF des élèves en impayé PRIVÉ —
 // porté de primaire/pdf/finances_impayes.php (primaire), adapté au schéma secondaire.
-require_once __DIR__ . '/../../../config.php';
+require_once __DIR__ . '/../../../config/config.php';
 require_once __DIR__ . '/../../../noyau/connexion.php';
 require_once __DIR__ . '/../../../noyau/fonctions.php';
 exiger_role(['ADMIN', 'PROVISEUR', 'SECRETAIRE', 'INTENDANT']);

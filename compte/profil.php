@@ -1,23 +1,23 @@
 <?php
-// profil.php — Compte utilisateur en libre-service (login + mot de passe +
+// compte/profil.php — Compte utilisateur en libre-service (login + mot de passe +
 // état des questions de sécurité), accessible à TOUS les rôles connectés
 // (demande explicite du 22/08/2026 : menu Paramètres visible à tous, en
 // libre-service pour tout rôle hors Directeur). La gestion complète des
 // comptes (création, rôle, suppression) reste un module séparé réservé au
 // Directeur — voir primaire/pages/utilisateurs/liste.php, ne PAS dupliquer ici.
-// Remplace un ancien profil.php copié tel quel d'un autre projet (table
+// Remplace un ancien compte/profil.php copié tel quel d'un autre projet (table
 // `utilisateur`/colonnes `id`/`role`/`login`/`mot_de_passe` inexistantes
 // dans ce schéma — jamais fonctionnel, jamais lié au menu).
-require_once __DIR__ . '/config.php';
-require_once __DIR__ . '/noyau/connexion.php';
-require_once __DIR__ . '/noyau/fonctions.php';
+require_once __DIR__ . '/../config/config.php';
+require_once __DIR__ . '/../noyau/connexion.php';
+require_once __DIR__ . '/../noyau/fonctions.php';
 exiger_connexion();
 
 // École secondaire : table `utilisateur` (login/mot_de_passe/role directement
 // dessus, pas de jointure enseignant obligatoire) — même principe que
-// dashboard.php, séparé tôt avant la moindre requête primaire.
+// noyau/dashboard.php, séparé tôt avant la moindre requête primaire.
 if (function_exists('type_enseignement_courant') && type_enseignement_courant() === 'secondaire') {
-    require __DIR__ . '/secondaire/commun/profil_contenu.php';
+    require __DIR__ . '/../secondaire/commun/profil_contenu.php';
     exit;
 }
 
@@ -29,7 +29,7 @@ $compte  = db_one(
      FROM user u JOIN enseignant e ON e.matricule_ens = u.matricule_ens
      WHERE u.id_user = ?", [$user_id]
 );
-if (!$compte) { flash_set('erreur', 'Compte introuvable.'); rediriger('dashboard.php'); }
+if (!$compte) { flash_set('erreur', 'Compte introuvable.'); rediriger('noyau/dashboard.php'); }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     csrf_verifier();
@@ -60,7 +60,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 //  php::journaliser_action()) — on le charge ici explicitement pour
 //  appareil_device_id() (function_exists() serait sinon faux tant
 //  qu'aucune action n'a encore été journalisée dans CETTE requête).
-require_once __DIR__ . '/bd/lib/audit.php';
+require_once __DIR__ . '/../bd/lib/audit.php';
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && post('action') === 'appareil_renommer') {
     csrf_verifier();
     $ok = appareil_connu_renommer((int) post('id_appareil'), 'user', $user_id, (string) post('nom_appareil'));
@@ -71,7 +71,7 @@ $mes_appareils     = appareil_connu_lister('user', $user_id);
 $mon_appareil_actu = appareil_device_id();
 
 $titre_page = 'Mon compte';
-require_once __DIR__ . '/noyau/layout/header.php';
+require_once __DIR__ . '/../noyau/layout/header.php';
 
 $initiales = mb_strtoupper(mb_substr($compte['nom_ens'] ?? '?', 0, 1)) . mb_strtoupper(mb_substr($compte['prenom_ens'] ?? '', 0, 1));
 $role_colors = [
@@ -124,7 +124,7 @@ $rc = $role_colors[$compte['id_fonction'] ?? ''] ?? ['bg' => '#f3f4f6', 'txt' =>
           <?php else: ?>
             <span class="badge bg-warning text-dark" style="font-size:.68rem">Non configurées</span>
           <?php endif; ?>
-          <a href="<?= APP_URL ?>/configurer_securite.php?retour=profil.php" class="btn btn-light btn-sm d-block mt-2" style="font-size:.72rem">
+          <a href="<?= APP_URL ?>/compte/configurer_securite.php?retour=compte/profil.php" class="btn btn-light btn-sm d-block mt-2" style="font-size:.72rem">
             <i class="bi bi-pencil me-1"></i>Modifier mes questions
           </a>
         </div>
@@ -232,4 +232,4 @@ $rc = $role_colors[$compte['id_fonction'] ?? ''] ?? ['bg' => '#f3f4f6', 'txt' =>
   </div>
 </div>
 
-<?php require_once __DIR__ . '/noyau/layout/footer.php'; ?>
+<?php require_once __DIR__ . '/../noyau/layout/footer.php'; ?>

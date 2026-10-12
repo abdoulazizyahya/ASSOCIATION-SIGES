@@ -1,6 +1,6 @@
 <?php
 header('Cache-Control: no-store, no-cache, must-revalidate');
-require_once __DIR__ . '/../../../../config.php';
+require_once __DIR__ . '/../../../../config/config.php';
 require_once __DIR__ . '/../../../../noyau/connexion.php';
 require_once __DIR__ . '/../../../../noyau/fonctions.php';
 aiguiller_page_technique('secondaire/technique/pages/bulletins/index.php');   // école technique : notes par séquence
@@ -17,7 +17,7 @@ $val_annee = $annee_act['libelle'] ?? '';
 
 if (!$is_admin && !$is_ens) {
     flash_set('erreur', 'Accès non autorisé.');
-    rediriger('dashboard.php');
+    rediriger('noyau/dashboard.php');
 }
 
 // Classes PP si enseignant

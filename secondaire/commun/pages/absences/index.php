@@ -1,6 +1,6 @@
 <?php
 header('Cache-Control: no-store, no-cache, must-revalidate');
-require_once __DIR__ . '/../../../../config.php';
+require_once __DIR__ . '/../../../../config/config.php';
 require_once __DIR__ . '/../../../../noyau/connexion.php';
 require_once __DIR__ . '/../../../../noyau/fonctions.php';
 exiger_connexion();
@@ -12,7 +12,7 @@ $mat_ens   = $is_ens ? get_matricule_ens_connecte() : null;
 
 if (!$is_admin && !$is_ens) {
     flash_set('erreur', 'Accès non autorisé.');
-    rediriger('dashboard.php');
+    rediriger('noyau/dashboard.php');
 }
 
 $annee_act = get_annee_active();

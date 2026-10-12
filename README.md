@@ -10,17 +10,22 @@ PHP 7.4 → 8.4, MySQL.
 
 ```
 SIGES/
-├─ index.php, login.php, logout.php, dashboard.php   points d'entrée
-├─ mot_de_passe_oublie.php, configurer_securite.php,
-│  questions_securite_reporter.php, profil.php        parcours de compte
-├─ install.php                                       premier lancement
-├─ verif_*.php                                       vérification publique des QR imprimés
-│                                                    (adresses figées : ne pas déplacer)
-├─ config.php, config.local.php                      configuration
+├─ index.php        seul point d'entrée à la racine (vitrine, puis connexion)
+├─ .htaccess        redirections des anciennes adresses (dont les QR imprimés)
+├─ composer.json/.lock, README.md, .gitignore   (conventions Composer / Git)
+│
+├─ config/          config.php, config.local.php (identifiants, secrets) —
+│                   accès web interdit
+├─ compte/          connexion, déconnexion, mot de passe oublié, sécurité, profil
+├─ verif/           vérification publique des QR (bulletin, reçu, carte…).
+│                   Les QR déjà imprimés (…/verif_X.php) sont redirigés ici
+│                   par .htaccess : NE JAMAIS retirer ces règles.
+├─ installation/    install.php (premier lancement)
 │
 ├─ noyau/            cœur commun aux trois types d'école
 │  ├─ connexion.php, connexion_assoc.php, ecole_contexte.php
 │  ├─ fonctions.php, paie_fonctions.php, chemins_historiques.php
+│  ├─ dashboard.php  tableau de bord (aiguillé primaire / secondaire)
 │  ├─ accueil.php    vitrine publique (rendue par index.php)
 │  ├─ partage/       code commun au primaire et au secondaire (vérification
 │  │                 des QR, photos et fiches des élèves, bulletins de paie)
@@ -44,7 +49,8 @@ SIGES/
 ├─ assets/           CSS, JS, images, fichiers téléversés (uploads/)
 ├─ deploy/           modèle .htaccess de production, outils de développement,
 │                    archives/ (zips de déploiement, locaux, non versionnés)
-├─ docs/             guide d'utilisation, présentation, notes de suivi
+├─ docs/             guide d'utilisation, présentation, notes de suivi,
+│                    promeducamsiges.html (copie statique de la vitrine, générée)
 └─ vendor/           dépendances Composer (non versionné)
 ```
 

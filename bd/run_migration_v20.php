@@ -7,7 +7,7 @@
 //  Ajoute etablissement.signature (image de signature du chef
 //  d'établissement, sélectionnée par l'admin dans les paramètres).
 // =====================================================================
-require_once __DIR__ . '/../config.php';
+require_once __DIR__ . '/../config/config.php';
 require_once __DIR__ . '/../noyau/connexion.php';
 
 header('Content-Type: text/plain; charset=utf-8');

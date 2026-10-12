@@ -8,13 +8,13 @@
 // rang_eleve_competence_annuelle() le rang par compétence), récapitulatif
 // disciplines sur les 3 trimestres + annuel, décision de fin d'année.
 // GET : id (bulletin d'UN élève) — OU classe (tous les élèves classés).
-require_once __DIR__ . '/../../config.php';
+require_once __DIR__ . '/../../config/config.php';
 require_once __DIR__ . '/../../noyau/connexion.php';
 require_once __DIR__ . '/../../noyau/fonctions.php';
 require_once __DIR__ . '/../notes_apc.php';
 require_once __DIR__ . '/verif_lib.php';
 
-// Accès public via le QR code du bulletin (jeton "vh", voir verif_bulletin.php
+// Accès public via le QR code du bulletin (jeton "vh", voir verif/bulletin.php
 // et bulletin_verif_valider() dans verif_lib.php) — la personne qui scanne
 // n'a pas forcément de compte dans le système ; le hash déjà vérifié une
 // fois là-bas suffit à prouver qu'elle a le droit de voir CE bulletin précis

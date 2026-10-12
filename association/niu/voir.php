@@ -3,7 +3,7 @@
 // historique des mouvements + actions (transfert inter-écoles, sortie du
 // réseau, réintégration, fusion de doublon). Superadmin uniquement pour
 // les actions ; lecture pour tout membre.
-require_once __DIR__ . '/../../config.php';
+require_once __DIR__ . '/../../config/config.php';
 require_once __DIR__ . '/../../noyau/connexion.php';
 require_once __DIR__ . '/../../noyau/fonctions.php';
 require_once __DIR__ . '/../_layout.php';

@@ -2,7 +2,7 @@
 // secondaire/commun/pages/paiements/pdf_stats_recouvrement.php — PDF du sous-onglet "Taux de
 // recouvrement par classe" de Statistiques avancées (colonnes différentes
 // des 3 autres sous-onglets — voir pdf_stats.php — d'où un fichier séparé).
-require_once __DIR__ . '/../../../../config.php';
+require_once __DIR__ . '/../../../../config/config.php';
 require_once __DIR__ . '/../../../../noyau/connexion.php';
 require_once __DIR__ . '/../../../../noyau/fonctions.php';
 exiger_role(['ADMIN', 'PROVISEUR', 'CENSEUR', 'INTENDANT']);

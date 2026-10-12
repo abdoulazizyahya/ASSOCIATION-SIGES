@@ -36,6 +36,18 @@
     RewriteRule ^(notes_apc|notes_apc_arabe)\.php$ %2primaire/$1.php [R=301,L]
     RewriteCond $0#%{REQUEST_URI} ^([^#]*)#(.*)\1$
     RewriteRule ^ajax/(.*)$ %2noyau/ajax/$1 [R=307,L]
+    # Racine réduite à index.php (12/10/2026). QR IMPRIMÉS : verif_X.php -> verif/X.php
+    # (ne jamais retirer cette règle — les documents papier en circulation en dépendent).
+    RewriteCond $0#%{REQUEST_URI} ^([^#]*)#(.*)\1$
+    RewriteRule ^verif_(attestation|bulletin|carte|honneur|paiement|recu|scolarite)\.php$ %2verif/$1.php [R=301,L]
+    RewriteCond $0#%{REQUEST_URI} ^([^#]*)#(.*)\1$
+    RewriteRule ^verif_bulletin_hors_ligne\.html$ %2verif/bulletin_hors_ligne.html [R=301,L]
+    RewriteCond $0#%{REQUEST_URI} ^([^#]*)#(.*)\1$
+    RewriteRule ^(login|logout|mot_de_passe_oublie|configurer_securite|questions_securite_reporter|profil)\.php$ %2compte/$1.php [R=307,L]
+    RewriteCond $0#%{REQUEST_URI} ^([^#]*)#(.*)\1$
+    RewriteRule ^dashboard\.php$ %2noyau/dashboard.php [R=307,L]
+    RewriteCond $0#%{REQUEST_URI} ^([^#]*)#(.*)\1$
+    RewriteRule ^install\.php$ %2installation/install.php [R=307,L]
 </IfModule>
 
 # ── PHP : pas d'affichage d'erreurs, journalisation active ──────────

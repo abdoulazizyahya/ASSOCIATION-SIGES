@@ -5,7 +5,7 @@
 // de compétences APC. On y arrive par secondaire/general/pages/notes/index.php
 // (redirection selon l'ordre d'enseignement de l'école).
 header('Cache-Control: no-store, no-cache, must-revalidate');
-require_once __DIR__ . '/../../../../config.php';
+require_once __DIR__ . '/../../../../config/config.php';
 require_once __DIR__ . '/../../../../noyau/connexion.php';
 require_once __DIR__ . '/../../../../noyau/fonctions.php';
 exiger_role(['ADMIN', 'PROVISEUR', 'FONDATEUR', 'CENSEUR', 'ENSEIGNANT']);

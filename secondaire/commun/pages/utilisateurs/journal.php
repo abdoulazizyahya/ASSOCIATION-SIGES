@@ -5,7 +5,7 @@
 // promeducam_assoc.journal_audit, filtrées par id_etablissement — voir
 // bd/lib/audit.php + connexion_assoc.php::audit_journal()), seuls les rôles
 // autorisés et les chemins changent.
-require_once __DIR__ . '/../../../../config.php';
+require_once __DIR__ . '/../../../../config/config.php';
 require_once __DIR__ . '/../../../../noyau/connexion.php';
 require_once __DIR__ . '/../../../../noyau/fonctions.php';
 require_once __DIR__ . '/../../../../bd/lib/audit_vue.php';

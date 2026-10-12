@@ -3,7 +3,7 @@
 // derrière l'authentification — les pièces jointes (acte de naissance,
 // carnet de vaccination...) sont sensibles, on évite un accès direct par
 // URL devinée dans assets/uploads/.
-require_once __DIR__ . '/../../../../config.php';
+require_once __DIR__ . '/../../../../config/config.php';
 require_once __DIR__ . '/../../../../noyau/connexion.php';
 require_once __DIR__ . '/../../../../noyau/fonctions.php';
 exiger_connexion();

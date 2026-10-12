@@ -1,7 +1,7 @@
 <?php
 // primaire/pages/finances/excel_impayes.php — Export Excel de la liste des impayés,
 // mêmes filtres et même en-tête institutionnel que excel_journal.php.
-require_once __DIR__ . '/../../../config.php';
+require_once __DIR__ . '/../../../config/config.php';
 require_once __DIR__ . '/../../../noyau/connexion.php';
 require_once __DIR__ . '/../../../noyau/fonctions.php';
 require_once __DIR__ . '/../../../vendor/autoload.php';

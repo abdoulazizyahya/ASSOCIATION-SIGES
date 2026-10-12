@@ -17,7 +17,7 @@
 
 return [
     'Principal' => [
-        ['Tableau de bord', 'dashboard.php', 'speedometer2', []],
+        ['Tableau de bord', 'noyau/dashboard.php', 'speedometer2', []],
     ],
     'Scolarité' => [
         ['Élèves',  'primaire/pages/eleves/liste.php',  'people',    []],
@@ -97,9 +97,9 @@ return [
         ['Mes informations',      'primaire/pages/enseignants/mon_profil.php', 'person-vcard', ['DIRECTEUR','ENSEIGNANT','SECRETAIRE','COMPTABLE']],
         ['Mes bulletins de paie', 'primaire/pages/paie/mes_bulletins.php','receipt',        ['DIRECTEUR','ENSEIGNANT','SECRETAIRE','COMPTABLE']],
     ],
-    // Paramètres : 'Mon compte' (profil.php) est un libre-service ouvert à TOUS.
+    // Paramètres : 'Mon compte' (compte/profil.php) est un libre-service ouvert à TOUS.
     'Paramètres' => [
-        ['Mon compte',        'profil.php',                    'key', []],
+        ['Mon compte',        'compte/profil.php',                    'key', []],
         ['Directeur',         'primaire/pages/fondateur/directeur.php', 'person-badge', ['FONDATEUR']],
         ['Configurations',    'primaire/pages/parametres/index.php',    'gear',        ['DIRECTEUR','FONDATEUR']],
         ['Utilisateurs',      'primaire/pages/utilisateurs/liste.php',  'person-gear', ['DIRECTEUR']],

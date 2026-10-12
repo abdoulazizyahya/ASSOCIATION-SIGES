@@ -5,7 +5,7 @@
 //  REFUSÉ au compte (table acces_utilisateur, migration v53). Le compte voit
 //  par défaut tout ce que son rôle autorise ; on lui enlève des entrées.
 //  Granularité : groupe de menu ('grp:<Nom>') ou entrée précise (son url).
-require_once __DIR__ . '/../../../config.php';
+require_once __DIR__ . '/../../../config/config.php';
 require_once __DIR__ . '/../../../noyau/connexion.php';
 require_once __DIR__ . '/../../../noyau/fonctions.php';
 exiger_role(['DIRECTEUR']);
@@ -33,7 +33,7 @@ if (!compte_gerable((string) $u['id_fonction'], $id)) {
 
 // Anti-verrouillage : on ne restreint pas son propre compte, ni ces entrées.
 $est_moi        = $id === (int) ($_SESSION['user_id'] ?? 0);
-$cles_protegees = ['dashboard.php', 'profil.php'];
+$cles_protegees = ['noyau/dashboard.php', 'compte/profil.php'];
 
 $menu = menu_definition();
 

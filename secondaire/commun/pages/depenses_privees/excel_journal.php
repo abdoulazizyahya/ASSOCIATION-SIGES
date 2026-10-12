@@ -2,7 +2,7 @@
 // secondaire/commun/pages/depenses_privees/excel_journal.php — Export Excel du
 // journal des dépenses PRIVÉES — porté de primaire/pages/depenses/excel_journal.php
 // (primaire), adapté au schéma secondaire.
-require_once __DIR__ . '/../../../../config.php';
+require_once __DIR__ . '/../../../../config/config.php';
 require_once __DIR__ . '/../../../../noyau/connexion.php';
 require_once __DIR__ . '/../../../../noyau/fonctions.php';
 require_once __DIR__ . '/../../../../vendor/autoload.php';

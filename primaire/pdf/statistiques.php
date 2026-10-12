@@ -6,7 +6,7 @@
 // stats_classe(), stats_par_competence()) — les MÊMES fonctions que la page
 // web, donc aucun risque de divergence entre l'écran et l'impression
 // (contrairement à ABZ_MBE, qui recalcule tout inline dans chaque PDF).
-require_once __DIR__ . '/../../config.php';
+require_once __DIR__ . '/../../config/config.php';
 require_once __DIR__ . '/../../noyau/connexion.php';
 require_once __DIR__ . '/../../noyau/fonctions.php';
 require_once __DIR__ . '/../notes_apc.php';

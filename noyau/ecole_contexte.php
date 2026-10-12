@@ -16,7 +16,7 @@
 //    est_visite_association()  : bool     un membre a « ouvert » une école
 //    est_lecture_seule()       : bool     écritures interdites (visite asso)
 
-require_once __DIR__ . '/../config.php';
+require_once __DIR__ . '/../config/config.php';
 
 // Démarre la session avec EXACTEMENT les mêmes paramètres que
 // fonctions.php::session_init() (nom + path dédiés à cette app). Doit
@@ -419,7 +419,7 @@ function resoudre_etablissement(): ?array {
     //    seule école active). Dès qu'il y a plusieurs établissements, aucune
     //    école par défaut : la page d'accueil / de connexion reste NEUTRE
     //    (pas de logo ni de nom d'école) tant que l'utilisateur n'en a pas
-    //    choisi une (login.php), et les pages publiques exigent ?ec=.
+    //    choisi une (compte/login.php), et les pages publiques exigent ?ec=.
     $nb_actives = (int) assoc_val("SELECT COUNT(*) FROM etablissement WHERE actif=1");
     if ($nb_actives > 1) return null;
 
@@ -443,9 +443,9 @@ function ecole_courante(): ?array {
 // Détermine quel module de primaire/pages/menu/dashboard/schéma s'applique — voir
 // bd/assoc/schema_ref_ecole_secondaire.sql et le dossier secondaire/.
 // Hors contexte multi-établissement (annuaire absent — installation mono-
-// école, voir install.php mode « école unique »), il n'y a pas de ligne
+// école, voir installation/install.php mode « école unique »), il n'y a pas de ligne
 // annuaire pour porter ce type : on retombe sur la constante ECOLE_TYPE_SOLO
-// (config.php / config.local.php), 'primaire' par défaut (comportement
+// (config/config.php / config.local.php), 'primaire' par défaut (comportement
 // historique inchangé pour toute installation existante).
 function type_enseignement_courant(): string {
     $t = ecole_courante()['type_enseignement'] ?? null;

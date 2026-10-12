@@ -7,7 +7,7 @@
  * (moyenne = moyenne des 3 moyennes trimestrielles, comme les bulletins).
  * GET : classe, trim|seq, annee, dl (0|1)
  */
-require_once __DIR__ . '/../../../../config.php';
+require_once __DIR__ . '/../../../../config/config.php';
 require_once __DIR__ . '/../../../../noyau/connexion.php';
 require_once __DIR__ . '/../../../../noyau/fonctions.php';
 exiger_connexion();

@@ -2,7 +2,7 @@
 // secondaire/commun/pages/eleves/statut_masse.php — bascule actif/désactivé pour
 // plusieurs élèves d'un coup (même sémantique que statut.php, en masse).
 // Demande explicite du 17/09/2026.
-require_once __DIR__ . '/../../../../config.php';
+require_once __DIR__ . '/../../../../config/config.php';
 require_once __DIR__ . '/../../../../noyau/connexion.php';
 require_once __DIR__ . '/../../../../noyau/fonctions.php';
 exiger_role(['ADMIN', 'PROVISEUR', 'FONDATEUR', 'CENSEUR', 'SG', 'SECRETAIRE']);

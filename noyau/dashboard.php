@@ -1,5 +1,5 @@
 <?php
-// dashboard.php — Tableau de bord : vue d'ensemble de TOUT le système en un
+// noyau/dashboard.php — Tableau de bord : vue d'ensemble de TOUT le système en un
 // coup d'œil (demande du 20/08/2026, enrichie le même jour avec des
 // diagrammes Chart.js + cellules plus compactes) — Scolarité (effectifs),
 // Pédagogie (moyenne générale, taux de réussite, meilleurs élèves),
@@ -8,11 +8,11 @@
 // à DIRECTEUR/SECRETAIRE — mêmes rôles que les menus Finances/Dépenses/Paie
 // eux-mêmes (voir noyau/layout/header.php) : ce n'est pas parce que c'est sur le
 // dashboard que ça doit être visible plus largement que le menu d'origine.
-require_once __DIR__ . '/config.php';
-require_once __DIR__ . '/noyau/connexion.php';
-require_once __DIR__ . '/noyau/fonctions.php';
-require_once __DIR__ . '/primaire/notes_apc.php';
-require_once __DIR__ . '/noyau/paie_fonctions.php'; // solde_avance()
+require_once __DIR__ . '/../config/config.php';
+require_once __DIR__ . '/connexion.php';
+require_once __DIR__ . '/fonctions.php';
+require_once __DIR__ . '/../primaire/notes_apc.php';
+require_once __DIR__ . '/paie_fonctions.php'; // solde_avance()
 exiger_connexion();
 
 // École secondaire : tout le reste de ce fichier interroge des tables
@@ -20,7 +20,7 @@ exiger_connexion();
 // schéma secondaire — bloc dédié, séparé tôt, avant la moindre requête
 // primaire (même principe que secondaire_en_construction.php/connexion.php).
 if (function_exists('type_enseignement_courant') && type_enseignement_courant() === 'secondaire') {
-    require __DIR__ . '/secondaire/commun/dashboard_contenu.php';
+    require __DIR__ . '/../secondaire/commun/dashboard_contenu.php';
     exit;
 }
 
@@ -273,7 +273,7 @@ $fmt_f   = fn(float $v): string => number_format($v, 0, ',', ' ') . ' F';
 // sa légende ET son chiffre en texte, jamais la couleur seule.
 
 $titre_page = 'Tableau de bord';
-require_once __DIR__ . '/noyau/layout/header.php';
+require_once __DIR__ . '/layout/header.php';
 ?>
 <style>
 /* ── Tableau de bord : cellules plus compactes (portée à cette page
@@ -898,4 +898,4 @@ new Chart(document.getElementById('chartEffectifsPie'), {
 });
 </script>
 
-<?php require_once __DIR__ . '/noyau/layout/footer.php'; ?>
+<?php require_once __DIR__ . '/layout/footer.php'; ?>

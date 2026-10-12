@@ -3,7 +3,7 @@
 // établissement : ligne d'annuaire + registres liés + BASE MySQL de l'école
 // (ou remise au pool). Superadmin uniquement. L'établissement doit être
 // inactif. Confirmation par saisie du code + cases à cocher.
-require_once __DIR__ . '/../config.php';
+require_once __DIR__ . '/../config/config.php';
 require_once __DIR__ . '/../noyau/connexion.php';
 require_once __DIR__ . '/../noyau/fonctions.php';
 require_once __DIR__ . '/_layout.php';

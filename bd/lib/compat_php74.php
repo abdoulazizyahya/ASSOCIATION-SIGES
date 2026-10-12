@@ -2,7 +2,7 @@
 // bd/lib/compat_php74.php — compatibilité PHP 7.4 → 8.x.
 //
 // L'application tourne de PHP 7.4 à 8.4. Ce fichier, chargé en tout premier
-// par config.php, fournit sous PHP 7.4 les fonctions apparues avec PHP 8 et
+// par config/config.php, fournit sous PHP 7.4 les fonctions apparues avec PHP 8 et
 // utilisées dans le code (sous PHP 8 elles existent déjà : rien n'est redéfini).
 //
 // Règles pour le code de l'application (vérifiables avec

@@ -3,7 +3,7 @@
 // (aperçu par enseignant, génération, bulletins, validation) est sur
 // primaire/pages/paie/periode.php?id=... — cette page-ci reste une simple liste
 // d'entrée, comme primaire/pages/finances/journal.php pour les encaissements.
-require_once __DIR__ . '/../../../config.php';
+require_once __DIR__ . '/../../../config/config.php';
 require_once __DIR__ . '/../../../noyau/connexion.php';
 require_once __DIR__ . '/../../../noyau/fonctions.php';
 require_once __DIR__ . '/../../../noyau/paie_fonctions.php';

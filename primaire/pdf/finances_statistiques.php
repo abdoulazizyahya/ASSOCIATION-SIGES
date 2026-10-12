@@ -2,7 +2,7 @@
 // primaire/pdf/finances_statistiques.php — Bilan financier PDF (totaux + par niveau
 // + par type de frais + évolution mensuelle), mêmes calculs que
 // primaire/pages/finances/statistiques.php.
-require_once __DIR__ . '/../../config.php';
+require_once __DIR__ . '/../../config/config.php';
 require_once __DIR__ . '/../../noyau/connexion.php';
 require_once __DIR__ . '/../../noyau/fonctions.php';
 exiger_role(['DIRECTEUR', 'COMPTABLE']);

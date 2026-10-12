@@ -12,7 +12,7 @@
 // Cette page est dans la liste blanche fondateur_ecriture_permise() : pour
 // un FONDATEUR, db_exec()/csrf_verifier() y sont donc autorisés.
 header('Cache-Control: no-store, no-cache, must-revalidate');
-require_once __DIR__ . '/../../../config.php';
+require_once __DIR__ . '/../../../config/config.php';
 require_once __DIR__ . '/../../../noyau/connexion.php';
 require_once __DIR__ . '/../../../noyau/fonctions.php';
 exiger_role(['FONDATEUR']);

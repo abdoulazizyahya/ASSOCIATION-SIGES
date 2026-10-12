@@ -4,7 +4,7 @@
 // (si type=trimestre), ordre=alpha|merite, dl=1, signature=1.
 // Réutilise les mêmes calculs que primaire/pages/conseil_classe_arabe/index.php
 // (classement_trimestre_classe_arabe()/classement_annuel_classe_arabe()).
-require_once __DIR__ . '/../../config.php';
+require_once __DIR__ . '/../../config/config.php';
 require_once __DIR__ . '/../../noyau/connexion.php';
 require_once __DIR__ . '/../../noyau/fonctions.php';
 require_once __DIR__ . '/../notes_apc_arabe.php';

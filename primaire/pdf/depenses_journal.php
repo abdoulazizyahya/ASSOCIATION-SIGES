@@ -2,7 +2,7 @@
 // primaire/pdf/depenses_journal.php — Journal des dépenses PDF (registre
 // chronologique, sous-total par jour) — miroir de primaire/pdf/finances_journal.php
 // côté décaissements, mêmes filtres que primaire/pages/depenses/journal.php.
-require_once __DIR__ . '/../../config.php';
+require_once __DIR__ . '/../../config/config.php';
 require_once __DIR__ . '/../../noyau/connexion.php';
 require_once __DIR__ . '/../../noyau/fonctions.php';
 exiger_role(['DIRECTEUR', 'SECRETAIRE', 'COMPTABLE']);

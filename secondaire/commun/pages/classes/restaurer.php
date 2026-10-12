@@ -3,7 +3,7 @@
 // redevient visible/utilisable partout). Pendant de supprimer.php — même
 // contrôle d'accès, même convention csrf_verifier(). Demande explicite du
 // 17/09/2026 (onglet « Classes archivées » de liste.php).
-require_once __DIR__ . '/../../../../config.php';
+require_once __DIR__ . '/../../../../config/config.php';
 require_once __DIR__ . '/../../../../noyau/connexion.php';
 require_once __DIR__ . '/../../../../noyau/fonctions.php';
 exiger_role(['ADMIN', 'PROVISEUR', 'FONDATEUR']);

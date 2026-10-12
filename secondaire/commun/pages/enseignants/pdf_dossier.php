@@ -4,7 +4,7 @@
  * GET : id=matricule_ens, dl=1 (téléchargement)
  * Le rendu est délégué à _dossier_lib.php (partagé avec l'export en lot).
  */
-require_once __DIR__ . '/../../../../config.php';
+require_once __DIR__ . '/../../../../config/config.php';
 require_once __DIR__ . '/../../../../noyau/connexion.php';
 require_once __DIR__ . '/../../../../noyau/fonctions.php';
 exiger_connexion();

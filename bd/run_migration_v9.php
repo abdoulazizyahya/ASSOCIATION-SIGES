@@ -4,7 +4,7 @@
 //  http://localhost/jaynitaare_v2/bd/run_migration_v9.php
 //  Conseil de classe — piste arabe (miroir des tables migration_v6/v8).
 // =====================================================================
-require_once __DIR__ . '/../config.php';
+require_once __DIR__ . '/../config/config.php';
 require_once __DIR__ . '/../noyau/connexion.php';
 
 header('Content-Type: text/plain; charset=utf-8');

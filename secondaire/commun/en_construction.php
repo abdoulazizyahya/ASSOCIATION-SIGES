@@ -61,7 +61,7 @@ $visite    = function_exists('est_visite_association') && est_visite_association
     <?php if ($visite): ?>
       <a href="<?= APP_URL ?>/association/index.php" class="btn btn-primary">← Retour à l'espace association</a>
     <?php else: ?>
-      <a href="<?= APP_URL ?>/logout.php" class="btn btn-light">Se déconnecter</a>
+      <a href="<?= APP_URL ?>/compte/logout.php" class="btn btn-light">Se déconnecter</a>
     <?php endif; ?>
   </div>
 </div>

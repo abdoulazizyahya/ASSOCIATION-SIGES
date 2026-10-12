@@ -4,7 +4,7 @@
 // logique que l'écran (fonctions.php::bareme_par_niveau()), pas de duplication.
 // GET : niveau=X (un seul niveau) — OU sans "niveau" (tous les niveaux
 // utilisés, un par page). Demande explicite du 21/08/2026.
-require_once __DIR__ . '/../../config.php';
+require_once __DIR__ . '/../../config/config.php';
 require_once __DIR__ . '/../../noyau/connexion.php';
 require_once __DIR__ . '/../../noyau/fonctions.php';
 exiger_connexion(); // même politique d'accès que l'écran (lecture) — primaire/pages/competences/liste.php

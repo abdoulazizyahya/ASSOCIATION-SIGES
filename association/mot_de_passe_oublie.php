@@ -4,7 +4,7 @@
 //   • identifiant + e-mail + téléphone (concordance exacte) ;
 //   • identifiant + réponses aux 2 questions secrètes.
 // Rate-limité comme la connexion (login_echec).
-require_once __DIR__ . '/../config.php';
+require_once __DIR__ . '/../config/config.php';
 require_once __DIR__ . '/../noyau/connexion.php';
 require_once __DIR__ . '/../noyau/fonctions.php';
 require_once __DIR__ . '/_layout.php';

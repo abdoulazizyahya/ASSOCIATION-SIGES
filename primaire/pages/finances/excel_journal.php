@@ -2,7 +2,7 @@
 // primaire/pages/finances/excel_journal.php — Export Excel du journal de caisse,
 // mêmes filtres et même en-tête institutionnel (logo+filigrane) que
 // primaire/pages/statistiques/excel_stats.php.
-require_once __DIR__ . '/../../../config.php';
+require_once __DIR__ . '/../../../config/config.php';
 require_once __DIR__ . '/../../../noyau/connexion.php';
 require_once __DIR__ . '/../../../noyau/fonctions.php';
 require_once __DIR__ . '/../../../vendor/autoload.php';

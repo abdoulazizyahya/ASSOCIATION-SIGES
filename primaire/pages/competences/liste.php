@@ -30,7 +30,7 @@
 //    pratique (confirmé par l'utilisateur) : cet écran édite un seul jeu de
 //    valeurs par niveau et l'applique à toutes les classes de ce niveau,
 //    plutôt que de les gérer classe par classe.
-require_once __DIR__ . '/../../../config.php';
+require_once __DIR__ . '/../../../config/config.php';
 require_once __DIR__ . '/../../../noyau/connexion.php';
 require_once __DIR__ . '/../../../noyau/fonctions.php';
 exiger_acces_pedagogie();

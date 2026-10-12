@@ -8,7 +8,7 @@
 
 if (!defined('HONNEUR_VERIF_SECRET')) {
     // ⚠️ Même remarque que BULLETIN_VERIF_SECRET (primaire/pdf/verif_lib.php) : à
-    // définir dans config.php avant mise en production.
+    // définir dans config/config.php avant mise en production.
     define('HONNEUR_VERIF_SECRET', 'CHANGE_ME_JAYNITAARE_INSECURE_DEFAULT_SECRET_HONNEUR');
 }
 require_once __DIR__ . '/../../noyau/partage/verif/verif_commun.php';
@@ -25,7 +25,7 @@ function honneur_verif_hash(int $id_eleve, string $vue, int $id_periode, string 
 
 function honneur_verif_url(int $id_eleve, string $vue, int $id_periode, string $matricule, string $piste = 'fr'): string {
     $h = honneur_verif_hash($id_eleve, $vue, $id_periode, $matricule, $piste);
-    return verif_ajout_ec(bulletin_verif_base_url() . '/verif_honneur.php?e=' . $id_eleve . '&v=' . $vue . '&p=' . $id_periode . '&t=' . $piste . '&h=' . $h);
+    return verif_ajout_ec(bulletin_verif_base_url() . '/verif/honneur.php?e=' . $id_eleve . '&v=' . $vue . '&p=' . $id_periode . '&t=' . $piste . '&h=' . $h);
 }
 
 /**

@@ -7,7 +7,7 @@
 //  Ajoute `groupe_competence.ordre_affichage` (+ réamorçage des 12 lignes
 //  existantes) et `discipline.actif`. Aucune autre donnée n'est modifiée.
 // =====================================================================
-require_once __DIR__ . '/../config.php';
+require_once __DIR__ . '/../config/config.php';
 require_once __DIR__ . '/../noyau/connexion.php';   // fournit $link + helpers db_*
 
 header('Content-Type: text/plain; charset=utf-8');

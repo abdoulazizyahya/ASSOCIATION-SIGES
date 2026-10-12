@@ -4,7 +4,7 @@
 // bulletins PDF. Ouvert à TOUT le personnel payé de l'école, directeur
 // compris (01/10/2026). Contenu partagé avec le secondaire :
 // primaire/pages/paie/_mes_bulletins_contenu.php.
-require_once __DIR__ . '/../../../config.php';
+require_once __DIR__ . '/../../../config/config.php';
 require_once __DIR__ . '/../../../noyau/connexion.php';
 require_once __DIR__ . '/../../../noyau/fonctions.php';
 require_once __DIR__ . '/../../../noyau/paie_fonctions.php';

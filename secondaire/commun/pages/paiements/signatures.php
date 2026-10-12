@@ -7,7 +7,7 @@
 // automatiquement — chaque impression choisit ensuite si elle s'applique à
 // ce document précis. Chaque carte n'est visible/modifiable que par le rôle
 // correspondant (ADMIN autorisé partout en secours).
-require_once __DIR__ . '/../../../../config.php';
+require_once __DIR__ . '/../../../../config/config.php';
 require_once __DIR__ . '/../../../../noyau/connexion.php';
 require_once __DIR__ . '/../../../../noyau/fonctions.php';
 exiger_role(['ADMIN', 'PROVISEUR', 'FONDATEUR', 'CENSEUR', 'INTENDANT', 'SG']);

@@ -1,7 +1,7 @@
 <?php
 /**
  * Bibliothèque partagée de rendu du dossier administratif de l'enseignant.
- * À inclure APRÈS : config.php, connexion.php, fonctions.php, secondaire/commun/pdf/fpdf.php.
+ * À inclure APRÈS : config/config.php, connexion.php, fonctions.php, secondaire/commun/pdf/fpdf.php.
  * Fournit :
  *   - la classe FPDF_Dossier (en-tête bilingue + pied de page paginé)
  *   - les helpers de mise en page d_section / d_row / d_full

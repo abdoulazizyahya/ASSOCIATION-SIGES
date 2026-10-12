@@ -3,7 +3,7 @@
 // de primaire/pages/paie/bulletin.php (primaire). Accès : ADMIN/PROVISEUR/FONDATEUR/
 // INTENDANT (tous les bulletins) OU l'agent lui-même consultant SON PROPRE
 // bulletin (lecture seule, self-service).
-require_once __DIR__ . '/../../../../config.php';
+require_once __DIR__ . '/../../../../config/config.php';
 require_once __DIR__ . '/../../../../noyau/connexion.php';
 require_once __DIR__ . '/../../../../noyau/fonctions.php';
 require_once __DIR__ . '/../../../../noyau/paie_fonctions.php';
@@ -17,7 +17,7 @@ $bulletin = db_one(
      FROM bulletin_paie b JOIN enseignant e ON e.matricule_ens=b.matricule_ens JOIN periode_paie p ON p.id=b.id_periode
      WHERE b.id=?", [$id]
 );
-if (!$bulletin) { flash_set('erreur', 'Bulletin introuvable.'); rediriger('dashboard.php'); }
+if (!$bulletin) { flash_set('erreur', 'Bulletin introuvable.'); rediriger('noyau/dashboard.php'); }
 
 $role = role_connecte();
 $mon_matricule = (int) (utilisateur_connecte()['matricule_ens'] ?? 0);

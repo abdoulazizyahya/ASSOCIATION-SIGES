@@ -27,7 +27,7 @@
 // bulletin) — dépend du moteur de calcul des bulletins (fonction_calcule1.php
 // / mes_fonctions.php côté jaynitaare legacy), pas encore repris dans
 // jaynitaare_v2 (« le gros morceau », hors périmètre de cette session).
-require_once __DIR__ . '/../../../config.php';
+require_once __DIR__ . '/../../../config/config.php';
 require_once __DIR__ . '/../../../noyau/connexion.php';
 require_once __DIR__ . '/../../../noyau/fonctions.php';
 exiger_role(['DIRECTEUR']);

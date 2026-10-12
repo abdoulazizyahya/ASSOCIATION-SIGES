@@ -5,7 +5,7 @@
 //  Absences en jours (plus en heures) + annulation d'évaluation (remplace
 //  l'annulation de trimestre). Voir bd/migration_v40.sql pour le détail.
 // =====================================================================
-require_once __DIR__ . '/../config.php';
+require_once __DIR__ . '/../config/config.php';
 require_once __DIR__ . '/../noyau/connexion.php';
 
 header('Content-Type: text/plain; charset=utf-8');

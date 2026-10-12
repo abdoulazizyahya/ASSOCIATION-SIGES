@@ -32,7 +32,7 @@ $statut_ecole = $GLOBALS['statut_ecole_menu']
 
 $menu = [
     'Principal' => [
-        ['Tableau de bord', 'dashboard.php', 'speedometer2', []],
+        ['Tableau de bord', 'noyau/dashboard.php', 'speedometer2', []],
     ],
     'Scolarité' => [
         ['Élèves',  'secondaire/commun/pages/eleves/liste.php',  'people',    ['ADMIN','PROVISEUR', 'FONDATEUR','CENSEUR','SG','SECRETAIRE']],
@@ -112,7 +112,7 @@ $menu = [
     // 24/09/2026 (jusqu'ici groupe « Administration » à seulement 2 entrées,
     // sans Mon compte/Directeur/Journal/Licence — demande explicite).
     'Paramètres' => [
-        ['Mon compte',        'profil.php',                              'key',          []],
+        ['Mon compte',        'compte/profil.php',                              'key',          []],
         ['Directeur',         'secondaire/commun/pages/fondateur/directeur.php', 'person-badge', ['FONDATEUR']],
         ['Configurations',    'secondaire/commun/pages/parametres/index.php',   'gear',        ['ADMIN','PROVISEUR', 'FONDATEUR']],
         ['Utilisateurs',      'secondaire/commun/pages/utilisateurs/liste.php', 'person-gear', ['ADMIN', 'FONDATEUR']],

@@ -1,24 +1,24 @@
 <?php
-// configurer_securite.php — 2 questions secrètes par compte (mot_de_passe_
+// compte/configurer_securite.php — 2 questions secrètes par compte (mot_de_passe_
 // oublie.php s'en sert pour réinitialiser un mot de passe sans passer par le
 // Directeur). PROPOSÉE dès la 1ère connexion (bandeau, voir noyau/layout/header.php
 // et exiger_connexion()) mais pas bloquante : un compte peut la reporter et
 // continuer à utiliser l'application (demande explicite du 24/09/2026 — avant
 // cette date, obligatoire côté primaire et totalement absente côté
 // secondaire). Reconfigurable ensuite à tout moment (lien « Modifier mes
-// questions », profil.php). Type-aware : question_secrete/
+// questions », compte/profil.php). Type-aware : question_secrete/
 // utilisateur_question_secrete existent déjà dans le schéma secondaire de
 // référence (table `utilisateur` autoporteuse, colonne id_utilisateur au
 // lieu de id_user) — voir bd/migration_v45.sql (primaire) et
 // bd/secondaire/migration_v6.sql (secondaire).
-require_once __DIR__ . '/config.php';
-require_once __DIR__ . '/noyau/connexion.php';
-require_once __DIR__ . '/noyau/fonctions.php';
+require_once __DIR__ . '/../config/config.php';
+require_once __DIR__ . '/../noyau/connexion.php';
+require_once __DIR__ . '/../noyau/fonctions.php';
 exiger_connexion();
 
 $secondaire  = function_exists('type_enseignement_courant') && type_enseignement_courant() === 'secondaire';
 $user_id     = (int) $_SESSION['user_id'];
-$retour      = $_GET['retour'] ?? 'dashboard.php';
+$retour      = $_GET['retour'] ?? 'noyau/dashboard.php';
 
 $questions_dispo = db_all("SELECT id, libelle FROM question_secrete WHERE actif = 1 ORDER BY libelle");
 $actuelles        = $secondaire
@@ -36,11 +36,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if (!$id_q1 || !$id_q2 || $rep1 === '' || $rep2 === '') {
         flash_set('erreur', 'Veuillez choisir 2 questions et renseigner les 2 réponses.');
-        rediriger('configurer_securite.php' . ($retour !== 'dashboard.php' ? '?retour=' . urlencode($retour) : ''));
+        rediriger('compte/configurer_securite.php' . ($retour !== 'noyau/dashboard.php' ? '?retour=' . urlencode($retour) : ''));
     }
     if ($id_q1 === $id_q2) {
         flash_set('erreur', 'Les 2 questions doivent être différentes.');
-        rediriger('configurer_securite.php' . ($retour !== 'dashboard.php' ? '?retour=' . urlencode($retour) : ''));
+        rediriger('compte/configurer_securite.php' . ($retour !== 'noyau/dashboard.php' ? '?retour=' . urlencode($retour) : ''));
     }
 
     if ($secondaire) {
@@ -63,7 +63,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 $titre_page = 'Questions de sécurité';
-require_once __DIR__ . '/noyau/layout/header.php';
+require_once __DIR__ . '/../noyau/layout/header.php';
 ?>
 <div class="page-titre d-flex justify-content-between align-items-center">
   <h4><i class="bi bi-shield-lock me-1 text-primary"></i><?= h($titre_page) ?></h4>
@@ -109,4 +109,4 @@ require_once __DIR__ . '/noyau/layout/header.php';
     </form>
   </div>
 </div>
-<?php require_once __DIR__ . '/noyau/layout/footer.php'; ?>
+<?php require_once __DIR__ . '/../noyau/layout/footer.php'; ?>

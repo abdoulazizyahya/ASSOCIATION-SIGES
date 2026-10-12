@@ -6,7 +6,7 @@ require_once __DIR__ . '/../../fonctions.php';
 exiger_connexion();
 
 $role = role_connecte();
-if (!in_array($role, ['ADMIN','PROVISEUR','CENSEUR'])) { flash_set('erreur','Accès refusé.'); rediriger('dashboard.php'); }
+if (!in_array($role, ['ADMIN','PROVISEUR','CENSEUR'])) { flash_set('erreur','Accès refusé.'); rediriger('noyau/dashboard.php'); }
 
 $mat = $_GET['id'] ?? '';
 $e   = db_one("SELECT * FROM enseignant WHERE matricule_ens=?", [$mat]);

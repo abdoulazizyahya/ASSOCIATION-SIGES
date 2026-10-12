@@ -10,9 +10,9 @@
 //  erreur fatale ici : le multi-établissement se greffe sans casser
 //  l'existant.
 //
-//  À inclure APRÈS config.php (constante DB_NAME_ASSOC).
+//  À inclure APRÈS config/config.php (constante DB_NAME_ASSOC).
 
-require_once __DIR__ . '/../config.php';
+require_once __DIR__ . '/../config/config.php';
 require_once __DIR__ . '/chemins_historiques.php';   // chemin_actuel() : clés acces_regle d'avant la réorganisation
 
 if (!defined('DB_NAME_ASSOC')) {
@@ -69,7 +69,7 @@ try {
     // celui-ci a été inclus avant ; on le force ici au cas où ce fichier
     // serait inclus seul (runners bd/assoc/*).
     mysqli_report(MYSQLI_REPORT_ERROR | MYSQLI_REPORT_STRICT);
-    // DB_NAME_ASSOC vide = installation « école unique » (install.php) :
+    // DB_NAME_ASSOC vide = installation « école unique » (installation/install.php) :
     // aucun annuaire, même si une base promeducam_assoc existe sur le serveur.
     if (DB_NAME_ASSOC !== '') {
         $link_assoc = mysqli_connect(DB_HOST, DB_USER, DB_PASS, DB_NAME_ASSOC);
@@ -322,7 +322,7 @@ function charger_schema_ecole(mysqli &$l, array $seed, string $type = 'primaire'
 // côté primaire, INTENDANT côté secondaire, mêmes rôles déjà autorisés sur
 // capacite_finances()/le module Paiements secondaire). Demande explicite du
 // 21/09/2026 : toute nouvelle école doit repartir avec ces 3 comptes déjà en
-// place — jusqu'ici seul un compte DIRECTEUR (install.php) ou AUCUN compte
+// place — jusqu'ici seul un compte DIRECTEUR (installation/install.php) ou AUCUN compte
 // (creer_etablissement(), association > Nouvel établissement — la page
 // renvoyait vers "Personnel > Affecter" pour le créer à la main après coup)
 // n'existait à la création.
@@ -330,7 +330,7 @@ function charger_schema_ecole(mysqli &$l, array $seed, string $type = 'primaire'
 // 22/09/2026) — plus simple à communiquer au personnel, à changer depuis
 // Sécurité dès la première connexion.
 // $l : connexion mysqli AVEC la base école déjà sélectionnée (schéma chargé).
-// $directeur_login : si fourni (install.php — la personne qui installe a
+// $directeur_login : si fourni (installation/install.php — la personne qui installe a
 // choisi son propre identifiant dans le formulaire), réutilisé tel quel pour
 // le compte DIRECTEUR/PROVISEUR plutôt que le défaut "directeur".
 // Retour : liste de ['role'=>'FONDATEUR'|'DIRECTEUR'|'FINANCIER', 'login'=>string,
@@ -1125,7 +1125,7 @@ function assoc_acces_definir(int $id_membre, string $portee, string $niveau, boo
 
 // ── Où est stocké le journal ? ─────────────────────────────────────
 // Mode réseau : dans l'annuaire (toutes les écoles). Mode « école unique »
-// (install.php, DB_NAME_ASSOC vide) : pas d'annuaire → dans la base de
+// (installation/install.php, DB_NAME_ASSOC vide) : pas d'annuaire → dans la base de
 // l'école elle-même ; ses 3 tables sont créées à la première utilisation
 // (même structure que bd/assoc/schema_assoc.sql).
 function audit_ecole_unique(): bool {

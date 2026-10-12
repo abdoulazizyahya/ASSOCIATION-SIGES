@@ -2,7 +2,7 @@
 // secondaire/commun/pages/depenses_privees/saisie.php — PAIEMENT PRIVÉ > Nouvelle
 // dépense : porté de primaire/pages/depenses/saisie.php (primaire), adapté au
 // schéma secondaire (table depense_privee, id_annee entier).
-require_once __DIR__ . '/../../../../config.php';
+require_once __DIR__ . '/../../../../config/config.php';
 require_once __DIR__ . '/../../../../noyau/connexion.php';
 require_once __DIR__ . '/../../../../noyau/fonctions.php';
 exiger_role(['ADMIN', 'PROVISEUR', 'SECRETAIRE', 'INTENDANT']);

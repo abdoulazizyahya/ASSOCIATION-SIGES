@@ -1,10 +1,10 @@
 <?php
-require_once __DIR__ . '/../../../config.php';
+require_once __DIR__ . '/../../../config/config.php';
 require_once __DIR__ . '/../../../noyau/connexion.php';
 require_once __DIR__ . '/../../../noyau/fonctions.php';
 // Bibliothèque PARTAGÉE avec le primaire (pas de duplicata) : mêmes
 // fonctions hash/URL utilisées par primaire/pdf/certificat_scolarite.php (primaire)
-// et verif_scolarite.php — schéma-agnostique (id_eleve + matricule en
+// et verif/scolarite.php — schéma-agnostique (id_eleve + matricule en
 // chaînes, jamais de requête SQL dedans). Corrige au passage l'absence de
 // &ec= dans l'URL du QR (verif_ajout_ec(), manquant dans l'ancien duplicata
 // secondaire/commun/pdf/verif_scolarite_lib.php, supprimé) — cassait la
@@ -26,7 +26,7 @@ if (!$eleve) die('Eleve introuvable.');
 // vérification déjà calculé pour ce certificat précis) : la personne qui
 // scanne n'a pas forcément de compte dans le système et ne doit pas avoir à
 // s'y connecter pour consulter le document qu'elle vient de vérifier (voir
-// verif_scolarite.php). En dehors de ce cas, connexion normale exigée.
+// verif/scolarite.php). En dehors de ce cas, connexion normale exigée.
 $vh_verif = (string)($_GET['vh'] ?? '');
 $acces_public = $vh_verif !== '' && hash_equals(scolarite_verif_hash($id_eleve, id_affichage_eleve($eleve)), $vh_verif);
 if (!$acces_public) {

@@ -5,7 +5,7 @@
 // classe créée par erreur). La classe source elle-même n'est pas touchée
 // (ni archivée ni supprimée) : seules les inscriptions de ses élèves
 // changent de classe. Demande explicite du 17/09/2026.
-require_once __DIR__ . '/../../../../config.php';
+require_once __DIR__ . '/../../../../config/config.php';
 require_once __DIR__ . '/../../../../noyau/connexion.php';
 require_once __DIR__ . '/../../../../noyau/fonctions.php';
 exiger_role(['ADMIN', 'PROVISEUR', 'FONDATEUR']);

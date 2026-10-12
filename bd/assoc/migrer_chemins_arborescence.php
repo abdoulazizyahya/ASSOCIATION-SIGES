@@ -14,7 +14,7 @@
 //    /bd/assoc/migrer_chemins_arborescence.php?token=XXX&go=1    (applique)
 //    php bd/assoc/migrer_chemins_arborescence.php [--go]
 // =====================================================================
-require_once __DIR__ . '/../../config.php';
+require_once __DIR__ . '/../../config/config.php';
 require_once __DIR__ . '/../../noyau/connexion_assoc.php';
 
 $est_cli = (PHP_SAPI === 'cli');

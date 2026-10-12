@@ -15,7 +15,7 @@
 // individuelle — aux élèves sans note ou ayant composé moins de 50% des
 // compétences pour l'évaluation choisie (même filtre que l'ancienne page,
 // recalculé par séquence plutôt que par trimestre).
-require_once __DIR__ . '/../../../config.php';
+require_once __DIR__ . '/../../../config/config.php';
 require_once __DIR__ . '/../../../noyau/connexion.php';
 require_once __DIR__ . '/../../../noyau/fonctions.php';
 require_once __DIR__ . '/../../notes_apc.php';

@@ -31,7 +31,7 @@
 //   licence_tentatives_restantes(): int
 
 // ── Secret cryptographique ───────────────────────────────────────────
-// Défini dans config.php (valeur PAR DÉFAUT manifestement insécure) et
+// Défini dans config/config.php (valeur PAR DÉFAUT manifestement insécure) et
 // surchargeable dans config.local.php (gitignoré) — voir
 // config.local.php.example. Sert À LA FOIS à la signature anti-tamper de
 // la ligne `licence` ET au chiffrement des clés générées : compromettre

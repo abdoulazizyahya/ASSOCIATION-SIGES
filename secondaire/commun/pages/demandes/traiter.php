@@ -3,13 +3,13 @@
  * Traite la décision (valider/rejeter) d'une demande de document, à l'étape
  * Censeur ou Proviseur selon le statut courant. POST uniquement.
  */
-require_once __DIR__ . '/../../../../config.php';
+require_once __DIR__ . '/../../../../config/config.php';
 require_once __DIR__ . '/../../../../noyau/connexion.php';
 require_once __DIR__ . '/../../../../noyau/fonctions.php';
 exiger_connexion();
 
 $role = role_connecte();
-if (!in_array($role, ['CENSEUR','PROVISEUR', 'FONDATEUR','ADMIN'])) { flash_set('erreur','Accès refusé.'); rediriger('dashboard.php'); }
+if (!in_array($role, ['CENSEUR','PROVISEUR', 'FONDATEUR','ADMIN'])) { flash_set('erreur','Accès refusé.'); rediriger('noyau/dashboard.php'); }
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') { rediriger('secondaire/commun/pages/demandes/index.php'); }
 
 csrf_verifier();

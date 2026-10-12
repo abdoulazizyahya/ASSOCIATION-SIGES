@@ -18,7 +18,7 @@
 // que la Cotisation) — voir finances_soldes_simules() ci-dessous, seule
 // source de vérité pour le solde par frais (affichage ET validation), qu'un
 // versement précis soit renseigné ou non.
-require_once __DIR__ . '/../../../config.php';
+require_once __DIR__ . '/../../../config/config.php';
 require_once __DIR__ . '/../../../noyau/connexion.php';
 require_once __DIR__ . '/../../../noyau/fonctions.php';
 exiger_role(['DIRECTEUR', 'SECRETAIRE', 'COMPTABLE']);

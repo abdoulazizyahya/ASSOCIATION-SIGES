@@ -3,11 +3,11 @@
 //  Fournit la variable globale $link et les helpers db_all / db_one /
 //  db_val / db_exec / db_last_id — mêmes signatures que la version PDO
 //  précédente, afin que toutes les pages consommatrices restent inchangées.
-require_once __DIR__ . '/../config.php';
+require_once __DIR__ . '/../config/config.php';
 
 // mysqli lève des exceptions (mysqli_sql_exception ⊂ Exception) en cas
 // d'erreur : on conserve ainsi le même modèle try/catch que l'ancienne
-// version PDO (profil.php, runners de migration…).
+// version PDO (compte/profil.php, runners de migration…).
 mysqli_report(MYSQLI_REPORT_ERROR | MYSQLI_REPORT_STRICT);
 
 try {
@@ -43,7 +43,7 @@ if ($ETAB_COURANT) {
     $bd_active = DB_NAME_ASSOC;           // interface /association/ : on travaille dans l'annuaire
 } elseif (annuaire_dispo() && est_contexte_neutre() && $_nb_ecoles > 0) {
     // Contexte neutre AVEC au moins une école : page de connexion / pages
-    // publiques sans ?ec=. On pointe l'annuaire (login.php liste les écoles).
+    // publiques sans ?ec=. On pointe l'annuaire (compte/login.php liste les écoles).
     // Aucune requête « école » n'est émise avant basculer_base_ecole().
     $bd_active = DB_NAME_ASSOC;
 } else {
@@ -65,8 +65,8 @@ if (!$_db_ok) {
     // d'association, création des bases). La page 503 ci-dessous ne sert que
     // pour une install PARTIELLEMENT cassée (config présente, base disparue).
     $_script = basename($_SERVER['SCRIPT_NAME'] ?? '');
-    if (!is_file(__DIR__ . '/../config.local.php') && $_script !== 'install.php') {
-        header('Location: ' . APP_URL . '/install.php');
+    if (CONFIG_LOCAL_FICHIER === '' && $_script !== 'install.php') {   // ni config/ ni racine (config/config.php)
+        header('Location: ' . APP_URL . '/installation/install.php');
         exit;
     }
     $_annu = annuaire_dispo();
@@ -106,9 +106,9 @@ if (!$_db_ok) {
 //  sur la table `sequence` d'une base primaire).
 //  Laissés passer dans les deux sens (déjà rendus compatibles, voir
 //  fonctions.php : get_annee_active()/get_sequence_active()/
-//  get_etablissement()/menu_definition() type-aware) : login.php,
-//  logout.php, dashboard.php, profil.php, configurer_securite.php et
-//  mot_de_passe_oublie.php (racine, type-aware, certains branchent vers un
+//  get_etablissement()/menu_definition() type-aware) : compte/login.php,
+//  compte/logout.php, noyau/dashboard.php, compte/profil.php, compte/configurer_securite.php et
+//  compte/mot_de_passe_oublie.php (racine, type-aware, certains branchent vers un
 //  fichier secondaire/*_contenu.php dédié) et noyau/ajax/
 //  (racine, partagé avec les deux modules — endpoints JSON appelés en
 //  fetch() par des pages secondaire, ex. secondaire/commun/pages/paiements/
@@ -119,7 +119,7 @@ if (!$_db_ok) {
 //  rendu type-aware individuellement (voir ses propres commentaires) — ne
 //  PAS supposer qu'un noyau/ajax/ non encore vérifié fonctionne pour autant.
 //  type_enseignement_courant() (et non $ETAB_COURANT directement) : couvre
-//  aussi le mono-école SANS annuaire (ECOLE_TYPE_SOLO, voir install.php
+//  aussi le mono-école SANS annuaire (ECOLE_TYPE_SOLO, voir installation/install.php
 //  mode « école unique » et ecole_contexte.php) — sans quoi ce garde-fou ne
 //  se déclenchait jamais pour une telle installation.
 if (function_exists('type_enseignement_courant')) {
@@ -131,14 +131,14 @@ if (function_exists('type_enseignement_courant')) {
     // (noyau/partage/eleves/_photos_lib.php) — commune aux deux types, sinon un
     // téléphone pas encore connecté (contexte primaire par défaut) serait
     // renvoyé au tableau de bord avant d'atteindre la connexion.
-    $_commun = in_array($_rel, ['login.php', 'logout.php', 'dashboard.php', 'profil.php', 'configurer_securite.php', 'mot_de_passe_oublie.php', 'questions_securite_reporter.php',
+    $_commun = in_array($_rel, ['compte/login.php', 'compte/logout.php', 'noyau/dashboard.php', 'compte/profil.php', 'compte/configurer_securite.php', 'compte/mot_de_passe_oublie.php', 'compte/questions_securite_reporter.php',
                                 'primaire/pages/eleves/photos_seance.php', 'secondaire/commun/pages/eleves/photos_seance.php',
                                 // Vérification publique du certificat de scolarité (QR) : type-aware
                                 // — sans cela, un QR d'école secondaire tombait sur « En construction ».
-                                'verif_scolarite.php', 'verif_bulletin.php'], true) || str_starts_with($_rel, 'noyau/ajax/')
-                // Toute page publique de vérification de QR à la racine
-                // (verif_paiement.php des reçus du secondaire, etc.).
-                || preg_match('~^verif_[a-z_]+\.php$~', $_rel);
+                                'verif/scolarite.php', 'verif/bulletin.php'], true) || str_starts_with($_rel, 'noyau/ajax/')
+                // Toute page publique de vérification de QR (dossier verif/)
+                // (verif/paiement.php des reçus du secondaire, etc.).
+                || str_starts_with($_rel, 'verif/');
     if (!$_commun) {
         $_secondaire = type_enseignement_courant() === 'secondaire';
         if ($_secondaire && !str_starts_with($_rel, 'secondaire/')) {
@@ -150,7 +150,7 @@ if (function_exists('type_enseignement_courant')) {
         if (!$_secondaire && str_starts_with($_rel, 'secondaire/')) {
             // École primaire sur une page secondaire/** : rien à y faire,
             // retour au tableau de bord (type-aware) plutôt qu'un Fatal error.
-            header('Location: ' . APP_URL . '/dashboard.php');
+            header('Location: ' . APP_URL . '/noyau/dashboard.php');
             exit;
         }
     }
@@ -194,7 +194,7 @@ function _db_stmt(string $sql, array $params) {
 // Données « globales » relues très souvent dans une même page
 // (get_etablissement(), get_annee_active() — fonctions.php) : mémorisées le
 // temps de la requête HTTP, PAR BASE D'ÉCOLE (la base peut changer en cours
-// de page : login.php, portail association). Vidé automatiquement par
+// de page : compte/login.php, portail association). Vidé automatiquement par
 // db_exec() à toute écriture sur ces tables.
 function db_cache_cle(string $nom): string {
     $db = function_exists('ecole_courante') ? (string) (ecole_courante()['db_name'] ?? '') : '';
@@ -284,18 +284,18 @@ function db_exec(string $sql, array $params = []): int {
     // sa cible. licence_etat() est fail-closed : toute anomalie renvoie
     // 'expiree', jamais 'ok' par défaut.
     // Scripts de CONTINUITÉ D'ACCÈS AU COMPTE toujours exemptés (bugs réels
-    // trouvés en test le 13/09/2026) : configurer_securite.php (étape
+    // trouvés en test le 13/09/2026) : compte/configurer_securite.php (étape
     // OBLIGATOIRE avant tout accès, exiger_connexion()/fonctions.php — sans
     // cette exemption, un compte pas encore configuré restait bloqué en
     // boucle infinie, jamais capable d'enregistrer ses 2 questions
-    // secrètes) et mot_de_passe_oublie.php (un directeur/fondateur qui a
+    // secrètes) et compte/mot_de_passe_oublie.php (un directeur/fondateur qui a
     // oublié son mot de passe doit pouvoir le réinitialiser pour ensuite
     // atteindre la page Licence et renouveler — sinon double blocage sans
     // issue). Ni l'un ni l'autre n'écrit de données métier.
     //
     // ⚠ La base COURANTE est relue ICI via SELECT DATABASE() (pas la
     // variable $bd_active posée une fois à l'inclusion de connexion.php) :
-    // basculer_base_ecole() (ecole_contexte.php, appelée par login.php après
+    // basculer_base_ecole() (ecole_contexte.php, appelée par compte/login.php après
     // le choix d'établissement) ne met PAS à jour $bd_active en changeant de
     // base sur $link — un $bd_active resté à DB_NAME_ASSOC aurait fait
     // sauter le gate en entier pour toute écriture faite juste après un

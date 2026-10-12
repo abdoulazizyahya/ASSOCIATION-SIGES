@@ -4,7 +4,7 @@
 // recu.php, via primaire/pdf/recu_paiement_render.php) et une fiche de préinscription
 // (bas, motif INSCRIPTION + éventuel FRAIS OPERATEUR), séparés par une ligne
 // en pointillés — visuel repris à l'identique du document MANWI annexé.
-require_once __DIR__ . '/../../../../config.php';
+require_once __DIR__ . '/../../../../config/config.php';
 require_once __DIR__ . '/../../../../noyau/connexion.php';
 require_once __DIR__ . '/../../../../noyau/fonctions.php';
 exiger_role(['ADMIN', 'PROVISEUR', 'FONDATEUR', 'CENSEUR', 'INTENDANT']);

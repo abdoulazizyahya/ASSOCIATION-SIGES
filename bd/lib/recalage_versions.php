@@ -6,7 +6,7 @@
 //  Utilisé par bd/assoc/recaler_versions.php (ligne de commande) et par
 //  association/versions.php (portail, propriétaire seul) — voir le
 //  commentaire de bd/assoc/recaler_versions.php pour la méthode.
-//  À inclure après config.php / connexion.php (fonctions assoc_*()).
+//  À inclure après config/config.php / connexion.php (fonctions assoc_*()).
 // =====================================================================
 
 // Version de départ (schéma de référence) par type d'école — PRIMAIRE :

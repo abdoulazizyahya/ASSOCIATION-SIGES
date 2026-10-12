@@ -8,7 +8,7 @@
 // GET : numero_recu=XXXX/AA&eleve=ID&annee=ID (interface normale) OU
 //       paiement=ID (compatibilité ascendante des anciens liens/QR générés
 //       avant le passage au regroupement — résolu vers le groupe complet).
-require_once __DIR__ . '/../../../../config.php';
+require_once __DIR__ . '/../../../../config/config.php';
 require_once __DIR__ . '/../../../../noyau/connexion.php';
 require_once __DIR__ . '/../../../../noyau/fonctions.php';
 exiger_role(['ADMIN', 'PROVISEUR', 'FONDATEUR', 'CENSEUR', 'INTENDANT']);

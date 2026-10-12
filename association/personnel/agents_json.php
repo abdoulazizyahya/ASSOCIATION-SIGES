@@ -1,6 +1,6 @@
 <?php
 // association/personnel/agents_json.php — liste des agents d'une école (JSON)
-require_once __DIR__ . '/../../config.php';
+require_once __DIR__ . '/../../config/config.php';
 require_once __DIR__ . '/../../noyau/connexion.php';
 require_once __DIR__ . '/../../noyau/fonctions.php';
 exiger_membre_association();

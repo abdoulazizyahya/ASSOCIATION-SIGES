@@ -4,7 +4,7 @@
 // (bulletins) : un QR de tableau d'honneur ne doit jamais valider un
 // bulletin, même si les deux documents partagent le même élève/période.
 // Inclus par secondaire/commun/pages/tableau_honneur/pdf_certificat.php (génération du QR) et
-// verif_honneur.php (vérification lors du scan).
+// verif/honneur.php (vérification lors du scan).
 
 if (!defined('BULLETIN_VERIF_SECRET')) {
     define('BULLETIN_VERIF_SECRET', 'CHANGE_ME_ABZ_MBE_INSECURE_DEFAULT_SECRET');
@@ -29,5 +29,5 @@ function honneur_verif_base_url(): string {
 
 function honneur_verif_url(int $id_eleve, string $vue, int $id_periode, string $matricule): string {
     $h = honneur_verif_hash($id_eleve, $vue, $id_periode, $matricule);
-    return honneur_verif_base_url() . '/verif_honneur.php?e=' . $id_eleve . '&v=' . $vue . '&p=' . $id_periode . '&h=' . $h;
+    return honneur_verif_base_url() . '/verif/honneur.php?e=' . $id_eleve . '&v=' . $vue . '&p=' . $id_periode . '&h=' . $h;
 }

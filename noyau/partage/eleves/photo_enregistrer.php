@@ -7,7 +7,7 @@
 // séance photo au téléphone (photos_seance.php).
 // La photo arrive déjà recadrée/réduite côté navigateur (300×400 JPEG, même
 // format que le recadrage Cropper.js de la fiche élève).
-require_once __DIR__ . '/../../../config.php';
+require_once __DIR__ . '/../../../config/config.php';
 require_once __DIR__ . '/../../connexion.php';
 require_once __DIR__ . '/../../fonctions.php';
 require_once __DIR__ . '/_photos_lib.php';

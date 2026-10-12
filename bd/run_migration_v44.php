@@ -6,7 +6,7 @@
 //  configurés via `discipline` (I/II/III) mais jamais associés
 //  explicitement via l'onglet « Groupes par niveau ». Voir bd/migration_v44.sql.
 // =====================================================================
-require_once __DIR__ . '/../config.php';
+require_once __DIR__ . '/../config/config.php';
 require_once __DIR__ . '/../noyau/connexion.php';
 require_once __DIR__ . '/../noyau/fonctions.php';
 

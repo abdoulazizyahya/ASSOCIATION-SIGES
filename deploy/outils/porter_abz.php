@@ -5,7 +5,7 @@
 //  l'arborescence de SIGES : chaque chemin d'ABZ (relatif à sa racine) est
 //  converti vers son emplacement SIGES puis réécrit relativement au
 //  fichier de destination.
-//    config.php                          → config.php
+//    config/config.php                          → config/config.php
 //    connexion|fonctions|paie_fonctions  → noyau/
 //    layout/                             → noyau/layout/
 //    pdf/                                → secondaire/commun/pdf/

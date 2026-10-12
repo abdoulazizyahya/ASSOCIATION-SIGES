@@ -3,7 +3,7 @@
 // catégorie PDF (montant et % du total), mêmes calculs que
 // primaire/pages/depenses/repartition_categories.php. Miroir de
 // primaire/pdf/finances_repartition_classes.php côté décaissements.
-require_once __DIR__ . '/../../config.php';
+require_once __DIR__ . '/../../config/config.php';
 require_once __DIR__ . '/../../noyau/connexion.php';
 require_once __DIR__ . '/../../noyau/fonctions.php';
 exiger_role(['DIRECTEUR', 'SECRETAIRE', 'COMPTABLE']);

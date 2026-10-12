@@ -3,7 +3,7 @@
 // (école secondaire). Carte « Poste & paie » + Contrats/Congés/Avances
 // ajoutés le 21/09/2026 (port du module Paie, voir secondaire/commun/pages/paie/
 // index.php) — porté de primaire/pages/enseignants/voir.php (primaire).
-require_once __DIR__ . '/../../../../config.php';
+require_once __DIR__ . '/../../../../config/config.php';
 require_once __DIR__ . '/../../../../noyau/connexion.php';
 require_once __DIR__ . '/../../../../noyau/fonctions.php';
 require_once __DIR__ . '/../../../../noyau/paie_fonctions.php';

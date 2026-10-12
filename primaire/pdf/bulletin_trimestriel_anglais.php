@@ -26,7 +26,7 @@
 // préférence d'AFFICHAGE, pas une piste de données distincte comme l'arabe
 // — mêmes notes, même moteur de calcul (primaire/notes_apc.php), seul le papier
 // change de langue.
-require_once __DIR__ . '/../../config.php';
+require_once __DIR__ . '/../../config/config.php';
 require_once __DIR__ . '/../../noyau/connexion.php';
 require_once __DIR__ . '/../../noyau/fonctions.php';
 require_once __DIR__ . '/../notes_apc.php';
@@ -667,7 +667,7 @@ function dessiner_bulletin_trimestriel_anglais(
 
     // ── QR de vérification ─────────────────────────────────────────
     // Piste 'fr' inchangée (même donnée, seul l'affichage change — voir
-    // le commentaire en tête de fichier) ; verif_bulletin.php choisit le
+    // le commentaire en tête de fichier) ; verif/bulletin.php choisit le
     // bon fichier de réouverture (français/anglais) selon la section du
     // niveau de l'élève.
     $qr_tmp = bulletin_qr_fichier_temp($eleve, 'trim', $id_trim);

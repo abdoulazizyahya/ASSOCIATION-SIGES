@@ -9,7 +9,7 @@
 // Hiérarchie : un superadmin « simple » ne voit ni ne gère le compte du
 // PROPRIÉTAIRE de l'association (membre.proprietaire). Le propriétaire a
 // tous les droits et voit tous les comptes.
-require_once __DIR__ . '/../config.php';
+require_once __DIR__ . '/../config/config.php';
 require_once __DIR__ . '/../noyau/connexion.php';
 require_once __DIR__ . '/../noyau/fonctions.php';
 require_once __DIR__ . '/_layout.php';

@@ -1,7 +1,7 @@
 <?php
 // secondaire/commun/pages/eleves/excel.php — Export Excel (.xlsx) de la liste des élèves —
 // mêmes filtres que secondaire/commun/pages/eleves/liste.php (classe, année active, statut actif).
-require_once __DIR__ . '/../../../../config.php';
+require_once __DIR__ . '/../../../../config/config.php';
 require_once __DIR__ . '/../../../../noyau/connexion.php';
 require_once __DIR__ . '/../../../../noyau/fonctions.php';
 require_once __DIR__ . '/../../../../vendor/autoload.php';

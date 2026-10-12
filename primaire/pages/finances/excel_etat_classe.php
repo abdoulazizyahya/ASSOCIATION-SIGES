@@ -1,7 +1,7 @@
 <?php
 // primaire/pages/finances/excel_etat_classe.php — Export Excel de l'état des
 // paiements d'une classe, mêmes calculs que primaire/pdf/finances_etat_classe.php.
-require_once __DIR__ . '/../../../config.php';
+require_once __DIR__ . '/../../../config/config.php';
 require_once __DIR__ . '/../../../noyau/connexion.php';
 require_once __DIR__ . '/../../../noyau/fonctions.php';
 require_once __DIR__ . '/../../../vendor/autoload.php';

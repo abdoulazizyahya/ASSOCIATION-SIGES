@@ -5,7 +5,7 @@
 // département→arrondissement — eleve.region_naiss/departement_naiss/
 // arrondissement_naiss sont de simples champs texte dans ce schéma, pas
 // des FK comme côté primaire, donc de simples <input> suffisent).
-require_once __DIR__ . '/../../../../config.php';
+require_once __DIR__ . '/../../../../config/config.php';
 require_once __DIR__ . '/../../../../noyau/connexion.php';
 require_once __DIR__ . '/../../../../noyau/fonctions.php';
 exiger_role(['ADMIN', 'PROVISEUR', 'FONDATEUR', 'CENSEUR', 'SG', 'SECRETAIRE']);

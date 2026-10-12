@@ -2,7 +2,7 @@
 // association/ecole_bd_sauvegarder.php — Sauvegarde « à la demande » de la
 // base d'UNE école (SQL + fichiers), écrite dans bd/sauvegardes/manuel_<horo>/.
 // Superadmin association uniquement. Non destructif.
-require_once __DIR__ . '/../config.php';
+require_once __DIR__ . '/../config/config.php';
 require_once __DIR__ . '/../noyau/connexion.php';
 require_once __DIR__ . '/../noyau/fonctions.php';
 require_once __DIR__ . '/_layout.php';

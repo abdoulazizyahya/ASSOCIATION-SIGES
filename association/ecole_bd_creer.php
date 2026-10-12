@@ -3,7 +3,7 @@
 // école déjà inscrite à l'annuaire mais dont la base est absente (jamais
 // provisionnée, supprimée à la main…). Superadmin association uniquement.
 // Non destructif : refuse d'agir si la base existe déjà avec des tables.
-require_once __DIR__ . '/../config.php';
+require_once __DIR__ . '/../config/config.php';
 require_once __DIR__ . '/../noyau/connexion.php';
 require_once __DIR__ . '/../noyau/fonctions.php';
 require_once __DIR__ . '/_layout.php';

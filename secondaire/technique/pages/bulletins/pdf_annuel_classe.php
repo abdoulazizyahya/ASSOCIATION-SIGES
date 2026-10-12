@@ -5,7 +5,7 @@
  * 3 trimestres de l'année au lieu d'une séquence/un trimestre.
  * GET : classe, annee, ordre (alpha|merite), dl (0|1)
  */
-require_once __DIR__ . '/../../../../config.php';
+require_once __DIR__ . '/../../../../config/config.php';
 require_once __DIR__ . '/../../../../noyau/connexion.php';
 require_once __DIR__ . '/../../../../noyau/fonctions.php';
 exiger_connexion();

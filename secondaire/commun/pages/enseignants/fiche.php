@@ -1,12 +1,12 @@
 <?php
 header('Cache-Control: no-store, no-cache, must-revalidate');
-require_once __DIR__ . '/../../../../config.php';
+require_once __DIR__ . '/../../../../config/config.php';
 require_once __DIR__ . '/../../../../noyau/connexion.php';
 require_once __DIR__ . '/../../../../noyau/fonctions.php';
 exiger_connexion();
 
 $role = role_connecte();
-if (!(in_array($role, ['ADMIN','PROVISEUR','FONDATEUR','CENSEUR'], true) || $role === 'MEMBRE_ASSOCIATION')) { flash_set('erreur','Accès refusé.'); rediriger('dashboard.php'); }
+if (!(in_array($role, ['ADMIN','PROVISEUR','FONDATEUR','CENSEUR'], true) || $role === 'MEMBRE_ASSOCIATION')) { flash_set('erreur','Accès refusé.'); rediriger('noyau/dashboard.php'); }
 
 $mat = $_GET['id'] ?? '';
 $e   = db_one("SELECT * FROM enseignant WHERE matricule_ens=?", [$mat]);

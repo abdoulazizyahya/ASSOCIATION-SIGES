@@ -5,7 +5,7 @@
 // GET : niveau=X (un seul niveau, une seule feuille) — OU sans "niveau"
 // (tous les niveaux utilisés, une feuille par niveau). Demande explicite du
 // 21/08/2026.
-require_once __DIR__ . '/../../../config.php';
+require_once __DIR__ . '/../../../config/config.php';
 require_once __DIR__ . '/../../../noyau/connexion.php';
 require_once __DIR__ . '/../../../noyau/fonctions.php';
 require_once __DIR__ . '/../../../vendor/autoload.php';

@@ -1,5 +1,5 @@
 <?php
-// verif_bulletin.php — page publique (pas de exiger_connexion) : quiconque
+// verif/bulletin.php — page publique (pas de exiger_connexion) : quiconque
 // scanne le QR imprimé sur un bulletin arrive ici pour vérifier son
 // authenticité.
 //
@@ -11,10 +11,10 @@
 // `primaire/pdf/bulletin_annuel.php`/`primaire/pdf/bulletin_trimestriel.php` (les vrais
 // fichiers ici, FR et AR). Ajout du paramètre `t` (piste fr/ar, absent du
 // modèle ABZ_MBE à une seule piste — voir primaire/pdf/verif_lib.php).
-require_once __DIR__ . '/config.php';
-require_once __DIR__ . '/noyau/connexion.php';
-require_once __DIR__ . '/noyau/fonctions.php';
-require_once __DIR__ . '/noyau/partage/verif/verif_commun.php';
+require_once __DIR__ . '/../config/config.php';
+require_once __DIR__ . '/../noyau/connexion.php';
+require_once __DIR__ . '/../noyau/fonctions.php';
+require_once __DIR__ . '/../noyau/partage/verif/verif_commun.php';
 
 // QR de bulletin SECONDAIRE imprimé avant le 03/10/2026 : il ne porte pas
 // &ec=. On retrouve son école en recalculant la signature dans chaque école
@@ -32,7 +32,7 @@ if (empty($_GET['ec']) && verif_multi_ecoles() && in_array($_GET['v'] ?? '', ['t
             if ($mat === null) continue;
             $attendu = substr(hash_hmac('sha256', $e_q . '|' . $_GET['v'] . '|' . $p_q . '|' . $mat, $secret), 0, 20);
             if (hash_equals($attendu, $h_q)) {
-                header('Location: ' . APP_URL . '/verif_bulletin.php?' . http_build_query($_GET + ['ec' => $ec_cand['code']]));
+                header('Location: ' . APP_URL . '/verif/bulletin.php?' . http_build_query($_GET + ['ec' => $ec_cand['code']]));
                 exit;
             }
         }
@@ -42,10 +42,10 @@ verif_exiger_ecole_publique();  // multi-école : URL sans &ec= -> page neutre
 
 // École SECONDAIRE : tables et générateur de bulletin distincts du primaire.
 if (function_exists('type_enseignement_courant') && type_enseignement_courant() === 'secondaire') {
-    require __DIR__ . '/secondaire/commun/verif_bulletin_contenu.php';
+    require __DIR__ . '/../secondaire/commun/verif_bulletin_contenu.php';
     exit;
 }
-require_once __DIR__ . '/primaire/pdf/verif_lib.php';
+require_once __DIR__ . '/../primaire/pdf/verif_lib.php';
 
 $id_eleve   = (int) ($_GET['e'] ?? 0);
 $vue_recue  = (string) ($_GET['v'] ?? '');

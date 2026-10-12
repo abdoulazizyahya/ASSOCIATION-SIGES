@@ -12,7 +12,7 @@
 //
 // GET : id + trim (bulletin d'UN élève) — OU classe + trim (sans id) :
 // imprime tous les élèves classés de la classe/du trimestre.
-require_once __DIR__ . '/../../config.php';
+require_once __DIR__ . '/../../config/config.php';
 require_once __DIR__ . '/../../noyau/connexion.php';
 require_once __DIR__ . '/../../noyau/fonctions.php';
 require_once __DIR__ . '/../notes_apc.php';

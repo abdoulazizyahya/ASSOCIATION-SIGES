@@ -1,5 +1,5 @@
 <?php
-require_once __DIR__ . '/../../../../config.php';
+require_once __DIR__ . '/../../../../config/config.php';
 require_once __DIR__ . '/../../../../noyau/connexion.php';
 require_once __DIR__ . '/../../../../noyau/fonctions.php';
 exiger_connexion();
@@ -35,7 +35,7 @@ $ids_classes_ok = array_column($classes_access, 'id');
 
 if (empty($ids_classes_ok)) {
     flash_set('erreur', 'Accès non autorisé.');
-    rediriger('dashboard.php');
+    rediriger('noyau/dashboard.php');
 }
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {

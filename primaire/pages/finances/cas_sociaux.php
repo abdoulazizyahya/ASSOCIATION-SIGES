@@ -3,7 +3,7 @@
 // filtrable (niveau/classe), des élèves marqués "Cas social" (fiche élève >
 // Informations complémentaires, migration_v39) — pourcentage de réduction,
 // montant normal, montant réellement dû après réduction, payé et solde.
-require_once __DIR__ . '/../../../config.php';
+require_once __DIR__ . '/../../../config/config.php';
 require_once __DIR__ . '/../../../noyau/connexion.php';
 require_once __DIR__ . '/../../../noyau/fonctions.php';
 exiger_role(['DIRECTEUR', 'SECRETAIRE', 'COMPTABLE']);

@@ -1,7 +1,7 @@
 <?php
 // association/etablissement_nouveau.php — un membre crée un nouvel
 // établissement : base école dédiée + inscription à l'annuaire.
-require_once __DIR__ . '/../config.php';
+require_once __DIR__ . '/../config/config.php';
 require_once __DIR__ . '/../noyau/connexion.php';
 require_once __DIR__ . '/../noyau/fonctions.php';
 require_once __DIR__ . '/_layout.php';

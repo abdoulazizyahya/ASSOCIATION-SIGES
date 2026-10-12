@@ -4,7 +4,7 @@
  * GET : id=matricule_ens, type=attestation|prise_service|reprise_service
  */
 header('Cache-Control: no-store, no-cache, must-revalidate');
-require_once __DIR__ . '/../../../../config.php';
+require_once __DIR__ . '/../../../../config/config.php';
 require_once __DIR__ . '/../../../../noyau/connexion.php';
 require_once __DIR__ . '/../../../../noyau/fonctions.php';
 exiger_connexion();
@@ -27,7 +27,7 @@ if ($est_staff) {
     // et uniquement un document que le circuit Censeur → Proviseur a validé.
     $mat  = matricule_ens_courant() ?? '';
     $type = $_GET['type'] ?? 'attestation';
-    if ($type === 'dossier') { flash_set('erreur','Accès réservé au personnel administratif.'); rediriger('dashboard.php'); }
+    if ($type === 'dossier') { flash_set('erreur','Accès réservé au personnel administratif.'); rediriger('noyau/dashboard.php'); }
     $type_document = ['attestation'=>'attestation','prise_service'=>'prise','reprise_service'=>'reprise'][$type] ?? '';
     if (!$mat || !demande_validee_existe($mat, $type_document)) {
         flash_set('erreur', 'Ce document n\'est pas (ou plus) disponible : votre demande doit d\'abord être validée par le Censeur puis le Proviseur.');
@@ -36,7 +36,7 @@ if ($est_staff) {
     $validite   = demande_validite_info($mat, $type_document);
     $doc_expire = $validite['expire'] ?? false;
 } else {
-    flash_set('erreur','Accès réservé.'); rediriger('dashboard.php');
+    flash_set('erreur','Accès réservé.'); rediriger('noyau/dashboard.php');
 }
 
 $e = $mat ? db_one("SELECT * FROM enseignant WHERE matricule_ens=?", [$mat]) : null;

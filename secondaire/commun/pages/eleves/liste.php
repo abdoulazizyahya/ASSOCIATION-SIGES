@@ -3,7 +3,7 @@
 // Adapté de LAM_ABZ/pages/eleves/liste.php aux helpers SIGES ; simplifié
 // pour cette 1ʳᵉ étape (pas encore d'export PDF/cartes scolaires — voir
 // LAM_ABZ pour le modèle complet quand ce sera le tour de ces écrans).
-require_once __DIR__ . '/../../../../config.php';
+require_once __DIR__ . '/../../../../config/config.php';
 require_once __DIR__ . '/../../../../noyau/connexion.php';
 require_once __DIR__ . '/../../../../noyau/fonctions.php';
 exiger_connexion();

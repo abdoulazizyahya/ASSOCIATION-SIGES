@@ -21,7 +21,7 @@
 // Toutes les opérations destructrices refusent les bases protégées
 // (_bases_protegees() : information_schema, mysql, DB_NAME, DB_NAME_ASSOC…).
 
-require_once __DIR__ . '/../../config.php';
+require_once __DIR__ . '/../../config/config.php';
 require_once __DIR__ . '/../../noyau/connexion_assoc.php';
 
 const ECOLE_MAINT_DIR_BACKUP = __DIR__ . '/../sauvegardes';

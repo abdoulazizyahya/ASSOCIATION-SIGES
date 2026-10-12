@@ -19,7 +19,7 @@
 //
 // Accès : DIRECTEUR (tout bulletin) ou l'enseignant concerné lui-même
 // (même règle que primaire/pages/paie/bulletin.php).
-require_once __DIR__ . '/../../config.php';
+require_once __DIR__ . '/../../config/config.php';
 require_once __DIR__ . '/../../noyau/connexion.php';
 require_once __DIR__ . '/../../noyau/fonctions.php';
 require_once __DIR__ . '/../../noyau/paie_fonctions.php';

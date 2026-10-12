@@ -11,7 +11,7 @@
  * que les bulletins) et la table `absence` déjà alimentée par le module Discipline.
  */
 header('Cache-Control: no-store, no-cache, must-revalidate');
-require_once __DIR__ . '/../../../../config.php';
+require_once __DIR__ . '/../../../../config/config.php';
 require_once __DIR__ . '/../../../../noyau/connexion.php';
 require_once __DIR__ . '/../../../../noyau/fonctions.php';
 exiger_connexion();
@@ -54,7 +54,7 @@ if ($full_access) {
 }
 if (empty($classes_access)) {
     flash_set('erreur', 'Accès non autorisé au Conseil de Classe.');
-    rediriger('dashboard.php');
+    rediriger('noyau/dashboard.php');
 }
 $ids_classes_ok = array_column($classes_access, 'id');
 $toutes_classes = db_all("SELECT * FROM classe WHERE archivee=0 ORDER BY ordre, designation");

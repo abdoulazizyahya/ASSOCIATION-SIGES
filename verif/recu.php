@@ -1,11 +1,11 @@
 <?php
-// verif_recu.php — page publique (pas de exiger_connexion) : quiconque
+// verif/recu.php — page publique (pas de exiger_connexion) : quiconque
 // scanne le QR imprimé sur un reçu de paiement arrive ici pour vérifier son
 // authenticité. Même pattern que verif_bulletin.php.
-require_once __DIR__ . '/config.php';
-require_once __DIR__ . '/noyau/connexion.php';
-require_once __DIR__ . '/noyau/fonctions.php';
-require_once __DIR__ . '/primaire/pdf/verif_recu_lib.php';
+require_once __DIR__ . '/../config/config.php';
+require_once __DIR__ . '/../noyau/connexion.php';
+require_once __DIR__ . '/../noyau/fonctions.php';
+require_once __DIR__ . '/../primaire/pdf/verif_recu_lib.php';
 verif_exiger_ecole_publique();  // multi-école : URL sans &ec= -> page neutre
 
 $id_eleve  = (int) ($_GET['e'] ?? 0);

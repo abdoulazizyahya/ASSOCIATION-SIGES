@@ -5,7 +5,7 @@
 // utilisateur connecté, dans les limites de ses classes (enseignant). Une
 // photo encore en fichier est convertie en base au passage
 // (fonctions.php::photo_sec_binaire()).
-require_once __DIR__ . '/../../../../config.php';
+require_once __DIR__ . '/../../../../config/config.php';
 require_once __DIR__ . '/../../../../noyau/connexion.php';
 require_once __DIR__ . '/../../../../noyau/fonctions.php';
 exiger_connexion();

@@ -3,7 +3,7 @@
 // PRIVÉ) — porté de primaire/pdf/finances_journal.php (primaire), adapté au schéma
 // secondaire. Pas de recherche par agent enseignant (utilisateur.nom/prenom
 // directement, pas de jointure enseignant).
-require_once __DIR__ . '/../../../config.php';
+require_once __DIR__ . '/../../../config/config.php';
 require_once __DIR__ . '/../../../noyau/connexion.php';
 require_once __DIR__ . '/../../../noyau/fonctions.php';
 exiger_role(['ADMIN', 'PROVISEUR', 'SECRETAIRE', 'INTENDANT']);

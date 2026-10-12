@@ -6,7 +6,7 @@
 //  CAMTEL) — champs administratifs sur enseignant + détail par rubrique
 //  sur ligne_bulletin_paie. Voir bd/migration_v35.sql pour le détail.
 // =====================================================================
-require_once __DIR__ . '/../config.php';
+require_once __DIR__ . '/../config/config.php';
 require_once __DIR__ . '/../noyau/connexion.php';
 
 header('Content-Type: text/plain; charset=utf-8');

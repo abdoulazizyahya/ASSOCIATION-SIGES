@@ -4,7 +4,7 @@
 // etat_classe.php qui détaille une classe à la fois) montrant l'apport
 // (montant encaissé) de chaque classe et son poids en % du total encaissé
 // de l'établissement pour l'année active.
-require_once __DIR__ . '/../../../config.php';
+require_once __DIR__ . '/../../../config/config.php';
 require_once __DIR__ . '/../../../noyau/connexion.php';
 require_once __DIR__ . '/../../../noyau/fonctions.php';
 exiger_role(['DIRECTEUR', 'SECRETAIRE', 'COMPTABLE']);

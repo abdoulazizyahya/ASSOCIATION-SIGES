@@ -4,7 +4,7 @@
 // modifiables volontairement restreints à opérateur/référence/date : jamais
 // le montant ni l'obligation, qui casseraient eleve_solde_obligation() et le
 // regroupement par numero_recu (voir save.php).
-require_once __DIR__ . '/../../../../config.php';
+require_once __DIR__ . '/../../../../config/config.php';
 require_once __DIR__ . '/../../../../noyau/connexion.php';
 require_once __DIR__ . '/../../../../noyau/fonctions.php';
 exiger_role(['ADMIN', 'PROVISEUR', 'FONDATEUR', 'CENSEUR', 'INTENDANT']);

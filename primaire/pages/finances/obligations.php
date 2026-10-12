@@ -7,7 +7,7 @@
 // confirmé sur les vraies données) : le montant dû par un élève est la
 // somme de toutes les obligations de son niveau (voir primaire/pages/finances/
 // versement.php et statistiques.php).
-require_once __DIR__ . '/../../../config.php';
+require_once __DIR__ . '/../../../config/config.php';
 require_once __DIR__ . '/../../../noyau/connexion.php';
 require_once __DIR__ . '/../../../noyau/fonctions.php';
 exiger_role(['DIRECTEUR', 'COMPTABLE']);

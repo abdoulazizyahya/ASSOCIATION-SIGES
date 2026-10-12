@@ -12,7 +12,7 @@
 // l'écran pour le PDF/Excel (même simplification que Statistiques/Conseil
 // de classe dans ce chantier, pour tenir le volume global de ce chantier).
 header('Cache-Control: no-store, no-cache, must-revalidate');
-require_once __DIR__ . '/../../../config.php';
+require_once __DIR__ . '/../../../config/config.php';
 require_once __DIR__ . '/../../../noyau/connexion.php';
 require_once __DIR__ . '/../../../noyau/fonctions.php';
 require_once __DIR__ . '/commun.php';

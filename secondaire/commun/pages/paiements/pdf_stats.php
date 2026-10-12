@@ -7,7 +7,7 @@
 // Le 4e sous-onglet (recouvrement par classe) a son propre générateur —
 // voir pdf_stats_recouvrement.php (colonnes trop différentes pour être
 // mélangées dans le même gabarit sans le complexifier inutilement).
-require_once __DIR__ . '/../../../../config.php';
+require_once __DIR__ . '/../../../../config/config.php';
 require_once __DIR__ . '/../../../../noyau/connexion.php';
 require_once __DIR__ . '/../../../../noyau/fonctions.php';
 exiger_role(['ADMIN', 'PROVISEUR', 'CENSEUR', 'INTENDANT']);

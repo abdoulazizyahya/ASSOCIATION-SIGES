@@ -5,7 +5,7 @@
 // emplacement en conservant les paramètres, pour que le lien de menu
 // existant (noyau/layout/header.php) et d'éventuels favoris continuent de
 // fonctionner.
-require_once __DIR__ . '/../../../../config.php';
+require_once __DIR__ . '/../../../../config/config.php';
 require_once __DIR__ . '/../../../../noyau/fonctions.php';
 
 $params = $_GET;

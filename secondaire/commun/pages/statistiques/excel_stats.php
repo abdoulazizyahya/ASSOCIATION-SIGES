@@ -6,7 +6,7 @@
  * secondaire/commun/pages/statistiques/index.php et secondaire/commun/pages/statistiques/pdf_stats.php.
  * GET : onglet (section|niveau|matiere|eleves), vue, seq, trim, classe
  */
-require_once __DIR__ . '/../../../../config.php';
+require_once __DIR__ . '/../../../../config/config.php';
 require_once __DIR__ . '/../../../../noyau/connexion.php';
 require_once __DIR__ . '/../../../../noyau/fonctions.php';
 require_once __DIR__ . '/../../../../vendor/autoload.php';

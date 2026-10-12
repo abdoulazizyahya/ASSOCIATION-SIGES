@@ -5,7 +5,7 @@
 // trimestre (APC) et affectation enseignants/professeur principal. Logique
 // métier et tables identiques entre les deux schémas — seuls les chemins
 // require, exiger_role() et flash_html() sont adaptés aux conventions SIGES.
-require_once __DIR__ . '/../../../../config.php';
+require_once __DIR__ . '/../../../../config/config.php';
 require_once __DIR__ . '/../../../../noyau/connexion.php';
 require_once __DIR__ . '/../../../../noyau/fonctions.php';
 exiger_role(['ADMIN', 'PROVISEUR', 'FONDATEUR', 'CENSEUR']);

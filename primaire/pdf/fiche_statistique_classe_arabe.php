@@ -1,7 +1,7 @@
 <?php
 // ── PDF : Fiche statistique d'une classe pour un trimestre (piste arabe) ─
 // Miroir de primaire/pdf/fiche_statistique_classe.php — statistiques_classe_trimestre_arabe().
-require_once __DIR__ . '/../../config.php';
+require_once __DIR__ . '/../../config/config.php';
 require_once __DIR__ . '/../../noyau/connexion.php';
 require_once __DIR__ . '/../../noyau/fonctions.php';
 require_once __DIR__ . '/../notes_apc_arabe.php';

@@ -25,12 +25,12 @@
 // l'exemple à 3 lignes) : la hauteur de chaque ligne s'adapte pour que le
 // tableau garde toujours la même zone verticale réservée (≤3 lignes =
 // hauteur identique à l'original, plus de lignes = légèrement compressé).
-require_once __DIR__ . '/../../../config.php';
+require_once __DIR__ . '/../../../config/config.php';
 require_once __DIR__ . '/../../../noyau/connexion.php';
 require_once __DIR__ . '/../../../noyau/fonctions.php';
 require_once __DIR__ . '/../../pdf/verif_recu_lib.php';
 
-// Accès public via le QR code du reçu (jeton "vh", voir verif_recu.php) —
+// Accès public via le QR code du reçu (jeton "vh", voir verif/recu.php) —
 // même mécanisme que les bulletins (primaire/pdf/bulletin_annuel.php).
 $acces_public = false;
 if (($_GET['vh'] ?? '') !== '' && (int) ($_GET['eleve'] ?? 0) > 0) {

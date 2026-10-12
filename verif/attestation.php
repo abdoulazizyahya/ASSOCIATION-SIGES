@@ -1,11 +1,11 @@
 <?php
-// verif_attestation.php — page publique (pas de exiger_connexion) : quiconque
+// verif/attestation.php — page publique (pas de exiger_connexion) : quiconque
 // scanne le QR imprimé sur une attestation de présence ou un certificat de
 // prise/reprise de service arrive ici pour vérifier son authenticité.
-require_once __DIR__ . '/config.php';
-require_once __DIR__ . '/noyau/connexion.php';
-require_once __DIR__ . '/noyau/fonctions.php';
-require_once __DIR__ . '/primaire/pdf/verif_attestation_lib.php';
+require_once __DIR__ . '/../config/config.php';
+require_once __DIR__ . '/../noyau/connexion.php';
+require_once __DIR__ . '/../noyau/fonctions.php';
+require_once __DIR__ . '/../primaire/pdf/verif_attestation_lib.php';
 verif_exiger_ecole_publique();  // multi-école : URL sans &ec= -> page neutre
 
 $type_recu = (string)($_GET['t'] ?? '');

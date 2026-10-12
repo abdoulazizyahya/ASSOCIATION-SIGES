@@ -334,8 +334,17 @@ les anciens sur le serveur. Dans l'ordre :
    `secondaire/dashboard_contenu.php`, `secondaire/profil_contenu.php`,
    `secondaire/verif_bulletin_contenu.php`, et à la racine `connexion.php`,
    `connexion_assoc.php`, `ecole_contexte.php`, `fonctions.php`, `paie_fonctions.php`,
-   `accueil.php`, `notes_apc.php`, `notes_apc_arabe.php`, `secondaire_en_construction.php`.
-   (Rester, s'ils existent : `assets/uploads/` et ses sous-dossiers, `config.local.php`.)
+   `accueil.php`, `notes_apc.php`, `notes_apc_arabe.php`, `secondaire_en_construction.php`,
+   puis (racine réduite à `index.php`) `config.php`, `login.php`, `logout.php`, `dashboard.php`,
+   `install.php`, `mot_de_passe_oublie.php`, `configurer_securite.php`,
+   `questions_securite_reporter.php`, `profil.php`, tous les `verif_*.php`,
+   `verif_bulletin_hors_ligne.html`, `promeducamsiges.html`.
+   Les QR déjà imprimés (`…/verif_bulletin.php?…`) restent valides : `.htaccess` les redirige
+   vers `verif/` — c'est pourquoi l'étape 3 est obligatoire.
+   (Rester : `assets/uploads/` et ses sous-dossiers.)
+   **`config.local.php`** : le déplacer de la racine vers `config/config.local.php` (dossier
+   interdit au web). S'il reste à la racine, il est encore lu (repli), mais n'y est protégé que
+   par la règle `FilesMatch` du `.htaccess`.
 5. Lancer `/bd/assoc/migrer_chemins_arborescence.php?token=…` (aperçu) puis `&go=1` :
    réécrit les chemins de pages stockés en base (privilèges, notifications). Facultatif — le
    code convertit déjà les anciennes valeurs — mais recommandé.
@@ -346,7 +355,7 @@ les anciens sur le serveur. Dans l'ordre :
 
 ### 8.7 Mise en service
 
-`https://promeducam.beero.cm/` → `login.php` avec sélecteur (EC1/EC2/MH). Puis
+`https://promeducam.beero.cm/` → `compte/login.php` avec sélecteur (EC1/EC2/MH). Puis
 `/bd/assoc/migrer_toutes_ecoles.php?dry=1` (et sans `dry` si retard de schéma), test de
 connexion par école, test « Nouvel établissement », re-blocage de `/bd/`.
 

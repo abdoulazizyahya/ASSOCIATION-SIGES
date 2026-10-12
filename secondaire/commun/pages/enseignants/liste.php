@@ -3,7 +3,7 @@
 // secondaire). Simplifié par rapport à LAM_ABZ/pages/enseignants/index.php
 // pour cette étape (pas encore d'export PDF dossier/attestation/prise de
 // service — voir LAM_ABZ pour le modèle complet le moment venu).
-require_once __DIR__ . '/../../../../config.php';
+require_once __DIR__ . '/../../../../config/config.php';
 require_once __DIR__ . '/../../../../noyau/connexion.php';
 require_once __DIR__ . '/../../../../noyau/fonctions.php';
 exiger_role(['ADMIN', 'PROVISEUR', 'FONDATEUR', 'CENSEUR']);

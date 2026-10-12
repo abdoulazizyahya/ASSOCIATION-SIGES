@@ -6,7 +6,7 @@
 // stats_par_matiere_arabe()) — les MÊMES fonctions que la page web.
 // Onglets : eleves|matieres|effectifs|niveau|matiere (miroir de
 // eleves|competences|effectifs|niveau|competence côté français).
-require_once __DIR__ . '/../../config.php';
+require_once __DIR__ . '/../../config/config.php';
 require_once __DIR__ . '/../../noyau/connexion.php';
 require_once __DIR__ . '/../../noyau/fonctions.php';
 require_once __DIR__ . '/../notes_apc_arabe.php';

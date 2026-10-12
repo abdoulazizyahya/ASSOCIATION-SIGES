@@ -4,7 +4,7 @@
 // matière (note_matiere_annuelle_arabe()) et classement annuel
 // (classement_annuel_classe_arabe()), décision de fin d'année si déjà
 // statuée (decision_conseil_annuel_arabe, bd/migration_v9.sql).
-require_once __DIR__ . '/../../config.php';
+require_once __DIR__ . '/../../config/config.php';
 require_once __DIR__ . '/../../noyau/connexion.php';
 require_once __DIR__ . '/../../noyau/fonctions.php';
 require_once __DIR__ . '/../notes_apc_arabe.php';

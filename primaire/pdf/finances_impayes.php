@@ -1,7 +1,7 @@
 <?php
 // primaire/pdf/finances_impayes.php — Liste PDF des élèves en impayé, mêmes filtres
 // que primaire/pages/finances/impayes.php.
-require_once __DIR__ . '/../../config.php';
+require_once __DIR__ . '/../../config/config.php';
 require_once __DIR__ . '/../../noyau/connexion.php';
 require_once __DIR__ . '/../../noyau/fonctions.php';
 exiger_role(['DIRECTEUR', 'SECRETAIRE', 'COMPTABLE']);

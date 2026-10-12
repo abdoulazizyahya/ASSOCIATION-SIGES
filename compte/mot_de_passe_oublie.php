@@ -1,6 +1,6 @@
 <?php
-// mot_de_passe_oublie.php — réinitialisation du mot de passe via les 2
-// questions secrètes du compte (voir configurer_securite.php,
+// compte/mot_de_passe_oublie.php — réinitialisation du mot de passe via les 2
+// questions secrètes du compte (voir compte/configurer_securite.php,
 // bd/migration_v45.sql). Accessible depuis login.php. Limité à
 // MAX_TENTATIVES réponses incorrectes avant de devoir recommencer la
 // procédure depuis le début (anti brute-force sur les réponses).
@@ -10,14 +10,14 @@
 // secondaire). Les requêtes secondaire aliasent leurs colonnes sur les mêmes
 // clés que le primaire (id_user, login_user…) pour que tout le reste du
 // fichier (sessions, affichage) reste inchangé.
-require_once __DIR__ . '/config.php';
-require_once __DIR__ . '/noyau/connexion.php';
-require_once __DIR__ . '/noyau/fonctions.php';
+require_once __DIR__ . '/../config/config.php';
+require_once __DIR__ . '/../noyau/connexion.php';
+require_once __DIR__ . '/../noyau/fonctions.php';
 session_init();
 $secondaire = function_exists('type_enseignement_courant') && type_enseignement_courant() === 'secondaire';
 
 if (est_connecte()) {
-    header('Location: ' . APP_URL . '/dashboard.php'); exit;
+    header('Location: ' . APP_URL . '/noyau/dashboard.php'); exit;
 }
 
 const MAX_TENTATIVES = 5;
@@ -25,7 +25,7 @@ const MAX_TENTATIVES = 5;
 $etape  = $_SESSION['reset_etape'] ?? 'login';
 $erreur = '';
 
-// Multi-établissement : choix de l'école à la 1re étape (comme login.php).
+// Multi-établissement : choix de l'école à la 1re étape (comme compte/login.php).
 // Une fois choisie, basculer_base_ecole() pose $_SESSION['ecole'] et
 // connexion.php résout automatiquement la bonne base aux étapes suivantes.
 $ecoles = annuaire_dispo()
@@ -69,7 +69,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $_SESSION['reset_qids']  = [$questions[0]['id'], $questions[1]['id']];
             $_SESSION['reset_tries'] = 0;
             $_SESSION['reset_etape'] = 'questions';
-            header('Location: ' . APP_URL . '/mot_de_passe_oublie.php'); exit;
+            header('Location: ' . APP_URL . '/compte/mot_de_passe_oublie.php'); exit;
         }
         if ($erreur === '') {
             $erreur = "Compte introuvable ou récupération indisponible pour ce compte. Contactez le Directeur.";
@@ -95,7 +95,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($ok1 && $ok2) {
             $_SESSION['reset_ok']    = true;
             $_SESSION['reset_etape'] = 'nouveau';
-            header('Location: ' . APP_URL . '/mot_de_passe_oublie.php'); exit;
+            header('Location: ' . APP_URL . '/compte/mot_de_passe_oublie.php'); exit;
         }
 
         $_SESSION['reset_tries'] = ($_SESSION['reset_tries'] ?? 0) + 1;
@@ -115,7 +115,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $conf = post('confirmer_mdp');
 
         if (!($_SESSION['reset_ok'] ?? false) || !$uid) {
-            header('Location: ' . APP_URL . '/mot_de_passe_oublie.php'); exit;
+            header('Location: ' . APP_URL . '/compte/mot_de_passe_oublie.php'); exit;
         }
         if ($mdp === '' || $mdp !== $conf) {
             $erreur = "Les mots de passe ne correspondent pas.";
@@ -127,7 +127,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 db_exec("UPDATE user SET pwd_user = ? WHERE id_user = ?", [password_hash($mdp, PASSWORD_DEFAULT), $uid]);
             }
             if (function_exists('annuaire_dispo') && annuaire_dispo()) {
-                require_once __DIR__ . '/bd/lib/audit.php';
+                require_once __DIR__ . '/../bd/lib/audit.php';
                 audit_log('action', [
                     'action' => 'mot_de_passe_change',
                     'login'  => $secondaire
@@ -138,7 +138,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
             unset($_SESSION['reset_uid'], $_SESSION['reset_qids'], $_SESSION['reset_tries'], $_SESSION['reset_ok'], $_SESSION['reset_etape']);
             flash_set('succes', 'Mot de passe réinitialisé. Vous pouvez vous connecter.');
-            header('Location: ' . APP_URL . '/login.php'); exit;
+            header('Location: ' . APP_URL . '/compte/login.php'); exit;
         }
     }
 }
@@ -161,7 +161,7 @@ $etab = get_etablissement();
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Mot de passe oublié — <?= h(($etab['Initial_Etab'] ?? '') ?: (defined('ASSOC_NOM') && ASSOC_NOM !== '' ? ASSOC_NOM : 'SIGES')) ?></title>
-  <?php if (!empty($etab['logo']) && is_file(__DIR__ . '/assets/uploads/' . $etab['logo'])): ?>
+  <?php if (!empty($etab['logo']) && is_file(__DIR__ . '/../assets/uploads/' . $etab['logo'])): ?>
     <link rel="icon" href="<?= APP_URL ?>/assets/uploads/<?= h($etab['logo']) ?>">
   <?php endif; ?>
   <link rel="stylesheet" href="<?= APP_URL ?>/assets/vendor/bootstrap/css/bootstrap.min.css">
@@ -246,7 +246,7 @@ $etab = get_etablissement();
   <?php endif; ?>
 
   <div class="text-hint">
-    <a href="<?= APP_URL ?>/login.php" style="color:#3a6cff;text-decoration:none">← Retour à la connexion</a>
+    <a href="<?= APP_URL ?>/compte/login.php" style="color:#3a6cff;text-decoration:none">← Retour à la connexion</a>
   </div>
 </div>
 </body>

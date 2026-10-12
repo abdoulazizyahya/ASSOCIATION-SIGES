@@ -69,7 +69,7 @@ function session_init() {
 //
 // Retourne l'hôte à utiliser : inchangé si ce n'est pas localhost/127.0.0.1
 // (accès déjà via une vraie adresse réseau) ; sinon la constante
-// SERVEUR_LAN_HOST si définie dans config.php (à ne renseigner QUE si le
+// SERVEUR_LAN_HOST si définie dans config/config.php (à ne renseigner QUE si le
 // serveur a une IP LAN fixe — sinon la laisser commentée : une valeur figée
 // devient fausse dès que le réseau change et fait échouer tous les scans) ;
 // sinon détection automatique de l'IP LAN réelle de la machine.
@@ -203,7 +203,7 @@ function est_connecte(): bool {
 // Configuration des 2 questions secrètes obligatoire dès la 1ère connexion
 // (demande explicite du 22/08/2026, même principe qu'ABZ_MBE) : tant qu'un
 // compte n'a pas ses 2 questions, exiger_connexion() le redirige vers
-// configurer_securite.php avant de le laisser accéder à quoi que ce soit
+// compte/configurer_securite.php avant de le laisser accéder à quoi que ce soit
 // d'autre. Liste d'exemption courte et explicite (jamais de boucle de
 // redirection possible) : la page de configuration elle-même et la
 // déconnexion.
@@ -215,17 +215,17 @@ function exiger_connexion(): void {
         return;
     }
     if (!est_connecte()) {
-        header('Location: ' . APP_URL . '/login.php');
+        header('Location: ' . APP_URL . '/compte/login.php');
         exit;
     }
     $script_courant = basename($_SERVER['SCRIPT_NAME'] ?? '');
     // Licence (bd/lib/licence.php) : blocage anti-brute-force — coupe une
     // session DÉJÀ OUVERTE immédiatement (pas seulement à la prochaine
-    // connexion, voir login.php pour ce cas-là), demande explicite du
+    // connexion, voir compte/login.php pour ce cas-là), demande explicite du
     // 13/09/2026. Seule exemption : se déconnecter reste toujours possible.
     if ($script_courant !== 'logout.php' && function_exists('licence_bloque') && licence_bloque()) {
         session_destroy();
-        header('Location: ' . APP_URL . '/login.php?bloque=1');
+        header('Location: ' . APP_URL . '/compte/login.php?bloque=1');
         exit;
     }
     // Questions secrètes (récupération de mot de passe) : DÉSORMAIS
@@ -233,7 +233,7 @@ function exiger_connexion(): void {
     // avant cette date, redirection forcée côté primaire tant que non
     // configurées ; côté secondaire, absentes du tout). Un bandeau
     // dismissible (noyau/layout/header.php) invite à les configurer sans empêcher
-    // l'accès aux pages — voir configurer_securite.php, utilisateur_a_questions().
+    // l'accès aux pages — voir compte/configurer_securite.php, utilisateur_a_questions().
     // Privilèges par utilisateur / règle centrale / rôle sans accès à ce
     // menu : NE bloque plus la page (demande explicite du 11/09/2026 — un
     // menu « retiré » doit rester consultable, seule l'écriture disparaît).
@@ -307,7 +307,7 @@ function menu_acces_autorise(string $groupe, string $url): bool {
 /**
  * Une entrée de menu est-elle AFFICHÉE à l'utilisateur connecté ? Règle
  * unique, partagée par le menu latéral (noyau/layout/header.php) et les tableaux
- * de bord (dashboard.php, secondaire/commun/dashboard_contenu.php) : rôle listé
+ * de bord (noyau/dashboard.php, secondaire/commun/dashboard_contenu.php) : rôle listé
  * dans l'entrée (ou entrée ouverte à tous), fondateur / visite association
  * (voient tout), octroi « Privilèges » central (lecture/écriture) qui
  * révèle l'entrée, masque central qui la cache.
@@ -390,7 +390,7 @@ function page_menu_label(): ?string {
  * explicite) : le retour sert uniquement à forcer la LECTURE SEULE
  * (est_lecture_seule()) — la page reste consultable, les boutons
  * d'enregistrement disparaissent / les écritures sont refusées en amont.
- * 'dashboard.php', 'profil.php' et 'logout.php' ne sont jamais concernés
+ * 'noyau/dashboard.php', 'compte/profil.php' et 'compte/logout.php' ne sont jamais concernés
  * (anti-verrouillage — voir aussi primaire/pages/utilisateurs/acces.php).
  */
 function acces_page_lecture_seule(): bool {
@@ -937,7 +937,7 @@ function exiger_annee_active(): void {
     $active = db_val("SELECT COUNT(*) FROM annee_scolaire WHERE Etat_annee_scolaire=1");
     if (!$active) {
         flash_set('erreur', "Aucune année scolaire active — activez une année dans Paramètres pour accéder à ce module.");
-        rediriger('dashboard.php');
+        rediriger('noyau/dashboard.php');
     }
 }
 
@@ -1108,7 +1108,7 @@ function get_annee_active_sans_cache(): array {
     // École secondaire : annee_scolaire.active/.libelle (pas Etat_annee_
     // scolaire/val_annee) — mêmes clés val_annee/Etat_annee_scolaire
     // rajoutées en alias pour que TOUT le reste de l'appli (header.php,
-    // dashboard.php, etc.) continue de lire les mêmes clés sans distinguo.
+    // noyau/dashboard.php, etc.) continue de lire les mêmes clés sans distinguo.
     if (function_exists('type_enseignement_courant') && type_enseignement_courant() === 'secondaire') {
         $a = db_one("SELECT * FROM annee_scolaire WHERE active=1 LIMIT 1")
             ?? db_one("SELECT * FROM annee_scolaire ORDER BY libelle DESC LIMIT 1");
@@ -1144,7 +1144,7 @@ function get_annee_active_sans_cache(): array {
 
 function get_etablissement(): array {
     // Contexte neutre (multi-école, aucune choisie) : aucune identité d'école
-    // — la page appelante doit afficher un habillage générique (login.php).
+    // — la page appelante doit afficher un habillage générique (compte/login.php).
     if (function_exists('est_contexte_neutre') && est_contexte_neutre()) return [];
     $cle = db_cache_cle('etablissement');
     return $GLOBALS['_db_cache_globales'][$cle] ??= get_etablissement_sans_cache();

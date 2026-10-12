@@ -3,7 +3,7 @@
 // QR de vérification publique (même fonctionnement que les bulletins) —
 // voir noyau/partage/verif/verif_scolarite_lib.php / verif_scolarite.php. Demande explicite
 // du 26/09/2026.
-require_once __DIR__ . '/../../config.php';
+require_once __DIR__ . '/../../config/config.php';
 require_once __DIR__ . '/../../noyau/connexion.php';
 require_once __DIR__ . '/../../noyau/fonctions.php';
 require_once __DIR__ . '/../../noyau/partage/verif/verif_scolarite_lib.php';

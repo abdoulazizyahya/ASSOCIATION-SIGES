@@ -12,7 +12,7 @@
 // copie racine primaire/pdf/fpdf.php, pour ne pas toucher la classe FPDF partagée
 // par tous les autres PDF secondaire). Demande explicite du 17/09/2026.
 //
-// À inclure APRÈS : config.php, connexion.php, fonctions.php,
+// À inclure APRÈS : config/config.php, connexion.php, fonctions.php,
 // secondaire/commun/pdf/fpdf.php, secondaire/commun/pdf/header_pdf.php.
 //
 // Fournit prive_dessiner_recu_eleve() : ajoute UNE page à $pdf pour un

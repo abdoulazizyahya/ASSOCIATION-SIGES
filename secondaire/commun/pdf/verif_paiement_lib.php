@@ -3,12 +3,12 @@
 // d'authenticité des reçus de paiement du secondaire (module « Paiement
 // public » : paiement_frais). Inclus par secondaire/commun/pages/paiements/
 // recu.php, recu_fiche.php, recap_paiement.php (génération du QR) et par
-// verif_paiement.php à la racine (vérification lors du scan).
+// verif/paiement.php à la racine (vérification lors du scan).
 //
 // Multi-établissement (12/10/2026) : les nouveaux QR portent &ec=CODE et un
 // hash propre à l'école (verif_secret()). Les reçus imprimés AVANT — hash
 // « legacy », sans code d'école — restent reconnus : paiement_verif_valider()
-// accepte les deux, et verif_paiement.php retrouve leur école
+// accepte les deux, et verif/paiement.php retrouve leur école
 // (verif_trouver_ecole()).
 
 require_once __DIR__ . '/verif_lib.php';   // bulletin_verif_base_url() (URL absolue, adresse réseau) + verif_commun.php
@@ -24,7 +24,7 @@ function paiement_verif_hash(int $id_paiement, string $numero_recu, ?string $sec
 
 function paiement_verif_url(int $id_paiement, string $numero_recu): string {
     $h = paiement_verif_hash($id_paiement, $numero_recu);
-    return verif_ajout_ec(bulletin_verif_base_url() . '/verif_paiement.php?p=' . $id_paiement . '&h=' . $h);
+    return verif_ajout_ec(bulletin_verif_base_url() . '/verif/paiement.php?p=' . $id_paiement . '&h=' . $h);
 }
 
 /** Paiement (avec l'élève) si le hash correspond — nouveau ou ancien format —, sinon null. */

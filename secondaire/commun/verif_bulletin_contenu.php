@@ -1,7 +1,7 @@
 <?php
 // secondaire/commun/verif_bulletin_contenu.php — vérification publique d'un
 // bulletin d'école SECONDAIRE (QR imprimé par secondaire/general/pages/bulletins/
-// pdf.php). Inclus par verif_bulletin.php (racine) une fois l'école
+// pdf.php). Inclus par verif/bulletin.php (racine) une fois l'école
 // résolue (&ec=CODE) et reconnue comme secondaire — même principe que
 // secondaire/dashboard_contenu.php. Avant le 03/10/2026, ces QR arrivaient
 // sur la page du primaire (tables différentes) sans code d'école :

@@ -20,7 +20,7 @@
 // affiche « Erreur de chargement » même quand la requête a réellement réussi).
 ob_start();
 
-require_once __DIR__ . '/../../config.php';
+require_once __DIR__ . '/../../config/config.php';
 require_once __DIR__ . '/../connexion.php';
 require_once __DIR__ . '/../fonctions.php';
 exiger_connexion();

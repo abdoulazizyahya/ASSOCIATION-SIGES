@@ -3,7 +3,7 @@
  * Bulletin scolaire — modèle LTM
  * GET : eleve=ID, trim=ID_TRIMESTRE, annee=ID_ANNEE, seq=ID_SEQ (optionnel)
  */
-require_once __DIR__ . '/../../../../config.php';
+require_once __DIR__ . '/../../../../config/config.php';
 require_once __DIR__ . '/../../../../noyau/connexion.php';
 require_once __DIR__ . '/../../../../noyau/fonctions.php';
 aiguiller_page_technique('secondaire/technique/pages/bulletins/pdf.php');   // école technique : notes par séquence
@@ -12,7 +12,7 @@ require_once __DIR__ . '/../../../commun/pdf/verif_lib.php';
 // Accès public via le QR code du bulletin (jeton "vh" = hash de vérification
 // déjà calculé pour CE bulletin précis) : la personne qui scanne n'a pas de
 // compte dans le système et ne doit pas avoir à s'y connecter pour consulter
-// le document qu'elle vient de vérifier (voir verif_bulletin.php). En dehors
+// le document qu'elle vient de vérifier (voir verif/bulletin.php). En dehors
 // de ce cas, comportement inchangé : connexion normale exigée.
 $vh_verif = (string)($_GET['vh'] ?? '');
 $acces_public = false;

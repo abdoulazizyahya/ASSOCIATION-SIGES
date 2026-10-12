@@ -3,7 +3,7 @@
 // du bilan financier PRIVÉ (totaux + par niveau + par type + par mode +
 // évolution mensuelle) — porté de primaire/pages/finances/excel_statistiques.php
 // (primaire), adapté au schéma secondaire.
-require_once __DIR__ . '/../../../../config.php';
+require_once __DIR__ . '/../../../../config/config.php';
 require_once __DIR__ . '/../../../../noyau/connexion.php';
 require_once __DIR__ . '/../../../../noyau/fonctions.php';
 require_once __DIR__ . '/../../../../vendor/autoload.php';

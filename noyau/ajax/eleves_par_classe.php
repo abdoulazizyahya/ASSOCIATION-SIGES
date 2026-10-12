@@ -14,7 +14,7 @@
 // qu'il ne casse jamais le parsing JSON côté navigateur.
 ob_start();
 
-require_once __DIR__ . '/../../config.php';
+require_once __DIR__ . '/../../config/config.php';
 require_once __DIR__ . '/../connexion.php';
 require_once __DIR__ . '/../fonctions.php';
 exiger_connexion();

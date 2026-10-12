@@ -5,7 +5,7 @@
 // la Secrétaire, complémentaire de la fiche par élève (versement.php).
 // date_paiement est stocké en texte ISO 'YYYY-MM-DD' (vérifié sur les
 // données réelles) : comparable directement en chaîne pour un intervalle.
-require_once __DIR__ . '/../../../config.php';
+require_once __DIR__ . '/../../../config/config.php';
 require_once __DIR__ . '/../../../noyau/connexion.php';
 require_once __DIR__ . '/../../../noyau/fonctions.php';
 exiger_role(['DIRECTEUR', 'SECRETAIRE', 'COMPTABLE']);

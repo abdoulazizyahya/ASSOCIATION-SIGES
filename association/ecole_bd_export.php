@@ -8,7 +8,7 @@
 //                       + assets/uploads/etab/<slug>/ (logos, signatures,
 //                       pièces de dossier). Les photos d'élèves sont en
 //                       BLOB dans la table `eleve` → déjà dans le dump.
-require_once __DIR__ . '/../config.php';
+require_once __DIR__ . '/../config/config.php';
 require_once __DIR__ . '/../noyau/connexion.php';
 require_once __DIR__ . '/../noyau/fonctions.php';
 require_once __DIR__ . '/../bd/lib/ecole_maintenance.php';

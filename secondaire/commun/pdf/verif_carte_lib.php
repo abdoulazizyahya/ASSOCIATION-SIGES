@@ -2,11 +2,11 @@
 // secondaire/commun/pdf/verif_carte_lib.php — signature et vérification
 // d'authenticité des cartes scolaires du SECONDAIRE. Inclus par
 // secondaire/commun/pdf/cartes.php (génération du QR) et par
-// secondaire/commun/verif_carte_contenu.php (scan, via verif_carte.php).
+// secondaire/commun/verif_carte_contenu.php (scan, via verif/carte.php).
 //
 // Hash inchangé (cartes déjà imprimées). Depuis le 12/10/2026 : URL absolue
 // (adresse réseau joignable par un téléphone) et &ec=CODE en multi-école —
-// avant, le QR menait à verif_carte.php sans code d'école, qui interrogeait
+// avant, le QR menait à verif/carte.php sans code d'école, qui interrogeait
 // le schéma du primaire (erreur fatale).
 
 require_once __DIR__ . '/verif_lib.php';   // bulletin_verif_base_url() + verif_commun.php
@@ -22,7 +22,7 @@ function carte_verif_hash(int $id_eleve, int $id_annee): string {
 
 function carte_verif_url(int $id_eleve, int $id_annee): string {
     $h = carte_verif_hash($id_eleve, $id_annee);
-    return verif_ajout_ec(bulletin_verif_base_url() . '/verif_carte.php?e=' . $id_eleve . '&a=' . $id_annee . '&h=' . $h);
+    return verif_ajout_ec(bulletin_verif_base_url() . '/verif/carte.php?e=' . $id_eleve . '&a=' . $id_annee . '&h=' . $h);
 }
 
 /** Élève si le hash de la carte (élève, année) est valide dans la base courante, sinon null. */

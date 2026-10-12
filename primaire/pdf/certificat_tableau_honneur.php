@@ -11,9 +11,9 @@
 // Félicitations, encadrés Moyenne/Rang, QR de vérification (photo incrustée,
 // même style que les bulletins) — inspiré des modèles fournis
 // (TH_fr_trim.pdf/TH_fr_ann.pdf). Seul modèle avec vérification publique par
-// QR (voir verif_honneur.php) — le Modèle 1 n'en a pas.
+// QR (voir verif/honneur.php) — le Modèle 1 n'en a pas.
 // Qualification et mention via mention_travail() (primaire/notes_apc.php).
-require_once __DIR__ . '/../../config.php';
+require_once __DIR__ . '/../../config/config.php';
 require_once __DIR__ . '/../../noyau/connexion.php';
 require_once __DIR__ . '/../../noyau/fonctions.php';
 require_once __DIR__ . '/../notes_apc.php';

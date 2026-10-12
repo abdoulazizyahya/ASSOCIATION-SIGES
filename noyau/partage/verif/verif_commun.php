@@ -52,7 +52,7 @@ function verif_ajout_ec(string $url): string {
 /**
  * Clé privée ECDSA P-256 de signature offline : celle de l'école si elle est
  * définie dans l'annuaire (etablissement.verif_cle_privee_pem), sinon la clé
- * globale de config.php (BULLETIN_VERIF_PRIVATE_KEY_PEM).
+ * globale de config/config.php (BULLETIN_VERIF_PRIVATE_KEY_PEM).
  */
 function verif_cle_privee_pem(): ?string {
     $e = function_exists('ecole_courante') ? ecole_courante() : null;

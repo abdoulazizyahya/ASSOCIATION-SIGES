@@ -8,13 +8,13 @@
 // l'appareil photo s'ouvre, on ajuste le cadre, la photo est envoyée
 // (photo_enregistrer.php) et on passe automatiquement au suivant. La photo
 // d'un élève peut aussi être supprimée.
-require_once __DIR__ . '/../../../config.php';
+require_once __DIR__ . '/../../../config/config.php';
 require_once __DIR__ . '/../../connexion.php';
 require_once __DIR__ . '/../../fonctions.php';
 require_once __DIR__ . '/_photos_lib.php';
 session_init();
 
-// Téléphone pas encore connecté : après la connexion, login.php ramène ici
+// Téléphone pas encore connecté : après la connexion, compte/login.php ramène ici
 // (et présélectionne l'école du QR code) au lieu du tableau de bord.
 if (!est_connecte() && !(function_exists('est_visite_association') && est_visite_association())) {
     $_SESSION['retour_apres_login'] = $_SERVER['REQUEST_URI'] ?? '';

@@ -6,7 +6,7 @@
  * les DONNÉES viennent de primaire/notes_apc_arabe.php (matière, pas compétences).
  * GET : onglet (niveau|matiere|eleves), vue (trim|annee), trim, classe
  */
-require_once __DIR__ . '/../../../config.php';
+require_once __DIR__ . '/../../../config/config.php';
 require_once __DIR__ . '/../../../noyau/connexion.php';
 require_once __DIR__ . '/../../../noyau/fonctions.php';
 require_once __DIR__ . '/../../notes_apc_arabe.php';

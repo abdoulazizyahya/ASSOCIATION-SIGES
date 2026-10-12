@@ -14,7 +14,7 @@
 // bulletins arabes (primaire/pdf/bulletin_trimestriel_arabe.php) plutôt que « الربع »
 // du PDF de référence annuel, pour rester cohérent avec le reste du
 // vocabulaire arabe déjà établi dans ce projet.
-require_once __DIR__ . '/../../config.php';
+require_once __DIR__ . '/../../config/config.php';
 require_once __DIR__ . '/../../noyau/connexion.php';
 require_once __DIR__ . '/../../noyau/fonctions.php';
 require_once __DIR__ . '/../notes_apc_arabe.php';

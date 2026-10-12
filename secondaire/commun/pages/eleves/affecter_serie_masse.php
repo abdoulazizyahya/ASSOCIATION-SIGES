@@ -4,7 +4,7 @@
 // répartir une classe mixte (ex. 4ème : 10 en Arabe, 5 en Espagnol, 33 en
 // Allemand) sans passer par la fiche élève un par un. Même modèle que
 // transferer_masse.php. Valeur vide = retire la série (repasse à NULL).
-require_once __DIR__ . '/../../../../config.php';
+require_once __DIR__ . '/../../../../config/config.php';
 require_once __DIR__ . '/../../../../noyau/connexion.php';
 require_once __DIR__ . '/../../../../noyau/fonctions.php';
 exiger_role(['ADMIN', 'PROVISEUR', 'FONDATEUR', 'CENSEUR', 'SG', 'SECRETAIRE']);

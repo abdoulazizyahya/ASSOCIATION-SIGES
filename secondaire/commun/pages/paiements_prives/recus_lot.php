@@ -2,7 +2,7 @@
 // secondaire/commun/pages/paiements_prives/recus_lot.php — Impression EN LOT des
 // reçus de paiement PRIVÉ (voir secondaire/commun/pdf/prive_recu_lib.php). Porté
 // de primaire/pages/finances/recus_lot.php (primaire).
-require_once __DIR__ . '/../../../../config.php';
+require_once __DIR__ . '/../../../../config/config.php';
 require_once __DIR__ . '/../../../../noyau/connexion.php';
 require_once __DIR__ . '/../../../../noyau/fonctions.php';
 exiger_role(['ADMIN', 'PROVISEUR', 'SECRETAIRE', 'INTENDANT']);

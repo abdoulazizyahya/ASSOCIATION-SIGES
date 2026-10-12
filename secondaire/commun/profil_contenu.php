@@ -1,17 +1,17 @@
 <?php
 // secondaire/commun/profil_contenu.php — « Mon compte » pour une école secondaire.
-// Porté depuis profil.php (primaire) le 24/09/2026 : même page libre-service
+// Porté depuis compte/profil.php (primaire) le 24/09/2026 : même page libre-service
 // (identifiant, mot de passe, appareils connus), adaptée au schéma
 // secondaire — une SEULE table `utilisateur` (id/login/mot_de_passe/role),
 // pas de jointure enseignant obligatoire (matricule_ens nullable). Les
-// questions de sécurité (configurer_securite.php) ne sont pas encore
+// questions de sécurité (compte/configurer_securite.php) ne sont pas encore
 // portées côté secondaire (déjà exempté par exiger_connexion()) : ce bloc
 // est donc omis ici, pas juste caché.
-// Inclus par profil.php (racine) via require + exit — jamais appelé seul.
+// Inclus par compte/profil.php (racine) via require + exit — jamais appelé seul.
 
 $user_id = (int) $_SESSION['user_id'];
 $compte  = db_one("SELECT * FROM utilisateur WHERE id = ?", [$user_id]);
-if (!$compte) { flash_set('erreur', 'Compte introuvable.'); rediriger('dashboard.php'); }
+if (!$compte) { flash_set('erreur', 'Compte introuvable.'); rediriger('noyau/dashboard.php'); }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     csrf_verifier();
@@ -19,13 +19,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $mdp   = post('mot_de_passe');
     $conf  = post('confirmer_mdp');
 
-    if (!$login) { flash_set('erreur', 'Le login est obligatoire.'); rediriger('profil.php'); }
+    if (!$login) { flash_set('erreur', 'Le login est obligatoire.'); rediriger('compte/profil.php'); }
 
     $existe = db_val("SELECT id FROM utilisateur WHERE login=? AND id!=?", [$login, $user_id]);
-    if ($existe) { flash_set('erreur', 'Ce login est déjà utilisé.'); rediriger('profil.php'); }
+    if ($existe) { flash_set('erreur', 'Ce login est déjà utilisé.'); rediriger('compte/profil.php'); }
 
     if ($mdp !== '') {
-        if ($mdp !== $conf) { flash_set('erreur', 'Les mots de passe ne correspondent pas.'); rediriger('profil.php'); }
+        if ($mdp !== $conf) { flash_set('erreur', 'Les mots de passe ne correspondent pas.'); rediriger('compte/profil.php'); }
         db_exec("UPDATE utilisateur SET login=?, mot_de_passe=? WHERE id=?",
                 [$login, password_hash($mdp, PASSWORD_DEFAULT), $user_id]);
         if (function_exists('journaliser_action')) journaliser_action('mot_de_passe_change');
@@ -34,7 +34,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
     $_SESSION['user']['login'] = $login;
     flash_set('succes', 'Profil mis à jour.');
-    rediriger('profil.php');
+    rediriger('compte/profil.php');
 }
 
 // ── Mes appareils (renommage) — générique, acteur_type='user' partagé ────
@@ -43,7 +43,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && post('action') === 'appareil_renomm
     csrf_verifier();
     $ok = appareil_connu_renommer((int) post('id_appareil'), 'user', $user_id, (string) post('nom_appareil'));
     flash_set($ok ? 'succes' : 'erreur', $ok ? 'Appareil renommé.' : 'Appareil introuvable.');
-    rediriger('profil.php');
+    rediriger('compte/profil.php');
 }
 $mes_appareils     = appareil_connu_lister('user', $user_id);
 $mon_appareil_actu = appareil_device_id();

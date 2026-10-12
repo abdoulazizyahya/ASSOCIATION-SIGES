@@ -12,7 +12,7 @@
 //   - ADMIN/PROVISEUR/FONDATEUR de l'école (jamais le propriétaire, qui n'a
 //     pas de compte local) : reçoivent la clé du propriétaire et la
 //     SAISISSENT ici.
-require_once __DIR__ . '/../../../../config.php';
+require_once __DIR__ . '/../../../../config/config.php';
 require_once __DIR__ . '/../../../../noyau/connexion.php';
 require_once __DIR__ . '/../../../../noyau/fonctions.php';
 exiger_connexion();

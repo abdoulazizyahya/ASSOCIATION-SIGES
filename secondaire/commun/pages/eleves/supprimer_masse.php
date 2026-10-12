@@ -8,7 +8,7 @@
 // définitif et irréversible de TOUTES ses inscriptions, notes, absences,
 // paiements et décisions de conseil. Action assumée comme irréversible —
 // la désactivation (statut_masse.php) reste l'option réversible.
-require_once __DIR__ . '/../../../../config.php';
+require_once __DIR__ . '/../../../../config/config.php';
 require_once __DIR__ . '/../../../../noyau/connexion.php';
 require_once __DIR__ . '/../../../../noyau/fonctions.php';
 exiger_role(['ADMIN', 'PROVISEUR', 'FONDATEUR']);

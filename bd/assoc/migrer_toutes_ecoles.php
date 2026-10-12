@@ -16,7 +16,7 @@
 //  Usage :  php bd/assoc/migrer_toutes_ecoles.php [--dry-run]
 // =====================================================================
 
-require_once __DIR__ . '/../../config.php';
+require_once __DIR__ . '/../../config/config.php';
 require_once __DIR__ . '/../../noyau/connexion_assoc.php';
 
 if (PHP_SAPI !== 'cli') header('Content-Type: text/plain; charset=utf-8');

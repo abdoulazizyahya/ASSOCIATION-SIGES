@@ -29,7 +29,7 @@
 //  Demande du 12/10/2026.
 // =====================================================================
 if (PHP_SAPI !== 'cli') { http_response_code(403); exit("Outil en ligne de commande uniquement.\n"); }
-require_once __DIR__ . '/../../../config.php';
+require_once __DIR__ . '/../../../config/config.php';
 require_once __DIR__ . '/../../../noyau/connexion_assoc.php';
 
 $src    = $argv[1] ?? '';

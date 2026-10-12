@@ -4,7 +4,7 @@
 // (bulletins, cartes, tableau d'honneur, paiements) : un QR de certificat de
 // scolarité ne doit jamais valider un autre type de document.
 // Inclus par primaire/pdf/certificat_scolarite.php (génération du QR) et
-// verif_scolarite.php (vérification lors du scan).
+// verif/scolarite.php (vérification lors du scan).
 
 if (!defined('BULLETIN_VERIF_SECRET')) {
     define('BULLETIN_VERIF_SECRET', 'CHANGE_ME_ABZ_MBE_INSECURE_DEFAULT_SECRET');
@@ -37,5 +37,5 @@ function scolarite_verif_base_url(): string {
 
 function scolarite_verif_url(int $id_eleve, string $matricule): string {
     $h = scolarite_verif_hash($id_eleve, $matricule);
-    return verif_ajout_ec(scolarite_verif_base_url() . '/verif_scolarite.php?e=' . $id_eleve . '&h=' . $h);
+    return verif_ajout_ec(scolarite_verif_base_url() . '/verif/scolarite.php?e=' . $id_eleve . '&h=' . $h);
 }

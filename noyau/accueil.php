@@ -4,13 +4,13 @@
 //  Rendu par index.php pour un visiteur non connecté sur la racine « / ».
 //  (On NE s'appuie PAS sur « DirectoryIndex » en .htaccess : interdit par
 //  certains hébergements mutualisés -> Internal Server Error.)
-//  « Se connecter » ouvre index.php?login -> login.php (ou le tableau de bord).
+//  « Se connecter » ouvre index.php?login -> compte/login.php (ou le tableau de bord).
 //  La grille des écoles est DYNAMIQUE : relit promeducam_assoc.etablissement
 //  à chaque affichage -> rien à régénérer quand une école change.
 //  Copie statique autonome pour partage : bd/assoc/generer_accueil.php
 //  (regénérée aussi à la création/modif/suppression d'une école).
 // ─────────────────────────────────────────────────────────────────────
-require_once __DIR__ . '/../config.php';
+require_once __DIR__ . '/../config/config.php';
 require_once __DIR__ . '/connexion_assoc.php';
 $APP       = rtrim(APP_URL, '/');
 $LOGIN_URL = $APP . '/index.php?login';

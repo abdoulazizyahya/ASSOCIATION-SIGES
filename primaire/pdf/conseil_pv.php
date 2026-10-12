@@ -4,7 +4,7 @@
 // ordre=alpha|merite, dl=1, signature=1.
 // Réutilise les mêmes calculs que primaire/pages/conseil_classe/index.php
 // (classement_trimestre_classe()/classement_annuel_classe(), déjà vérifiées).
-require_once __DIR__ . '/../../config.php';
+require_once __DIR__ . '/../../config/config.php';
 require_once __DIR__ . '/../../noyau/connexion.php';
 require_once __DIR__ . '/../../noyau/fonctions.php';
 require_once __DIR__ . '/../notes_apc.php';

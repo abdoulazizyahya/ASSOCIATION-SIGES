@@ -8,7 +8,7 @@
 // AUTO_INCREMENT (pas de génération façon Mat_elv), mat_ens est un champ
 // libre optionnel (matricule administratif officiel, pas l'identifiant
 // interne).
-require_once __DIR__ . '/../../../config.php';
+require_once __DIR__ . '/../../../config/config.php';
 require_once __DIR__ . '/../../../noyau/connexion.php';
 require_once __DIR__ . '/../../../noyau/fonctions.php';
 require_once __DIR__ . '/../../../noyau/paie_fonctions.php';

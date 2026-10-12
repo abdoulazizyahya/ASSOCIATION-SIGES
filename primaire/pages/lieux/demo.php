@@ -9,7 +9,7 @@
 // sur une vraie fiche (élève/enseignant/tuteur), reporté à une session
 // ultérieure une fois la table `arrondissement` peuplée (voir bd/
 // sync_arrondissements.php). Accessible via l'URL directe uniquement.
-require_once __DIR__ . '/../../../config.php';
+require_once __DIR__ . '/../../../config/config.php';
 require_once __DIR__ . '/../../../noyau/connexion.php';
 require_once __DIR__ . '/../../../noyau/fonctions.php';
 exiger_connexion();

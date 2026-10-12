@@ -2,7 +2,7 @@
 // primaire/pages/depenses/excel_repartition_categories.php — Export Excel de la
 // répartition des dépenses par catégorie, mêmes données que
 // primaire/pages/depenses/repartition_categories.php.
-require_once __DIR__ . '/../../../config.php';
+require_once __DIR__ . '/../../../config/config.php';
 require_once __DIR__ . '/../../../noyau/connexion.php';
 require_once __DIR__ . '/../../../noyau/fonctions.php';
 require_once __DIR__ . '/../../../vendor/autoload.php';

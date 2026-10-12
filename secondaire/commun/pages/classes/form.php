@@ -1,7 +1,7 @@
 <?php
 // secondaire/commun/pages/classes/form.php — création/modification d'une classe
 // (école secondaire). Porté de LAM_ABZ, URLs rebranchées sous secondaire/.
-require_once __DIR__ . '/../../../../config.php';
+require_once __DIR__ . '/../../../../config/config.php';
 require_once __DIR__ . '/../../../../noyau/connexion.php';
 require_once __DIR__ . '/../../../../noyau/fonctions.php';
 exiger_role(['ADMIN', 'PROVISEUR', 'FONDATEUR', 'CENSEUR']);

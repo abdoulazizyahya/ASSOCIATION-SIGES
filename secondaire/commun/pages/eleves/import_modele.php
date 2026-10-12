@@ -10,7 +10,7 @@
 // Feuille 1 : colonnes à remplir + une ligne d'exemple, avec listes
 // déroulantes (Classe, Statut) puisées dans la feuille 2.
 // Feuille 2 : listes de référence (classes, statuts).
-require_once __DIR__ . '/../../../../config.php';
+require_once __DIR__ . '/../../../../config/config.php';
 require_once __DIR__ . '/../../../../noyau/connexion.php';
 require_once __DIR__ . '/../../../../noyau/fonctions.php';
 require_once __DIR__ . '/../../../../vendor/autoload.php';

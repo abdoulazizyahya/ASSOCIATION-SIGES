@@ -12,7 +12,7 @@
 //  installation ; ce script ne sert qu'aux bases existantes.)
 // =====================================================================
 
-require_once __DIR__ . '/../../config.php';
+require_once __DIR__ . '/../../config/config.php';
 require_once __DIR__ . '/../../noyau/connexion_assoc.php';
 
 if (PHP_SAPI !== 'cli') header('Content-Type: text/plain; charset=utf-8');
@@ -199,7 +199,7 @@ if (!col_existe('etablissement', 'type_enseignement')) {
 //  journal_audit.device_id relie chaque ligne à un cookie durable côté
 //  navigateur (bd/lib/audit.php::appareil_device_id()) ; appareil_connu
 //  porte le nom que le compte donne lui-même à son appareil (« Mon compte »,
-//  profil.php) — jamais le nom système, inaccessible à un site web.
+//  compte/profil.php) — jamais le nom système, inaccessible à un site web.
 if (!col_existe('journal_audit', 'device_id')) {
     mysqli_query($link_assoc, "ALTER TABLE `journal_audit` ADD COLUMN `device_id` varchar(40) DEFAULT NULL AFTER `geo_operateur`");
     mysqli_query($link_assoc, "ALTER TABLE `journal_audit` ADD KEY `k_appareil` (`device_id`,`acteur_type`,`acteur_id`)");

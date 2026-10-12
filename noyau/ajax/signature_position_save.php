@@ -7,7 +7,7 @@
 // cet endpoint ne fait que mémoriser OÙ elle doit apparaître.
 ob_start();
 
-require_once __DIR__ . '/../../config.php';
+require_once __DIR__ . '/../../config/config.php';
 require_once __DIR__ . '/../connexion.php';
 require_once __DIR__ . '/../fonctions.php';
 // DIRECTEUR (primaire) ou ADMIN/PROVISEUR (secondaire, schema_ref_ecole_

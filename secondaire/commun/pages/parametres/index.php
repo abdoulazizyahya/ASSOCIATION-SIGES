@@ -1,5 +1,5 @@
 <?php
-require_once __DIR__ . '/../../../../config.php';
+require_once __DIR__ . '/../../../../config/config.php';
 require_once __DIR__ . '/../../../../noyau/connexion.php';
 require_once __DIR__ . '/../../../../noyau/fonctions.php';
 // FONDATEUR a les mêmes accès que PROVISEUR sur cette page (Années/

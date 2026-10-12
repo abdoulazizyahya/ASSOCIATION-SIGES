@@ -6,7 +6,7 @@
  * voir secondaire/general/pages/bulletins/pdf.php pour le détail des sections communes
  * (en-tête, photo, décision/observations, QR, copyright) — identiques ici.
  */
-require_once __DIR__ . '/../../../../config.php';
+require_once __DIR__ . '/../../../../config/config.php';
 require_once __DIR__ . '/../../../../noyau/connexion.php';
 require_once __DIR__ . '/../../../../noyau/fonctions.php';
 aiguiller_page_technique('secondaire/technique/pages/bulletins/pdf_annuel.php');   // école technique : notes par séquence

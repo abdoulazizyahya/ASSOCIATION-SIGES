@@ -2,7 +2,7 @@
 // primaire/pages/depenses/categories.php — Dépenses > Catégories : catalogue des
 // catégories de dépenses (`categorie_depense`, migration v33). Miroir de
 // primaire/pages/finances/obligations.php (même convention CRUD) côté décaissements.
-require_once __DIR__ . '/../../../config.php';
+require_once __DIR__ . '/../../../config/config.php';
 require_once __DIR__ . '/../../../noyau/connexion.php';
 require_once __DIR__ . '/../../../noyau/fonctions.php';
 exiger_role(['DIRECTEUR', 'COMPTABLE']);

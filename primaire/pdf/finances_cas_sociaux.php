@@ -1,7 +1,7 @@
 <?php
 // primaire/pdf/finances_cas_sociaux.php — Liste PDF des élèves "Cas social", mêmes
 // filtres que primaire/pages/finances/cas_sociaux.php.
-require_once __DIR__ . '/../../config.php';
+require_once __DIR__ . '/../../config/config.php';
 require_once __DIR__ . '/../../noyau/connexion.php';
 require_once __DIR__ . '/../../noyau/fonctions.php';
 exiger_role(['DIRECTEUR', 'SECRETAIRE', 'COMPTABLE']);

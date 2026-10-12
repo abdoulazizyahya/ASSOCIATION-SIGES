@@ -4,7 +4,7 @@
 // sur chaque menu / sous-menu. Superadmin uniquement.
 // Stockage : promeducam_assoc.acces_regle — appliqué côté école par
 // ecole_contexte.php::regles_centrales() / niveau_central().
-require_once __DIR__ . '/../config.php';
+require_once __DIR__ . '/../config/config.php';
 require_once __DIR__ . '/../noyau/connexion.php';
 require_once __DIR__ . '/../noyau/fonctions.php';
 require_once __DIR__ . '/_layout.php';

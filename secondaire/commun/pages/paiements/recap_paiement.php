@@ -4,7 +4,7 @@
 // séparées par des lignes en pointillés, regroupant tous les frais d'un même
 // numero_recu (voir secondaire/commun/pages/paiements/save.php). Remplace l'ancien mode
 // `recu.php?mode=recap` (retiré).
-require_once __DIR__ . '/../../../../config.php';
+require_once __DIR__ . '/../../../../config/config.php';
 require_once __DIR__ . '/../../../../noyau/connexion.php';
 require_once __DIR__ . '/../../../../noyau/fonctions.php';
 exiger_role(['ADMIN', 'PROVISEUR', 'FONDATEUR', 'CENSEUR', 'INTENDANT']);

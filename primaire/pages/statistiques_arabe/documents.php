@@ -10,7 +10,7 @@
 //  - Un seul modèle de certificat.
 //  - Pas d'export Excel du relevé de notes.
 header('Cache-Control: no-store, no-cache, must-revalidate');
-require_once __DIR__ . '/../../../config.php';
+require_once __DIR__ . '/../../../config/config.php';
 require_once __DIR__ . '/../../../noyau/connexion.php';
 require_once __DIR__ . '/../../../noyau/fonctions.php';
 require_once __DIR__ . '/../../notes_apc_arabe.php';

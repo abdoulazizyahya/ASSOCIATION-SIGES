@@ -8,7 +8,7 @@
  *  - ADMIN       : vue globale, peut agir en lieu et place du Censeur ou du Proviseur
  */
 header('Cache-Control: no-store, no-cache, must-revalidate');
-require_once __DIR__ . '/../../../../config.php';
+require_once __DIR__ . '/../../../../config/config.php';
 require_once __DIR__ . '/../../../../noyau/connexion.php';
 require_once __DIR__ . '/../../../../noyau/fonctions.php';
 exiger_connexion();
@@ -23,7 +23,7 @@ if (isset($_GET['lu']) && $_GET['lu'] === '1') {
 
 if ($role === 'ENSEIGNANT') {
     $mat = matricule_ens_courant();
-    if (!$mat) { flash_set('erreur', 'Aucune fiche enseignant liée à votre compte.'); rediriger('dashboard.php'); }
+    if (!$mat) { flash_set('erreur', 'Aucune fiche enseignant liée à votre compte.'); rediriger('noyau/dashboard.php'); }
     $demandes = db_all(
         "SELECT * FROM demande_document WHERE matricule_ens=? ORDER BY date_demande DESC", [$mat]
     );
@@ -52,7 +52,7 @@ if ($role === 'ENSEIGNANT') {
          LIMIT 50"
     );
 } else {
-    flash_set('erreur', 'Accès réservé.'); rediriger('dashboard.php');
+    flash_set('erreur', 'Accès réservé.'); rediriger('noyau/dashboard.php');
 }
 
 $titre_page = 'Demandes de documents';

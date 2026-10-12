@@ -18,7 +18,7 @@
 // `etablissement` (identité, localisation administrative, direction, en-tête
 // bilingue FR/AR piste arabe) + logo en image, voir get_etablissement() —
 // purement informatif, jamais lu par import.php.
-require_once __DIR__ . '/../../../config.php';
+require_once __DIR__ . '/../../../config/config.php';
 require_once __DIR__ . '/../../../noyau/connexion.php';
 require_once __DIR__ . '/../../../noyau/fonctions.php';
 require_once __DIR__ . '/../../../vendor/autoload.php';

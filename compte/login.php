@@ -1,12 +1,12 @@
 <?php
-require_once __DIR__ . '/config.php';
-require_once __DIR__ . '/noyau/connexion.php';
-require_once __DIR__ . '/noyau/fonctions.php';
+require_once __DIR__ . '/../config/config.php';
+require_once __DIR__ . '/../noyau/connexion.php';
+require_once __DIR__ . '/../noyau/fonctions.php';
 session_init();
 
 // Si déjà connecté → dashboard
 if (est_connecte()) {
-    header('Location: ' . APP_URL . '/dashboard.php'); exit;
+    header('Location: ' . APP_URL . '/noyau/dashboard.php'); exit;
 }
 
 // ?bloque=1 : session coupée immédiatement par exiger_connexion() suite à
@@ -37,7 +37,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             basculer_base_ecole($ec);
             // Mémorise le dernier établissement choisi (cookie 1 an, ce
             // navigateur/appareil) pour présélectionner la liste au prochain
-            // passage sur login.php — demande explicite du 24/09/2026.
+            // passage sur compte/login.php — demande explicite du 24/09/2026.
             setcookie('siges_dernier_ecole', $ec['code'], time() + 365 * 86400, APP_URL . '/', '', false, true);
         } else {
             $erreur = 'Veuillez sélectionner votre établissement.';
@@ -77,7 +77,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $u_id = $u['id_user'] ?? null; $u_pwd_hash = $u['pwd_user'] ?? ''; $u_actif = $a_statut ? (int) ($u['actif'] ?? 0) : 1;
         }
         $id_etab_ctx = $ec['id'] ?? (function_exists('ecole_courante') ? (ecole_courante()['id'] ?? null) : null);
-        require_once __DIR__ . '/bd/lib/audit.php';
+        require_once __DIR__ . '/../bd/lib/audit.php';
         // Licence (bd/lib/licence.php) : blocage anti-brute-force sur la
         // saisie de clé — refuse la connexion MÊME avec le bon mot de passe,
         // demande explicite du 13/09/2026. Le propriétaire n'a pas de compte
@@ -118,7 +118,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             // cette page) renvoie vers le tableau de bord. Jamais bloquant
             // (demande explicite du 24/09/2026) : un bandeau reste ensuite
             // disponible sur les autres pages tant que ce n'est pas fait
-            // (noyau/layout/header.php + questions_securite_reporter.php).
+            // (noyau/layout/header.php + compte/questions_securite_reporter.php).
             $dest = (function_exists('utilisateur_a_questions') && !utilisateur_a_questions($u_id))
                 ? '/configurer_securite.php'
                 : '/dashboard.php';
@@ -172,7 +172,7 @@ if (preg_match_all('/\b[\p{L}]/u', $marque_defaut, $mm) && count($mm[0]) > 1) {
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Connexion — <?= h(($etab['Initial_Etab'] ?? '') ?: (defined('ASSOC_NOM') && ASSOC_NOM !== '' ? ASSOC_NOM : 'SIGES')) ?></title>
-  <?php if (!empty($etab['logo']) && is_file(__DIR__ . '/assets/uploads/' . $etab['logo'])): ?>
+  <?php if (!empty($etab['logo']) && is_file(__DIR__ . '/../assets/uploads/' . $etab['logo'])): ?>
     <link rel="icon" href="<?= APP_URL ?>/assets/uploads/<?= h($etab['logo']) ?>">
   <?php endif; ?>
   <link rel="stylesheet" href="<?= APP_URL ?>/assets/vendor/bootstrap/css/bootstrap.min.css">
@@ -199,7 +199,7 @@ if (preg_match_all('/\b[\p{L}]/u', $marque_defaut, $mm) && count($mm[0]) > 1) {
     <i class="bi bi-arrow-left"></i>Retour à l'accueil
   </a>
   <div class="login-logo" id="loginLogo">
-    <?php if (!empty($etab['logo']) && is_file(__DIR__ . '/assets/uploads/' . $etab['logo'])): ?>
+    <?php if (!empty($etab['logo']) && is_file(__DIR__ . '/../assets/uploads/' . $etab['logo'])): ?>
       <img src="<?= APP_URL ?>/assets/uploads/<?= h($etab['logo']) ?>" alt="<?= h(($etab['Initial_Etab'] ?? '') ?: 'Logo') ?>">
     <?php else: ?>
       <?= h(($etab['Initial_Etab'] ?? '') ?: $sigle_defaut) ?>
@@ -259,7 +259,7 @@ if (preg_match_all('/\b[\p{L}]/u', $marque_defaut, $mm) && count($mm[0]) > 1) {
     </button>
   </form>
   <div class="text-hint" style="font-size:.75rem;text-align:center;margin-top:1rem">
-    <a href="<?= APP_URL ?>/mot_de_passe_oublie.php" style="color:#3a6cff;text-decoration:none">Mot de passe oublié ?</a>
+    <a href="<?= APP_URL ?>/compte/mot_de_passe_oublie.php" style="color:#3a6cff;text-decoration:none">Mot de passe oublié ?</a>
   </div>
   <?php if (annuaire_dispo()): ?>
   <div style="border-top:1px solid #eef0f4;margin-top:1rem;padding-top:.9rem;text-align:center">

@@ -23,7 +23,7 @@
 // référence ni matière ni compétence, aucune table `absence_arabe` dans le
 // schéma) — un même relevé sert les deux pistes.
 header('Cache-Control: no-store, no-cache, must-revalidate');
-require_once __DIR__ . '/../../../config.php';
+require_once __DIR__ . '/../../../config/config.php';
 require_once __DIR__ . '/../../../noyau/connexion.php';
 require_once __DIR__ . '/../../../noyau/fonctions.php';
 exiger_acces_pedagogie();

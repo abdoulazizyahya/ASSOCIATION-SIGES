@@ -5,7 +5,7 @@
  * Réutilise les mêmes calculs que index.php (pv_moy_generale() etc. de fonctions.php)
  * et les mêmes conventions FPDF que le reste du projet (pdf_entete/pdf_bandeau).
  */
-require_once __DIR__ . '/../../../../config.php';
+require_once __DIR__ . '/../../../../config/config.php';
 require_once __DIR__ . '/../../../../noyau/connexion.php';
 require_once __DIR__ . '/../../../../noyau/fonctions.php';
 exiger_connexion();

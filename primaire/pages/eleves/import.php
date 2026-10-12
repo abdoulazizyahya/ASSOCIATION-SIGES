@@ -16,7 +16,7 @@
 // Champs élève gérés : Matricule (optionnel, généré si absent), Nom*,
 // Prénom(s), Nom en arabe, Sexe, Date de naissance, Lieu de naissance,
 // Arrondissement ("Intitulé (Département)"), Adresse, NIU, Classe, Statut.
-require_once __DIR__ . '/../../../config.php';
+require_once __DIR__ . '/../../../config/config.php';
 require_once __DIR__ . '/../../../noyau/connexion.php';
 require_once __DIR__ . '/../../../noyau/fonctions.php';
 require_once __DIR__ . '/../../../vendor/autoload.php';

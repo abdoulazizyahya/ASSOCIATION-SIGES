@@ -7,7 +7,7 @@
 //      matricule est vérifié (unique en base ET dans le lot) puis enregistré.
 // On revient toujours sur l'onglet Matricules, qui affiche le résultat.
 // Mêmes rôles que la configuration des matricules (matricule_config.php).
-require_once __DIR__ . '/../../../config.php';
+require_once __DIR__ . '/../../../config/config.php';
 require_once __DIR__ . '/../../../noyau/connexion.php';
 require_once __DIR__ . '/../../../noyau/fonctions.php';
 require_once __DIR__ . '/_matricules_lib.php';

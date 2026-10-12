@@ -3,7 +3,7 @@
 // (mirroir de list_of_payment.php du vrai jaynitaare legacy). Style simple
 // (comme primaire/pdf/fiche_eleve.php), pas le style MANWI/ABZ_MBE (pdf_pilule,
 // dégradés, reçus multi-copies) — volontairement pas utilisé ici.
-require_once __DIR__ . '/../../config.php';
+require_once __DIR__ . '/../../config/config.php';
 require_once __DIR__ . '/../../noyau/connexion.php';
 require_once __DIR__ . '/../../noyau/fonctions.php';
 exiger_role(['DIRECTEUR', 'SECRETAIRE', 'COMPTABLE']);

@@ -6,7 +6,7 @@
 //  Onglet « Générer les NIU » : génération en masse des NIU manquants,
 //    par école ou pour tout le réseau. Réglage du format (sigle par école).
 // Génération / modification d'un NIU : superadmin de l'association uniquement.
-require_once __DIR__ . '/../../config.php';
+require_once __DIR__ . '/../../config/config.php';
 require_once __DIR__ . '/../../noyau/connexion.php';
 require_once __DIR__ . '/../../noyau/fonctions.php';
 require_once __DIR__ . '/../_layout.php';

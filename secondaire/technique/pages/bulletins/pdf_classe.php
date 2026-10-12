@@ -3,7 +3,7 @@
  * PDF de tous les bulletins d'une classe (un élève par page)
  * GET : classe, trim|seq, annee, ordre (alpha|merite), dl (0|1)
  */
-require_once __DIR__ . '/../../../../config.php';
+require_once __DIR__ . '/../../../../config/config.php';
 require_once __DIR__ . '/../../../../noyau/connexion.php';
 require_once __DIR__ . '/../../../../noyau/fonctions.php';
 exiger_connexion();

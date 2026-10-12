@@ -6,7 +6,7 @@
 // RESULTATS DE L'ELEVE en 4 colonnes (3 trimestres + annuelle).
 //
 // GET : id (bulletin d'UN élève) — OU classe (tous les élèves classés).
-require_once __DIR__ . '/../../config.php';
+require_once __DIR__ . '/../../config/config.php';
 require_once __DIR__ . '/../../noyau/connexion.php';
 require_once __DIR__ . '/../../noyau/fonctions.php';
 require_once __DIR__ . '/../notes_apc.php';

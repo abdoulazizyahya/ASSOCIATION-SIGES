@@ -9,7 +9,7 @@
  * GET : classe (0 = toutes les classes), dl (0|1),
  *       vh+va = accès public via le QR de vérification (voir plus bas).
  */
-require_once __DIR__ . '/../../../../config.php';
+require_once __DIR__ . '/../../../../config/config.php';
 require_once __DIR__ . '/../../../../noyau/connexion.php';
 require_once __DIR__ . '/../../../../noyau/fonctions.php';
 require_once __DIR__ . '/../../../commun/pdf/verif_releve_vierge_lib.php';

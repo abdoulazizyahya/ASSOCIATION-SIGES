@@ -1,11 +1,11 @@
 <?php
 // primaire/pages/enseignants/statut.php — Active/désactive un membre du personnel
 // (pattern primaire/pages/eleves/statut.php). Ne bloque PAS la connexion d'un compte
-// `user` déjà existant pour ce matricule (login.php ne vérifie pas
+// `user` déjà existant pour ce matricule (compte/login.php ne vérifie pas
 // statut_ens) — un membre désactivé disparaît juste des effectifs actifs
 // (listes, génération de paie), la révocation d'accès reste un geste
 // séparé (primaire/pages/utilisateurs/liste.php) si nécessaire.
-require_once __DIR__ . '/../../../config.php';
+require_once __DIR__ . '/../../../config/config.php';
 require_once __DIR__ . '/../../../noyau/connexion.php';
 require_once __DIR__ . '/../../../noyau/fonctions.php';
 exiger_role(['DIRECTEUR']);

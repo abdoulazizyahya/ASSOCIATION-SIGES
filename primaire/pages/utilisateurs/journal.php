@@ -5,7 +5,7 @@
 //  financier…) : qui, quand, depuis quel appareil et quelle localisation.
 //  Données centralisées dans promeducam_assoc.journal_audit — voir
 //  bd/lib/audit.php + connexion_assoc.php::audit_journal().
-require_once __DIR__ . '/../../../config.php';
+require_once __DIR__ . '/../../../config/config.php';
 require_once __DIR__ . '/../../../noyau/connexion.php';
 require_once __DIR__ . '/../../../noyau/fonctions.php';
 require_once __DIR__ . '/../../../bd/lib/audit_vue.php';

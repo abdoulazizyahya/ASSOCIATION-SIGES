@@ -1,7 +1,7 @@
 <?php
 // secondaire/commun/pages/matieres/supprimer.php — suppression d'une matière du
 // catalogue (porté de LAM_ABZ/pages/matieres/supprimer.php).
-require_once __DIR__ . '/../../../../config.php';
+require_once __DIR__ . '/../../../../config/config.php';
 require_once __DIR__ . '/../../../../noyau/connexion.php';
 require_once __DIR__ . '/../../../../noyau/fonctions.php';
 exiger_role(['ADMIN', 'PROVISEUR', 'FONDATEUR', 'CENSEUR']);

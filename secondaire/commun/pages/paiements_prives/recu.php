@@ -3,7 +3,7 @@
 // élève (un seul numéro par élève). Porté de primaire/pages/finances/recu.php
 // (primaire) — SIMPLIFIÉ : pas d'accès public par QR (voir
 // secondaire/commun/pdf/prive_recu_lib.php), toujours réservé au personnel.
-require_once __DIR__ . '/../../../../config.php';
+require_once __DIR__ . '/../../../../config/config.php';
 require_once __DIR__ . '/../../../../noyau/connexion.php';
 require_once __DIR__ . '/../../../../noyau/fonctions.php';
 exiger_role(['ADMIN', 'PROVISEUR', 'SECRETAIRE', 'INTENDANT']);

@@ -5,7 +5,7 @@
 // primaire/pages/finances/statistiques.php, vue stratégique réservée au Directeur).
 // Le montant dû par élève = somme de toutes les obligations de son niveau
 // (voir primaire/pages/finances/obligations.php), comme le reste du module.
-require_once __DIR__ . '/../../../config.php';
+require_once __DIR__ . '/../../../config/config.php';
 require_once __DIR__ . '/../../../noyau/connexion.php';
 require_once __DIR__ . '/../../../noyau/fonctions.php';
 exiger_role(['DIRECTEUR', 'SECRETAIRE', 'COMPTABLE']);

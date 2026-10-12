@@ -2,7 +2,7 @@
 // primaire/pages/finances/excel_repartition_classes.php — Export Excel de la
 // répartition des encaissements par classe, mêmes données que
 // primaire/pages/finances/repartition_classes.php.
-require_once __DIR__ . '/../../../config.php';
+require_once __DIR__ . '/../../../config/config.php';
 require_once __DIR__ . '/../../../noyau/connexion.php';
 require_once __DIR__ . '/../../../noyau/fonctions.php';
 require_once __DIR__ . '/../../../vendor/autoload.php';

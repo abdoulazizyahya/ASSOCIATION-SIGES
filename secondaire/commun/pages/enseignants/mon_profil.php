@@ -18,7 +18,7 @@
  * (déjà présent côté SIGES, désormais type-aware secondaire).
  */
 header('Cache-Control: no-store, no-cache, must-revalidate');
-require_once __DIR__ . '/../../../../config.php';
+require_once __DIR__ . '/../../../../config/config.php';
 require_once __DIR__ . '/../../../../noyau/connexion.php';
 require_once __DIR__ . '/../../../../noyau/fonctions.php';
 // Ouvert à TOUT le personnel (03/10/2026) : chacun voit et complète SES
@@ -33,7 +33,7 @@ $mat = matricule_ens_courant();
 // pré-remplie depuis son compte, puis la complète ci-dessous.
 if (!$mat) {
     $compte = db_one("SELECT id, nom, prenom, email, role FROM utilisateur WHERE id=?", [(int) ($_SESSION['user_id'] ?? 0)]);
-    if (!$compte) { flash_set('erreur', 'Compte introuvable.'); rediriger('dashboard.php'); }
+    if (!$compte) { flash_set('erreur', 'Compte introuvable.'); rediriger('noyau/dashboard.php'); }
     if ($_SERVER['REQUEST_METHOD'] === 'POST' && post('form') === 'creer_fiche') {
         csrf_verifier();
         db_exec("INSERT INTO enseignant (nom_ens, prenom_ens, mail_ens, id_fonction) VALUES (?, ?, ?, ?)",
@@ -73,7 +73,7 @@ if (!$mat) {
 }
 
 $e = db_one("SELECT * FROM enseignant WHERE matricule_ens=?", [$mat]);
-if (!$e) { flash_set('erreur', 'Fiche enseignant introuvable.'); rediriger('dashboard.php'); }
+if (!$e) { flash_set('erreur', 'Fiche enseignant introuvable.'); rediriger('noyau/dashboard.php'); }
 
 $v = fn(string $k) => $e[$k] ?? '';
 $regions = db_all("SELECT id, nom FROM region ORDER BY nom");

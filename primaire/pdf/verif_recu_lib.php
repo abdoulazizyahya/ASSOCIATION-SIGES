@@ -2,13 +2,13 @@
 // primaire/pdf/verif_recu_lib.php — signature et vérification d'authenticité du reçu
 // de paiement PAR ÉLÈVE (primaire/pages/finances/recu.php). Même pattern que
 // primaire/pdf/verif_lib.php (bulletins) : hash HMAC signé, QR mis en cache disque,
-// page publique verif_recu.php qui recharge toujours les données depuis la
+// page publique verif/recu.php qui recharge toujours les données depuis la
 // BD (jamais confiance en un paramètre d'URL). Secret séparé de
 // BULLETIN_VERIF_SECRET (documents différents, jamais interchangeables).
 
 if (!defined('RECU_VERIF_SECRET')) {
     // ⚠️ À FAIRE AVANT MISE EN PRODUCTION : définir une vraie valeur secrète
-    // dans config.php, ex. define('RECU_VERIF_SECRET', bin2hex(random_bytes(32)));
+    // dans config/config.php, ex. define('RECU_VERIF_SECRET', bin2hex(random_bytes(32)));
     define('RECU_VERIF_SECRET', 'CHANGE_ME_RECU_INSECURE_DEFAULT_SECRET');
 }
 require_once __DIR__ . '/../../noyau/partage/verif/verif_commun.php';
@@ -39,7 +39,7 @@ function recu_verif_base_url(): string {
 
 function recu_verif_url(int $id_eleve, string $val_annee, string $numero): string {
     $h = recu_verif_hash($id_eleve, $val_annee, $numero);
-    return verif_ajout_ec(recu_verif_base_url() . '/verif_recu.php?e=' . $id_eleve . '&a=' . urlencode($val_annee) . '&h=' . $h);
+    return verif_ajout_ec(recu_verif_base_url() . '/verif/recu.php?e=' . $id_eleve . '&a=' . urlencode($val_annee) . '&h=' . $h);
 }
 
 /**

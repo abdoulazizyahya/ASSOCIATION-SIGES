@@ -4,7 +4,7 @@
 // cette étape (carrière/administratif détaillé — arrêté de recrutement,
 // affectation, etc. — laissé pour une itération future si besoin, LAM_ABZ
 // a le modèle complet dans primaire/pages/enseignants/form.php).
-require_once __DIR__ . '/../../../../config.php';
+require_once __DIR__ . '/../../../../config/config.php';
 require_once __DIR__ . '/../../../../noyau/connexion.php';
 require_once __DIR__ . '/../../../../noyau/fonctions.php';
 require_once __DIR__ . '/../../../../noyau/paie_fonctions.php';

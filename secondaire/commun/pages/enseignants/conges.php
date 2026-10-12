@@ -3,7 +3,7 @@
 // du personnel, porté de primaire/pages/enseignants/conges.php (primaire) à
 // l'identique — `deduit_paie=1` relie ce module à la paie via
 // jours_absence_deductibles() (paie_fonctions.php, réutilisée telle quelle).
-require_once __DIR__ . '/../../../../config.php';
+require_once __DIR__ . '/../../../../config/config.php';
 require_once __DIR__ . '/../../../../noyau/connexion.php';
 require_once __DIR__ . '/../../../../noyau/fonctions.php';
 require_once __DIR__ . '/../../../../noyau/paie_fonctions.php';

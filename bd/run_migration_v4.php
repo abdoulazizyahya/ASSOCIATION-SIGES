@@ -7,7 +7,7 @@
 //  Crée `arrondissement` (vide — voir bd/migration_v4.sql). Aucune donnée
 //  existante n'est modifiée.
 // =====================================================================
-require_once __DIR__ . '/../config.php';
+require_once __DIR__ . '/../config/config.php';
 require_once __DIR__ . '/../noyau/connexion.php';
 
 header('Content-Type: text/plain; charset=utf-8');
