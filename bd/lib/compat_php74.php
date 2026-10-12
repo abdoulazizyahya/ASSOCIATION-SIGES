@@ -67,7 +67,27 @@ if (!function_exists('compat_match_echec')) {
 // n'existe qu'à partir de PhpSpreadsheet 2.x, or la version installée est
 // 1.30 (dernière compatible PHP 7.4, voir composer.json). Sans cette
 // méthode, l'export se fait sans filigrane au lieu de planter.
+// PhpSpreadsheet 1.x : image d'EN-TÊTE de page (&G) — la méthode standard
+// d'Excel pour un filigrane, visible en mode « Mise en page » et à
+// l'impression / en PDF (pas en mode Normal à l'écran, contrairement au
+// fond de feuille de la 2.x).
 function excel_filigrane($sheet, string $chemin): void {
-    if ($chemin === '' || !is_file($chemin) || !method_exists($sheet, 'setBackgroundImage')) return;
-    $sheet->setBackgroundImage(file_get_contents($chemin));
+    if ($chemin === '' || !is_file($chemin)) return;
+    if (method_exists($sheet, 'setBackgroundImage')) {
+        $sheet->setBackgroundImage(file_get_contents($chemin));
+        return;
+    }
+    if (!class_exists('\PhpOffice\PhpSpreadsheet\Worksheet\HeaderFooterDrawing')) return;
+    $dim = @getimagesize($chemin);
+    $paysage = $sheet->getPageSetup()->getOrientation() === \PhpOffice\PhpSpreadsheet\Worksheet\PageSetup::ORIENTATION_LANDSCAPE;
+    $largeur = $paysage ? 900 : 640;   // px, ~ largeur utile d'une page A4
+    $img = new \PhpOffice\PhpSpreadsheet\Worksheet\HeaderFooterDrawing();
+    $img->setName('Filigrane');
+    $img->setPath($chemin);
+    $img->setWidth($largeur);
+    $img->setHeight($dim && $dim[0] > 0 ? (int) round($largeur * $dim[1] / $dim[0]) : (int) round($largeur * 0.7));
+    $hf = $sheet->getHeaderFooter();
+    $hf->addImage($img, \PhpOffice\PhpSpreadsheet\Worksheet\HeaderFooter::IMAGE_HEADER_CENTER);
+    $hf->setOddHeader('&C&G');
+    $hf->setEvenHeader('&C&G');
 }
