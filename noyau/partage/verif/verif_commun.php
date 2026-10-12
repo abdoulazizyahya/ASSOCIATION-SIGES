@@ -61,6 +61,30 @@ function verif_cle_privee_pem(): ?string {
 }
 
 /**
+ * QR imprimé SANS &ec=CODE (documents générés avant l'ajout du code
+ * d'école) alors que l'annuaire compte plusieurs écoles : essaie chaque
+ * école active du type donné et garde la première pour laquelle $valide()
+ * renvoie vrai (le hash HMAC du document ne correspond qu'à une seule
+ * école). Bascule seulement la base de la requête — jamais la session :
+ * un visiteur connecté par ailleurs garde son école. Vrai si une école est
+ * déjà résolue ou vient de l'être.
+ */
+function verif_trouver_ecole(string $type, callable $valide): bool {
+    global $link, $ETAB_COURANT;
+    if (!verif_multi_ecoles() || (function_exists('ecole_courante') && ecole_courante())) return true;
+    foreach (assoc_all("SELECT * FROM etablissement WHERE actif=1 AND type_enseignement=? ORDER BY id", [$type]) as $e) {
+        try {
+            $ETAB_COURANT = $e;
+            mysqli_select_db($link, $e['db_name']);
+            if (function_exists('db_cache_vider')) db_cache_vider();
+            if ($valide()) return true;
+        } catch (\Throwable $ex) { /* base indisponible : école suivante */ }
+    }
+    $ETAB_COURANT = null;
+    return false;
+}
+
+/**
  * Garde des pages PUBLIQUES de vérification (verif_*.php) en multi-école :
  * si l'URL scannée n'a pas résolu d'établissement (pas de &ec=CODE, pas de
  * sous-domaine), on ne sait pas dans quelle base chercher le document —

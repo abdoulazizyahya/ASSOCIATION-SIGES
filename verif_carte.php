@@ -14,6 +14,23 @@
 require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/noyau/connexion.php';
 require_once __DIR__ . '/noyau/fonctions.php';
+
+// Carte d'école SECONDAIRE (paramètre a = id d'année, numérique ; au
+// primaire a = libellé « 2025-2026 ») : page dédiée. Une carte imprimée
+// sans &ec=CODE retrouve son école (verif_trouver_ecole()). Avant le
+// 12/10/2026 ce QR finissait en erreur fatale (schéma du primaire).
+// Aiguillage AVANT la bibliothèque du primaire : mêmes noms de fonctions.
+if (ctype_digit((string) ($_GET['a'] ?? ''))) {
+    require_once __DIR__ . '/secondaire/commun/pdf/verif_carte_lib.php';
+    verif_trouver_ecole('secondaire', function () {
+        try { return carte_sec_verif_valider((int) ($_GET['e'] ?? 0), (int) $_GET['a'], (string) ($_GET['h'] ?? '')) !== null; }
+        catch (\Throwable $e) { return false; }
+    });
+    if (!ecole_courante() || type_enseignement_courant() === 'secondaire') {
+        require __DIR__ . '/secondaire/commun/verif_carte_contenu.php';
+        exit;
+    }
+}
 require_once __DIR__ . '/primaire/pdf/verif_carte_lib.php';
 verif_exiger_ecole_publique();  // multi-école : URL sans &ec= -> page neutre
 

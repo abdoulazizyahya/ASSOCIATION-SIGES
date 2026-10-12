@@ -135,7 +135,10 @@ if (function_exists('type_enseignement_courant')) {
                                 'primaire/pages/eleves/photos_seance.php', 'secondaire/commun/pages/eleves/photos_seance.php',
                                 // Vérification publique du certificat de scolarité (QR) : type-aware
                                 // — sans cela, un QR d'école secondaire tombait sur « En construction ».
-                                'verif_scolarite.php', 'verif_bulletin.php'], true) || str_starts_with($_rel, 'noyau/ajax/');
+                                'verif_scolarite.php', 'verif_bulletin.php'], true) || str_starts_with($_rel, 'noyau/ajax/')
+                // Toute page publique de vérification de QR à la racine
+                // (verif_paiement.php des reçus du secondaire, etc.).
+                || preg_match('~^verif_[a-z_]+\.php$~', $_rel);
     if (!$_commun) {
         $_secondaire = type_enseignement_courant() === 'secondaire';
         if ($_secondaire && !str_starts_with($_rel, 'secondaire/')) {
