@@ -231,7 +231,7 @@ foreach ($eleves_raw as $e) {
     $dest = $type === 'annee' && $e['decision'] === 'Admis'
         ? ($dest_noms[$e['next_classe']] ?? ($e['next_classe'] ? '#'.$e['next_classe'] : '-'))
         : '-';
-    $vals = [$n, id_affichage_eleve($e), $e['nom'].' '.$e['prenom'], $moyFmt, $e['rang'], $e['abs_jus'].'h', $e['abs_nj'].'h', $e['excl_j'].'j'];
+    $vals = [$n, niu_eleve($e), $e['nom'].' '.$e['prenom'], $moyFmt, $e['rang'], $e['abs_jus'].'h', $e['abs_nj'].'h', $e['excl_j'].'j'];
     if ($type === 'annee') { $vals[] = $e['decision'] ?: '-'; $vals[] = $dest; $vals[] = $e['observation']; }
     else { $vals[] = $e['decision'] ?: 'RAS'; $vals[] = $e['observation']; }
     foreach ($cols as $i => $c) {

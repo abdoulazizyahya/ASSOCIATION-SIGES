@@ -8,6 +8,17 @@
 //  valeurs par défaut ci-dessous s'appliquent, comportement historique
 //  inchangé. En production (Camoo, cPanel), déposer un config.local.php
 //  d'après config.local.php.example. config.local.php est gitignoré.
+
+// Version de PHP : 7.4 minimum (testé de 7.4 à 8.4). Syntaxe volontairement
+// ancienne ici pour que le message s'affiche même sous un très vieux PHP.
+if (version_compare(PHP_VERSION, '7.4.0', '<')) {
+    header('Content-Type: text/html; charset=utf-8');
+    exit('<p style="font:15px sans-serif;padding:2em">Ce système nécessite <b>PHP 7.4 ou plus récent</b> '
+       . '(PHP 8.3 recommandé) — version installée : <b>' . PHP_VERSION . '</b>.<br>'
+       . 'WampServer : clic sur l’icône → PHP → Version → choisir 7.4 ou plus.</p>');
+}
+require_once __DIR__ . '/bd/lib/compat_php74.php';   // fonctions PHP 8 absentes de PHP 7.4
+
 if (is_file(__DIR__ . '/config.local.php')) {
     require __DIR__ . '/config.local.php';
 }

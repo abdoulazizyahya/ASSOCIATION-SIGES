@@ -144,6 +144,11 @@ $id_eleve = (int)($_GET['eleve'] ?? 0);
 $id_trim  = (int)($_GET['trim']  ?? 0);
 $id_seq_u = (int)($_GET['seq']   ?? 0);
 $id_annee = (int)($_GET['annee'] ?? 0);
+// Mise en page (choix de l'utilisateur, bouton à côté de l'ordre dans
+// secondaire/pages/bulletins/index.php) : 'page' = tout forcé sur UNE page
+// (police et espacements réduits au besoin, comportement historique) ;
+// 'lisible' = police et espacements confortables, sur 2 pages au maximum.
+$lisible = ($_GET['mise'] ?? '') === 'lisible';
 
 if (!$id_eleve) die('Parametre eleve manquant.');
 
@@ -388,13 +393,63 @@ $ph = $pdf->GetPageHeight();
 $ml = 8; $mr = 8;
 $uw = $pw - $ml - $mr; // 194
 
-pdf_filigrane($pdf, $etab, $pw, $ph);
+// QR code de vérification d'authenticité : position FIXE sur chaque page,
+// centré, son bas collé à la ligne du copyright ($ph - 9), dessiné EN DERNIER
+// (au premier plan, par-dessus tableaux et textes — demande explicite). Il ne
+// réserve aucune place dans la mise en page. Photo de
+// l'élève incrustée au centre (le niveau de correction d'erreur qr-h tolère
+// ~30% de perte, une photo sur ~20% de la surface reste donc scannable).
+require_once __DIR__ . '/../../pdf/qrcode.php';
+$qr_taille = 20;
+$y_qr      = ($ph - 9) - $qr_taille;   // bas du QR collé à la ligne du copyright
+$qr_photo  = !empty($eleve['photo']) ? photo_sec_fichier_tmp((int) $eleve['id']) : '';
+if (!$qr_photo || !is_file($qr_photo)) {
+    $qr_photo = __DIR__ . '/../../../assets/img/avatars/' . ((strtoupper($eleve['sexe'] ?? '') === 'F') ? 'fille.png' : 'garcon.png');
+}
+$qr_base = tempnam(sys_get_temp_dir(), 'abzqr_');
+$qr_tmp  = $qr_base . '.png';
+register_shutdown_function(function () use ($qr_base, $qr_tmp) {
+    foreach ([$qr_base, $qr_tmp] as $fic) { if (is_file($fic)) @unlink($fic); }
+});
+$qr_img = (new QRCode(bulletin_verif_url(
+    $id_eleve,
+    $is_seq ? 'seq' : 'trim',
+    $is_seq ? $id_seq_u : $id_trim,
+    id_affichage_eleve($eleve)
+), ['s' => 'qr-h']))->render_image();   // qr-h = correction d'erreur élevée (impression papier)
+qr_incruster_photo($qr_img, $qr_photo);
+imagepng($qr_img, $qr_tmp);
+imagedestroy($qr_img);
 
-// Cadre extérieur à coins arrondis (comme le modèle papier)
-$pdf->SetDrawColor(0, 0, 0);
-$pdf->SetLineWidth(0.4);
-$pdf->RoundedRect(4, 4, $pw - 8, $ph - 8, 4, 'D');
-$pdf->SetLineWidth(0.2);
+// Habillage de chaque page : filigrane + cadre extérieur à coins arrondis
+// (comme le modèle papier) au début, copyright (+ tampon AUTHENTIQUE si
+// ouvert depuis le QR) à la fin. En mode lisible, une 2e page reçoit le
+// même habillage (sauts de page gérés à la main, voir section 4).
+$decor_page = function () use ($pdf, $etab, $pw, $ph) {
+    pdf_filigrane($pdf, $etab, $pw, $ph);
+    $pdf->SetDrawColor(0, 0, 0);
+    $pdf->SetLineWidth(0.4);
+    $pdf->RoundedRect(4, 4, $pw - 8, $ph - 8, 4, 'D');
+    $pdf->SetLineWidth(0.2);
+};
+$fin_page = function () use ($pdf, $ml, $uw, $pw, $ph, $acces_public, $qr_tmp, $qr_taille, $y_qr) {
+    // QR au premier plan : dessiné après tout le contenu de la page.
+    $pdf->Image($qr_tmp, ($pw - $qr_taille) / 2, $y_qr, $qr_taille, $qr_taille, 'PNG');
+    $pdf->SetFont('Arial', '', 6.5);
+    $pdf->SetXY($ml, $ph - 9);
+    $pdf->Cell($uw, 4, u('Copyright © SIGES ABZ   , E-mail: abdoulazizyahya@gmail.com'), 0, 1, 'C');
+    // Ouvert depuis le scan du QR code : tampon « AUTHENTIQUE » comme sur les
+    // reçus, redessiné PAR-DESSUS le bulletin (lettres creuses) — celui posé
+    // en fond par pdf_filigrane() serait caché par les cases remplies.
+    if ($acces_public) {
+        pdf_tampon_authentique($pdf, $pw / 2, $ph * 0.52, $pw * 0.80, 'AUTHENTIQUE', true);
+    }
+};
+$decor_page();
+if ($lisible) {
+    $pdf->SetAutoPageBreak(false);   // sauts de page décidés à la main (une matière n'est jamais coupée)
+    $pdf->SetDisplayMode('real');    // ouverture à 100 %
+}
 
 // ── 1. En-tête bilingue ──────────────────────────────────────────
 $col3 = $uw / 3;
@@ -426,7 +481,7 @@ if ($logo_path && is_file($logo_path)) {
 $logo_x = $ml + $col3 + ($col3 - $logo_w) / 2;
 $logo_y = $y0 + ($logo_bande_h - $logo_h) / 2;
 if ($logo_path && is_file($logo_path)) {
-    $pdf->Image($logo_path, $logo_x, $logo_y+5, $logo_w);
+    // (logo dessiné plus bas, une fois la position de l'immatriculation connue)
 } else {
     $pdf->SetFont('Arial', 'B', 10);
     $pdf->SetXY($logo_x, $y0 + ($logo_bande_h - 16) / 2);
@@ -605,6 +660,14 @@ function cell2l(FPDF $pdf, float $w, float $h, string $fr, string $en, string $a
 // des compétences).
 $photo_w = 20;
 $photo_h = 22;
+// Mode lisible : lignes d'identification plus hautes et espacées, polices
+// agrandies ; la case photo suit la hauteur du bloc (photo non déformée).
+$h_id  = $lisible ? 6.4 : 4.7;   // hauteur d'une ligne
+$g_id  = $lisible ? 0.9 : 0.2;   // espace entre deux lignes
+$f_lbl = $lisible ? 8.5 : 8;     // libellé FR (gras)
+$f_en  = $lisible ? 7 : 7.5;     // libellé EN (italique)
+$f_val = $lisible ? 9 : 8;       // valeurs
+if ($lisible) $photo_h = 5 * $h_id + 4 * $g_id;
 $x_photo = $ml;
 $y_photo = $pdf->GetY();
 $x_info  = $ml + $photo_w;
@@ -622,7 +685,13 @@ if (!$photo_reelle) {
 $pdf->SetDrawColor(0, 0, 0);
 $pdf->Rect($x_photo, $y_photo, $photo_w, $photo_h);
 if (is_file($photo_path)) {
-    $pdf->Image($photo_path, $x_photo + 0.5, $y_photo + 0.5, $photo_w - 1, $photo_h - 1);
+    if ($lisible) {
+        $dim_ph = @getimagesize($photo_path);
+        $h_img  = ($dim_ph && $dim_ph[0] > 0) ? min($photo_h - 1, ($photo_w - 1) * $dim_ph[1] / $dim_ph[0]) : $photo_h - 1;
+        $pdf->Image($photo_path, $x_photo + 0.5, $y_photo + ($photo_h - $h_img) / 2, $photo_w - 1, $h_img);
+    } else {
+        $pdf->Image($photo_path, $x_photo + 0.5, $y_photo + 0.5, $photo_w - 1, $photo_h - 1);
+    }
 }
 
 $gris = [230, 230, 230];
@@ -631,62 +700,63 @@ $pdf->SetFont('Arial', 'B', 7);
 
 $wL1 = [24, 34, 18, 14, 18, 60]; // somme = 168 = $w_info
 $pdf->SetXY($x_info, $y_photo);
-cell2l($pdf, 30, 4.7, 'CLASSE :', 'Class', 'L', true, 8, 7.5, $gris, true);
-$pdf->SetFont('Arial', 'I', 8);
-$pdf->Cell(45, 4.7, u($insc['classe'] ?? ''), 1, 0, 'L');
-cell2l($pdf, $wL1[2], 4.7, 'EFFECTIF :', 'Size', 'L', true, 8, 7.5, $gris, true);
-$pdf->SetFont('Arial', 'I', 8);
-$pdf->Cell($wL1[3], 4.7, (string)$nb_inscrits, 1, 0, 'C');
-cell2l($pdf, 41, 4.7, 'IDENTIFIANT UNIQUE (NIU) :', 'ID No.', 'L', true, 8, 7.5, $gris, true);
-$pdf->SetFont('Arial', 'I', 8);
-
-$pdf->Cell(20, 4.7, id_affichage_eleve($eleve), 1, 1, 'C');
-$pdf->ln(0.2);
+cell2l($pdf, 30, $h_id, 'CLASSE :', 'Class', 'L', true, $f_lbl, $f_en, $gris, true);
+$pdf->SetFont('Arial', 'I', $f_val);
+$pdf->Cell(45, $h_id, u($insc['classe'] ?? ''), 1, 0, 'L');
+cell2l($pdf, $wL1[2], $h_id, 'EFFECTIF :', 'Size', 'L', true, $f_lbl, $f_en, $gris, true);
+$pdf->SetFont('Arial', 'I', $f_val);
+$pdf->Cell($wL1[3], $h_id, (string)$nb_inscrits, 1, 0, 'C');
+cell2l($pdf, 41, $h_id, 'IDENTIFIANT UNIQUE (NIU) :', 'ID No.', 'L', true, $f_lbl, $f_en, $gris, true);
+// Taille ajustée à la case (un NIU long ne déborde jamais).
+$pdf->SetFont('Arial', 'I', cell2l_taille_ajustee($pdf, niu_eleve($eleve), 'I', 20 - 1.4, $f_val, 5));
+$pdf->Cell(20, $h_id, niu_eleve($eleve), 1, 1, 'C');
+$pdf->ln($g_id);
 $pdf->SetX($x_info);
 //$pdf->SetFont('Arial', 'B', 17);
-cell2l($pdf, 30, 4.7, 'NOM ET PRENOMS :', 'ID No.', 'L', true, 8, 7.5, $gris, true);
-//	cell2l($pdf, 26, 4.7, 'NOM ET PRENOMS :', 'Name', 'L', true, 28, 7.5, $gris, true);
-$pdf->SetFont('Arial', 'BI', 9);
-$pdf->Cell(110, 4.7, u(strtoupper($eleve['nom']) . ' ' . ($eleve['prenom'] ?? '')), 1, 0, 'L');
-cell2l($pdf, 16, 4.7, 'GENRE :', 'Gender', 'L', true, 8, 7.5, $gris, true);
-$pdf->SetFont('Arial', 'I', 8);
-$pdf->Cell(12, 4.7, $eleve['sexe'] ?? '', 1, 1, 'C');
+cell2l($pdf, 30, $h_id, 'NOM ET PRENOMS :', 'Name', 'L', true, $f_lbl, $f_en, $gris, true);
+//	cell2l($pdf, 26, $h_id, 'NOM ET PRENOMS :', 'Name', 'L', true, 28, 7.5, $gris, true);
+$pdf->SetFont('Arial', 'BI', $lisible ? 10.5 : 9);
+$pdf->Cell(110, $h_id, u(strtoupper($eleve['nom']) . ' ' . ($eleve['prenom'] ?? '')), 1, 0, 'L');
+cell2l($pdf, 16, $h_id, 'GENRE :', 'Gender', 'L', true, $f_lbl, $f_en, $gris, true);
+$pdf->SetFont('Arial', 'I', $f_val);
+$pdf->Cell(12, $h_id, $eleve['sexe'] ?? '', 1, 1, 'C');
 
-$pdf->ln(0.2);
+$pdf->ln($g_id);
 $pdf->SetX($x_info);
-cell2l($pdf, 18, 4.7, 'NE(E) LE :', 'Born on', 'L', true, 8, 7.5, $gris, true);
-$pdf->SetFont('Arial', 'I', 8);
+cell2l($pdf, 18, $h_id, 'NE(E) LE :', 'Born on', 'L', true, $f_lbl, $f_en, $gris, true);
+$pdf->SetFont('Arial', 'I', $f_val);
 $dnaiss = $eleve['date_naiss'] ? date('d/m/Y', strtotime($eleve['date_naiss'])) : '';
-$pdf->Cell(22, 4.7, $dnaiss, 1, 0, 'C');
-$pdf->SetFont('Arial', 'B', 8);
-$pdf->Cell(10, 4.7, 'A/at', 1, 0, 'C', true);
-$pdf->SetFont('Arial', 'I', 8);
-$pdf->Cell(64, 4.7, u($eleve['lieu_naiss'] ?? ''), 1, 0, 'L');
-cell2l($pdf, 26, 4.7, 'REDOUBLANT :', 'Repeater', 'L', true, 8, 7.5, $gris, true);
+$pdf->Cell(22, $h_id, $dnaiss, 1, 0, 'C');
+$pdf->SetFont('Arial', 'B', $f_val);
+$pdf->Cell(10, $h_id, 'A/at', 1, 0, 'C', true);
+$pdf->SetFont('Arial', 'I', $f_val);
+$pdf->Cell(64, $h_id, u($eleve['lieu_naiss'] ?? ''), 1, 0, 'L');
+cell2l($pdf, 26, $h_id, 'REDOUBLANT :', 'Repeater', 'L', true, $f_lbl, $f_en, $gris, true);
 $is_redoub = (strtolower($insc['statut'] ?? '') === 'redoublant');
 $y_row3 = $pdf->GetY();
 $x_row3 = $pdf->GetX();
-$pdf->Cell(28, 4.7, '', 1, 1, 'L');
-$pdf->SetFont('Arial', 'I', 8);
-$pdf->SetXY($x_row3 + 1, $y_row3 + 1);
+$pdf->Cell(28, $h_id, '', 1, 1, 'L');
+$pdf->SetFont('Arial', 'I', $f_val);
+$dy3 = ($h_id - 3) / 2;
+$pdf->SetXY($x_row3 + 1, $y_row3 + $dy3);
 $pdf->Cell(7, 3, 'Oui', 0, 0, 'L');
-checkbox_ltm($pdf, $x_row3 + 8, $y_row3 + 1, $is_redoub);
-$pdf->SetXY($x_row3 + 15, $y_row3 + 1);
+checkbox_ltm($pdf, $x_row3 + 8, $y_row3 + $dy3, $is_redoub);
+$pdf->SetXY($x_row3 + 15, $y_row3 + $dy3);
 $pdf->Cell(7, 3, 'Non', 0, 0, 'L');
-checkbox_ltm($pdf, $x_row3 + 23, $y_row3 + 1, !$is_redoub);
+checkbox_ltm($pdf, $x_row3 + 23, $y_row3 + $dy3, !$is_redoub);
 
 //$pdf->ln(20);
-$pdf->SetXY($x_info, $y_row3 + 5.0);
+$pdf->SetXY($x_info, $y_row3 + $h_id + $g_id + 0.1);
 //$pdf->ln();
-cell2l($pdf, 30, 4.7, 'PROF PRINCIPAL :', 'Class Teacher', 'L', true, 8, 7.5, $gris, true);
-$pdf->SetFont('Arial', 'I', 8);
-$pdf->Cell(138, 4.7, u($nom_pp), 1, 1, 'L');
+cell2l($pdf, 30, $h_id, 'PROF PRINCIPAL :', 'Class Teacher', 'L', true, $f_lbl, $f_en, $gris, true);
+$pdf->SetFont('Arial', 'I', $f_val);
+$pdf->Cell(138, $h_id, u($nom_pp), 1, 1, 'L');
 
-$pdf->ln(0.2);
+$pdf->ln($g_id);
 $pdf->SetX($x_info);
-cell2l($pdf, 42, 4.7, 'NOM ET CONTACTS DES PARENTS :', "Parent's Name & Contact", 'L', true, 8, 7.5, $gris, true);
-$pdf->SetFont('Arial', '', 7);
-$pdf->Cell(126, 4.7, u($contacts_parents), 1, 1, 'L');
+cell2l($pdf, 42, $h_id, 'NOM ET CONTACTS DES PARENTS :', "Parent's Name & Contact", 'L', true, $f_lbl, $f_en, $gris, true);
+$pdf->SetFont('Arial', '', $lisible ? 8.5 : 7);
+$pdf->Cell(126, $h_id, u($contacts_parents), 1, 1, 'L');
 
 $pdf->SetY(max($pdf->GetY(), $y_photo + $photo_h));
 
@@ -722,10 +792,13 @@ $decisions = [
     ["Risque l'exclusion définitive", 'Risk the definitive exclusion'],
     ['Exclusion', 'Exclusion'],
 ];
+// Mode lisible : bas du bulletin plus aéré (lignes et cases de décision plus hautes).
+if ($lisible) { $h_bas = 7; $h_ligne = 6.6; $h_dec = 4.2; $hdr_h = 5.5; }
 // Revenu à $ph - 13 (une tentative à $ph - 10 privait le bloc signature/date
 // (offsets fixes dans la boîte OBSERVATIONS) de sa place habituelle et
 // provoquait un débordement sur une 2e page presque vide).
-$bas_dispo = $ph - 13; // marge bas + mention copyright
+$bas_dispo = $ph - 13; // marge bas + mention copyright (le QR, en fond, ne réserve aucune place)
+$h_sig_min = 30;   // hauteur mini du cadre OBSERVATIONS : date + « LE PRINCIPAL » + signature
 
 // Largeurs colonnes (somme = $uw = 194mm)
 $cD      = 82;  // COMPÉTENCES ÉVALUÉES / NOM DE L'ENSEIGNANT
@@ -766,7 +839,7 @@ function comp_wrap_lignes(FPDF $pdf, string $texte, float $largeur, float $taill
 // partout ailleurs dans ce bulletin) — l'espace manquant au-delà
 // de ce plancher doit venir de la compression des marges/espacements du
 // reste du bulletin (haut/bas de page), pas d'une police illisible.
-$footer_fixe = 1 + 6 * $h_ligne + 1 + $h_bas + count($decisions) * $h_dec;
+$footer_fixe = 1 + 6 * $h_ligne + 1 + $h_bas + max(count($decisions) * $h_dec, $h_sig_min);
 // Marge de sécurité de 6mm : le bloc date/signature (section 7, plus bas)
 // a des décalages fixes non capturés par $footer_fixe — sans cette marge,
 // une petite imprécision de prédiction du nombre de lignes suffit à faire
@@ -780,7 +853,60 @@ $taille_comp = 7.5;
 $lignes_par_mat = []; // [id_mat] => [ [id_comp, nb_lignes], ... ]
 $total_lignes = 0;
 $h_unit = 4;
-while (true) {
+
+// ── Mode lisible : police et espacements confortables, 2 pages au plus ──
+// Chaque compétence prend la hauteur de son texte (+ marge interne), chaque
+// matière reste entière sur une page, et le bas du bulletin (résultats,
+// décision, observations/signature, QR) reste groupé sur la dernière page.
+// On part de 9.5pt et on ne réduit (par pas de 0.25, plancher 7.5pt) que si
+// la pagination simulée dépasse 2 pages.
+$h_fin_tab   = $ph - 13;         // bas utile d'une page de tableau (sans QR)
+$y_haut_suite = 10;              // haut du tableau sur une page suivante
+$h_mat_l     = 6.2;              // ligne d'en-tête « COMPETENCE N: MATIERE »
+$pad_l       = 1.4;              // marge interne (haut + bas) d'une compétence
+$h_grp_min_l = 8;                // hauteur mini des compétences d'une matière (appréciation sur 2 lignes)
+$h_pied_l    = 2 + 6 * $h_ligne + $h_bas + 42;   // résultats + décision/observations + signature
+$h_txt_l     = 0;
+$h_grp_l     = [];               // [id_mat] => hauteur totale de la matière (en-tête compris)
+$h_obs_max_l = 42;               // hauteur du cadre OBSERVATIONS (date + signature)
+$serre_l     = false;            // 2e niveau : espacements resserrés (classes très chargées)
+while ($lisible) {
+    // Au-delà du plancher de 7.5pt, on resserre d'abord les espacements
+    // (marges internes, en-têtes de matière, cadre OBSERVATIONS), puis on
+    // autorise 7pt — toujours plus lisible que le mode « 1 page ».
+    if ($serre_l) {
+        $h_mat_l = 5.2; $pad_l = 0.8; $h_grp_min_l = 6.5; $h_obs_max_l = 36;
+        $h_ligne = 4.6; $h_dec = 3.6; $h_bas = 6;   // bas du bulletin un peu moins haut
+        $h_pied_l = 2 + 6 * $h_ligne + $h_bas + $h_obs_max_l;
+    }
+    $h_txt_l = $taille_comp * ($serre_l ? 0.44 : 0.47);
+    $lignes_par_mat = []; $h_grp_l = [];
+    foreach ($disciplines as $d) {
+        $id_mat = (int)$d['id_mat'];
+        $lignes_par_mat[$id_mat] = [];
+        $h_lignes = 0;
+        foreach ($competences_par_mat[$id_mat] ?? [] as $c) {
+            $nl = comp_wrap_lignes($pdf, $c['libelle'], $cD, $taille_comp);
+            $lignes_par_mat[$id_mat][] = [(int)$c['id'], $nl];
+            $h_lignes += $nl * $h_txt_l + $pad_l;
+        }
+        $h_grp_l[$id_mat] = $h_mat_l + max($h_lignes, $h_grp_min_l);
+    }
+    $pages = 1; $y_sim = $y_table0 + $hdr_h;
+    foreach ($disciplines as $d) {
+        $h = $h_grp_l[(int)$d['id_mat']];
+        if ($y_sim + $h > $h_fin_tab) { $pages++; $y_sim = $y_haut_suite + $hdr_h; }
+        $y_sim += $h;
+    }
+    if ($y_sim + $h_pied_l > $bas_dispo) $pages++;   // le bas du bulletin tient au-dessus du QR
+    if ($pages <= 2) break;
+    if (!$serre_l && $taille_comp <= 7.5) { $serre_l = true; $taille_comp = 8.0; continue; }
+    if ($serre_l && $taille_comp <= 7.0) break;   // dernier recours : 3 pages plutôt qu'illisible
+    $taille_comp -= 0.25;
+}
+if ($lisible) $h_unit = $h_mat_l;
+
+while (!$lisible) {
     $lignes_par_mat = [];
     $total_lignes = 0;
     foreach ($disciplines as $d) {
@@ -810,29 +936,46 @@ while (true) {
 // date/signature (section 7) sur une page presque vide — mieux vaut que
 // $h_unit suive fidèlement $dispo_table (garantissant une seule page) que
 // de forcer une hauteur de ligne "confortable" hors budget.
-$h_unit = max(1.6, min(4.6, $h_unit));
+if (!$lisible) $h_unit = max(1.6, min(4.6, $h_unit));
 $pdf->SetFont('Arial', '', 6.5);
 
-// En-tête tableau
-$pdf->SetFont('Arial', 'B', 6.3);
-pdf_fill($pdf, 'entete_tableau_individuel');
-$pdf->SetTextColor(255, 255, 255);
-$pdf->SetX($ml);
-$pdf->Cell($cD, $hdr_h, u("COMPÉTENCES ÉVALUÉES / NOM DE L'ENSEIGNANT"), 1, 0, 'C', true);
-$pdf->Cell($cN,      $hdr_h, 'N/20',   1, 0, 'C', true);
-$pdf->Cell($cM,      $hdr_h, 'M/20',   1, 0, 'C', true);
-$pdf->Cell($cCF,     $hdr_h, 'Coef',   1, 0, 'C', true);
-$pdf->Cell($cMXC,    $hdr_h, 'MxC',    1, 0, 'C', true);
-$pdf->Cell($cCOTE,   $hdr_h, 'Cote',   1, 0, 'C', true);
-$pdf->Cell($cMINMAX, $hdr_h, u('[Min-Max]'), 1, 0, 'C', true);
-$pdf->Cell($cAPPR,   $hdr_h, u("Appréciations et visa de l'enseignant"), 1, 1, 'C', true);
-$pdf->SetTextColor(0, 0, 0);
-$pdf->SetFillColor(255, 255, 255);
+// En-tête tableau (redessiné en haut de chaque page suivante en mode lisible)
+$entete_tableau = function () use ($pdf, $ml, $hdr_h, $cD, $cN, $cM, $cCF, $cMXC, $cCOTE, $cMINMAX, $cAPPR, $lisible) {
+    pdf_fill($pdf, 'entete_tableau_individuel');
+    $pdf->SetTextColor(255, 255, 255);
+    $pdf->SetX($ml);
+    $cols = [
+        [$cD, "COMPÉTENCES ÉVALUÉES / NOM DE L'ENSEIGNANT"], [$cN, 'N/20'], [$cM, 'M/20'], [$cCF, 'Coef'],
+        [$cMXC, 'MxC'], [$cCOTE, 'Cote'], [$cMINMAX, '[Min-Max]'], [$cAPPR, "Appréciations et visa de l'enseignant"],
+    ];
+    foreach ($cols as $i => [$larg, $txt]) {
+        // Chaque intitulé s'ajuste à sa colonne (jamais de débordement).
+        $t = cell2l_taille_ajustee($pdf, $txt, 'B', $larg - 1.4, $lisible ? 7.2 : 6.3, 4.2);
+        $pdf->SetFont('Arial', 'B', $t);
+        $pdf->Cell($larg, $hdr_h, u($txt), 1, $i === count($cols) - 1 ? 1 : 0, 'C', true);
+    }
+    $pdf->SetTextColor(0, 0, 0);
+    $pdf->SetFillColor(255, 255, 255);
+};
+// Mode lisible : page suivante avec le même habillage.
+$nouvelle_page = function () use ($pdf, $decor_page, $fin_page, $y_haut_suite) {
+    $fin_page();
+    $pdf->AddPage();
+    $decor_page();
+    $pdf->SetY($y_haut_suite);
+};
+$entete_tableau();
 
 $num_mat = 0;
 foreach ($disciplines as $d) {
     $num_mat++;
     $id_mat = (int)$d['id_mat'];
+    // Mode lisible : une matière qui ne tient plus sur la page part entière
+    // sur la page suivante, sous un en-tête de tableau répété.
+    if ($lisible && $pdf->GetY() + $h_grp_l[$id_mat] > $h_fin_tab) {
+        $nouvelle_page();
+        $entete_tableau();
+    }
     $comps  = $competences_par_mat[$id_mat] ?? [];
     $avg    = mat_avg_comp($id_eleve, $comps, $notes_idx, $notes_count, $nb_inscrits);
     $stat   = $mat_stats[$id_mat] ?? ['min' => null, 'avg' => null, 'max' => null];
@@ -847,17 +990,46 @@ foreach ($disciplines as $d) {
     $y_hdr = $pdf->GetY();
     $pdf->SetXY($ml, $y_hdr);
     pdf_fill($pdf, 'bandeau_section');
-    [$t_mat, $lib_mat] = fpdf_texte_ajuste($pdf, 'COMPETENCE ' . $num_mat . ': ' . mb_strtoupper($d['matiere']), $cD + $cN, 7.5, 5.5);
+    // Taille mesurée en GRAS (style réellement utilisé) : le titre ne déborde plus dans la colonne voisine.
+    $lib_mat = 'COMPETENCE ' . $num_mat . ': ' . mb_strtoupper($d['matiere']);
+    $t_mat   = cell2l_taille_ajustee($pdf, $lib_mat, 'B', $cD + $cN - 1.6, $lisible ? 9.5 : 7.5, 5);
     $pdf->SetFont('Arial', 'B', $t_mat);
     $pdf->Cell($cD + $cN, $h_unit, u($lib_mat), 1, 0, 'L', true);
-    [$t_ens, $lib_ens] = fpdf_texte_ajuste($pdf, $d['enseignant'] ?? '', $uw - $cD - $cN, 7, 5);
+    [$t_ens, $lib_ens] = fpdf_texte_ajuste($pdf, $d['enseignant'] ?? '', $uw - $cD - $cN, $lisible ? 8.5 : 7, 5);
     $pdf->SetFont('Arial', '', $t_ens);
     $pdf->Cell($uw - $cD - $cN, $h_unit, u($lib_ens), 1, 1, 'R', true);
     $pdf->SetFont('Arial', '', $taille_comp);
 
     $y_grp0 = $pdf->GetY();
 
-    if (empty($comps)) {
+    if ($lisible) {
+        // Chaque compétence prend la hauteur réelle de son texte + une marge
+        // interne ; la dernière s'allonge si la matière est trop courte pour
+        // loger l'appréciation sur 2 lignes.
+        $h_grp = 0;
+        $lignes = $comps ? $lignes_par_mat[$id_mat] : [[0, 1]];
+        $nb = count($lignes);
+        foreach ($lignes as $k => [$id_comp, $nb_lignes]) {
+            $comp = null;
+            foreach ($comps as $c) { if ((int)$c['id'] === $id_comp) { $comp = $c; break; } }
+            $h_row_reel = $nb_lignes * $h_txt_l + $pad_l;
+            if ($k === $nb - 1 && $h_grp + $h_row_reel < $h_grp_min_l) $h_row_reel = $h_grp_min_l - $h_grp;
+            $x0 = $ml; $y0 = $pdf->GetY();
+            $pdf->SetFillColor(...$bg);
+            $pdf->Rect($x0, $y0, $cD, $h_row_reel, 'DF');
+            $pdf->SetFont('Arial', $comp ? '' : 'I', $taille_comp);
+            $pdf->SetXY($x0, $y0 + $pad_l / 2);
+            $pdf->MultiCell($cD, $h_txt_l, u($comp ? ($comp['libelle'] ?? '') : 'Aucune compétence définie pour ce trimestre.'), 0, 'L', false);
+            $pdf->SetXY($x0 + $cD, $y0);
+            $v = $comp ? note_eff_comp($id_eleve, $id_comp, $notes_idx, $notes_count, $nb_inscrits) : null;
+            $pdf->SetFont('Arial', 'B', 9);
+            if ($v !== null) { if ($v < 10) $pdf->SetTextColor(180, 0, 0); else $pdf->SetTextColor(0, 100, 0); }
+            $pdf->Cell($cN, $h_row_reel, $v !== null ? fmt_note_b($v) : '', 1, 0, 'C', true);
+            $pdf->SetTextColor(0, 0, 0);
+            $pdf->SetXY($x0, $y0 + $h_row_reel);
+            $h_grp += $h_row_reel;
+        }
+    } elseif (empty($comps)) {
         $pdf->SetX($ml);
         $pdf->SetFillColor(...$bg);
         $pdf->Cell($cD, $h_unit, u('Aucune compétence définie pour ce trimestre.'), 1, 0, 'L', true);
@@ -918,24 +1090,24 @@ foreach ($disciplines as $d) {
 
     $centrer_y = fn(float $h_texte) => $y_grp0 + max(0, ($h_grp - $h_texte) / 2);
 
-    $pdf->SetFont('Arial', 'B', 8);
+    $pdf->SetFont('Arial', 'B', $lisible ? 9.5 : 8);
     if ($avg !== null) { if ($avg >= 10) $pdf->SetTextColor(0, 100, 0); else $pdf->SetTextColor(180, 0, 0); }
     $pdf->SetXY($x_fus, $centrer_y(4));
     $pdf->Cell($cM, 4, $avg !== null ? fmt_note_b($avg) : '', 0, 0, 'C');
     $pdf->SetTextColor(0, 0, 0);
 
-    $pdf->SetFont('Arial', 'B', 7.5);
+    $pdf->SetFont('Arial', 'B', $lisible ? 9 : 7.5);
     $pdf->SetXY($x_fus + $cM, $centrer_y(4));
     $pdf->Cell($cCF, 4, $avg !== null ? (string)$d['coef'] : '', 0, 0, 'C');
 
     $pdf->SetXY($x_fus + $cM + $cCF, $centrer_y(4));
     $pdf->Cell($cMXC, 4, $nxc !== null ? fmt_note_b($nxc) : '', 0, 0, 'C');
 
-    $pdf->SetFont('Arial', 'B', 8);
+    $pdf->SetFont('Arial', 'B', $lisible ? 9.5 : 8);
     $pdf->SetXY($x_fus + $cM + $cCF + $cMXC, $centrer_y(4));
     $pdf->Cell($cCOTE, 4, u($appr['COTE']), 0, 0, 'C');
 
-    $pdf->SetFont('Arial', '', 6.5);
+    $pdf->SetFont('Arial', '', $lisible ? 8 : 6.5);
     $minmax = ($stat['min'] !== null) ? fmt_note_b($stat['min']) . ' - ' . fmt_note_b($stat['max']) : '';
     $pdf->SetXY($x_fus + $cM + $cCF + $cMXC + $cCOTE, $centrer_y(4));
     $pdf->Cell($cMINMAX, 4, $minmax, 0, 0, 'C');
@@ -946,13 +1118,13 @@ foreach ($disciplines as $d) {
     $x_appr = $x_fus + $cM + $cCF + $cMXC + $cCOTE + $cMINMAX;
     if ($appr['COTE'] !== '') {
         if ($h_grp >= 5) {
-            $h2 = min(3.4, $h_grp / 2);
+            $h2 = min($lisible ? 4.2 : 3.4, $h_grp / 2);
             $y_txt = $centrer_y($h2 * 2);
-            $t_fr = cell2l_taille_ajustee($pdf, $appr['APPR1_FR'], 'B', $cAPPR - 2, 6, 4.2);
+            $t_fr = cell2l_taille_ajustee($pdf, $appr['APPR1_FR'], 'B', $cAPPR - 2, $lisible ? 7.5 : 6, 4.2);
             $pdf->SetFont('Arial', 'B', $t_fr);
             $pdf->SetXY($x_appr, $y_txt);
             $pdf->Cell($cAPPR, $h2, u($appr['APPR1_FR']), 0, 0, 'C');
-            $t_en = cell2l_taille_ajustee($pdf, $appr['APPR1_EN'], 'I', $cAPPR - 2, 5.2, 3.8);
+            $t_en = cell2l_taille_ajustee($pdf, $appr['APPR1_EN'], 'I', $cAPPR - 2, $lisible ? 6.5 : 5.2, 3.8);
             $pdf->SetFont('Arial', 'I', $t_en);
             $pdf->SetXY($x_appr, $y_txt + $h2);
             $pdf->Cell($cAPPR, $h2, u($appr['APPR1_EN']), 0, 0, 'C');
@@ -974,8 +1146,15 @@ foreach ($disciplines as $d) {
 // (bandeaux DISCIPLINES | TRAVAIL | PROFIL DE LA CLASSE | RESULTATS DE
 // L'ELEVE, chaque libellé bilingue FR (gras) / EN (italique) sur 2 lignes,
 // via cell2l() défini plus haut.)
+// Mode lisible : le bas du bulletin reste d'un seul tenant — s'il ne tient
+// plus sous le tableau, il part sur la page suivante.
+if ($lisible && $pdf->GetY() + $h_pied_l > $bas_dispo) {
+    $nouvelle_page();
+}
 $pdf->Ln(1);
 $y_bas    = $pdf->GetY();
+$f5_fr = $lisible ? 8.5 : 9;  // libellés FR (gras) — en mode lisible, la place gagnée sert à aérer
+$f5_en = 7;                   // libellés EN (italique)
 // TRAVAIL agrandi (demande explicite : "Tableau d'honneur" trop à l'étroit)
 // au détriment de PROFIL DE LA CLASSE, dont les libellés tiennent déjà
 // largement à taille max avec moins de place (vérifié).
@@ -1009,10 +1188,10 @@ $blame_trav  = bulletin_blame_travail($moy_generale ?? 0, $reglage_mention) === 
 // libellés DISCIPLINES/TRAVAIL/PROFIL juste en dessous.
 $pdf->SetXY($ml, $y_bas);
 $w_dis = 36; $w_trav = $wB_left - $w_dis; // 36 / 34
-cell2l($pdf, $w_dis,  $h_ligne, 'DISCIPLINES', 'Disciplines', 'C', true, 9, 7);
-cell2l($pdf, $w_trav, $h_ligne, 'TRAVAIL',     'Work',        'C', true, 9, 7);
-cell2l($pdf, $wB_mid,   $h_ligne, 'PROFIL DE LA CLASSE', 'Class profile',   'C', true, 9, 7);
-cell2l($pdf, $wB_right, $h_ligne, "RESULTATS DE L'ELEVE", 'Student results', 'C', true, 9, 7);
+cell2l($pdf, $w_dis,  $h_ligne, 'DISCIPLINES', 'Disciplines', 'C', true, $f5_fr, $f5_en);
+cell2l($pdf, $w_trav, $h_ligne, 'TRAVAIL',     'Work',        'C', true, $f5_fr, $f5_en);
+cell2l($pdf, $wB_mid,   $h_ligne, 'PROFIL DE LA CLASSE', 'Class profile',   'C', true, $f5_fr, $f5_en);
+cell2l($pdf, $wB_right, $h_ligne, "RESULTATS DE L'ELEVE", 'Student results', 'C', true, $f5_fr, $f5_en);
 $pdf->Ln($h_ligne);
 
 // ── Ligne par ligne : DISCIPLINES | TRAVAIL | PROFIL DE LA CLASSE ──
@@ -1041,7 +1220,7 @@ $prof_rows = [
 foreach ($left_rows as $i => $lr) {
     $y0r = $pdf->GetY();
     $pdf->SetXY($ml, $y0r);
-    cell2l($pdf, $w_dis_lbl, $h_ligne, $lr[0], $lr[1], 'L', false, 9, 7);
+    cell2l($pdf, $w_dis_lbl, $h_ligne, $lr[0], $lr[1], 'L', false, $f5_fr, $f5_en);
     if ($lr[2] === null) {
         $pdf->Cell($w_dis_val, $h_ligne, '', 1, 0, 'C');
         checkbox_ltm($pdf, $ml + $w_dis_lbl + $w_dis_val / 2 - 1.25, $y0r + $h_ligne / 2 - 1.25, $lr[6] ?? false, 2.5);
@@ -1054,11 +1233,11 @@ foreach ($left_rows as $i => $lr) {
     }
     checkbox_ltm($pdf, $pdf->GetX() + 1.5, $y0r + $h_ligne / 2 - 1.25, $lr[5], 2.5);
     $pdf->SetX($pdf->GetX() + $w_tr_chk);
-    cell2l($pdf, $w_tr_lbl, $h_ligne, $lr[3], $lr[4], 'L', false, 9, 7);
+    cell2l($pdf, $w_tr_lbl, $h_ligne, $lr[3], $lr[4], 'L', false, $f5_fr, $f5_en);
 
     $pr = $prof_rows[$i];
     $pdf->SetXY($ml + $wB_left, $y0r);
-    cell2l($pdf, $w_pr_lbl, $h_ligne, $pr[0], $pr[1], 'L', false, 9, 7);
+    cell2l($pdf, $w_pr_lbl, $h_ligne, $pr[0], $pr[1], 'L', false, $f5_fr, $f5_en);
     // Moyennes du profil de classe : en gras, taille agrandie mais auto-
     // ajustée (colonne réduite, demande explicite : ne doit jamais déborder).
     $taille_pr = cell2l_taille_ajustee($pdf, $pr[2], 'B', $w_pr_val - 2.4, 8.5, 6);
@@ -1086,25 +1265,25 @@ $res_rows2 = [
 ];
 $pdf->SetXY($xR, $y_res0);
 foreach ($res_rows2 as $rr) {
-    cell2l($pdf, $wB_right * 0.55, $h_ligne, $rr[0], $rr[1], 'L', false, 9, 7);
+    cell2l($pdf, $wB_right * 0.55, $h_ligne, $rr[0], $rr[1], 'L', false, $f5_fr, $f5_en);
     $pdf->SetFont('Arial', 'B', 9);
     $pdf->Cell($wB_right * 0.45, $h_ligne, u($rr[2]), 1, 1, 'C');
     $pdf->SetFont('Arial', '', 6.5);
     $pdf->SetX($xR);
 }
-cell2l($pdf, $wB_right * 0.55, $h_ligne, 'MOYENNE', 'Average', 'L', false, 9, 7);
+cell2l($pdf, $wB_right * 0.55, $h_ligne, 'MOYENNE', 'Average', 'L', false, $f5_fr, $f5_en);
 $taille_moy = cell2l_taille_ajustee($pdf, $moy_str, 'B', $wB_right * 0.45 - 2.4, 11, 7);
 $pdf->SetFont('Arial', 'B', $taille_moy);
 $pdf->SetTextColor(0, 130, 0);
 $pdf->Cell($wB_right * 0.45, $h_ligne, u($moy_str), 1, 1, 'C');
 $pdf->SetTextColor(0, 0, 0);
 $pdf->SetX($xR);
-cell2l($pdf, $wB_right * 0.55, $h_ligne, 'RANG', 'Rank', 'L', false, 9, 7);
+cell2l($pdf, $wB_right * 0.55, $h_ligne, 'RANG', 'Rank', 'L', false, $f5_fr, $f5_en);
 $taille_rang = cell2l_taille_ajustee($pdf, $rang_str, 'B', $wB_right * 0.45 - 2.4, 10, 6);
 cell_rang($pdf, $wB_right * 0.45, $h_ligne, $rang_general, ' / ' . $nb_classes, 1, 'C', $taille_rang);
 $pdf->Ln($h_ligne);
 $pdf->SetX($xR);
-cell2l($pdf, $wB_right * 0.55, $h_ligne, 'APPRECIATION', 'Appreciation', 'L', false, 9, 7);
+cell2l($pdf, $wB_right * 0.55, $h_ligne, 'APPRECIATION', 'Appreciation', 'L', false, $f5_fr, $f5_en);
 $pdf->SetFont('Arial', 'B', 8.5);
 $pdf->SetTextColor(0, 130, 0);
 $pdf->Cell($wB_right * 0.45, $h_ligne, u($mention_str), 1, 1, 'C');
@@ -1130,7 +1309,10 @@ $x_dec = $ml; $x_obs = $ml + $w_dec; $y_dec2 = $pdf->GetY();
 // vérification est désormais dessiné À L'INTÉRIEUR de ce même cadre (voir
 // plus bas, section 8), donc plus besoin de réserver de place en dessous.
 // Ne descend jamais sous la hauteur de la liste DECISION.
-$h_obs_box = max(count($decisions) * $h_dec, $bas_dispo - $y_dec2);
+$h_obs_box = max(count($decisions) * $h_dec, $h_sig_min, $bas_dispo - $y_dec2);
+// Mode lisible : cadre de hauteur raisonnable (signature + QR) plutôt que
+// tout le reste d'une page éventuellement presque vide.
+if ($lisible) $h_obs_box = max(count($decisions) * $h_dec, $h_sig_min, min($h_obs_box, $h_obs_max_l));
 foreach ($decisions as $i => $dec) {
     $y_row = $y_dec2 + $i * $h_dec;
     // Cases cochées automatiquement sur des règles définies :
@@ -1141,62 +1323,25 @@ foreach ($decisions as $i => $dec) {
             || ($i === 2 && $moy_generale !== null && $moy_generale < 8)
             || ($i === 3 && ($avert_cond || $blame_cond));
     // Case à cocher réduite au minimum lisible (demande explicite).
-    checkbox_ltm($pdf, $x_dec + 1.2, $y_row + $h_dec / 2 - 1, $checked, 2);
+    checkbox_ltm($pdf, $x_dec + 1.2, $y_row + $h_dec / 2 - ($lisible ? 1.25 : 1), $checked, $lisible ? 2.5 : 2);
     $pdf->SetXY($x_dec + 5.5, $y_row);
-    $pdf->SetFont('Arial', 'B', 7.5);
+    $pdf->SetFont('Arial', 'B', $lisible ? 8 : 7.5);
     $txt_fr = u($dec[0] . ' / ');
     $w_fr   = $pdf->GetStringWidth($txt_fr);
     $pdf->Cell($w_fr, $h_dec, $txt_fr, 0, 0, 'L');
     // Texte anglais agrandi pour la lisibilité (demande explicite) — même
     // taille que le français (7.5), seul le style (italique) les distingue.
-    $pdf->SetFont('Arial', 'I', 7.5);
+    $pdf->SetFont('Arial', 'I', $lisible ? 8 : 7.5);
     $pdf->Cell($w_dec - 7.5 - $w_fr, $h_dec, u($dec[1]), 0, 1, 'L');
     $pdf->Rect($x_dec, $y_row, $w_dec, $h_dec); // bordure complète de la ligne
 }
 // Dernière cellule (vide) qui complète la liste DECISION jusqu'au bas du
 // cadre OBSERVATIONS d'en face, pour que les deux colonnes finissent à la
-// même hauteur — c'est DANS cette dernière cellule, aligné à droite, qu'est
-// dessiné le QR code de vérification (demande explicite), et non plus dans
-// le cadre OBSERVATIONS.
+// même hauteur.
 $y_fill   = $y_dec2 + count($decisions) * $h_dec;
 $h_rempli = $h_obs_box - count($decisions) * $h_dec;
 if ($h_rempli > 0.01) {
     $pdf->Rect($x_dec, $y_fill, $w_dec, $h_rempli);
-}
-
-// QR code de vérification d'authenticité — dans la dernière cellule de
-// DECISION, aligné à droite, avec la photo de l'élève incrustée au centre
-// (le niveau de correction d'erreur qr-h tolère ~30% de perte, une photo
-// centrée sur ~20% de la surface reste donc scannable). Plus de légende
-// "Scannez..." sous le QR (supprimée, demande explicite).
-require_once __DIR__ . '/../../pdf/verif_lib.php';
-require_once __DIR__ . '/../../pdf/qrcode.php';
-
-if ($h_rempli > 15) {
-    $verif_url = bulletin_verif_url(
-        $id_eleve,
-        $is_seq ? 'seq' : 'trim',
-        $is_seq ? $id_seq_u : $id_trim,
-        id_affichage_eleve($eleve)
-    );
-
-    $qr_tmp = tempnam(sys_get_temp_dir(), 'abzqr_') . '.png';
-    try {
-        $qr_gen = new QRCode($verif_url, ['s' => 'qr-h']); // qr-h = correction d'erreur élevée (impression papier)
-        $qr_img = $qr_gen->render_image();
-        qr_incruster_photo($qr_img, $photo_path ?: '');
-        imagepng($qr_img, $qr_tmp);
-        imagedestroy($qr_img);
-
-        $qr_size = min(26, $w_dec - 6, $h_rempli - 4);
-        $qr_x    = $x_dec + $w_dec - $qr_size - 3; // aligné à droite
-        // Aligné en bas, à 2mm de la ligne finale du tableau (demande
-        // explicite) — plus haut ancré en haut de la cellule restante.
-        $qr_y    = $y_fill + $h_rempli - $qr_size - 2;
-        $pdf->Image($qr_tmp, $qr_x, $qr_y, $qr_size, $qr_size, 'PNG');
-    } finally {
-        if (is_file($qr_tmp)) unlink($qr_tmp);
-    }
 }
 
 $pdf->SetFont('Arial', '', 6);
@@ -1236,17 +1381,8 @@ if (($_GET['signature'] ?? '0') === '1') {
 $pdf->SetY($y_dec2 + $h_obs_box);
 
 // Mention copyright en bas de page, centrée, à l'intérieur du cadre extérieur
-// (demande explicite).
-$pdf->SetFont('Arial', '', 6.5);
-$pdf->SetXY($ml, $ph - 9);
-$pdf->Cell($uw, 4, u('Copyright © SIGES ABZ   , E-mail: abdoulazizyahya@gmail.com'), 0, 1, 'C');
-
-// Ouvert depuis le scan du QR code : tampon « AUTHENTIQUE » comme sur les
-// reçus, mais redessiné PAR-DESSUS le bulletin (lettres creuses) — celui
-// posé en fond par pdf_filigrane() était caché par les cases remplies.
-if ($acces_public) {
-    pdf_tampon_authentique($pdf, $pw / 2, $ph * 0.52, $pw * 0.80, 'AUTHENTIQUE', true);
-}
+// (demande explicite) + tampon AUTHENTIQUE éventuel — voir $fin_page.
+$fin_page();
 
 // ── Sortie ────────────────────────────────────────────────────────
 $mode     = ($_GET['dl'] ?? '') === '1' ? 'D' : 'I';

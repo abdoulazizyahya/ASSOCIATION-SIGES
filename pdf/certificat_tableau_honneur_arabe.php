@@ -66,7 +66,9 @@ $etab      = etab_pour_pdf($etab_brut);
 $etab_ar   = $etab_brut;
 
 // Libellé arabe du trimestre — même convention que les bulletins arabes.
-$trim_ar_lib = match ($id_trim) { 2 => 'الفصل الثاني', 3 => 'الفصل الثالث', default => 'الفصل الأول' };
+$trim_ar_lib = (($__m30 = $id_trim) === 2 ? ('الفصل الثاني')
+    : ($__m30 === 3 ? ('الفصل الثالث')
+    : ('الفصل الأول')));
 
 if ($vue === 'annee') {
     $classement = classement_annuel_classe_arabe($id_classe, $val_annee);

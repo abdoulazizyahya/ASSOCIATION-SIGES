@@ -58,15 +58,13 @@ $seqs_copie = $seqs;
 // Mention arabe (ضعيف/متوسط/مقبول/جيد/جيد جدا/ممتاز, appreciation_moyenne_arabe()
 // dans notes_apc.php) → couleur, même principe que jn_cote_color() côté FR.
 function jn_mention_ar_color(string $m): string {
-    return match ($m) {
-        'ممتاز'    => '#15803d',
-        'جيد جدا'  => '#0891b2',
-        'جيد'      => '#1d4ed8',
-        'مقبول'    => '#ca8a04',
-        'متوسط'    => '#d97706',
-        'ضعيف'     => '#dc2626',
-        default    => '#6b7280',
-    };
+    return (($__m19 = $m) === 'ممتاز' ? ('#15803d')
+        : ($__m19 === 'جيد جدا' ? ('#0891b2')
+        : ($__m19 === 'جيد' ? ('#1d4ed8')
+        : ($__m19 === 'مقبول' ? ('#ca8a04')
+        : ($__m19 === 'متوسط' ? ('#d97706')
+        : ($__m19 === 'ضعيف' ? ('#dc2626')
+        : ('#6b7280')))))));
 }
 
 // Cote /20 — échelle A+/A/B+/B/C+/C/D d'ABZ_MBE reprise à l'identique
@@ -981,9 +979,14 @@ if (!$es_partiel) {
             <label class="form-label">Matière</label>
             <select name="mat_cop" class="form-select form-select-sm" data-ajax-nav-auto>
               <option value="">— Choisir —</option>
-              <?php foreach ($mats_cop as $m): ?>
+              <?php $groupe_courant = null; foreach ($mats_cop as $m):
+                if ($m['id_groupe'] !== $groupe_courant) {
+                    if ($groupe_courant !== null) echo '</optgroup>';
+                    $groupe_courant = $m['id_groupe'];
+                    echo '<optgroup label="' . h(mb_strtoupper($m['nom_groupe_fr'])) . '">';
+                } ?>
                 <option value="<?= $m['id_mat'] ?>" <?= $id_mat_cop == $m['id_mat'] ? 'selected' : '' ?>><?= h($m['matiere_fr']) ?> / <?= h($m['matiere_ar']) ?></option>
-              <?php endforeach; ?>
+              <?php endforeach; if ($groupe_courant !== null) echo '</optgroup>'; ?>
             </select>
           </div>
           <div class="col-md-5">

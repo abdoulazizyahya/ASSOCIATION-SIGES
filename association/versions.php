@@ -20,11 +20,9 @@ $msg = ''; $lignes = [];
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     csrf_verifier();
     $code   = trim((string) ($_POST['code'] ?? ''));
-    $cibles = match ($_POST['op'] ?? '') {
-        'recaler_une'  => $code !== '' ? rv_analyser($code) : [],
-        'recaler_tout' => rv_analyser(),
-        default        => [],
-    };
+    $cibles = (($__m1 = $_POST['op'] ?? '') === 'recaler_une' ? ($code !== '' ? rv_analyser($code) : [])
+        : ($__m1 === 'recaler_tout' ? (rv_analyser())
+        : ([])));
     foreach ($cibles as $r) {
         if ($r['actuel'] === $r['reelle']) continue;
         if (rv_recaler($r)) {

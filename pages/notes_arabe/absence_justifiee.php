@@ -184,9 +184,15 @@ if (!$es_partiel) {
         <label class="form-label">Matière</label>
         <select name="mat" class="form-select" data-ajax-nav-auto <?= $id_classe_sel ? '' : 'disabled' ?>>
           <option value="">— Choisir —</option>
-          <?php foreach ($matieres as $m): ?>
+          <?php // Matières regroupées par groupe (même liste que la saisie des notes arabes)
+            $groupe_courant = null; foreach ($matieres as $m):
+            if ($m['id_groupe'] !== $groupe_courant) {
+                if ($groupe_courant !== null) echo '</optgroup>';
+                $groupe_courant = $m['id_groupe'];
+                echo '<optgroup label="' . h(mb_strtoupper($m['nom_groupe_fr'])) . '">';
+            } ?>
             <option value="<?= $m['id_mat'] ?>" <?= $id_mat_sel == $m['id_mat'] ? 'selected' : '' ?>><?= h($m['matiere_fr']) ?><?= $m['matiere_ar'] ? ' — ' . h($m['matiere_ar']) : '' ?></option>
-          <?php endforeach; ?>
+          <?php endforeach; if ($groupe_courant !== null) echo '</optgroup>'; ?>
         </select>
       </div>
       <div class="col-md-3">

@@ -268,7 +268,7 @@ $pdf->Cell($uw, 3.3, 'Is effectively part of my school in class', 0, 1, 'L');
 
 $pdf->Ln(3.2);
 $champ('Pour le compte de l\'année scolaire :', $val_annee, 'On behalf of the school year');
-$champ('Sous le matricule national :', id_affichage_eleve($eleve), 'Under the national matricule');
+$champ('Sous le matricule national :', niu_eleve($eleve), 'Under the national matricule');
 
 $pdf->Ln(2);   // + 2,2 mm déjà ajoutés après la dernière paire
 $pdf->SetFont('Arial', '', 10.5);

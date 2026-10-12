@@ -42,11 +42,9 @@ $sequence_lbl = [
         </div>
         <p class="text-muted mb-2" style="font-size:.8rem">
           Actuellement :
-          <strong><?= match ($mc['mode']) {
-              'manuel'    => 'saisi à la main',
-              'aleatoire' => 'généré aléatoirement',
-              default     => 'généré automatiquement (séquentiel)',
-          } ?></strong>
+          <strong><?= (($__m15 = $mc['mode']) === 'manuel' ? ('saisi à la main')
+              : ($__m15 === 'aleatoire' ? ('généré aléatoirement')
+              : ('généré automatiquement (séquentiel)'))) ?></strong>
           <?php if ($mc['mode'] !== 'manuel'): ?>
             — exemple : <span class="badge-code font-monospace"><?= h($mc_exemple) ?></span>
           <?php endif; ?>

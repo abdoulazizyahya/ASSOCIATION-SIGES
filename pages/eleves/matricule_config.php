@@ -51,9 +51,7 @@ db_exec(
 );
 
 $exemple = matricule_exemple($format, $longueur_seq, get_annee_active()['val_annee'] ?? '');
-flash_set('succes', match ($mode) {
-    'manuel'    => 'Matricule en saisie manuelle — il sera un champ libre (éventuellement vide) dans la fiche élève.',
-    'aleatoire' => "Matricule généré aléatoirement à chaque élève (exemple : $exemple).",
-    default     => "Format de matricule enregistré (exemple : $exemple).",
-});
+flash_set('succes', (($__m14 = $mode) === 'manuel' ? ('Matricule en saisie manuelle — il sera un champ libre (éventuellement vide) dans la fiche élève.')
+    : ($__m14 === 'aleatoire' ? ("Matricule généré aléatoirement à chaque élève (exemple : $exemple).")
+    : ("Format de matricule enregistré (exemple : $exemple)."))));
 rediriger('pages/eleves/liste.php?statut=outils');

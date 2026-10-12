@@ -186,9 +186,10 @@ $pdf->Cell($uw/2,6,ud("du/dated : ".$blank($fmt_date($e['date_acte_recrutement']
 $pdf->SetX($ml);
 $pdf->Cell($uw,6,ud("Date d'entrée dans la Fonction Publique/Date of entry into Civil Service : ".$blank($fmt_date($e['date_entree_fp']??null),22)),0,1,'L');
 
-$aff_type = match($e['type_affectation']??'') {
-    'Arrete' => 'Arrêté', 'Note de service' => 'Note de service', 'Decision' => 'Décision', default => 'Arrêté, Note de service, Décision'
-};
+$aff_type = (($__m17 = $e['type_affectation']??'') === 'Arrete' ? ('Arrêté')
+    : ($__m17 === 'Note de service' ? ('Note de service')
+    : ($__m17 === 'Decision' ? ('Décision')
+    : ('Arrêté, Note de service, Décision'))));
 $pdf->Ln(1);
 $paire("Affecté(e)/Nommé(e)/Muté(e) par : $aff_type (*)", 'Posted, Appointed, Transferred by service note, decision, order', 1);
 

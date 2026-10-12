@@ -33,6 +33,7 @@
 require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/connexion_assoc.php';            // slug_base_ecole(), charger_schema_ecole(), annuaire_dispo()
 require_once __DIR__ . '/bd/lib/lieux_normalisation.php'; // lieu_normaliser() : accents -> ASCII (table manuelle, fiable Windows)
+require_once __DIR__ . '/bd/lib/licence.php';             // licence_signature() : essai 60 jours posé par charger_schema_ecole() — sans lui, école neuve en lecture seule
 
 mysqli_report(MYSQLI_REPORT_OFF);                // on gère les erreurs à la main ici
 
@@ -105,7 +106,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $srv = null;
     if (!$err) {
         try { $srv = mysqli_connect(DB_HOST, DB_USER, DB_PASS); mysqli_set_charset($srv, 'utf8mb4'); }
-        catch (\Throwable $e) { $err[] = "Connexion MySQL impossible : " . $e->getMessage(); }
+        catch (\Throwable $e) {
+            $err[] = "Connexion MySQL impossible : " . $e->getMessage()
+                   . " — si MySQL a un mot de passe, créez d'abord à la racine un fichier config.local.php contenant"
+                   . " define('DB_USER', 'root'); define('DB_PASS', 'votre_mot_de_passe'); puis rechargez cette page.";
+        }
     }
 
     // Nom d'association tronqué (préfixe commun), + slug de l'école (mots
@@ -146,7 +151,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $sql = @file_get_contents(__DIR__ . '/bd/assoc/schema_assoc.sql');
                 if ($sql === false) throw new RuntimeException("bd/assoc/schema_assoc.sql introuvable.");
                 $sql = str_replace('{{DB_NAME_ASSOC}}', $db_assoc, $sql);
-                if (mysqli_multi_query($srv, $sql)) { do { /* drain */ } while (mysqli_next_result($srv)); }
+                if (mysqli_multi_query($srv, $sql)) { do { if ($r = mysqli_store_result($srv)) mysqli_free_result($r); } while (mysqli_more_results($srv) && mysqli_next_result($srv)); }
                 if (mysqli_errno($srv)) throw new RuntimeException("Création de l'annuaire : " . mysqli_error($srv));
             }
 
@@ -219,9 +224,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $conf = "<?php\n"
                     . "// Généré par install.php le " . date('Y-m-d H:i') . " — installation ÉCOLE UNIQUE (sans annuaire association), spécifique à ce serveur, NE PAS versionner.\n"
                     . "define('DB_NAME',          " . var_export($db_ec1, true) . ");\n"
+                    . "define('DB_NAME_ASSOC',    '');   // pas d'annuaire association\n"
                     . "define('APP_NOM',          " . var_export($val['nom_ecole'] . ' · Gestion scolaire', true) . ");\n"
                     . "define('ASSOC_NOM',        " . var_export($val['nom_ecole'], true) . ");\n"
                     . "define('ECOLE_TYPE_SOLO',  " . var_export($type, true) . ");\n";
+            }
+            // Accès MySQL personnalisés (mot de passe root posé, autre
+            // utilisateur, autre hôte) : déclarés AVANT l'installation dans
+            // un config.local.php minimal — on les reporte, sinon la
+            // réécriture ci-dessus les perdrait et plus rien ne se connecterait.
+            foreach (['DB_HOST' => '127.0.0.1', 'DB_USER' => 'root', 'DB_PASS' => ''] as $k => $defaut) {
+                if (constant($k) !== $defaut) {
+                    $conf .= "define(" . var_export($k, true) . ", " . str_repeat(' ', 16 - strlen($k)) . var_export(constant($k), true) . ");\n";
+                }
             }
             if (@file_put_contents(__DIR__ . '/config.local.php', $conf) === false) {
                 $conf_manuel = $conf;

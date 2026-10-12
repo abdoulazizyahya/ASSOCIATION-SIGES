@@ -653,7 +653,7 @@ foreach ($eleves as $el) {
     $logo_x = $ml + $col3 + ($col3 - $logo_w) / 2;
     $logo_y = $y0 + ($logo_bande_h - $logo_h) / 2;
     if ($logo_path && is_file($logo_path)) {
-        $pdf->Image($logo_path, $logo_x, $logo_y+3, $logo_w);
+        // (logo dessiné plus bas, une fois la position de l'immatriculation connue)
     } else {
         $pdf->SetFont('Arial', 'B', 10);
         $pdf->SetXY($logo_x, $y0 + ($logo_bande_h - 16) / 2);
@@ -735,7 +735,7 @@ foreach ($eleves as $el) {
 	cell2l_c($pdf, 41, 5.5, 'IDENTIFIANT UNIQUE (NIU) :', 'ID No.', 'L', true, 8, 7.5, $gris, true);
 	$pdf->SetFont('Arial', 'I', 8);
 
-	$pdf->Cell(20, 5.5, id_affichage_eleve($eleve), 1, 1, 'C');
+	$pdf->Cell(20, 5.5, niu_eleve($eleve), 1, 1, 'C');
 	$pdf->ln(0.5);
 	$pdf->SetX($x_info);
 	//$pdf->SetFont('Arial', 'B', 17);

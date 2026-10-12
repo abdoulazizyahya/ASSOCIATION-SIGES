@@ -79,7 +79,11 @@ $seqs_copie = $seqs;
 // Cote → couleur (échelle NA/ECA/A/A+ de jaynitaare, voir appreciation_fr()
 // dans notes_apc.php — 4 crans au lieu des 7 A+/A/B+/B/C+/C/D d'ABZ_MBE).
 function jn_cote_color(string $cote): string {
-    return match ($cote) { 'A+' => '#15803d', 'A' => '#1d4ed8', 'ECA' => '#d97706', 'NA' => '#dc2626', default => '#6b7280' };
+    return (($__m18 = $cote) === 'A+' ? ('#15803d')
+        : ($__m18 === 'A' ? ('#1d4ed8')
+        : ($__m18 === 'ECA' ? ('#d97706')
+        : ($__m18 === 'NA' ? ('#dc2626')
+        : ('#6b7280')))));
 }
 
 // Section anglophone d'une classe (même convention que pdf/bulletin_trimestriel.php
@@ -963,9 +967,14 @@ if (!$es_partiel) {
             <label class="form-label">Compétence</label>
             <select name="comp_cop" class="form-select form-select-sm" data-ajax-nav-auto>
               <option value="">— Choisir —</option>
-              <?php $section_cop = jn_section_en($id_cl_cop); foreach ($comps_cop as $c): ?>
+              <?php $section_cop = jn_section_en($id_cl_cop); $groupe_courant = null; foreach ($comps_cop as $c):
+                if ($c['id_groupe_comp'] !== $groupe_courant) {
+                    if ($groupe_courant !== null) echo '</optgroup>';
+                    $groupe_courant = $c['id_groupe_comp'];
+                    echo '<optgroup label="' . h(mb_strtoupper(mb_substr(jn_libelle_groupe_comp($c, $section_cop), 0, 45))) . '">';
+                } ?>
                 <option value="<?= $c['id_comp'] ?>" <?= $id_comp_cop == $c['id_comp'] ? 'selected' : '' ?>><?= h($c['code_comp'] . ' — ' . jn_libelle_comp($c, $section_cop)) ?></option>
-              <?php endforeach; ?>
+              <?php endforeach; if ($groupe_courant !== null) echo '</optgroup>'; ?>
             </select>
           </div>
           <div class="col-md-5">

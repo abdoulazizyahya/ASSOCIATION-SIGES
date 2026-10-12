@@ -19,7 +19,7 @@ exiger_role(function_exists('type_enseignement_courant') && type_enseignement_co
 
 header('Content-Type: application/json; charset=utf-8');
 
-function repondre_erreur(string $msg): never {
+function repondre_erreur(string $msg) {
     ob_end_clean();
     http_response_code(400);
     echo json_encode(['ok' => false, 'error' => $msg]);

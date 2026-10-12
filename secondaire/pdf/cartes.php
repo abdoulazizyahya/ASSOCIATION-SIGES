@@ -359,9 +359,9 @@ function carte_flag_triangle_tmp(int $w_px = 200, int $h_px = 200): string {
 
     // Triangle rectangle (angle droit en haut-gauche), 3 bandes diagonales
     // parallèles à l'hypoténuse — dessinées de l'extérieur vers le coin.
-    imagefilledpolygon($img, [0, 0, $w_px, 0, 0, $h_px], $yellow);
-    imagefilledpolygon($img, [0, 0, (int) round($w_px * 2 / 3), 0, 0, (int) round($h_px * 2 / 3)], $red);
-    imagefilledpolygon($img, [0, 0, (int) round($w_px / 3), 0, 0, (int) round($h_px / 3)], $green);
+    compat_imagefilledpolygon($img, [0, 0, $w_px, 0, 0, $h_px], $yellow);
+    compat_imagefilledpolygon($img, [0, 0, (int) round($w_px * 2 / 3), 0, 0, (int) round($h_px * 2 / 3)], $red);
+    compat_imagefilledpolygon($img, [0, 0, (int) round($w_px / 3), 0, 0, (int) round($h_px / 3)], $green);
 
     // Petite étoile jaune dans la bande rouge.
     $cx = $w_px * 0.30; $cy = $h_px * 0.30;
@@ -373,7 +373,7 @@ function carte_flag_triangle_tmp(int $w_px = 200, int $h_px = 200): string {
         $pts[] = $cx + $r * cos($ang);
         $pts[] = $cy + $r * sin($ang);
     }
-    imagefilledpolygon($img, $pts, $yellow);
+    compat_imagefilledpolygon($img, $pts, $yellow);
 
     $tmp = tempnam(sys_get_temp_dir(), 'abzflag_') . '.png';
     imagepng($img, $tmp);
@@ -520,7 +520,7 @@ function dessiner_carte_2(FPDF $pdf, array $el, array $etab, array $annee,
     $pdf->SetX($xi);
     $ligne('Classe :', mb_strimwidth($el['classe'] ?? '—', 0, 16, '…'));
     $pdf->SetX($xi);
-    $ligne('NIU :', id_affichage_eleve($el));
+    $ligne('NIU :', niu_eleve($el));
 
     // QR de vérification (absent de l'original, ajouté pour l'authenticité).
     $qrSize = max(6, min(9, $cH * 0.13));
@@ -619,7 +619,7 @@ function dessiner_carte_3(FPDF $pdf, array $el, array $etab, array $annee,
     $pdf->SetXY($x + 1.5, $yr + 0.5);
     $pdf->Cell($mainW - 3, 3, pdf_u('Classe : ' . mb_strimwidth($el['classe'] ?? '—', 0, 18, '…')), 0, 1, 'L');
     $pdf->SetX($x + 1.5);
-    $pdf->Cell($mainW - 3, 3, pdf_u('NIU : ' . id_affichage_eleve($el)), 0, 1, 'L');
+    $pdf->Cell($mainW - 3, 3, pdf_u('NIU : ' . niu_eleve($el)), 0, 1, 'L');
     $pdf->SetTextColor(0);
 
     // ── QR (bas-gauche, comme dans le gabarit d'origine) ───────────────
@@ -721,7 +721,7 @@ function dessiner_carte_4(FPDF $pdf, array $el, array $etab, array $annee,
     $infos4 = [
         'Classe/Class' => mb_strimwidth($el['classe'] ?? '—', 0, 16, '…'),
         'Né(e)/Born'   => $el['date_naiss'] ? date('d/m/Y', strtotime($el['date_naiss'])) : '—',
-        'NIU'          => id_affichage_eleve($el),
+        'NIU'          => niu_eleve($el),
         'Sexe/Sex'     => $el['sexe'] === 'M' ? 'M / Masc.' : 'F / Fém.',
     ];
     $pdf->SetFont('Arial', '', $fs2);
@@ -815,7 +815,7 @@ function dessiner_carte_5(FPDF $pdf, array $el, array $etab, array $annee,
         'Cl./Class'  => mb_strimwidth($el['classe'] ?? '—', 0, 16, '…'),
         'Né/Born'    => $el['date_naiss'] ? date('d/m/Y', strtotime($el['date_naiss'])) : '—',
         'À/At'       => mb_strimwidth($el['lieu_naiss'] ?? '—', 0, 13, '…'),
-        'NIU'        => id_affichage_eleve($el),
+        'NIU'        => niu_eleve($el),
         'Sexe/Sex'   => $el['sexe'] === 'M' ? 'M / Masc.' : 'F / Fém.',
     ];
     foreach ($infos5 as $lbl => $val) {

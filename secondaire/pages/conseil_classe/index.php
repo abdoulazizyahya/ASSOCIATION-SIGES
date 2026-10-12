@@ -524,7 +524,7 @@ require_once __DIR__ . '/../../../layout/header.php';
             <td><?= $n+1 ?></td>
             <td class="pv-tdid">
               <div class="pv-nom"><?= pv_h($e['nom'].' '.$e['prenom']) ?></div>
-              <div style="font-size:.6rem;color:var(--muted)"><?= pv_h(id_affichage_eleve($e)) ?></div>
+              <div style="font-size:.6rem;color:var(--muted)"><?= pv_h(niu_eleve($e)) ?></div>
             </td>
             <td><?= pv_fmt_moy($e['moy']) ?></td>
             <td><span class="pv-moy"><?= $e['rang'] ?></span></td>

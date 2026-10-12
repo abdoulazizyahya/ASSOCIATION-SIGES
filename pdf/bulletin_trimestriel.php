@@ -60,12 +60,12 @@ $sub_en  = $etab['subdivision_en'] ?: 'NGAOUNDERE I SUBDIVISION';
 // ── Libellés UA1/UA2 selon le trimestre (port des libellés fixes legacy —
 // UA1/UA2 pour T1, UA3/UA4 pour T2, UA5/UA6 pour T3) + libellé anglais du
 // trimestre (jamais stocké en base, seul le libellé FR l'est).
-[$note_1, $note_2] = match ($id_trim) {
-    2 => ['UA3', 'UA4'],
-    3 => ['UA5', 'UA6'],
-    default => ['UA1', 'UA2'],
-};
-$trim_en = match ($id_trim) { 2 => '2nd Trimester', 3 => '3rd Trimester', default => '1st Trimester' };
+[$note_1, $note_2] = (($__m24 = $id_trim) === 2 ? (['UA3', 'UA4'])
+    : ($__m24 === 3 ? (['UA5', 'UA6'])
+    : (['UA1', 'UA2'])));
+$trim_en = (($__m23 = $id_trim) === 2 ? ('2nd Trimester')
+    : ($__m23 === 3 ? ('3rd Trimester')
+    : ('1st Trimester')));
 
 // ── Liste des élèves à imprimer ──────────────────────────────────
 if ($id) {

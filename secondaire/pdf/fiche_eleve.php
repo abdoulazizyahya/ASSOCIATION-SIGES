@@ -55,7 +55,7 @@ $pdf->SetFont('Arial', 'B', 11);
 $pdf->Cell($wi, 7, pdf_u(strtoupper($eleve['nom']) . ' ' . ($eleve['prenom'] ?? '')), 0, 1, 'L');
 
 $champs = [
-    'NIU'               => id_affichage_eleve($eleve),
+    'NIU'               => niu_eleve($eleve),
     'Sexe'              => $eleve['sexe'] === 'M' ? 'Masculin' : 'Féminin',
     'Date de naissance' => $eleve['date_naiss'] ? date('d/m/Y', strtotime($eleve['date_naiss'])) : '—',
     'Lieu de naissance' => $eleve['lieu_naiss'] ?? '—',

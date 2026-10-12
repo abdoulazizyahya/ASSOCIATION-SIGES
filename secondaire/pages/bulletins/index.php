@@ -49,6 +49,11 @@ $id_eleve  = (int)($_GET['eleve']  ?? 0);
 $ordre     = in_array($_GET['ordre'] ?? '', ['alpha','merite']) ? $_GET['ordre'] : 'alpha';
 $voir_tous = isset($_GET['voir_tous']);
 $id_serie  = (int)($_GET['serie'] ?? 0);
+// Mise en page du bulletin trimestriel (boutons à côté de l'ordre) : 'page' =
+// forcé sur une page (compact), 'lisible' = police confortable, 2 pages au plus.
+// Choix mémorisé pour la session.
+if (in_array($_GET['mise'] ?? '', ['page', 'lisible'], true)) $_SESSION['bull_sec_mise'] = $_GET['mise'];
+$mise      = $_SESSION['bull_sec_mise'] ?? 'page';
 
 // Sécurité PP
 if ($is_ens && $id_classe) {
@@ -239,6 +244,7 @@ function pdf_url_bull(int $id_eleve, string $vue, int $id_trim, int $id_annee, b
         $base = APP_URL.'/secondaire/pages/bulletins/pdf_annuel.php?eleve='.$id_eleve.'&annee='.$id_annee;
     } else {
         $base = APP_URL.'/secondaire/pages/bulletins/pdf.php?eleve='.$id_eleve.'&annee='.$id_annee.'&trim='.$id_trim;
+        if (($GLOBALS['mise'] ?? 'page') === 'lisible') $base .= '&mise=lisible';
     }
     if ($dl) $base .= '&dl=1';
     return $base;
@@ -248,6 +254,7 @@ function url_classe_bull(int $id_classe, string $vue, int $id_trim, int $id_anne
         $base = APP_URL.'/secondaire/pages/bulletins/pdf_annuel_classe.php?classe='.$id_classe.'&annee='.$id_annee.'&ordre='.$ordre;
     } else {
         $base = APP_URL.'/secondaire/pages/bulletins/pdf_classe.php?classe='.$id_classe.'&annee='.$id_annee.'&ordre='.$ordre.'&trim='.$id_trim;
+        if (($GLOBALS['mise'] ?? 'page') === 'lisible') $base .= '&mise=lisible';
     }
     if ($id_serie) $base .= '&serie='.$id_serie;
     if ($dl) $base .= '&dl=1';
@@ -355,6 +362,24 @@ require_once __DIR__ . '/../../../layout/header.php';
           </a>
         </div>
       </div>
+      <?php if ($vue !== 'annee'):
+        $base_mise = '?vue=' . $vue . '&classe=' . $id_classe . '&ordre=' . $ordre
+                   . ($id_serie ? '&serie=' . $id_serie : '') . ($id_eleve ? '&eleve=' . $id_eleve : ''); ?>
+      <!-- Mise en page du bulletin trimestriel -->
+      <div class="col-auto">
+        <label class="form-label mb-1" style="font-size:.78rem;font-weight:600;color:#1a3c6b">Mise en page</label>
+        <div class="d-flex gap-1">
+          <a href="<?= h($base_mise . '&mise=page') ?>" class="ordre-btn <?= $mise === 'page' ? 'active' : '' ?>"
+             title="Tout le bulletin sur une seule page (police et espacements réduits si nécessaire)">
+            <i class="bi bi-file-earmark me-1"></i>1 page
+          </a>
+          <a href="<?= h($base_mise . '&mise=lisible') ?>" class="ordre-btn <?= $mise === 'lisible' ? 'active' : '' ?>"
+             title="Police et espacements confortables, sur 2 pages au maximum">
+            <i class="bi bi-files me-1"></i>Lisible (2 pages max)
+          </a>
+        </div>
+      </div>
+      <?php endif; ?>
       <?php endif; ?>
 
     </form>

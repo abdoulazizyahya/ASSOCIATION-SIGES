@@ -57,8 +57,12 @@ try {
     // celui-ci a été inclus avant ; on le force ici au cas où ce fichier
     // serait inclus seul (runners bd/assoc/*).
     mysqli_report(MYSQLI_REPORT_ERROR | MYSQLI_REPORT_STRICT);
-    $link_assoc = mysqli_connect(DB_HOST, DB_USER, DB_PASS, DB_NAME_ASSOC);
-    mysqli_set_charset($link_assoc, 'utf8mb4');
+    // DB_NAME_ASSOC vide = installation « école unique » (install.php) :
+    // aucun annuaire, même si une base promeducam_assoc existe sur le serveur.
+    if (DB_NAME_ASSOC !== '') {
+        $link_assoc = mysqli_connect(DB_HOST, DB_USER, DB_PASS, DB_NAME_ASSOC);
+        mysqli_set_charset($link_assoc, 'utf8mb4');
+    }
 } catch (mysqli_sql_exception $e) {
     // Base annuaire absente / inaccessible — mode mono-école, pas d'erreur.
     $link_assoc = null;
@@ -73,7 +77,11 @@ function annuaire_dispo(): bool {
 // ── Helper interne : prépare, lie en « s », exécute (cf. connexion.php) ──
 function _assoc_stmt(string $sql, array $params) {
     global $link_assoc;
-    $stmt = mysqli_prepare($link_assoc, $sql);
+    return _stmt_sur($link_assoc, $sql, $params);
+}
+
+function _stmt_sur(mysqli $l, string $sql, array $params) {
+    $stmt = mysqli_prepare($l, $sql);
     if ($params) {
         mysqli_stmt_bind_param($stmt, str_repeat('s', count($params)), ...$params);
     }
@@ -256,7 +264,7 @@ function charger_schema_ecole(mysqli &$l, array $seed, string $type = 'primaire'
              VALUES (1, ?, ?, ?, ?, ?, ?)
              ON DUPLICATE KEY UPDATE nom_fr=VALUES(nom_fr), nom_en=VALUES(nom_en),
                                      sigle=VALUES(sigle), ville=VALUES(ville)");
-        mysqli_stmt_bind_param($st, 'ssssss', $seed['nom'], $seed['nom_en'], $seed['sigle'], $seed['ville'], $chef_fr, $statut);
+        mysqli_stmt_bind_param($st, 'sssssss', $seed['nom'], $seed['nom_en'], $seed['sigle'], $seed['ville'], $chef_fr, $statut, $ordre);
         mysqli_stmt_execute($st);
         mysqli_stmt_close($st);
 
@@ -264,7 +272,7 @@ function charger_schema_ecole(mysqli &$l, array $seed, string $type = 'primaire'
         // de compétence, séries) — voir bd/assoc/seed_ref_ecole_secondaire.sql.
         // Sans elles, discipline.id_groupe (NOT NULL, FK -> groupe) rend le
         // module Matières inutilisable dès la première affectation.
-        charger_seed_ref_ecole_secondaire($l);
+        charger_seed_ref_ecole_secondaire($l, $ordre);
         return $nbTables;
     }
 
@@ -381,7 +389,7 @@ function charger_seed_ref_ecole(mysqli $l): int {
 // École secondaire (schema_ref_ecole_secondaire.sql) : équivalent de
 // charger_seed_ref_ecole() ci-dessus pour les tables niveau/section_classe/
 // groupe/serie — voir bd/assoc/seed_ref_ecole_secondaire.sql.
-function charger_seed_ref_ecole_secondaire(mysqli $l): int {
+function charger_seed_ref_ecole_secondaire(mysqli $l, string $ordre = 'general'): int {
     $f = __DIR__ . '/bd/assoc/seed_ref_ecole_secondaire.sql';
     $sql = @file_get_contents($f);
     if ($sql === false || trim($sql) === '') return 0;
@@ -1086,10 +1094,92 @@ function assoc_acces_definir(int $id_membre, string $portee, string $niveau, boo
 //  déconnexions, échecs, actions sensibles + appareil + localisation.
 // =====================================================================
 
+// ── Où est stocké le journal ? ─────────────────────────────────────
+// Mode réseau : dans l'annuaire (toutes les écoles). Mode « école unique »
+// (install.php, DB_NAME_ASSOC vide) : pas d'annuaire → dans la base de
+// l'école elle-même ; ses 3 tables sont créées à la première utilisation
+// (même structure que bd/assoc/schema_assoc.sql).
+function audit_ecole_unique(): bool {
+    return !annuaire_dispo() && defined('DB_NAME_ASSOC') && DB_NAME_ASSOC === ''
+        && ($GLOBALS['link'] ?? null) instanceof mysqli;
+}
+
+function audit_dispo(): bool {
+    return annuaire_dispo() || audit_ecole_unique();
+}
+
+function _audit_link(): mysqli {
+    global $link_assoc;
+    if (annuaire_dispo()) return $link_assoc;
+    if (!audit_ecole_unique()) throw new RuntimeException("Journal d'audit indisponible.");
+    static $tables_pretes = false;
+    $l = $GLOBALS['link'];
+    if (!$tables_pretes) {
+        $tables_pretes = true;
+        $existe = mysqli_query($l, "SHOW TABLES LIKE 'journal_audit'");
+        if ($existe && mysqli_num_rows($existe) === 0) {
+            mysqli_query($l, "CREATE TABLE IF NOT EXISTS `journal_audit` (
+              `id` bigint NOT NULL AUTO_INCREMENT, `date` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+              `evenement` varchar(20) NOT NULL, `action` varchar(60) DEFAULT NULL, `cible` varchar(255) DEFAULT NULL,
+              `acteur_type` enum('membre','user','inconnu') NOT NULL DEFAULT 'inconnu', `acteur_id` int DEFAULT NULL,
+              `acteur_login` varchar(60) DEFAULT NULL, `acteur_nom` varchar(120) DEFAULT NULL, `role` varchar(30) DEFAULT NULL,
+              `id_etablissement` int DEFAULT NULL, `ip` varchar(45) DEFAULT NULL,
+              `ua_navigateur` varchar(60) DEFAULT NULL, `ua_os` varchar(60) DEFAULT NULL, `ua_appareil` varchar(12) DEFAULT NULL,
+              `ua_modele` varchar(40) DEFAULT NULL, `ua_brut` varchar(400) DEFAULT NULL,
+              `geo_pays` varchar(60) DEFAULT NULL, `geo_region` varchar(80) DEFAULT NULL, `geo_ville` varchar(80) DEFAULT NULL,
+              `geo_operateur` varchar(120) DEFAULT NULL, `device_id` varchar(40) DEFAULT NULL,
+              PRIMARY KEY (`id`), KEY `k_date` (`date`), KEY `k_etab` (`id_etablissement`,`date`),
+              KEY `k_acteur` (`acteur_type`,`acteur_login`), KEY `k_appareil` (`device_id`,`acteur_type`,`acteur_id`)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+            mysqli_query($l, "CREATE TABLE IF NOT EXISTS `appareil_connu` (
+              `id` bigint NOT NULL AUTO_INCREMENT, `device_id` varchar(40) NOT NULL,
+              `acteur_type` enum('membre','user') NOT NULL, `acteur_id` int NOT NULL, `nom` varchar(60) DEFAULT NULL,
+              `ua_appareil` varchar(12) DEFAULT NULL, `ua_modele` varchar(40) DEFAULT NULL,
+              `ua_navigateur` varchar(60) DEFAULT NULL, `ua_os` varchar(60) DEFAULT NULL,
+              `premiere_connexion` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+              `derniere_connexion` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+              PRIMARY KEY (`id`), UNIQUE KEY `u_appareil` (`device_id`,`acteur_type`,`acteur_id`),
+              KEY `k_acteur` (`acteur_type`,`acteur_id`)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+            mysqli_query($l, "CREATE TABLE IF NOT EXISTS `geo_ip_cache` (
+              `ip` varchar(45) NOT NULL, `pays` varchar(60) DEFAULT NULL, `region` varchar(80) DEFAULT NULL,
+              `ville` varchar(80) DEFAULT NULL, `operateur` varchar(120) DEFAULT NULL,
+              `ok` tinyint(1) NOT NULL DEFAULT 0, `maj_le` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+              PRIMARY KEY (`ip`)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+        }
+    }
+    return $l;
+}
+
+function audit_all(string $sql, array $params = []): array {
+    $stmt = _stmt_sur(_audit_link(), $sql, $params);
+    $res  = mysqli_stmt_get_result($stmt);
+    $rows = $res ? mysqli_fetch_all($res, MYSQLI_ASSOC) : [];
+    mysqli_stmt_close($stmt);
+    return $rows;
+}
+
+function audit_one(string $sql, array $params = []) {
+    return audit_all($sql, $params)[0] ?? null;
+}
+
+function audit_val(string $sql, array $params = []) {
+    $r = audit_one($sql, $params);
+    return $r ? reset($r) : null;
+}
+
+function audit_exec(string $sql, array $params = []): int {
+    $stmt = _stmt_sur(_audit_link(), $sql, $params);
+    $n    = mysqli_stmt_affected_rows($stmt);
+    mysqli_stmt_close($stmt);
+    return (int) $n;
+}
+
 /** Valeurs distinctes présentes dans le journal, pour peupler les filtres. */
 function audit_journal_filtres(): array {
     $col = fn(string $c) => array_values(array_filter(array_column(
-        assoc_all("SELECT DISTINCT `$c` AS v FROM journal_audit WHERE `$c` IS NOT NULL AND `$c` <> '' ORDER BY `$c`"),
+        audit_all("SELECT DISTINCT `$c` AS v FROM journal_audit WHERE `$c` IS NOT NULL AND `$c` <> '' ORDER BY `$c`"),
         'v'
     )));
     return [
@@ -1124,14 +1214,14 @@ function audit_journal(array $f, int $page = 1, int $par_page = 50, ?int $id_eta
     if (!empty($f['jusqua']))    { $w[] = "j.date <= ?";       $p[] = $f['jusqua'] . ' 23:59:59'; }
     $sql_w = $w ? ('WHERE ' . implode(' AND ', $w)) : '';
 
-    $total = (int) assoc_val("SELECT COUNT(*) FROM journal_audit j $sql_w", $p);
+    $total = (int) audit_val("SELECT COUNT(*) FROM journal_audit j $sql_w", $p);
     $page  = max(1, $page);
     $off   = ($page - 1) * $par_page;
 
-    $lignes = assoc_all(
-        "SELECT j.*, e.code AS etab_code, e.nom AS etab_nom, a.nom AS appareil_nom
+    $lignes = audit_all(
+        "SELECT j.*, " . (annuaire_dispo() ? "e.code AS etab_code, e.nom AS etab_nom" : "NULL AS etab_code, NULL AS etab_nom") . ", a.nom AS appareil_nom
          FROM journal_audit j
-         LEFT JOIN etablissement e ON e.id = j.id_etablissement
+         " . (annuaire_dispo() ? "LEFT JOIN etablissement e ON e.id = j.id_etablissement" : "") . "
          LEFT JOIN appareil_connu a
            ON a.device_id = j.device_id AND a.acteur_type = j.acteur_type AND a.acteur_id = j.acteur_id
          $sql_w
@@ -1145,7 +1235,7 @@ function audit_journal(array $f, int $page = 1, int $par_page = 50, ?int $id_eta
 
 /** Purge les entrées plus vieilles que $mois mois. */
 function audit_journal_purger(int $mois = 12): int {
-    return assoc_exec("DELETE FROM journal_audit WHERE date < (NOW() - INTERVAL ? MONTH)", [$mois]);
+    return audit_exec("DELETE FROM journal_audit WHERE date < (NOW() - INTERVAL ? MONTH)", [$mois]);
 }
 
 // =====================================================================
@@ -1156,9 +1246,9 @@ function audit_journal_purger(int $mois = 12): int {
 
 /** Appareils de CE compte (membre ou user), plus récemment vus d'abord. */
 function appareil_connu_lister(string $acteur_type, int $acteur_id): array {
-    if (!annuaire_dispo()) return [];
+    if (!audit_dispo()) return [];
     try {
-        return assoc_all(
+        return audit_all(
             "SELECT id, device_id, nom, ua_appareil, ua_navigateur, ua_os, premiere_connexion, derniere_connexion
              FROM appareil_connu WHERE acteur_type=? AND acteur_id=? ORDER BY derniere_connexion DESC",
             [$acteur_type, $acteur_id]
@@ -1170,10 +1260,10 @@ function appareil_connu_lister(string $acteur_type, int $acteur_id): array {
 
 /** Renomme un appareil — vérifie qu'il appartient bien à CE compte avant d'écrire. */
 function appareil_connu_renommer(int $id_appareil, string $acteur_type, int $acteur_id, string $nom): bool {
-    if (!annuaire_dispo()) return false;
+    if (!audit_dispo()) return false;
     $nom = trim($nom);
     try {
-        $n = assoc_exec(
+        $n = audit_exec(
             "UPDATE appareil_connu SET nom=? WHERE id=? AND acteur_type=? AND acteur_id=?",
             [$nom !== '' ? $nom : null, $id_appareil, $acteur_type, $acteur_id]
         );

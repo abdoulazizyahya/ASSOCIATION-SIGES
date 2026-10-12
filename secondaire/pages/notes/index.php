@@ -132,11 +132,30 @@ if ($onglet === 'classe') {
             );
         }
     }
-    if ($id_cl_c && $id_mat_c && $id_trim_c && $classe_c_info) {
-        $comps_c = db_all(
-            "SELECT * FROM competence WHERE id_matiere=? AND code_niveau=? AND id_trim=? ORDER BY ordre",
-            [$id_mat_c, $classe_c_info['code_niveau'], $id_trim_c]
+    // Compétences du trimestre pour TOUTES les matières de la classe (déjà
+    // filtrées pour un enseignant), regroupées par matière = groupe de
+    // compétences, dans l'ordre des matières puis des compétences — même
+    // modèle de liste que la saisie du primaire (optgroup par groupe).
+    $comps_par_mat = [];
+    if ($id_cl_c && $mats_c && $id_trim_c && $classe_c_info) {
+        $ids_mat = array_map('intval', array_column($mats_c, 'id'));
+        $toutes  = db_all(
+            "SELECT * FROM competence
+             WHERE id_matiere IN (" . implode(',', $ids_mat) . ") AND code_niveau=? AND id_trim=?
+             ORDER BY ordre, id",
+            [$classe_c_info['code_niveau'], $id_trim_c]
         );
+        foreach ($toutes as $c) $comps_par_mat[(int) $c['id_matiere']][] = $c;
+        // La matière se déduit de la compétence choisie (une seule liste) ;
+        // une compétence hors des matières autorisées est ignorée.
+        if ($id_comp_c) {
+            $id_mat_c = 0;
+            foreach ($toutes as $c) {
+                if ((int) $c['id'] === $id_comp_c) { $id_mat_c = (int) $c['id_matiere']; break; }
+            }
+            if (!$id_mat_c) $id_comp_c = 0;
+        }
+        $comps_c = $comps_par_mat[$id_mat_c] ?? [];
     }
     if ($id_cl_c && $id_mat_c && $id_comp_c) {
         $eleves_c = db_all(
@@ -623,7 +642,7 @@ async function ajaxSelectReload(selectEl, containerId) {
     <form method="get" class="row g-2 align-items-end">
       <input type="hidden" name="onglet" value="classe">
       <?php if ($is_admin): ?><input type="hidden" name="trim_c" value="<?= $id_trim_c ?>"><?php endif; ?>
-      <div class="col-md-3">
+      <div class="col-md-2">
         <label class="form-label fw-semibold">Classe</label>
         <select name="classe_c" class="form-select" onchange="ajaxSelectReload(this,'saisie-classe-dynamic')">
           <option value="">— Choisir —</option>
@@ -635,7 +654,7 @@ async function ajaxSelectReload(selectEl, containerId) {
         </select>
       </div>
       <?php if ($id_cl_c && $series_c): ?>
-      <div class="col-md-3">
+      <div class="col-md-2">
         <label class="form-label fw-semibold">Série / LV2</label>
         <select name="serie_c" class="form-select" onchange="ajaxSelectReload(this,'saisie-classe-dynamic')">
           <option value="">— Toutes —</option>
@@ -647,39 +666,43 @@ async function ajaxSelectReload(selectEl, containerId) {
         </select>
       </div>
       <?php endif; ?>
-      <?php if ($id_cl_c && $mats_c): ?>
-      <div class="col-md-4">
-        <label class="form-label fw-semibold">Matière</label>
-        <select name="mat_c" class="form-select" onchange="ajaxSelectReload(this,'saisie-classe-dynamic')">
-          <option value="">— Choisir —</option>
-          <?php foreach ($mats_c as $m): ?>
-            <option value="<?= $m['id'] ?>" <?= $id_mat_c==$m['id']?'selected':''?>>
-              <?= h($m['libelle']) ?> (coef <?= $m['coef'] ?>)
-            </option>
-          <?php endforeach; ?>
-        </select>
-      </div>
-      <?php endif; ?>
-      <?php if ($id_cl_c && $id_mat_c): ?>
-      <!-- Ligne pleine largeur : les libellés de compétence sont des phrases
-           complètes, trop longues pour une colonne étroite. -->
-      <div class="col-12">
+      <?php if ($id_cl_c && $mats_c && $comps_par_mat): ?>
+      <!-- Une seule liste, comme au primaire, sur la même ligne que la
+           classe : compétences regroupées par matière (= groupe de
+           compétences), numérotées C1, C2… dans chaque groupe. Libellés longs
+           raccourcis (texte complet en info-bulle et dans le bandeau sous le
+           filtre) pour que la liste déroulée reste compacte. -->
+      <div class="col">
         <label class="form-label fw-semibold">Compétence</label>
-        <select name="comp_c" class="form-select" style="white-space:normal" onchange="ajaxSelectReload(this,'saisie-classe-dynamic')" <?= empty($comps_c)?'disabled':'' ?>>
+        <select name="comp_c" class="form-select" onchange="ajaxSelectReload(this,'saisie-classe-dynamic')">
           <option value="">— Choisir —</option>
-          <?php foreach ($comps_c as $c): ?>
-            <option value="<?= $c['id'] ?>" <?= $id_comp_c==$c['id']?'selected':''?>>
-              <?= h($c['libelle']) ?>
-            </option>
+          <?php $num_groupe = 0; foreach ($mats_c as $m):
+            $comps_m = $comps_par_mat[(int) $m['id']] ?? [];
+            if (!$comps_m) continue;
+            $num_groupe++; ?>
+            <optgroup label="<?= h($num_groupe . '. ' . mb_strtoupper($m['libelle']) . ' — coef ' . $m['coef']) ?>">
+              <?php foreach ($comps_m as $i => $c):
+                $lib = (string) $c['libelle'];
+                $court = mb_strlen($lib) > 95 ? rtrim(mb_substr($lib, 0, 92)) . '…' : $lib; ?>
+                <option value="<?= $c['id'] ?>" title="<?= h($lib) ?>" <?= $id_comp_c==$c['id']?'selected':''?>><?= h('C' . ($i + 1) . ' — ' . $court) ?></option>
+              <?php endforeach; ?>
+            </optgroup>
           <?php endforeach; ?>
         </select>
       </div>
       <?php endif; ?>
     </form>
-    <?php if ($id_cl_c && $id_mat_c && empty($comps_c)): ?>
+    <?php
+      // Matières de la classe sans aucune compétence pour ce niveau/trimestre.
+      $mats_sans_comp = ($id_cl_c && $mats_c && $classe_c_info)
+          ? array_filter($mats_c, function ($m) use ($comps_par_mat) { return empty($comps_par_mat[(int) $m['id']]); })
+          : [];
+    ?>
+    <?php if ($mats_sans_comp): ?>
       <div class="alert alert-warning py-1 px-2 mt-2 mb-0" style="font-size:.75rem">
-        <i class="bi bi-exclamation-triangle me-1"></i>Aucune compétence définie pour cette matière/niveau/trimestre.
-        <a href="<?= APP_URL ?>/secondaire/pages/matieres/liste.php?onglet=competences_trim&niveau_comp=<?= urlencode($classe_c_info['code_niveau'] ?? '') ?>&trim_comp=<?= $id_trim_c ?>">Aller en créer une</a>.
+        <i class="bi bi-exclamation-triangle me-1"></i><?= $comps_par_mat ? 'Sans compétence pour ce niveau/trimestre' : 'Aucune compétence définie pour ce niveau/trimestre' ?> :
+        <?= h(implode(', ', array_column($mats_sans_comp, 'libelle'))) ?>.
+        <a href="<?= APP_URL ?>/secondaire/pages/matieres/liste.php?onglet=competences_trim&niveau_comp=<?= urlencode($classe_c_info['code_niveau'] ?? '') ?>&trim_comp=<?= $id_trim_c ?>">Les définir</a>.
       </div>
     <?php endif; ?>
   </div>
@@ -732,7 +755,7 @@ async function ajaxSelectReload(selectEl, containerId) {
           <tr>
             <td class="text-muted"><?= $i+1 ?></td>
             <td class="fw-semibold"><?= h(strtoupper($el['nom']).' '.($el['prenom']??'')) ?></td>
-            <td class="text-muted" style="font-size:.78rem"><?= h(id_affichage_eleve($el)) ?></td>
+            <td class="text-muted" style="font-size:.78rem"><?= h(niu_eleve($el) ?: '—') ?></td>
             <?php if ($series_c): ?><td style="font-size:.75rem"><?= h($el['serie'] ?? '—') ?></td><?php endif; ?>
             <td>
               <input type="number" name="notes[<?= $el['id'] ?>]"
@@ -777,7 +800,7 @@ async function ajaxSelectReload(selectEl, containerId) {
 <?php elseif ($id_cl_c && $id_mat_c): ?>
   <div class="alert alert-light text-muted py-3 text-center">Sélectionnez une compétence.</div>
 <?php elseif ($id_cl_c): ?>
-  <div class="alert alert-light text-muted py-3 text-center">Sélectionnez une matière.</div>
+  <div class="alert alert-light text-muted py-3 text-center">Sélectionnez une compétence.</div>
 <?php else: ?>
   <div class="alert alert-light text-muted py-4 text-center">
     <i class="bi bi-arrow-up" style="font-size:2rem;display:block;opacity:.2;margin-bottom:.4rem"></i>
@@ -946,7 +969,7 @@ document.addEventListener('submit', function(e){
         <?= h(strtoupper($eleve_info['nom']).' '.($eleve_info['prenom']??'')) ?>
       </div>
       <div style="font-size:.72rem;color:#6b7280">
-        NIU <?= h(id_affichage_eleve($eleve_info)) ?> &nbsp;|&nbsp;
+        NIU <?= h(niu_eleve($eleve_info) ?: '—') ?> &nbsp;|&nbsp;
         <?= $seq_lbl ?> &nbsp;|&nbsp;
         <?= $saisi_e ?>/<?= count($mats_e) ?> matière(s)
       </div>

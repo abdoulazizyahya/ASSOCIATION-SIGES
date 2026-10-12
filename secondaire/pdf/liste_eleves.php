@@ -130,7 +130,7 @@ foreach ($eleves as $el) {
         } elseif ($k === 'date') {
             $val = $el['date_naiss'] ? date('d/m/Y', strtotime($el['date_naiss'])) : '—';
         } elseif ($k === 'matricule') {
-            $val = id_affichage_eleve($el);
+            $val = niu_eleve($el);
         } else {
             $val = $el[$col[2]] ?? '—';
         }

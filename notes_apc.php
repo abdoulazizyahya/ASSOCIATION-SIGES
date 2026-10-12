@@ -250,13 +250,11 @@ function appreciation_moyenne_arabe(?float $moyenne): string {
 }
 
 function libelle_appreciation(string $code): string {
-    return match ($code) {
-        'NA'  => 'Non Acquis',
-        'ECA' => "En Cours d'Acquisition",
-        'A'   => 'Acquis',
-        'A+'  => 'Acquis avec Facilité',
-        default => '',
-    };
+    return (($__m13 = $code) === 'NA' ? ('Non Acquis')
+        : ($__m13 === 'ECA' ? ("En Cours d'Acquisition")
+        : ($__m13 === 'A' ? ('Acquis')
+        : ($__m13 === 'A+' ? ('Acquis avec Facilité')
+        : ('')))));
 }
 
 // Port de Appreciation_Fr($note, $bareme) — échelle proportionnelle au
@@ -783,15 +781,13 @@ function mention_travail(?float $moyenne, float $jours_absence_non_justifiees = 
     $avertissement_conduite = $jrs >= 5 && $jrs < 10;
     $blame_conduite         = $jrs >= 10;
 
-    $libelle = match (true) {
-        $felicitations          => "Tableau d'honneur, Félicitations",
-        $encouragement          => "Tableau d'honneur, Encouragement",
-        $tableau_honneur        => "Tableau d'honneur",
-        $refuse_tableau_honneur => "Tableau d'honneur refusé (absences)",
-        $avertissement          => 'Avertissement travail',
-        $blame                  => 'Blâme travail',
-        default                 => '',
-    };
+    $libelle = (($__m12 = true) === $felicitations ? ("Tableau d'honneur, Félicitations")
+        : ($__m12 === $encouragement ? ("Tableau d'honneur, Encouragement")
+        : ($__m12 === $tableau_honneur ? ("Tableau d'honneur")
+        : ($__m12 === $refuse_tableau_honneur ? ("Tableau d'honneur refusé (absences)")
+        : ($__m12 === $avertissement ? ('Avertissement travail')
+        : ($__m12 === $blame ? ('Blâme travail')
+        : ('')))))));
     return compact(
         'blame', 'avertissement', 'tableau_honneur', 'encouragement', 'felicitations',
         'refuse_tableau_honneur', 'avertissement_conduite', 'blame_conduite', 'libelle'
@@ -950,15 +946,13 @@ function bilan_classe_genre(int $id_classe, string $val_annee, string $vue = 'tr
         $incr('classes', $sx);
         $moy_somme[$sx] += $moy; $moy_somme['T'] += $moy;
         $incr($moy >= 10 ? 'moy_ge10' : 'moy_lt10', $sx);
-        $tranche = match (true) {
-            $moy < 7    => 'tr_0_7',
-            $moy < 10   => 'tr_7_10',
-            $moy < 12   => 'tr_10_12',
-            $moy < 14   => 'tr_12_14',
-            $moy < 16   => 'tr_14_16',
-            $moy < 18   => 'tr_16_18',
-            default     => 'tr_18_20',
-        };
+        $tranche = (($__m11 = true) === $moy < 7 ? ('tr_0_7')
+            : ($__m11 === $moy < 10 ? ('tr_7_10')
+            : ($__m11 === $moy < 12 ? ('tr_10_12')
+            : ($__m11 === $moy < 14 ? ('tr_12_14')
+            : ($__m11 === $moy < 16 ? ('tr_14_16')
+            : ($__m11 === $moy < 18 ? ('tr_16_18')
+            : ('tr_18_20')))))));
         $incr($tranche, $sx);
         $jours = $vue === 'annee'
             ? jours_absence_non_justifiees_annuel((int) $l['id_eleve'], $id_classe, $val_annee)

@@ -212,9 +212,15 @@ if (!$es_partiel) {
         <label class="form-label">Compétence</label>
         <select name="comp" class="form-select" data-ajax-nav-auto <?= $id_classe_sel ? '' : 'disabled' ?>>
           <option value="">— Choisir —</option>
-          <?php $section_sel = $id_classe_sel ? section_classe($id_classe_sel) : 'Fr'; foreach ($competences as $c): ?>
-            <option value="<?= $c['id_comp'] ?>" <?= $id_comp_sel == $c['id_comp'] ? 'selected' : '' ?>><?= h(libelle_comp_affiche($c, $section_sel)) ?></option>
-          <?php endforeach; ?>
+          <?php // Compétences regroupées par groupe de compétences (même liste que la saisie des notes)
+            $section_sel = $id_classe_sel ? section_classe($id_classe_sel) : 'Fr'; $groupe_courant = null; foreach ($competences as $c):
+            if ($c['id_groupe_comp'] !== $groupe_courant) {
+                if ($groupe_courant !== null) echo '</optgroup>';
+                $groupe_courant = $c['id_groupe_comp'];
+                echo '<optgroup label="' . h(mb_strtoupper(mb_substr(libelle_groupe_comp_affiche($c, $section_sel), 0, 45))) . '">';
+            } ?>
+            <option value="<?= $c['id_comp'] ?>" <?= $id_comp_sel == $c['id_comp'] ? 'selected' : '' ?>><?= h($c['code_comp'] . ' — ' . libelle_comp_affiche($c, $section_sel)) ?></option>
+          <?php endforeach; if ($groupe_courant !== null) echo '</optgroup>'; ?>
         </select>
       </div>
       <div class="col-md-3">

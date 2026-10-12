@@ -69,17 +69,37 @@ require_once __DIR__ . '/../../../layout/header.php';
               <label class="form-label">Lieu de naissance</label>
               <input type="text" name="lieu_naiss" class="form-control" value="<?= $ve('lieu_naiss') ?>">
             </div>
+            <?php
+              // Listes en cascade région → département → arrondissement
+              // (tables region/departement/arrondissement, enregistrées par
+              // NOM comme avant). Une valeur déjà saisie absente des listes
+              // (ancienne saisie libre) reste proposée et sélectionnée.
+              $regions_geo = db_all("SELECT nom FROM region ORDER BY nom");
+              $region_act  = (string) ($eleve['region_naiss'] ?? '');
+            ?>
             <div class="col-md-4">
               <label class="form-label">Région de naissance</label>
-              <input type="text" name="region_naiss" class="form-control" value="<?= $ve('region_naiss') ?>">
+              <select name="region_naiss" id="selRegionNaiss" class="form-select">
+                <option value="">— Choisir —</option>
+                <?php $vu = false; foreach ($regions_geo as $r): $vu = $vu || $r['nom'] === $region_act; ?>
+                  <option value="<?= h($r['nom']) ?>" <?= $r['nom'] === $region_act ? 'selected' : '' ?>><?= h($r['nom']) ?></option>
+                <?php endforeach; ?>
+                <?php if ($region_act !== '' && !$vu): ?>
+                  <option value="<?= h($region_act) ?>" selected><?= h($region_act) ?></option>
+                <?php endif; ?>
+              </select>
             </div>
             <div class="col-md-4">
               <label class="form-label">Département de naissance</label>
-              <input type="text" name="departement_naiss" class="form-control" value="<?= $ve('departement_naiss') ?>">
+              <select name="departement_naiss" id="selDeptNaiss" class="form-select">
+                <option value="">— Choisir une région d'abord —</option>
+              </select>
             </div>
             <div class="col-md-4">
               <label class="form-label">Arrondissement de naissance</label>
-              <input type="text" name="arrondissement_naiss" class="form-control" value="<?= $ve('arrondissement_naiss') ?>">
+              <select name="arrondissement_naiss" id="selArrNaiss" class="form-select">
+                <option value="">— Choisir un département d'abord —</option>
+              </select>
             </div>
             <div class="col-md-4">
               <label class="form-label">NIU</label>
@@ -142,5 +162,46 @@ require_once __DIR__ . '/../../../layout/header.php';
     <a href="<?= APP_URL ?>/secondaire/pages/eleves/liste.php" class="btn btn-light btn-sm">Annuler</a>
   </div>
 </form>
+
+<script>
+(function () {
+  var selRegion = document.getElementById('selRegionNaiss');
+  var selDept   = document.getElementById('selDeptNaiss');
+  var selArr    = document.getElementById('selArrNaiss');
+  var deptInit  = <?= json_encode((string) ($eleve['departement_naiss'] ?? '')) ?>;
+  var arrInit   = <?= json_encode((string) ($eleve['arrondissement_naiss'] ?? '')) ?>;
+
+  function esc(s) { var d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+  // Remplit une liste ; la valeur à présélectionner est ajoutée si absente.
+  function remplir(sel, items, vide, choix) {
+    var html = '<option value="">' + vide + '</option>', trouve = false;
+    items.forEach(function (it) {
+      var s = it.nom === choix; trouve = trouve || s;
+      html += '<option value="' + esc(it.nom) + '"' + (s ? ' selected' : '') + '>' + esc(it.nom) + '</option>';
+    });
+    if (choix && !trouve) html += '<option value="' + esc(choix) + '" selected>' + esc(choix) + '</option>';
+    sel.innerHTML = html;
+  }
+  function charger(url, sel, vide, choix, ensuite) {
+    sel.innerHTML = '<option value="">Chargement…</option>';
+    fetch(url).then(function (r) { return r.json(); })
+      .then(function (items) { remplir(sel, Array.isArray(items) ? items : [], vide, choix); if (ensuite) ensuite(); })
+      .catch(function () { remplir(sel, [], 'Erreur de chargement', choix); });
+  }
+  function departements(choixDept, choixArr) {
+    if (!selRegion.value) { remplir(selDept, [], "— Choisir une région d'abord —", choixDept); arrondissements(choixArr); return; }
+    charger('<?= APP_URL ?>/ajax/departements_par_region.php?nom_region=' + encodeURIComponent(selRegion.value),
+            selDept, '— Choisir —', choixDept, function () { arrondissements(choixArr); });
+  }
+  function arrondissements(choixArr) {
+    if (!selDept.value) { remplir(selArr, [], "— Choisir un département d'abord —", choixArr); return; }
+    charger('<?= APP_URL ?>/ajax/arrondissements_par_departement.php?departement=' + encodeURIComponent(selDept.value),
+            selArr, '— Choisir —', choixArr);
+  }
+  selRegion.addEventListener('change', function () { departements('', ''); });
+  selDept.addEventListener('change', function () { arrondissements(''); });
+  departements(deptInit, arrInit);
+})();
+</script>
 
 <?php require_once __DIR__ . '/../../../layout/footer.php'; ?>

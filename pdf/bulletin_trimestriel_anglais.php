@@ -78,12 +78,12 @@ $sub_en  = $etab['subdivision_en'] ?: 'NGAOUNDERE I SUBDIVISION';
 // trimestre (jamais stocké en base, seul le libellé FR l'est). UA1/UA2...
 // restent des codes courts identiques dans les deux langues (pas de
 // libellé anglais distinct établi ailleurs dans le projet pour "UA").
-[$note_1, $note_2] = match ($id_trim) {
-    2 => ['UA3', 'UA4'],
-    3 => ['UA5', 'UA6'],
-    default => ['UA1', 'UA2'],
-};
-$trim_en = match ($id_trim) { 2 => '2nd Trimester', 3 => '3rd Trimester', default => '1st Trimester' };
+[$note_1, $note_2] = (($__m26 = $id_trim) === 2 ? (['UA3', 'UA4'])
+    : ($__m26 === 3 ? (['UA5', 'UA6'])
+    : (['UA1', 'UA2'])));
+$trim_en = (($__m25 = $id_trim) === 2 ? ('2nd Trimester')
+    : ($__m25 === 3 ? ('3rd Trimester')
+    : ('1st Trimester')));
 
 // ── Liste des élèves à imprimer ──────────────────────────────────
 if ($id) {

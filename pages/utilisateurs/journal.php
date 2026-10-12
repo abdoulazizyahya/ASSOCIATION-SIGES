@@ -16,7 +16,7 @@ if (function_exists('ecole_courante')) $id_etab = ecole_courante()['id'] ?? null
 if ($id_etab === null) $id_etab = $_SESSION['ecole']['id'] ?? null;
 $id_etab = $id_etab !== null ? (int) $id_etab : null;
 
-$dispo = (function_exists('annuaire_dispo') && annuaire_dispo()) && $id_etab !== null;
+$dispo = function_exists('audit_dispo') && audit_dispo() && ($id_etab !== null || audit_ecole_unique());   // école unique : journal dans la base de l'école
 
 // Nommée $crit (et non $f) : layout/header.php, inclus plus bas en
 // require_once DANS CETTE MÊME PORTÉE (pas une fonction), utilise déjà $f

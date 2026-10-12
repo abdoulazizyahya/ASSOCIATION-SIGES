@@ -202,9 +202,9 @@ function carte_flag_triangle_tmp(int $w_px = 200, int $h_px = 200): string {
     $green  = imagecolorallocate($img, 0, 158, 73);
     $red    = imagecolorallocate($img, 206, 17, 38);
     $yellow = imagecolorallocate($img, 252, 209, 22);
-    imagefilledpolygon($img, [0, 0, $w_px, 0, 0, $h_px], $yellow);
-    imagefilledpolygon($img, [0, 0, (int) round($w_px * 2 / 3), 0, 0, (int) round($h_px * 2 / 3)], $red);
-    imagefilledpolygon($img, [0, 0, (int) round($w_px / 3), 0, 0, (int) round($h_px / 3)], $green);
+    compat_imagefilledpolygon($img, [0, 0, $w_px, 0, 0, $h_px], $yellow);
+    compat_imagefilledpolygon($img, [0, 0, (int) round($w_px * 2 / 3), 0, 0, (int) round($h_px * 2 / 3)], $red);
+    compat_imagefilledpolygon($img, [0, 0, (int) round($w_px / 3), 0, 0, (int) round($h_px / 3)], $green);
     $cx = $w_px * 0.30; $cy = $h_px * 0.30;
     $r1 = min($w_px, $h_px) * 0.09; $r2 = $r1 * 0.42;
     $pts = [];
@@ -214,7 +214,7 @@ function carte_flag_triangle_tmp(int $w_px = 200, int $h_px = 200): string {
         $pts[] = $cx + $r * cos($ang);
         $pts[] = $cy + $r * sin($ang);
     }
-    imagefilledpolygon($img, $pts, $yellow);
+    compat_imagefilledpolygon($img, $pts, $yellow);
     imagepng($img, $tmp);
     imagedestroy($img);
     return $tmp;
@@ -244,7 +244,7 @@ function carte_etoile_tmp(int $w_px = 120, array $rgb = [252, 209, 22]): string 
         $pts[] = $cx + $r * cos($ang);
         $pts[] = $cy + $r * sin($ang);
     }
-    imagefilledpolygon($img, $pts, $color);
+    compat_imagefilledpolygon($img, $pts, $color);
     imagepng($img, $tmp);
     imagedestroy($img);
     return $tmp;
@@ -273,8 +273,8 @@ function carte_armoiries_tmp(int $w_px = 140, int $h_px = 160): string {
     // Écusson (rectangle + pointe basse), rempli or, contour foncé.
     $ymid = (int) round($h_px * 0.62);
     $shield = [0, 0, $w_px - 1, 0, $w_px - 1, $ymid, (int) round($w_px / 2), $h_px - 1, 0, $ymid];
-    imagefilledpolygon($img, $shield, $gold);
-    imagepolygon($img, $shield, $dark);
+    compat_imagefilledpolygon($img, $shield, $gold);
+    compat_imagepolygon($img, $shield, $dark);
 
     // Bandeau tricolore horizontal au centre de l'écusson.
     $by0 = (int) round($h_px * 0.34); $by1 = (int) round($h_px * 0.5);
@@ -294,7 +294,7 @@ function carte_armoiries_tmp(int $w_px = 140, int $h_px = 160): string {
         $pts[] = $cx + $r * cos($ang);
         $pts[] = $cy + $r * sin($ang);
     }
-    imagefilledpolygon($img, $pts, $dark);
+    compat_imagefilledpolygon($img, $pts, $dark);
 
     imagepng($img, $tmp);
     imagedestroy($img);
@@ -325,7 +325,7 @@ function carte_vague_tmp(int $w_px, int $h_px, array $rgb): string {
     }
     $pts[] = (float) $w_px; $pts[] = (float) $h_px;
     $pts[] = 0.0; $pts[] = (float) $h_px;
-    imagefilledpolygon($img, $pts, $color);
+    compat_imagefilledpolygon($img, $pts, $color);
     imagepng($img, $tmp);
     imagedestroy($img);
     return $tmp;

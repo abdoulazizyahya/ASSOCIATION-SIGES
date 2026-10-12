@@ -142,7 +142,7 @@ function detecter_ip_lan(): ?string {
 // reçus, attestations, tableau d'honneur...). Un visiteur anonyme ne doit
 // JAMAIS voir un fatal error brut ; le personnel connecté voit en plus le
 // message technique. Termine toujours la requête (never revient).
-function pdf_erreur_generation(Throwable $e): never {
+function pdf_erreur_generation(Throwable $e) {
     error_log('[PDF] ' . ($_SERVER['REQUEST_URI'] ?? '') . ' : ' . $e->getMessage() . ' @ ' . $e->getFile() . ':' . $e->getLine());
     http_response_code(500);
     $connecte = est_connecte();
@@ -662,11 +662,9 @@ function classes_ids_visibles(string $val_annee, string $piste = 'union'): ?arra
     if (function_exists('est_fondateur') && est_fondateur()) return null;
     $mat = matricule_ens_courant();
     if (!$mat) return [];
-    $tables = match ($piste) {
-        'fr'    => ['enseignat_classe'],
-        'ar'    => ['enseignat_classe_arabe'],
-        default => ['enseignat_classe', 'enseignat_classe_arabe'],
-    };
+    $tables = (($__m10 = $piste) === 'fr' ? (['enseignat_classe'])
+        : ($__m10 === 'ar' ? (['enseignat_classe_arabe'])
+        : (['enseignat_classe', 'enseignat_classe_arabe'])));
     $ids = [];
     foreach ($tables as $t) {
         foreach (db_all("SELECT IDClasses FROM $t WHERE matricule_ens=? AND val_annee=?", [$mat, $val_annee]) as $r) {
@@ -748,7 +746,7 @@ function sec_classes_ids_visibles(bool $pp_seulement = false): ?array {
     return array_keys($ids);
 }
 
-function sec_refuser_acces(string $message): never {
+function sec_refuser_acces(string $message) {
     http_response_code(403);
     die('<div style="font-family:sans-serif;padding:2rem;color:#b91c1c">' . h($message) . '</div>');
 }
@@ -1080,6 +1078,11 @@ function get_annee_active_sans_cache(): array {
             $libelle = $an . '-' . ($an + 1);
             db_exec("INSERT IGNORE INTO annee_scolaire (libelle, active) VALUES (?, 1)", [$libelle]);
             $a = db_one("SELECT * FROM annee_scolaire WHERE libelle=?", [$libelle]);
+            // Trimestres + séquences + compétences du gabarit tout de suite,
+            // comme une année créée depuis Paramètres : sinon une école
+            // fraîchement installée n'a ni compétences ni matières par classe
+            // tant qu'on n'a pas ouvert un écran qui appelle get_trimestre_actif().
+            if ($a && function_exists('provisionner_trimestres_annee')) provisionner_trimestres_annee((int) $a['id']);
         }
         if (!$a) return ['val_annee' => '—', 'Etat_annee_scolaire' => 0, 'id' => null];
         $a['val_annee'] = $a['libelle'];
@@ -1158,11 +1161,9 @@ function generer_filigrane_logo(string $source_abs, string $dest_abs): bool {
     if (!extension_loaded('gd')) return false;
 
     $ext = strtolower(pathinfo($source_abs, PATHINFO_EXTENSION));
-    $src = match ($ext) {
-        'png'         => @imagecreatefrompng($source_abs),
-        'jpg', 'jpeg' => @imagecreatefromjpeg($source_abs),
-        default       => null,
-    };
+    $src = (($__m9 = $ext) === 'png' ? (@imagecreatefrompng($source_abs))
+        : ($__m9 === 'jpg' || $__m9 === 'jpeg' ? (@imagecreatefromjpeg($source_abs))
+        : (null)));
     if (!$src) return false;
 
     // Taille plafonnée : le filigrane n'a pas besoin d'être plus grand que
@@ -2057,6 +2058,14 @@ function id_affichage_eleve(array $eleve): string {
     return (string)($eleve['Mat_elv'] ?? '');
 }
 
+// Vrai NIU de l'élève (champ eleve.niu, secondaire) pour tout ce qui est
+// affiché sous l'intitulé « NIU » — chaîne vide s'il n'est pas renseigné.
+// À ne pas confondre avec id_affichage_eleve() (matricule), qui reste la
+// valeur des QR codes de vérification déjà imprimés.
+function niu_eleve(array $eleve): string {
+    return trim((string) ($eleve['niu'] ?? ''));
+}
+
 // ── Statut d'inscription (Redoublant ?) ──────────────────────────
 // `inscrire.Statut_elv` est un champ historique Oui/Non (« Redoublant * »
 // dans le formulaire legacy, voir jaynitaare/php/form_enreg_eleve.php) — pas
@@ -2102,13 +2111,12 @@ function pagination_html(int $page, int $total_pages, string $url_base): string 
 // 7 rôles d'ABZ_MBE (pas de Proviseur/Censeur/SG/Intendant — c'est une école
 // maternelle/primaire dirigée par un Directeur).
 function libelle_role(string $role): string {
-    return match ($role) {
-        'DIRECTEUR'  => 'Directeur/Directrice',
-        'FONDATEUR'  => 'Fondateur/Fondatrice',
-        'ENSEIGNANT' => 'Enseignant(e)',
-        'SECRETAIRE' => 'Secrétaire',
-        'COMPTABLE'  => 'Agent financier / Comptable',
-        'MEMBRE_ASSOCIATION' => 'Membre de l\'association',
+    return (($__m8 = $role) === 'DIRECTEUR' ? ('Directeur/Directrice')
+        : ($__m8 === 'FONDATEUR' ? ('Fondateur/Fondatrice')
+        : ($__m8 === 'ENSEIGNANT' ? ('Enseignant(e)')
+        : ($__m8 === 'SECRETAIRE' ? ('Secrétaire')
+        : ($__m8 === 'COMPTABLE' ? ('Agent financier / Comptable')
+        : ($__m8 === 'MEMBRE_ASSOCIATION' ? ('Membre de l\'association')
         // Rôles école SECONDAIRE (utilisateur.role, schema_ref_ecole_secondaire.sql
         // — vocabulaire LAM_ABZ, distinct des rôles primaire ci-dessus).
         // PROVISEUR reste le rôle réel en base (permissions inchangées) —
@@ -2116,15 +2124,14 @@ function libelle_role(string $role): string {
         // secondaire PRIVÉ (etablissement.statut, migration v4 secondaire),
         // vocabulaire camerounais : Proviseur = public, Principal = privé.
         // Demande explicite du 22/09/2026.
-        'ADMIN'      => 'Administrateur',
-        'PROVISEUR'  => (function_exists('type_enseignement_courant') && type_enseignement_courant() === 'secondaire'
+        : ($__m8 === 'ADMIN' ? ('Administrateur')
+        : ($__m8 === 'PROVISEUR' ? ((function_exists('type_enseignement_courant') && type_enseignement_courant() === 'secondaire'
                           && (get_etablissement()['statut'] ?? 'public') === 'prive')
-                         ? 'Principal(e)' : 'Proviseur(e)',
-        'CENSEUR'    => 'Censeur(e)',
-        'SG'         => 'Surveillant(e) Général(e)',
-        'INTENDANT'  => 'Intendant(e)',
-        default      => $role,
-    };
+                         ? 'Principal(e)' : 'Proviseur(e)')
+        : ($__m8 === 'CENSEUR' ? ('Censeur(e)')
+        : ($__m8 === 'SG' ? ('Surveillant(e) Général(e)')
+        : ($__m8 === 'INTENDANT' ? ('Intendant(e)')
+        : ($role))))))))))));
 }
 
 // ── Fonctions assignables à un membre du personnel (pages/enseignants/
@@ -2542,13 +2549,11 @@ function gen_matricule(string $val_annee, string $niveau, bool $forcer = false):
     $niv_wild = in_array($cfg['sequence_par'], ['annee', 'globale'], true);
     $regex = '^';
     foreach (preg_split('/(\{AAAA\}|\{AA\}|\{NIV\}|\{SEQ\})/', $cfg['format'], -1, PREG_SPLIT_DELIM_CAPTURE) as $p) {
-        $regex .= match ($p) {
-            '{AAAA}' => $an_wild ? '[0-9]{4}' : preg_quote($an),
-            '{AA}'   => $an_wild ? '[0-9]{2}' : preg_quote($aa),
-            '{NIV}'  => $niv_wild ? '[MP]' : $niv,
-            '{SEQ}'  => '[0-9]{' . $lseq . ',}',
-            default  => preg_quote($p),
-        };
+        $regex .= (($__m7 = $p) === '{AAAA}' ? ($an_wild ? '[0-9]{4}' : preg_quote($an))
+            : ($__m7 === '{AA}' ? ($an_wild ? '[0-9]{2}' : preg_quote($aa))
+            : ($__m7 === '{NIV}' ? ($niv_wild ? '[MP]' : $niv)
+            : ($__m7 === '{SEQ}' ? ('[0-9]{' . $lseq . ',}')
+            : (preg_quote($p))))));
     }
     $regex .= '$';
 
@@ -2831,14 +2836,12 @@ function journaliser_mouvement_classe(int $id_eleve, string $val_annee, ?int $av
 // ── Dossier élève (pièces jointes) ──────────────────────────
 
 function libelle_type_dossier(string $type): string {
-    return match ($type) {
-        'acte_naissance'      => 'Acte de naissance',
-        'carnet_vaccination'  => 'Carnet de vaccination',
-        'bulletin'            => 'Bulletin',
-        'document_transfert'  => 'Document de transfert',
-        'photo_4x4'           => 'Photo 4×4',
-        default                => 'Autre document',
-    };
+    return (($__m6 = $type) === 'acte_naissance' ? ('Acte de naissance')
+        : ($__m6 === 'carnet_vaccination' ? ('Carnet de vaccination')
+        : ($__m6 === 'bulletin' ? ('Bulletin')
+        : ($__m6 === 'document_transfert' ? ('Document de transfert')
+        : ($__m6 === 'photo_4x4' ? ('Photo 4×4')
+        : ('Autre document'))))));
 }
 
 // Sauvegarde un scan (PDF ou image) uploadé dans assets/uploads/dossiers_eleves/,
@@ -2890,11 +2893,9 @@ function blob_est_image(?string $blob): bool {
 function photo_eleve_fichier_temp(?string $blob, int $id_eleve): ?string {
     if (!blob_est_image($blob)) return null;
     $fi  = finfo_open(FILEINFO_MIME_TYPE);
-    $ext = match (finfo_buffer($fi, $blob)) {
-        'image/png'  => 'png',
-        'image/webp' => 'webp',
-        default      => 'jpg',
-    };
+    $ext = (($__m5 = finfo_buffer($fi, $blob)) === 'image/png' ? ('png')
+        : ($__m5 === 'image/webp' ? ('webp')
+        : ('jpg')));
     finfo_close($fi);
     $chemin = sys_get_temp_dir() . '/jn_photo_' . $id_eleve . '.' . $ext;
     file_put_contents($chemin, $blob);
@@ -3391,25 +3392,21 @@ function notifications_tout_marquer_lu(int $id_utilisateur): void {
 // ==== libelle_type_demande ====
 /** Libellé lisible d'un type de document de demande. */
 function libelle_type_demande(string $type): string {
-    return match ($type) {
-        'attestation' => 'Attestation de présence effective',
-        'prise'       => 'Certificat de prise de service',
-        'reprise'     => 'Certificat de reprise de service',
-        default       => $type,
-    };
+    return (($__m4 = $type) === 'attestation' ? ('Attestation de présence effective')
+        : ($__m4 === 'prise' ? ('Certificat de prise de service')
+        : ($__m4 === 'reprise' ? ('Certificat de reprise de service')
+        : ($type))));
 }
 
 // ==== libelle_statut_demande ====
 /** [libellé, classe badge Bootstrap, icône Bootstrap Icons] pour un statut de demande. */
 function libelle_statut_demande(string $statut): array {
-    return match ($statut) {
-        'en_attente_censeur'   => ['En attente du Censeur',   'warning',  'hourglass-split'],
-        'en_attente_proviseur' => ['En attente du Proviseur', 'info',     'hourglass-split'],
-        'rejetee_censeur'      => ['Rejetée par le Censeur',  'danger',   'x-circle'],
-        'rejetee_proviseur'    => ['Rejetée par le Proviseur','danger',   'x-circle'],
-        'validee'               => ['Validée — disponible',   'success',  'check-circle'],
-        default                 => [$statut, 'secondary', 'question-circle'],
-    };
+    return (($__m3 = $statut) === 'en_attente_censeur' ? (['En attente du Censeur',   'warning',  'hourglass-split'])
+        : ($__m3 === 'en_attente_proviseur' ? (['En attente du Proviseur', 'info',     'hourglass-split'])
+        : ($__m3 === 'rejetee_censeur' ? (['Rejetée par le Censeur',  'danger',   'x-circle'])
+        : ($__m3 === 'rejetee_proviseur' ? (['Rejetée par le Proviseur','danger',   'x-circle'])
+        : ($__m3 === 'validee' ? (['Validée — disponible',   'success',  'check-circle'])
+        : ([$statut, 'secondary', 'question-circle']))))));
 }
 
 // ==== demande_validee_existe ====

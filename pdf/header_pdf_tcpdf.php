@@ -78,7 +78,7 @@ function tcpdf_colonne_lignes(TCPDF $pdf, array $lignes, float $x, float $y, flo
         $pdf->SetFont($police, $style, $taille);
         // Rétrécit la police si le texte dépasse la largeur de colonne
         // (Cell() ne retourne jamais à la ligne, contrairement à MultiCell()).
-        while ($pdf->GetStringWidth($texte) > $w && $taille > 5) { $taille -= 0.5; $pdf->SetFontSize($taille); }
+        while ($pdf->GetStringWidth($texte) > $w - 1 && $taille > 3) { $taille -= 0.25; $pdf->SetFontSize($taille); }
         $pdf->SetXY($rtl ? $x + $w : $x, $y, true);
         $pdf->Cell($w, $lh, $texte, 0, 0, 'C');
         $pdf->SetRTL(false, false);

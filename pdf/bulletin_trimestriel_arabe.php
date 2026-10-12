@@ -55,11 +55,9 @@ $etab_brut = get_etablissement();
 $etab      = etab_pour_pdf($etab_brut);
 $etab_ar   = $etab_brut;
 
-[$trim_ar_lib] = match ($id_trim) {
-    2 => ['الفصل الثاني'],
-    3 => ['الفصل الثالث'],
-    default => ['الفصل الأول'],
-};
+[$trim_ar_lib] = (($__m29 = $id_trim) === 2 ? (['الفصل الثاني'])
+    : ($__m29 === 3 ? (['الفصل الثالث'])
+    : (['الفصل الأول'])));
 
 if ($id) {
     $eleve = db_one("SELECT * FROM eleve WHERE id_eleve=?", [$id]);
@@ -160,7 +158,8 @@ function detail_sequence_matiere_arabe(int $id_eleve, int $id_mat, int $id_class
 function bilingue(TCPDF $pdf, float $x, float $y, float $w, float $h, string $fr, string $ar,
                    int $border = 1, string $align = 'C', bool $fill = false,
                    float $taille_fr = 7.5, float $taille_ar = 6.5, array $couleur_texte = [0, 0, 0],
-                   string $style_ar = '', float $gap = 0.1, string $police_fr = 'helvetica'): void {
+                   string $style_ar = '', float $gap = 0.1, string $police_fr = 'helvetica',
+                   string $align_ar = ''): void {
     if ($fill || $border) {
         $pdf->Rect($x, $y, $w, $h, $fill && $border ? 'DF' : ($fill ? 'F' : 'D'));
     }
@@ -186,7 +185,10 @@ function bilingue(TCPDF $pdf, float $x, float $y, float $w, float $h, string $fr
     $pdf->SetFont('amirib', $style_ar, $taille_ar);
     $pdf->SetRTL(true, false);
     $pdf->SetXY($x + $w, $y_ar, true);
-    $pdf->Cell($w, $lh_ar, $ar, 0, 0, $align);
+    // Arabe aligné comme le français par défaut (centré dans les en-têtes et
+    // les tableaux DISCIPLINES / TRAVAIL / PROFIL / RESULTATS) ; $align_ar
+    // force un autre alignement (en mode RTL, 'R' = bord droit de la case).
+    $pdf->Cell($w, $lh_ar, $ar, 0, 0, $align_ar !== '' ? $align_ar : $align);
     $pdf->SetRTL(false, false);
     $pdf->SetTextColor(0, 0, 0);
 }
@@ -226,16 +228,12 @@ function dessiner_bulletin_trimestriel_arabe(
     // à helvetica), sinon helvetica comme avant — jamais basculée à la volée.
     $police_ch = $chiffres_ar ? 'amirib' : 'helvetica';
 
-    [$lbl_ua1, $lbl_ua2] = match ($id_trim) {
-        2 => ['UA3', 'UA4'],
-        3 => ['UA5', 'UA6'],
-        default => ['UA1', 'UA2'],
-    };
-    [$lbl_ua1_ar, $lbl_ua2_ar] = match ($id_trim) {
-        2 => ['الوحدة 3', 'الوحدة 4'],
-        3 => ['الوحدة 5', 'الوحدة 6'],
-        default => ['الوحدة 1', 'الوحدة 2'],
-    };
+    [$lbl_ua1, $lbl_ua2] = (($__m28 = $id_trim) === 2 ? (['UA3', 'UA4'])
+        : ($__m28 === 3 ? (['UA5', 'UA6'])
+        : (['UA1', 'UA2'])));
+    [$lbl_ua1_ar, $lbl_ua2_ar] = (($__m27 = $id_trim) === 2 ? (['الوحدة 3', 'الوحدة 4'])
+        : ($__m27 === 3 ? (['الوحدة 5', 'الوحدة 6'])
+        : (['الوحدة 1', 'الوحدة 2'])));
 
     $matieres = matieres_classe_arabe($id_classe);
     $resultat = rang_eleve_trimestre_arabe($id, $id_classe, $id_trim, $val_annee);
@@ -326,6 +324,23 @@ function dessiner_bulletin_trimestriel_arabe(
     $pdf->Cell(48, 5, ' ' . $trim_ar_lib, 0, 0, 'R');
     $pdf->SetRTL(false, false);
 
+    // Année scolaire : texte seul (sans cadre ni fond), à gauche du titre, sur
+    // la même ligne que le cadre « BULLETIN DE NOTES », aligné au-dessus de la
+    // case CLASSE — « Année scolaire : 2026/2027 » en haut, « العام الدراسي »
+    // centré en dessous (la valeur n'est écrite qu'une fois).
+    $x_an = 5 + $OX; $w_an = (50 + $OX) - $x_an - 1.5; $y_an = 33 + $OY;
+    $txt_an_fr = 'Année scolaire : ' . $val_annee;
+    $taille_an = 8.5;
+    $pdf->SetFont('helvetica', 'B', $taille_an);
+    while ($pdf->GetStringWidth($txt_an_fr) > $w_an - 2 && $taille_an > 6) { $taille_an -= 0.25; $pdf->SetFontSize($taille_an); }
+    $pdf->SetXY($x_an, $y_an + 0.6);
+    $pdf->Cell($w_an, 4.4, $txt_an_fr, 0, 0, 'C');
+    $pdf->SetFont('amirib', 'B', 10);
+    $pdf->SetRTL(true, false);
+    $pdf->SetXY($x_an + $w_an, $y_an + 5, true);
+    $pdf->Cell($w_an, 4.4, 'العام الدراسي', 0, 0, 'C');
+    $pdf->SetRTL(false, false);
+
 	
 	
 	
@@ -356,8 +371,22 @@ function dessiner_bulletin_trimestriel_arabe(
 	$nom = pdf_u_ar(' ' . $nom_affiche);
 
 	
-	  $pdf->SetFont('amirib', '', 12);
-    $pdf->Cell(113, 5.5, $nom, 1, 1, 'L', 1);
+	// Nom arabe : écrit de droite à gauche (RTL) et aligné à droite de la case ;
+	// repli sur le nom français (s'il n'y a pas de nom arabe) : aligné à gauche.
+	$x_nom = 45.5 + $OX; $y_nom = 50.1 + $OY;
+	$pdf->Cell(113, 5.5, '', 1, 1, 'L', 1);
+	$pdf->SetFont('amirib', '', 12);
+	while ($pdf->GetStringWidth($nom) > 111 && $pdf->getFontSizePt() > 7) $pdf->SetFontSize($pdf->getFontSizePt() - 0.5);
+	if (!empty($eleve['Nom_arabe_elv'])) {
+	    $pdf->SetRTL(true, false);
+	    $pdf->SetXY($x_nom + 113, $y_nom, true);
+	    $pdf->Cell(113, 5.5, $nom, 0, 0, 'R');
+	    $pdf->SetRTL(false, false);
+	} else {
+	    $pdf->SetXY($x_nom, $y_nom);
+	    $pdf->Cell(113, 5.5, $nom, 0, 0, 'L');
+	}
+	$pdf->SetXY($x_nom, $y_nom + 5.5);
 
 	$pdf->SetFont('helvetica', 'B', 9);
     $date_naiss = $eleve['Date_naiss_elv'] ? date('d/m/Y', strtotime($eleve['Date_naiss_elv'])) : '';
@@ -441,7 +470,10 @@ function dessiner_bulletin_trimestriel_arabe(
     // pas l'échelle à mots de appreciation_moyenne_arabe().
     $TX0 = 9; $TW = 192; $TX1 = $TX0 + $TW;
     $y0 = 81;
-    $w_item = 78; $w_ua = 42; $w_sub = $w_ua / 4; $w_moy = 14; $w_cote = 16;
+    // Colonne des compétences élargie (78 -> 88 mm) pour des intitulés FR/AR
+    // plus grands sur une seule ligne ; les colonnes de notes cèdent un peu
+    // de largeur (notes ajustées à leur case, voir $cell_note).
+    $w_item = 88; $w_ua = 38; $w_sub = $w_ua / 4; $w_moy = 13; $w_cote = 15;
     $x_ua1 = $TX0 + $w_item; $x_ua2 = $x_ua1 + $w_ua; $x_moy = $x_ua2 + $w_ua; $x_cote = $x_moy + $w_moy;
     $seqs = sequences_du_trimestre($id_trim);
     $id_seq1 = $seqs[0] ?? 0; $id_seq2 = $seqs[1] ?? 0;
@@ -454,16 +486,12 @@ function dessiner_bulletin_trimestriel_arabe(
     // Oral/Ecrit/Pratique/Total) — toutes les polices de cet en-tête à 14/gras.
     $h_entete = 12; $h_lbl_ua = $h_entete / 3; $h_sub = $h_entete - $h_lbl_ua;
     pdf_fill($pdf, 'entete_tableau_arabe');
-    bilingue($pdf, $TX0, $y0, $w_item, $h_entete, 'COMPETENCES', 'الكفايات', 1, 'C', true, 10, 10, [0, 0, 0], 'B', police_fr: $police_ch);
-    if ($id_trim === 2) {
-        bilingue_ligne($pdf, $x_ua1, $y0, $w_ua, $h_lbl_ua, $lbl_ua1, $lbl_ua1_ar, 1, 'C', true, 10);
-        bilingue_ligne($pdf, $x_ua2, $y0, $w_ua, $h_lbl_ua, $lbl_ua2, $lbl_ua2_ar, 1, 'C', true, 10);
-    } else {
-        bilingue($pdf, $x_ua1, $y0, $w_ua, $h_lbl_ua, $lbl_ua1, $lbl_ua1_ar, 1, 'C', true, 10, 10, [0, 0, 0], 'B', -1.5, $police_ch);
-        bilingue($pdf, $x_ua2, $y0, $w_ua, $h_lbl_ua, $lbl_ua2, $lbl_ua2_ar, 1, 'C', true, 10, 10, [0, 0, 0], 'B', -1.5, $police_ch);
-    }
-    bilingue($pdf, $x_moy, $y0, $w_moy, $h_entete, 'MOY', 'المعدل', 1, 'C', true, 10, 10, [0, 0, 0], 'B', police_fr: $police_ch);
-    bilingue($pdf, $x_cote, $y0, $w_cote, $h_entete, 'COTE', 'التقدير', 1, 'C', true, 10, 10, [0, 0, 0], 'B', police_fr: $police_ch);
+    bilingue($pdf, $TX0, $y0, $w_item, $h_entete, 'COMPETENCES', 'الكفايات', 1, 'C', true, 10, 10, [0, 0, 0], 'B', 0.1, $police_ch);
+    // UA1 / الوحدة 1 sur UNE seule ligne, quel que soit le trimestre.
+    bilingue_ligne($pdf, $x_ua1, $y0, $w_ua, $h_lbl_ua, $lbl_ua1, $lbl_ua1_ar, 1, 'C', true, 10);
+    bilingue_ligne($pdf, $x_ua2, $y0, $w_ua, $h_lbl_ua, $lbl_ua2, $lbl_ua2_ar, 1, 'C', true, 10);
+    bilingue($pdf, $x_moy, $y0, $w_moy, $h_entete, 'MOY', 'المعدل', 1, 'C', true, 10, 10, [0, 0, 0], 'B', 0.1, $police_ch);
+    bilingue($pdf, $x_cote, $y0, $w_cote, $h_entete, 'COTE', 'التقدير', 1, 'C', true, 10, 10, [0, 0, 0], 'B', 0.1, $police_ch);
 
     $xx = $x_ua1;
     foreach ([['Oral', 'شفوي'], ['Ecrit', 'كتابي'], ['Pratiq', 'تطبيقي'], ['Total', 'مجموع'],
@@ -473,15 +501,9 @@ function dessiner_bulletin_trimestriel_arabe(
     }
 
     $y = $y0 + $h_entete;
-    // 8.3 -> 7.8 (demande explicite du 29/08/2026, en même temps que l'arabe
-    // 10 -> 14pt ci-dessous) : à ce point l'arabe (14pt, ~6.36mm de ligne)
-    // occupe déjà la quasi-totalité de $h_row=7.8 à lui seul — le français
-    // n'a mécaniquement plus qu'environ 1mm restant (~2.5-3pt, voir calcul
-    // de $taille_item_fr plus bas) pour que le bloc tienne SANS agrandir
-    // $h_row, comme demandé. Le français devient donc à peine lisible dans
-    // le pire cas (nom de matière court, non rétréci) — c'est la conséquence
-    // arithmétique directe des deux contraintes posées (14pt fixe + 7.8mm),
-    // signalé explicitement plutôt que silencieusement subi.
+    // Hauteur normale d'une ligne de compétence (arabe 10pt + français ~6.5pt,
+    // voir plus bas) — une ligne dont l'intitulé français passe sur 2 lignes
+    // est un peu plus haute.
     $h_row = 7.8;
     $T_bareme = 0.0; $T_points = 0.0;
     $T_bareme_seq1 = 0.0; $T_points_seq1 = 0.0;
@@ -525,58 +547,57 @@ function dessiner_bulletin_trimestriel_arabe(
             if ($pts1 !== null) { $T_bareme_seq1 += $bareme_pts; $T_points_seq1 += $pts1; }
             if ($pts2 !== null) { $T_bareme_seq2 += $bareme_pts; $T_points_seq2 += $pts2; }
 
-            // Nom de matière sur 2 lignes empilées — arabe en haut, français
-            // en bas (demande explicite du 29/08/2026) — plutôt que la seule
-            // ligne "FR / AR (Pts)" concaténée d'avant : certains intitulés
-            // (ex. "Avoir une foi pure et authentique et mettre en
-            // application l'unicité d'Allah", 76 caractères) débordaient de
-            // $w_item même réduits au plancher (6pt), le français à lui seul
-            // ayant déjà besoin de toute la largeur de la cellule. AR à 14pt
-            // FIXE (demande explicite — même taille que l'arabe de l'en-tête
-            // COMPETENCES/الكفايات avait été portée à 10pt, puis 14pt ici)
-            // SANS agrandir $h_row (doit rester 7.8) : à 14pt l'arabe occupe
-            // déjà ~6.36mm de ligne à lui seul, il ne reste donc plus qu'une
-            // fraction de mm pour le français — $taille_item_fr est dérivée
-            // de l'espace VERTICAL restant (pas seulement de la largeur comme
-            // avant), avec un plancher dur à 3pt pour ne jamais aller à 0.
-            $pdf->Rect($TX0, $y, $w_item, $h_row, 'D');
-            $texte_item_ar = ' ' . $m['matiere_ar'];
+            // Nom de la compétence : arabe en haut, français en bas, CHACUN SUR
+            // UNE SEULE LIGNE, sans jamais agrandir la ligne du tableau ($h_row).
+            // Répartition de la hauteur (demande du 07/10/2026 : tout agrandir) :
+            //  - le français passe en priorité — taille max 10pt, réduite pour
+            //    tenir dans la largeur, et plafonnée pour laisser au moins 10pt
+            //    à l'arabe ;
+            //  - l'arabe prend toute la hauteur restante (max 14pt), réduit lui
+            //    aussi s'il dépasse la largeur.
+            // Hauteurs de ligne au plus juste (Amiri a de grandes hampes : 0.42,
+            // Helvetica : 0.38 mm par point).
+            $texte_item_ar = ' ' . $m['matiere_ar'] . ' ';
             $texte_item_fr = ' ' . $m['matiere_fr'] . ' (' . (int) $bareme_pts . 'Pts)';
-            $gap_item = 0.2;
-            $taille_item_ar = 14;
-            $pdf->SetFont('amirib', 'B', $taille_item_ar);
-            while ($pdf->GetStringWidth($texte_item_ar) > $w_item - 2 && $taille_item_ar > 10) {
-                $taille_item_ar -= 0.5;
-                $pdf->SetFontSize($taille_item_ar);
-            }
-            $lh_item_ar = $taille_item_ar / 2.2;
-            // Espace restant sous l'arabe, converti en taille de police
-            // (inverse de lh = taille/2.2) — plafonné à 7 (jamais plus gros
-            // que sans la contrainte de hauteur), plancher dur 3.
-            $taille_item_fr = max(3, min(7, ($h_row - $lh_item_ar - $gap_item) * 2.2));
+            $gap_item = 0.1;
+            $h_dispo_item = $h_row - 0.3 - $gap_item;
+            $taille_item_fr = min(10, floor(($h_dispo_item - 10 * 0.42) / 0.38 * 4) / 4);
             $pdf->SetFont('helvetica', 'B', $taille_item_fr);
-            while ($pdf->GetStringWidth($texte_item_fr) > $w_item - 2 && $taille_item_fr > 3) {
-                $taille_item_fr -= 0.5;
+            while ($pdf->GetStringWidth($texte_item_fr) > $w_item - 1.5 && $taille_item_fr > 4) {
+                $taille_item_fr -= 0.25;
                 $pdf->SetFontSize($taille_item_fr);
             }
-            $lh_item_fr = $taille_item_fr / 2.2;
-            $y_item_ar = $y + max(0, ($h_row - ($lh_item_ar + $gap_item + $lh_item_fr)) / 2);
+            $taille_item_ar = min(14, floor(($h_dispo_item - $taille_item_fr * 0.38) / 0.42 * 4) / 4);
+            $pdf->SetFont('amirib', 'B', $taille_item_ar);
+            while ($pdf->GetStringWidth($texte_item_ar) > $w_item - 1.5 && $taille_item_ar > 5) {
+                $taille_item_ar -= 0.25;
+                $pdf->SetFontSize($taille_item_ar);
+            }
+            $lh_item_ar = $taille_item_ar * 0.42;
+            $lh_item_fr = $taille_item_fr * 0.38;
+            $pdf->Rect($TX0, $y, $w_item, $h_row, 'D');
+            $y_item_ar = $y + ($h_row - ($lh_item_ar + $gap_item + $lh_item_fr)) / 2;
             $y_item_fr = $y_item_ar + $lh_item_ar + $gap_item;
             $pdf->SetFont('amirib', 'B', $taille_item_ar);
             $pdf->SetRTL(true, false);
             $pdf->SetXY($TX0 + $w_item, $y_item_ar, true);
-            $pdf->Cell($w_item, $lh_item_ar, $texte_item_ar, 0, 0, 'L');
+            $pdf->Cell($w_item, $lh_item_ar, $texte_item_ar, 0, 0, 'R', false, '', 0, false, 'T', 'M');   // arabe aligné à droite
             $pdf->SetRTL(false, false);
             $pdf->SetFont('helvetica', 'B', $taille_item_fr);
             $pdf->SetXY($TX0, $y_item_fr);
-            $pdf->Cell($w_item, $lh_item_fr, $texte_item_fr, 0, 0, 'L');
-
+            $pdf->Cell($w_item, $lh_item_fr, $texte_item_fr, 0, 0, 'L', false, '', 0, false, 'T', 'M');
             // Note en rouge si < la moitié de son barème (ex: barème 40 →
             // rouge sous 20) — sous-notes contre le barème de leur propre
             // composante (discipline_arabe.orale/ecrite/pratique), Total
             // contre $bareme_pts (barème total de la matière).
             $xx = $x_ua1;
             $pdf->SetFont($police_ch, '', 9);
+            // Note dans sa case : taille réduite seulement si elle dépasse la largeur.
+            $cell_note = function (string $txt, float $taille, string $style) use ($pdf, $police_ch, $w_sub, &$h_row) {
+                $pdf->SetFont($police_ch, $style, $taille);
+                while ($txt !== '' && $pdf->GetStringWidth($txt) > $w_sub - 1 && $taille > 6) { $taille -= 0.25; $pdf->SetFontSize($taille); }
+                $pdf->Cell($w_sub, $h_row, $txt, 1, 0, 'C');
+            };
             foreach ([['d' => $d1, 'total' => $pts1], ['d' => $d2, 'total' => $pts2]] as $ua) {
                 foreach (['orale', 'ecrite', 'pratique'] as $ch) {
                     $v = $ua['d'][$ch] ?? null;
@@ -584,7 +605,7 @@ function dessiner_bulletin_trimestriel_arabe(
                     $rouge = $v !== null && $seuil !== null && $v < $seuil;
                     $pdf->SetTextColor($rouge ? 255 : 0, 0, 0);
                     $pdf->SetXY($xx, $y);
-                    $pdf->Cell($w_sub, $h_row, $v !== null ? rtrim(rtrim(number_format($v, 2), '0'), '.') : '', 1, 0, 'C');
+                    $cell_note($v !== null ? rtrim(rtrim(number_format($v, 2), '0'), '.') : '', 9, '');
                     $xx += $w_sub;
                 }
                 $seuil_total = $bareme_pts / 2;
@@ -592,7 +613,7 @@ function dessiner_bulletin_trimestriel_arabe(
                 $pdf->SetFont($police_ch, 'B', 10);
                 $pdf->SetTextColor($rouge_total ? 255 : 0, 0, 0);
                 $pdf->SetXY($xx, $y);
-                $pdf->Cell($w_sub, $h_row, $ua['total'] !== null ? rtrim(rtrim(number_format($ua['total'], 2), '0'), '.') : '', 1, 0, 'C');
+                $cell_note($ua['total'] !== null ? rtrim(rtrim(number_format($ua['total'], 2), '0'), '.') : '', 10, 'B');
                 $pdf->SetFont($police_ch, '', 9);
                 $xx += $w_sub;
             }
@@ -646,11 +667,11 @@ function dessiner_bulletin_trimestriel_arabe(
     $pdf->Cell($w_ua, 4, $moy_seq1 !== null ? 'Total: ' . number_format($T_points_seq1, 2) . '/' . (int) $T_bareme_seq1 : '-', 1, 0, 'C', true);
     $pdf->SetXY($x_ua2, $y);
     $pdf->Cell($w_ua, 4, $moy_seq2 !== null ? 'Total: ' . number_format($T_points_seq2, 2) . '/' . (int) $T_bareme_seq2 : '-', 1, 0, 'C', true);
-    $pdf->SetFont($police_ch, 'B', 5.8);
+    $pdf->SetFont($police_ch, 'B', 6.5);   // même taille que la ligne « Total » au-dessus
     $pdf->Rect($x_ua1, $y + 4, $w_ua, 4, 'DF');
-    pdf_texte_rang_exposant($pdf, $x_ua1, $y + 4, $w_ua, 4, $moy_seq1 !== null ? 'Moy:' . number_format($moy_seq1, 2) . ($rang_seq1_txt !== '' ? '  Rang:' . $rang_seq1_txt : '') : '', $police_ch, 'B', 5.8);
+    pdf_texte_rang_exposant($pdf, $x_ua1, $y + 4, $w_ua, 4, $moy_seq1 !== null ? 'Moy:' . number_format($moy_seq1, 2) . ($rang_seq1_txt !== '' ? '  Rang:' . $rang_seq1_txt : '') : '', $police_ch, 'B', 6.5);
     $pdf->Rect($x_ua2, $y + 4, $w_ua, 4, 'DF');
-    pdf_texte_rang_exposant($pdf, $x_ua2, $y + 4, $w_ua, 4, $moy_seq2 !== null ? 'Moy:' . number_format($moy_seq2, 2) . ($rang_seq2_txt !== '' ? '  Rang:' . $rang_seq2_txt : '') : '', $police_ch, 'B', 5.8);
+    pdf_texte_rang_exposant($pdf, $x_ua2, $y + 4, $w_ua, 4, $moy_seq2 !== null ? 'Moy:' . number_format($moy_seq2, 2) . ($rang_seq2_txt !== '' ? '  Rang:' . $rang_seq2_txt : '') : '', $police_ch, 'B', 6.5);
 
     $pdf->SetFont($police_ch, 'B', 7.5);
     $pdf->SetXY($x_moy, $y);
@@ -725,7 +746,7 @@ function dessiner_bulletin_trimestriel_arabe(
             $pdf->SetFont('amirib', 'B', 11);
             $pdf->SetRTL(true, false);
             $pdf->SetXY($x4[3] + $w_res_lbl + $w_res_val, $ry, true);
-            $pdf->Cell($w_res_val, $H_RES, pdf_u_ar_appr($val), 1, 0, 'C', true);
+            $pdf->Cell($w_res_val, $H_RES, pdf_u_ar_appr($val), 1, 0, 'C', true);   // appréciation centrée
             $pdf->SetRTL(false, false);
         } else {
             $pdf->Rect($x4[3] + $w_res_lbl, $ry, $w_res_val, $H_RES, 'DF');
@@ -741,7 +762,7 @@ function dessiner_bulletin_trimestriel_arabe(
     // l'ordre change. x_sig recalculé en conséquence (cumul des largeurs).
     $w_sig = [51, 42, 38, 61]; $x_sig = [9, 60, 102, 140];
     foreach ([['Interprétation des cotes', 'شرح التقديرات'], ['PARENTS', 'أولياء الأمور'], ['ENSEIGNANT(E)', 'المعلم(ة)'], [mb_strtoupper($etab_ar['chef_etablissement'] ?? 'LE DIRECTEUR'), 'المدير']] as $i => [$fr, $ar]) {
-        bilingue($pdf, $x_sig[$i], $y, $w_sig[$i], 6.8, $fr, $ar, 1, 'C', true, 9, 11, [0, 0, 0], 'B', -1.5, $police_ch);
+        bilingue($pdf, $x_sig[$i], $y, $w_sig[$i], 6.8, $fr, $ar, 1, 'C', true, 9, 11, [0, 0, 0], 'B', -1.5, $police_ch, 'C');   // FR et AR centrés
     }
     $y += 6.8;
     $pp = $y;
@@ -786,62 +807,24 @@ function dessiner_bulletin_trimestriel_arabe(
     }
     $pdf->SetLineWidth($lw_defaut);
 
-    // ── QR de vérification, centré en bas de page — copyright collé
-    // juste en dessous (pas d'écart), voir tcpdf_copyright() plus bas.
-    // URL signée ECDSA (bulletin_verif_signature_offline()) : en ligne,
-    // ouvre verif_bulletin.php normalement ; hors ligne, vérifiable SANS
-    // secret partagé via verif_bulletin_hors_ligne.html (clé PUBLIQUE
-    // seulement — un simple "code à comparer à l'œil" serait contournable
-    // par quiconque régénère le QR avec des données falsifiées).
-    // 35mm : niveau de correction Q (pdf/verif_lib.php), pas H — ~117
-    // modules avec le détail par matière inclus (mesuré), contre ~129 à
-    // l'ancien niveau H. Toujours assez dense pour garder une grande taille
-    // d'impression malgré le contenu complet.
-    $qr_taille = 35;
-    $qr_y = $ph - 8 - 2 - $qr_taille;
-    // Détail par matière repêché (demande du 26/08/2026 — priorité au contenu
-    // complet même si le QR est plus dense) : "nom~moyenne~cote", matières
-    // séparées par ";", en 10e champ. Recalcul léger (fonctions déjà mises
-    // en cache par les boucles d'affichage ci-dessus) plutôt que collecte
-    // pendant le rendu — matière non composée exclue (pas de note à montrer).
-    $matieres_qr = [];
-    foreach ($groupes as $g) {
-        foreach ($g['matieres'] as $m) {
-            $id_mat_qr = (int) $m['id_mat'];
-            $bareme_qr = bareme_matiere_classe_arabe($id_classe, $id_mat_qr, $val_annee);
-            $bareme_pts_qr = $bareme_qr ? (float) $bareme_qr['total_points'] : 20.0;
-            $note_qr = note_matiere_trimestre_arabe($id, $id_mat_qr, $id_classe, $id_trim, $val_annee);
-            if ($note_qr['moyenne'] === null) continue;
-            $matieres_qr[] = $m['matiere_fr'] . '~' . number_format($note_qr['moyenne'], 2) . '~' . appreciation_fr($note_qr['moyenne'], $bareme_pts_qr);
-        }
-    }
-    $donnees_offline = [
-        (string) ($eleve['Mat_elv'] ?? ''),
-        (string) ($eleve['niu'] ?? ''),
-        mb_strtoupper($eleve['Nom_elv']) . ' ' . ($eleve['Prenom_elv'] ?? ''),
-        $date_naiss . ($eleve['Lieu_naiss_elv'] ? ' à ' . $eleve['Lieu_naiss_elv'] : ''),
-        'T' . $id_trim . ' ' . $val_annee,
-        $moy_seq1 !== null ? number_format($moy_seq1, 2) : '-',
-        $moy_seq2 !== null ? number_format($moy_seq2, 2) : '-',
-        $resultat['moyenne'] !== null ? number_format($resultat['moyenne'], 2) . '/20' : '-',
-        $resultat['rang'] ? $resultat['rang'] . '/' . $resultat['effectif'] : '-',
-        implode(';', $matieres_qr),
-    ];
-    // $chiffres_ar (préférence d'affichage, pas une donnée de sécurité) est
-    // reportée dans l'URL pour que "Ouvrir le bulletin" (verif_bulletin.php)
-    // rouvre avec la même préférence que le bulletin scanné.
-    $qr_tmp = bulletin_qr_fichier_temp($eleve, 'trim', $id_trim, 'ar', $donnees_offline, $chiffres_ar);
+    // ── QR de vérification + copyright : comme le bulletin français
+    // (pdf/bulletin_trimestriel.php) — QR agrandi à 22 mm (demande : 16 mm trop petit), centré, collé au copyright,
+    // même contenu (lien de vérification seul, sans données embarquées),
+    // même affichage après scan (bulletin rouvert avec le tampon oblique
+    // « AUTHENTIQUE », posé par tcpdf_filigrane() quand $acces_public) et
+    // même mention de copyright. Piste 'ar' : le scan rouvre CE bulletin arabe.
+    $qr_tmp = bulletin_qr_fichier_temp($eleve, 'trim', $id_trim, 'ar', [], $chiffres_ar);
     if ($qr_tmp) {
-        $pdf->Image($qr_tmp, ($pw - $qr_taille) / 2, $qr_y, $qr_taille, $qr_taille, 'PNG');
+        $qr_taille = 22;   // dessiné en dernier : passe au premier plan sur le bas des cases de signature
+        $pdf->Image($qr_tmp, ($pw - $qr_taille) / 2, $ph - 8 - $qr_taille - 0.3, $qr_taille, $qr_taille, 'PNG');
     }
 
-    // tcpdf_copyright() est partagée avec d'autres PDF et toujours en
-    // helvetica (glyphes ٠١٢٣... absents) — copyright/branding, pas une
-    // donnée du bulletin, désactivé ici pour éviter un "?" à la place du 2.
+    // tcpdf_copyright() est toujours en helvetica (glyphes ٠١٢٣... absents) —
+    // conversion des chiffres désactivée pour ne pas afficher « ? » à la place du 2.
     if ($pdf instanceof TCPDF_ChiffresArabes) {
         $pdf->convertirChiffres = false;
     }
-    tcpdf_copyright($pdf, $pw, $ph, $ph - ($qr_y + $qr_taille) + 1);
+    tcpdf_copyright($pdf, $pw, $ph);
 }
 
 // Signature établissement pour TCPDF (équivalent pdf_signature_appliquer_jn() côté FPDF).

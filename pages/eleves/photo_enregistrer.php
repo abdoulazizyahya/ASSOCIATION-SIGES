@@ -14,7 +14,7 @@ require_once __DIR__ . '/_photos_lib.php';
 exiger_role(photos_roles());
 
 header('Content-Type: application/json; charset=utf-8');
-function photo_json(bool $ok, string $message = '', array $extra = []): never {
+function photo_json(bool $ok, string $message = '', array $extra = []) {
     echo json_encode(['ok' => $ok, 'message' => $message] + $extra);
     exit;
 }

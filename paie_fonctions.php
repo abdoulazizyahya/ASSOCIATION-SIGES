@@ -61,14 +61,12 @@ function avances_dues_enseignant(int $matricule_ens): array {
 // ── Congés / absences enseignant ──────────────────────────────────────
 
 function libelle_type_conge(string $type): string {
-    return match ($type) {
-        'Congé payé'              => 'Congé payé',
-        'Maladie'                 => 'Maladie',
-        'Maternité'                => 'Maternité',
-        'Sans solde'               => 'Sans solde',
-        'Absence non justifiée'    => 'Absence non justifiée',
-        default                    => $type ?: 'Autre',
-    };
+    return (($__m22 = $type) === 'Congé payé' ? ('Congé payé')
+        : ($__m22 === 'Maladie' ? ('Maladie')
+        : ($__m22 === 'Maternité' ? ('Maternité')
+        : ($__m22 === 'Sans solde' ? ('Sans solde')
+        : ($__m22 === 'Absence non justifiée' ? ('Absence non justifiée')
+        : ($type ?: 'Autre'))))));
 }
 
 // Nombre de jours calendaires d'un congé qui tombent dans [periode_debut,
@@ -294,11 +292,19 @@ function marquer_bulletin_paye(int $id_bulletin, ?string $mode, ?string $referen
 // ── Libellés / affichage ───────────────────────────────────────────
 
 function libelle_mois(int $mois): string {
-    return match ($mois) {
-        1 => 'Janvier', 2 => 'Février', 3 => 'Mars', 4 => 'Avril', 5 => 'Mai', 6 => 'Juin',
-        7 => 'Juillet', 8 => 'Août', 9 => 'Septembre', 10 => 'Octobre', 11 => 'Novembre', 12 => 'Décembre',
-        default => (string) $mois,
-    };
+    return (($__m21 = $mois) === 1 ? ('Janvier')
+        : ($__m21 === 2 ? ('Février')
+        : ($__m21 === 3 ? ('Mars')
+        : ($__m21 === 4 ? ('Avril')
+        : ($__m21 === 5 ? ('Mai')
+        : ($__m21 === 6 ? ('Juin')
+        : ($__m21 === 7 ? ('Juillet')
+        : ($__m21 === 8 ? ('Août')
+        : ($__m21 === 9 ? ('Septembre')
+        : ($__m21 === 10 ? ('Octobre')
+        : ($__m21 === 11 ? ('Novembre')
+        : ($__m21 === 12 ? ('Décembre')
+        : ((string) $mois)))))))))))));
 }
 
 // Dérivé de id_bulletin — même principe que finances_numero_recu()/
@@ -308,13 +314,11 @@ function numero_bulletin(int $id_bulletin): string {
 }
 
 function libelle_type_contrat(string $type): string {
-    return match ($type) {
-        'Permanent'  => 'Permanent',
-        'Vacataire'  => 'Vacataire',
-        'CDD'        => 'CDD',
-        'Stagiaire'  => 'Stagiaire',
-        default      => $type ?: 'Non précisé',
-    };
+    return (($__m20 = $type) === 'Permanent' ? ('Permanent')
+        : ($__m20 === 'Vacataire' ? ('Vacataire')
+        : ($__m20 === 'CDD' ? ('CDD')
+        : ($__m20 === 'Stagiaire' ? ('Stagiaire')
+        : ($type ?: 'Non précisé')))));
 }
 
 // Type de contrat EN COURS d'un enseignant (le plus récent marqué actif=1,

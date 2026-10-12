@@ -178,7 +178,18 @@ function lien_actif(string $url): string {
           <img src="<?= APP_URL ?>/assets/uploads/<?= h($etab['logo']) ?>" alt="<?= h($etab['Initial_Etab'] ?: 'Logo') ?>">
         </div>
       <?php else: ?>
-        <div class="brand-logo"><?= h($etab['Initial_Etab'] ?: 'JN') ?></div>
+        <?php
+          // Sans sigle (école fraîchement installée) : initiales du nom de
+          // l'école (3 max), même règle que login.php — jamais un « JN » figé.
+          $sigle_logo = $etab['Initial_Etab'] ?? '';
+          if ($sigle_logo === '') {
+              $nom_logo = (string) ($etab['Nom_Etab_Fr'] ?? APP_NOM);
+              $sigle_logo = preg_match_all('/\b[\p{L}]/u', $nom_logo, $mm) && count($mm[0]) > 1
+                  ? mb_strtoupper(implode('', array_slice($mm[0], 0, 3)), 'UTF-8')
+                  : mb_strtoupper(mb_substr(preg_replace('/[^\p{L}]/u', '', $nom_logo) ?: 'SG', 0, 2), 'UTF-8');
+          }
+        ?>
+        <div class="brand-logo"><?= h($sigle_logo) ?></div>
       <?php endif; ?>
       <div>
         <div class="brand-name"><?= h($etab['Nom_Etab_Fr'] ?? APP_NOM) ?></div>
