@@ -11,6 +11,8 @@ require_once __DIR__ . '/../../../fonctions.php';
 exiger_role(['ADMIN', 'PROVISEUR', 'FONDATEUR', 'CENSEUR']);
 
 $onglet     = $_GET['onglet'] ?? 'catalogue';
+// Technique : notes par séquence, aucune compétence APC — onglet masqué.
+if ($onglet === 'competences_trim' && est_technique()) $onglet = 'catalogue';
 $id_cl_aff  = (int)($_GET['classe_aff'] ?? 0);
 $id_cl_ens  = (int)($_GET['classe_ens'] ?? 0);
 $niveau_aff = $_GET['niveau_aff'] ?? '';
@@ -379,12 +381,14 @@ function grp_style(string $lib, string $part): string {
       <i class="bi bi-diagram-3 me-1"></i>Affectation par classe
     </a>
   </li>
+  <?php if (!est_technique()): ?>
   <li class="nav-item">
     <a class="nav-link <?= $onglet==='competences_trim'?'active':'' ?>"
        href="<?= APP_URL ?>/secondaire/pages/matieres/liste.php?onglet=competences_trim<?= $f_niveau_comp?"&niveau_comp=".urlencode($f_niveau_comp):'' ?><?= $f_trim_comp?"&trim_comp=$f_trim_comp":'' ?>">
       <i class="bi bi-list-stars me-1"></i>Compétences par trimestre
     </a>
   </li>
+  <?php endif; ?>
   <li class="nav-item">
     <a class="nav-link <?= $onglet==='enseignants'?'active':'' ?>"
        href="<?= APP_URL ?>/secondaire/pages/matieres/liste.php?onglet=enseignants<?= $id_cl_ens?"&classe_ens=$id_cl_ens":'' ?>">

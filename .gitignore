@@ -8,6 +8,7 @@
 /assets/uploads/qr_bulletins/
 /assets/uploads/qr_honneur/
 /assets/uploads/qr_recus/
+/assets/uploads/qr_cache/
 
 # ── Données personnelles élèves (photos, dossiers) — jamais en dépôt,
 # même privé : à restaurer depuis un backup séparé si besoin ──────────

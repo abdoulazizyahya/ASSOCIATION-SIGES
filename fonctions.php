@@ -618,8 +618,54 @@ function secondaire_auto_matieres_classe(int $id_classe, ?string $code_niveau, ?
     if ($id_classe <= 0 || (int) db_val("SELECT COUNT(*) FROM discipline WHERE IDClasses=?", [$id_classe])) {
         return 0;
     }
+    if (est_technique()) return secondaire_auto_matieres_classe_technique($id_classe);
     $n = secondaire_copier_matieres_niveau($id_classe, $code_niveau, $libelle_section);
     return $n > 0 ? $n : secondaire_deriver_matieres_competences($id_classe, $code_niveau, $libelle_section);
+}
+
+/**
+ * Équivalent TECHNIQUE de secondaire_auto_matieres_classe() : en technique
+ * les matières dépendent de la FILIÈRE (Électrotechnique, Maçonnerie,
+ * Comptabilité…) et pas seulement du niveau. 1) copie depuis une classe sœur
+ * (même niveau, même filière) déjà affectée ; 2) sinon programme de
+ * référence d'ABZ_MBE (bd/secondaire/reference_programme_technique.php) —
+ * matières, coefficients, groupe (Enseignement professionnel / général /
+ * autres) et ordre réels. Une matière ou un groupe absent de la base de
+ * l'école est ignoré. INSERT IGNORE : jamais d'écrasement.
+ */
+function secondaire_auto_matieres_classe_technique(int $id_classe): int {
+    $c = db_one("SELECT code_niveau, id_filiere FROM classe WHERE id=?", [$id_classe]);
+    if (!$c || !$c['code_niveau'] || !$c['id_filiere']) return 0;
+
+    $source = db_val(
+        "SELECT cl.id FROM classe cl
+         WHERE cl.code_niveau=? AND cl.id_filiere=? AND cl.id<>? AND cl.archivee=0
+           AND EXISTS (SELECT 1 FROM discipline d WHERE d.IDClasses=cl.id)
+         ORDER BY cl.id LIMIT 1",
+        [$c['code_niveau'], $c['id_filiere'], $id_classe]
+    );
+    if ($source) {
+        $rows = db_all("SELECT id_mat, id_groupe, coef, ordre FROM discipline WHERE IDClasses=?", [(int) $source]);
+    } else {
+        static $prog = null;
+        if ($prog === null) {
+            $f = __DIR__ . '/bd/secondaire/reference_programme_technique.php';
+            $prog = is_file($f) ? (require $f) : [];
+        }
+        $rows = [];
+        $mats    = array_flip(array_map('intval', array_column(db_all("SELECT id FROM matiere WHERE actif=1"), 'id')));
+        $groupes = array_flip(array_map('intval', array_column(db_all("SELECT id_groupe_comp FROM groupe"), 'id_groupe_comp')));
+        foreach ($prog[$c['code_niveau']][$c['id_filiere']] ?? [] as $r) {
+            if (isset($mats[$r['id_mat']], $groupes[$r['id_groupe']])) $rows[] = $r;
+        }
+    }
+    foreach ($rows as $r) {
+        db_exec(
+            "INSERT IGNORE INTO discipline (id_mat, IDClasses, id_groupe, coef, ordre) VALUES (?,?,?,?,?)",
+            [$r['id_mat'], $id_classe, $r['id_groupe'], $r['coef'], (string) $r['ordre']]
+        );
+    }
+    return count($rows);
 }
 
 // Un compte non-ENSEIGNANT (ex. COMPTABLE) est-il par ailleurs affecté à
@@ -1116,6 +1162,36 @@ function get_etablissement_sans_cache(): array {
     return $e;
 }
 
+// Ordre d'enseignement d'une école SECONDAIRE : 'general' (programme APC,
+// notes par compétence — porté de LAM_ABZ) ou 'technique' (notes par
+// séquence, matières groupées Enseignement professionnel / général —
+// porté d'ABZ_MBE). Colonne etablissement.ordre_enseignement (migration v13
+// secondaire), choisie à la création de l'école. 'general' pour une école
+// primaire ou une base pas encore migrée.
+function ordre_enseignement_courant(): string {
+    if (!function_exists('type_enseignement_courant') || type_enseignement_courant() !== 'secondaire') return 'general';
+    return (get_etablissement()['ordre_enseignement'] ?? 'general') === 'technique' ? 'technique' : 'general';
+}
+
+function est_technique(): bool {
+    return ordre_enseignement_courant() === 'technique';
+}
+
+// Aiguillage vers la version TECHNIQUE d'une page (secondaire/technique/
+// pages/…, notes par séquence) quand l'école courante est technique. Appelé
+// tout en haut des pages du secondaire général qui ont une version dédiée
+// (notes, bulletins) : tous les liens existants (menu, conseil de classe,
+// QR de vérification…) continuent de fonctionner. Redirection 307 : la
+// méthode et le corps d'un POST sont conservés, comme la chaîne de requête.
+// Pas de require de la page technique : les fonctions déclarées en tête des
+// deux fichiers portent les mêmes noms (erreur fatale « Cannot redeclare »).
+function aiguiller_page_technique(string $chemin): void {
+    if (!est_technique()) return;
+    $qs = (string) ($_SERVER['QUERY_STRING'] ?? '');
+    header('Location: ' . APP_URL . '/' . ltrim($chemin, '/') . ($qs !== '' ? '?' . $qs : ''), true, 307);
+    exit;
+}
+
 // ── Isolation des fichiers uploadés par école (multi-établissement) ──────
 // Les logos / signatures / documents étaient écrits sous des noms FIXES
 // (assets/uploads/logo_etab.jpg…) → en multi-école, l'upload d'une école
@@ -1284,6 +1360,7 @@ function appliquer_competences_ref_secondaire(int $id_annee): int {
     global $link;
     if ($id_annee <= 0) return 0;
     if (function_exists('est_lecture_seule') && est_lecture_seule()) return 0;
+    if (est_technique()) return 0;   // le technique note par séquence : aucune compétence APC
     $sql = @file_get_contents(__DIR__ . '/bd/assoc/seed_competences_secondaire.sql');
     if ($sql === false || trim($sql) === '') return 0;
     $sql = str_replace(':ID_ANNEE:', (string) $id_annee, $sql);
@@ -3124,7 +3201,37 @@ function bulletin_blame_conduite(float $heur, array $r): string {
 
 // ==== eleve_absence_trimestre ====
 // donné, lues dans la table `absence` (alimentée par pages/discipline/index.php).
+function &_cache_absences_trim(): array {
+    static $cache = ['groupes' => [], 'valeurs' => []];
+    return $cache;
+}
+
+// Précharge en UNE requête groupée les heures d'absence de TOUS les élèves
+// d'une classe pour un trimestre (porté d'ABZ_MBE) — à appeler avant une
+// boucle sur les élèves (bulletins de classe du technique). Sans appel
+// préalable, eleve_absence_trimestre() garde son chemin à 1 requête.
+function precharger_absences_trimestre(int $id_classe, string $val_annee, int $id_trim): void {
+    $cache      = &_cache_absences_trim();
+    $cle_groupe = "$id_classe:$val_annee:$id_trim";
+    if (!empty($cache['groupes'][$cle_groupe])) return;
+    $rows = db_all(
+        "SELECT mat_elv, SUM(nbre_heure_jus) AS jus, SUM(nbre_heure_non_jus) AS non_jus
+         FROM absence WHERE id_trim=? AND IDClasses=? AND val_annee=? GROUP BY mat_elv",
+        [$id_trim, $id_classe, $val_annee]
+    );
+    foreach ($rows as $r) {
+        $jus = (float)($r['jus'] ?? 0); $non_jus = (float)($r['non_jus'] ?? 0);
+        $cache['valeurs']["$cle_groupe:{$r['mat_elv']}"] = ['jus' => $jus, 'non_jus' => $non_jus, 'total' => $jus + $non_jus];
+    }
+    $cache['groupes'][$cle_groupe] = true;
+}
+
 function eleve_absence_trimestre(string $matricule, int $id_trim, int $id_classe, string $val_annee): array {
+    $cache      = &_cache_absences_trim();
+    $cle_groupe = "$id_classe:$val_annee:$id_trim";
+    if (!empty($cache['groupes'][$cle_groupe])) {
+        return $cache['valeurs']["$cle_groupe:$matricule"] ?? ['jus' => 0.0, 'non_jus' => 0.0, 'total' => 0.0];
+    }
     $r = db_one(
         "SELECT SUM(nbre_heure_jus) AS jus, SUM(nbre_heure_non_jus) AS non_jus
          FROM absence WHERE mat_elv=? AND id_trim=? AND IDClasses=? AND val_annee=?",
@@ -3600,6 +3707,9 @@ function pv_note_effective_comp(int $eid, int $id_comp, array $notes_idx, array 
 function pv_moy_matiere_comp(int $eid, array $competences, array $notes_idx, array $notes_count, int $nb_inscrits): ?float {
     $tot = 0; $cnt = 0;
     foreach ($competences as $c) {
+        // Technique : absence JUSTIFIÉE à cette séquence (sans note) — exclue
+        // du calcul, jamais un zéro automatique (voir pv_charger_donnees_technique()).
+        if (isset($c['exclus'][$eid]) && !isset($notes_idx[$eid][(int)$c['id']])) continue;
         $v = pv_note_effective_comp($eid, (int)$c['id'], $notes_idx, $notes_count, $nb_inscrits);
         if ($v !== null) { $tot += $v; $cnt++; }
     }
@@ -3631,12 +3741,15 @@ function pv_matiere_vraie_note_comp(int $eid, array $competences, array $notes_i
 function pv_moy_generale_comp(int $eid, array $disciplines, array $competences_par_mat, array $notes_idx, array $notes_count, int $nb_inscrits, array $mats_avec_notes, int $nb_mats_avec_notes, array $annules = []): array {
     if (!empty($annules[$eid])) return [null, false, 0.0, true]; // Règle 4 : jamais de moyenne, jamais "non classé"
     $tot = 0; $coef = 0; $nb_reelles = 0;
+    $technique = est_technique();
     foreach ($disciplines as $d) {
         if (!in_array($d['id_mat'], $mats_avec_notes)) continue;
         $comps = $competences_par_mat[$d['id_mat']] ?? [];
         $avg = pv_moy_matiere_comp($eid, $comps, $notes_idx, $notes_count, $nb_inscrits);
         if ($avg !== null) { $tot += $avg * $d['coef']; $coef += $d['coef']; }
-        if (pv_matiere_vraie_note_comp($eid, $comps, $notes_idx)) $nb_reelles++;
+        // Technique (règle d'ABZ_MBE, la même que ses bulletins) : une
+        // matière compte dès qu'elle a une moyenne, zéro automatique compris.
+        if ($technique ? $avg !== null : pv_matiere_vraie_note_comp($eid, $comps, $notes_idx)) $nb_reelles++;
     }
     $moy = $coef > 0 ? $tot / $coef : null;
     // Règle 2 : classé seulement si l'élève a personnellement composé (vraie
@@ -3656,6 +3769,7 @@ function pv_moy_generale_comp(int $eid, array $disciplines, array $competences_p
  * @return array{disciplines:array, competences_par_mat:array, notes_idx:array, notes_count:array, mats_avec_notes:array, nb_mats_avec_notes:int, nb_inscrits:int, annules:array}
  */
 function pv_charger_donnees_comp(int $id_classe, int $id_trim, int $id_annee): array {
+    if (est_technique()) return pv_charger_donnees_technique($id_classe, $id_trim, $id_annee);
     $disciplines = db_all(
         "SELECT d.id_mat, d.coef FROM discipline d
          JOIN matiere m ON m.id=d.id_mat AND m.actif=1
@@ -3713,6 +3827,103 @@ function pv_charger_donnees_comp(int $id_classe, int $id_trim, int $id_annee): a
         'mats_avec_notes' => $mats_avec_notes, 'nb_mats_avec_notes' => count($mats_avec_notes),
         'nb_inscrits' => $nb_inscrits, 'annules' => $annules,
     ];
+}
+
+// ==== pv_charger_donnees_technique ====
+/**
+ * Équivalent TECHNIQUE de pv_charger_donnees_comp() (école secondaire
+ * d'enseignement technique, porté d'ABZ_MBE) : les notes portent sur des
+ * SÉQUENCES (note.id_seq, 2 par trimestre) et non sur des compétences. Pour
+ * que tous les calculs existants (bulletins, conseil de classe,
+ * statistiques, tableau d'honneur, résultat annuel) fonctionnent SANS
+ * modification, chaque couple (matière, séquence) devient une « unité
+ * d'évaluation » au même format qu'une compétence : ['id' => clé unique,
+ * 'id_seq' => …, 'exclus' => [eid => true] pour une absence justifiée].
+ * Mêmes règles qu'ABZ_MBE (pv_note_effective()) : note saisie = note ;
+ * absence justifiée = exclue ; sinon 0 si au moins la moitié de la classe a
+ * une note sur cette séquence, sinon ignorée.
+ * Même structure de retour que pv_charger_donnees_comp().
+ */
+function pv_cle_unite_technique(int $id_mat, int $id_seq): int {
+    return $id_seq * 1000000 + $id_mat;
+}
+
+function pv_charger_donnees_technique(int $id_classe, int $id_trim, int $id_annee): array {
+    $disciplines = db_all(
+        "SELECT d.id_mat, d.coef FROM discipline d
+         JOIN matiere m ON m.id=d.id_mat AND m.actif=1
+         WHERE d.IDClasses=?", [$id_classe]
+    );
+    $nb_inscrits = (int) db_val(
+        "SELECT COUNT(*) FROM eleve e
+         JOIN inscription i ON i.id_eleve=e.id AND i.id_classe=? AND i.id_annee=?
+         WHERE e.statut='actif'",
+        [$id_classe, $id_annee]
+    );
+    $annules = pv_annules_trimestre($id_classe, $id_annee, $id_trim);
+    $vide = [
+        'disciplines' => $disciplines, 'competences_par_mat' => [], 'notes_idx' => [],
+        'notes_count' => [], 'mats_avec_notes' => [], 'nb_mats_avec_notes' => 0,
+        'nb_inscrits' => $nb_inscrits, 'annules' => $annules,
+    ];
+    if (empty($disciplines) || !$id_trim) return $vide;
+
+    $seq_ids = array_map('intval', array_column(
+        db_all("SELECT id FROM sequence WHERE id_trim=? ORDER BY ordre", [$id_trim]), 'id'));
+    if (empty($seq_ids)) return $vide;
+    $in_s = implode(',', array_fill(0, count($seq_ids), '?'));
+
+    $notes_idx = []; $notes_count = [];
+    $rows = db_all(
+        "SELECT n.id_eleve, n.id_matiere, n.id_seq, n.valeur FROM note n
+         JOIN inscription i ON i.id_eleve=n.id_eleve AND i.id_annee=? AND i.id_classe=?
+         JOIN eleve el ON el.id=n.id_eleve AND el.statut='actif'
+         WHERE n.id_seq IN ($in_s)",
+        array_merge([$id_annee, $id_classe], $seq_ids)
+    );
+    foreach ($rows as $r) {
+        $k = pv_cle_unite_technique((int)$r['id_matiere'], (int)$r['id_seq']);
+        $notes_idx[(int)$r['id_eleve']][$k] = (float)$r['valeur'];
+        $notes_count[$k] = ($notes_count[$k] ?? 0) + 1;
+    }
+    $exclus = [];
+    foreach (db_all("SELECT id_eleve, id_matiere, id_seq FROM absence_justifiee
+                     WHERE justifie=1 AND id_seq IN ($in_s)", $seq_ids) as $r) {
+        $exclus[pv_cle_unite_technique((int)$r['id_matiere'], (int)$r['id_seq'])][(int)$r['id_eleve']] = true;
+    }
+
+    $unites_par_mat = []; $mats_avec_notes = [];
+    foreach ($disciplines as $d) {
+        $id_mat = (int)$d['id_mat'];
+        foreach ($seq_ids as $sid) {
+            $k = pv_cle_unite_technique($id_mat, $sid);
+            $unites_par_mat[$id_mat][] = ['id' => $k, 'id_seq' => $sid, 'exclus' => $exclus[$k] ?? []];
+            if (($notes_count[$k] ?? 0) > 0 && !in_array($id_mat, $mats_avec_notes, true)) $mats_avec_notes[] = $id_mat;
+        }
+    }
+    return [
+        'disciplines' => $disciplines, 'competences_par_mat' => $unites_par_mat,
+        'notes_idx' => $notes_idx, 'notes_count' => $notes_count,
+        'mats_avec_notes' => $mats_avec_notes, 'nb_mats_avec_notes' => count($mats_avec_notes),
+        'nb_inscrits' => $nb_inscrits, 'annules' => $annules,
+    ];
+}
+
+// ==== stat_jointures_notes_periode ====
+/**
+ * Jointures SQL qui rattachent une note (alias n, inscription i) aux
+ * trimestres d'une période ($in_t = liste de « ? », un par trimestre) pour
+ * les statistiques « par matière » : via la compétence en général (APC,
+ * filtrée sur le niveau de la classe), via la séquence en technique.
+ * @return array [jointure unité, jointure classe cl]
+ */
+function stat_jointures_notes_periode(string $in_t): array {
+    if (est_technique()) {
+        return ["JOIN sequence sq ON sq.id = n.id_seq AND sq.id_trim IN ($in_t)",
+                "JOIN classe cl ON cl.id=i.id_classe"];
+    }
+    return ["JOIN competence comp ON comp.id = n.id_competence AND comp.id_trim IN ($in_t)",
+            "JOIN classe cl ON cl.id=i.id_classe AND cl.code_niveau=comp.code_niveau"];
 }
 
 // ==== pv_moy_annuelle_comp ====

@@ -9,6 +9,7 @@
 require_once __DIR__ . '/../../../config.php';
 require_once __DIR__ . '/../../../connexion.php';
 require_once __DIR__ . '/../../../fonctions.php';
+aiguiller_page_technique('secondaire/technique/pages/bulletins/pdf_annuel.php');   // école technique : notes par séquence
 require_once __DIR__ . '/../../pdf/verif_lib.php';
 
 // Accès public via le QR code du bulletin (jeton "vh") — voir pdf.php pour

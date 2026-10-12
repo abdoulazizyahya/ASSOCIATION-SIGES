@@ -26,6 +26,17 @@ if (!defined('DB_NAME_ASSOC')) {
 //  tronqué à 40 caractères. Repli sur le code si le slug est vide.
 if (!function_exists('slug_base_ecole')) {
     function slug_base_ecole(string $nom, string $code = ''): string {
+        // Lettres accentuées translittérées À LA MAIN d'abord : sous Windows,
+        // iconv //TRANSLIT rend « É » par « 'E » (« LYCÉE » → lyc_ee).
+        $nom = strtr($nom, [
+            'À'=>'A','Â'=>'A','Ä'=>'A','Á'=>'A','Ã'=>'A','à'=>'a','â'=>'a','ä'=>'a','á'=>'a','ã'=>'a',
+            'Ç'=>'C','ç'=>'c',
+            'É'=>'E','È'=>'E','Ê'=>'E','Ë'=>'E','é'=>'e','è'=>'e','ê'=>'e','ë'=>'e',
+            'Î'=>'I','Ï'=>'I','Í'=>'I','î'=>'i','ï'=>'i','í'=>'i',
+            'Ô'=>'O','Ö'=>'O','Ó'=>'O','Õ'=>'O','ô'=>'o','ö'=>'o','ó'=>'o','õ'=>'o',
+            'Ù'=>'U','Û'=>'U','Ü'=>'U','Ú'=>'U','ù'=>'u','û'=>'u','ü'=>'u','ú'=>'u',
+            'Ÿ'=>'Y','ÿ'=>'y','Ñ'=>'N','ñ'=>'n','Œ'=>'OE','œ'=>'oe','Æ'=>'AE','æ'=>'ae',
+        ]);
         $s = @iconv('UTF-8', 'ASCII//TRANSLIT', $nom);
         if ($s === false || $s === null) $s = $nom;
         $s = strtolower($s);
@@ -259,17 +270,19 @@ function charger_schema_ecole(mysqli &$l, array $seed, string $type = 'primaire'
         // visible (layout/menu_secondaire.php) — jamais les deux à la fois.
         $statut = in_array($seed['statut'] ?? '', ['public', 'prive'], true) ? $seed['statut'] : 'public';
         $chef_fr = $statut === 'prive' ? 'Le Principal' : 'Le Proviseur';
+        $ordre   = ($seed['ordre_enseignement'] ?? '') === 'technique' ? 'technique' : 'general';
         $st = mysqli_prepare($l,
-            "INSERT INTO etablissement (id, nom_fr, nom_en, sigle, ville, chef_etablissement, statut)
-             VALUES (1, ?, ?, ?, ?, ?, ?)
+            "INSERT INTO etablissement (id, nom_fr, nom_en, sigle, ville, chef_etablissement, statut, ordre_enseignement)
+             VALUES (1, ?, ?, ?, ?, ?, ?, ?)
              ON DUPLICATE KEY UPDATE nom_fr=VALUES(nom_fr), nom_en=VALUES(nom_en),
                                      sigle=VALUES(sigle), ville=VALUES(ville)");
         mysqli_stmt_bind_param($st, 'sssssss', $seed['nom'], $seed['nom_en'], $seed['sigle'], $seed['ville'], $chef_fr, $statut, $ordre);
         mysqli_stmt_execute($st);
         mysqli_stmt_close($st);
 
-        // Données de référence pédagogiques (niveaux, sections Fr/An, groupes
-        // de compétence, séries) — voir bd/assoc/seed_ref_ecole_secondaire.sql.
+        // Données de référence pédagogiques (niveaux, sections, groupes,
+        // séries, matières) — voir bd/assoc/seed_ref_ecole_secondaire.sql
+        // (général) et bd/assoc/seed_ref_ecole_technique.sql (technique).
         // Sans elles, discipline.id_groupe (NOT NULL, FK -> groupe) rend le
         // module Matières inutilisable dès la première affectation.
         charger_seed_ref_ecole_secondaire($l, $ordre);
@@ -393,6 +406,16 @@ function charger_seed_ref_ecole_secondaire(mysqli $l, string $ordre = 'general')
     $f = __DIR__ . '/bd/assoc/seed_ref_ecole_secondaire.sql';
     $sql = @file_get_contents($f);
     if ($sql === false || trim($sql) === '') return 0;
+    if ($ordre === 'technique') {
+        // École TECHNIQUE : on garde la partie commune (opérateurs de
+        // paiement, signatures, grades, géographie, formats de carte…) mais
+        // PAS les références pédagogiques du général (sections Fr/An,
+        // niveaux 6e-3e, séries de langue, matières APC) — remplacées par
+        // celles d'ABZ_MBE (bd/assoc/seed_ref_ecole_technique.sql).
+        $sql = preg_replace('/^INSERT IGNORE INTO `(section_classe|niveau|groupe|serie|matiere)`.*?;[ \t]*$/ms', '', $sql);
+        $tech = @file_get_contents(__DIR__ . '/bd/assoc/seed_ref_ecole_technique.sql');
+        if ($tech !== false) $sql .= "\n" . $tech;
+    }
     if (mysqli_multi_query($l, $sql)) {
         do { if ($r = mysqli_store_result($l)) mysqli_free_result($r); } while (mysqli_more_results($l) && mysqli_next_result($l));
     }
@@ -540,6 +563,10 @@ function creer_etablissement(array $in): array {
     // "Proviseur"/"Principal" et quel module Paiements est visible, voir
     // libelle_role()/layout/menu_secondaire.php). Sans effet en primaire.
     $statut = in_array($in['statut'] ?? '', ['public', 'prive'], true) ? $in['statut'] : 'public';
+    // Ordre d'enseignement — secondaire uniquement : 'general' (APC, LAM_ABZ)
+    // ou 'technique' (séquences, ABZ_MBE). Figé à la création (migration v13
+    // secondaire). Sans effet en primaire.
+    $ordre = ($in['ordre_enseignement'] ?? '') === 'technique' ? 'technique' : 'general';
 
     if (!preg_match('/^[A-Z0-9]{2,10}$/', $code)) {
         return ['ok' => false, 'message' => 'Code invalide : 2 à 10 caractères A–Z ou 0–9.', 'id' => null, 'db_name' => null];
@@ -602,7 +629,8 @@ function creer_etablissement(array $in): array {
         return ['ok' => false, 'message' => "La base « $db » est déjà référencée.", 'id' => null, 'db_name' => null];
     }
 
-    $seed = ['nom' => $nom, 'nom_en' => $nomEn, 'sigle' => $sigle, 'ville' => $ville, 'statut' => $statut];
+    $seed = ['nom' => $nom, 'nom_en' => $nomEn, 'sigle' => $sigle, 'ville' => $ville, 'statut' => $statut,
+             'ordre_enseignement' => $ordre];
     $comptes = [];
 
     try {

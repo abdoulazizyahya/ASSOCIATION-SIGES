@@ -379,6 +379,7 @@ CREATE TABLE `etablissement` (
   `chef_etablissement` varchar(150) DEFAULT 'Le Proviseur',
   `chef_etablissement_en` varchar(150) DEFAULT 'The Principal',
   `statut` enum('public','prive') NOT NULL DEFAULT 'public',
+  `ordre_enseignement` enum('general','technique') NOT NULL DEFAULT 'general',
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;

@@ -47,8 +47,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
     // Fond blanc nettoyé/rendu transparent (PNG) : le texte du document
     // reste visible même si la signature est déplacée par-dessus.
-    $fichier = 'signature_' . $code . '.png';
-    if (signature_traiter_transparence($_FILES['fichier']['tmp_name'], __DIR__ . '/../../../assets/uploads/' . $fichier)) {
+    // Préfixe par école (assets/uploads/etab/<code>/) : sinon une 2e école
+    // secondaire écraserait la signature de l'Intendant de la première.
+    $fichier = upload_prefixe_etab() . 'signature_' . $code . '.png';
+    if (signature_traiter_transparence($_FILES['fichier']['tmp_name'],
+            upload_dir_etab(__DIR__ . '/../../../assets/uploads') . 'signature_' . $code . '.png')) {
         db_exec("UPDATE signature_titulaire SET fichier=? WHERE code=?", [$fichier, $code]);
         flash_set('succes', 'Signature mise à jour.');
     } else {

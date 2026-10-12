@@ -113,8 +113,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && post('form') === 'signature') {
     // Fond blanc nettoyé/rendu transparent (PNG) : le texte du document
     // (bulletin, PV, fiche statistique de sa classe) reste visible même si
     // la signature est positionnée par-dessus.
-    $fichier_sig = 'signature_pp_' . $mat . '.png';
-    if (signature_traiter_transparence($_FILES['signature']['tmp_name'], __DIR__ . '/../../../assets/uploads/' . $fichier_sig)) {
+    // Préfixe par école (assets/uploads/etab/<code>/) : deux écoles
+    // secondaires peuvent avoir le même matricule enseignant.
+    $fichier_sig = upload_prefixe_etab() . 'signature_pp_' . $mat . '.png';
+    if (signature_traiter_transparence($_FILES['signature']['tmp_name'],
+            upload_dir_etab(__DIR__ . '/../../../assets/uploads') . 'signature_pp_' . $mat . '.png')) {
         db_exec("UPDATE enseignant SET signature=? WHERE matricule_ens=?", [$fichier_sig, $mat]);
         flash_set('succes', 'Signature mise à jour.');
     } else {

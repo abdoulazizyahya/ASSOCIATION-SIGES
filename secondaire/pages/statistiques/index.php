@@ -625,12 +625,13 @@ $trims_calc_mat = $vue === 'annee'
 if (!empty($classe_ids_mat) && !empty($trims_calc_mat)) {
     $in_c = implode(',', array_fill(0, count($classe_ids_mat), '?'));
     $in_t = implode(',', array_fill(0, count($trims_calc_mat), '?'));
+    [$j_unite, $j_classe] = stat_jointures_notes_periode($in_t);   // compétence (général) ou séquence (technique)
     $rows = db_all(
         "SELECT n.id_matiere, n.id_eleve, n.valeur, m.libelle AS matiere
          FROM note n
-         JOIN competence comp ON comp.id = n.id_competence AND comp.id_trim IN ($in_t)
+         $j_unite
          JOIN inscription i ON i.id_eleve=n.id_eleve AND i.id_annee=? AND i.id_classe IN ($in_c)
-         JOIN classe cl ON cl.id=i.id_classe AND cl.code_niveau=comp.code_niveau
+         $j_classe
          JOIN matiere m ON m.id=n.id_matiere AND m.actif=1
          JOIN discipline d ON d.id_mat=n.id_matiere AND d.IDClasses=i.id_classe",
         array_merge($trims_calc_mat, [$id_annee], $classe_ids_mat)

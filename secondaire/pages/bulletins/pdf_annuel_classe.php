@@ -8,6 +8,7 @@
 require_once __DIR__ . '/../../../config.php';
 require_once __DIR__ . '/../../../connexion.php';
 require_once __DIR__ . '/../../../fonctions.php';
+aiguiller_page_technique('secondaire/technique/pages/bulletins/pdf_annuel_classe.php');   // école technique : notes par séquence
 exiger_connexion();
 
 function uc(string $s): string {

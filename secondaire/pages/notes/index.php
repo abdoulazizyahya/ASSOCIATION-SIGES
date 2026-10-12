@@ -13,6 +13,7 @@ header('Cache-Control: no-store, no-cache, must-revalidate');
 require_once __DIR__ . '/../../../config.php';
 require_once __DIR__ . '/../../../connexion.php';
 require_once __DIR__ . '/../../../fonctions.php';
+aiguiller_page_technique('secondaire/technique/pages/notes/index.php');   // école technique : notes par séquence
 // exiger_role() (au lieu du seul exiger_connexion() côté LAM_ABZ) : ferme un
 // accès direct par URL pour SG/SECRETAIRE/INTENDANT — jamais proposés dans
 // layout/menu_secondaire.php mais pas bloqués par exiger_connexion() seule

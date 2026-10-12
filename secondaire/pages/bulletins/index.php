@@ -3,6 +3,7 @@ header('Cache-Control: no-store, no-cache, must-revalidate');
 require_once __DIR__ . '/../../../config.php';
 require_once __DIR__ . '/../../../connexion.php';
 require_once __DIR__ . '/../../../fonctions.php';
+aiguiller_page_technique('secondaire/technique/pages/bulletins/index.php');   // école technique : notes par séquence
 exiger_connexion();
 
 $role      = role_connecte();

@@ -71,6 +71,7 @@ $val = [
     'mode'              => 'ecole',
     'type_enseignement' => 'primaire',
     'statut'            => 'public',
+    'ordre_enseignement' => 'general',
     'nom_association'   => '',
     'nom_ecole'         => '',
     'ville'             => '',
@@ -91,6 +92,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $val['type_enseignement'] = in_array($_POST['type_enseignement'] ?? '', ['primaire', 'secondaire'], true)
                                ? $_POST['type_enseignement'] : 'primaire';
     $val['statut'] = in_array($_POST['statut'] ?? '', ['public', 'prive'], true) ? $_POST['statut'] : 'public';
+    $val['ordre_enseignement'] = ($_POST['ordre_enseignement'] ?? '') === 'technique' ? 'technique' : 'general';
     $val['login'] = strtolower($val['login']);
     $reseau = $val['mode'] === 'reseau';
 
@@ -166,6 +168,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'sigle'  => null,
                 'ville'  => $val['ville'] ?: null,
                 'statut' => $val['statut'],
+                'ordre_enseignement' => $val['ordre_enseignement'],
             ], $type);
 
             // 3. Comptes par défaut de l'école : FONDATEUR, DIRECTEUR (identifiant
@@ -375,6 +378,19 @@ $exemple_slug = install_slug(($val['mode'] === 'reseau' ? $val['nom_association'
       </div>
 
       <div id="bloc_statut" style="<?= $val['type_enseignement'] === 'secondaire' ? '' : 'display:none' ?>">
+        <label>Enseignement</label>
+        <div class="choix">
+          <label class="opt">
+            <input type="radio" name="ordre_enseignement" value="general" <?= $val['ordre_enseignement'] !== 'technique' ? 'checked' : '' ?>>
+            Général
+          </label>
+          <label class="opt">
+            <input type="radio" name="ordre_enseignement" value="technique" <?= $val['ordre_enseignement'] === 'technique' ? 'checked' : '' ?>>
+            Technique
+          </label>
+        </div>
+        <div class="hint">Général : programme APC, notes par compétence. Technique : notes par séquence, filières commerciales et industrielles.</div>
+
         <label>Statut de l'école</label>
         <div class="choix">
           <label class="opt">
