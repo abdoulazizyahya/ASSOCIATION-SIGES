@@ -55,3 +55,6 @@
 # index.php) ; en prod, copie de deploy/htaccess-prod.txt. Spécifique au
 # poste → non versionné (le modèle prod reste dans deploy/). ───────────
 /.htaccess
+
+# Archives de déploiement (zips envoyés sur l'hébergeur) : locales, jamais versionnées
+/deploy/archives/

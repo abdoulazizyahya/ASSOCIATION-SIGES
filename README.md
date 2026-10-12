@@ -42,7 +42,8 @@ SIGES/
 ├─ association/      portail de l'association (écoles, membres, migrations…)
 ├─ bd/               schémas, migrations, outils d'administration (bd/assoc/)
 ├─ assets/           CSS, JS, images, fichiers téléversés (uploads/)
-├─ deploy/           modèle .htaccess de production, outils de développement
+├─ deploy/           modèle .htaccess de production, outils de développement,
+│                    archives/ (zips de déploiement, locaux, non versionnés)
 ├─ docs/             guide d'utilisation, présentation, notes de suivi
 └─ vendor/           dépendances Composer (non versionné)
 ```
