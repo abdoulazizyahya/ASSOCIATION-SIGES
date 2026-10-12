@@ -86,6 +86,7 @@ $menu = [
         ['Opérateurs de paiement',  'secondaire/commun/pages/paiements/operateurs.php',  'credit-card-2-front',  ['ADMIN','PROVISEUR', 'FONDATEUR','CENSEUR']],
         ['Impayés',                 'secondaire/commun/pages/paiements/rapport.php?onglet=insolvables', 'exclamation-diamond', ['ADMIN','PROVISEUR', 'FONDATEUR','CENSEUR','INTENDANT']],
         ['Rapports',                'secondaire/commun/pages/paiements/rapport.php',     'graph-up',             ['ADMIN','PROVISEUR', 'FONDATEUR','CENSEUR','INTENDANT']],
+        ['Statistiques avancées',   'secondaire/commun/pages/paiements/statistiques.php', 'bar-chart-line',     ['ADMIN','PROVISEUR', 'FONDATEUR','CENSEUR','INTENDANT']],   // porté d'ABZ_MBE
         ['Signatures numériques',   'secondaire/commun/pages/paiements/signatures.php',  'vector-pen',           ['ADMIN','PROVISEUR', 'FONDATEUR','CENSEUR','INTENDANT','SG']],
     ],
     // Paie : porté du module Paie du PRIMAIRE (primaire/pages/paie/*,
@@ -103,6 +104,7 @@ $menu = [
         ['Mes informations',      'secondaire/commun/pages/enseignants/mon_profil.php','person-vcard',       ['ADMIN','PROVISEUR','CENSEUR','SG','INTENDANT','SECRETAIRE','ENSEIGNANT']],
         ['Mes bulletins de paie', 'secondaire/commun/pages/paie/mes_bulletins.php',    'receipt',            ['ADMIN','PROVISEUR','CENSEUR','SG','INTENDANT','SECRETAIRE','ENSEIGNANT']],
         ['Demandes de documents', 'secondaire/commun/pages/demandes/index.php',        'file-earmark-text',  ['ENSEIGNANT','CENSEUR','PROVISEUR', 'FONDATEUR','ADMIN']],
+        ['Validité des documents', 'secondaire/commun/pages/enseignants/validite_documents.php', 'file-earmark-lock', ['ADMIN','PROVISEUR', 'FONDATEUR']],   // porté d'ABZ_MBE
     ],
     // Paramètres : alignée sur noyau/layout/menu.php (primaire) — mêmes 6 entrées,
     // même ordre, mêmes fonctionnalités (Mon compte, Directeur/Proviseur,

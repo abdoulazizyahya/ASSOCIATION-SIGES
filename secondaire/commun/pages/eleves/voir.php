@@ -17,6 +17,16 @@ $inscription = $id_annee ? db_one(
      WHERE i.id_eleve=? AND i.id_annee=?", [$id, $id_annee]
 ) : null;
 
+// Dossier de l'élève (pièces jointes) — porté d'ABZ_MBE, table dossier_eleve
+// (migration secondaire v14). Base pas encore migrée : bloc masqué.
+$types_dossier = ['acte_naissance', 'carnet_vaccination', 'bulletin', 'document_transfert', 'photo_4x4', 'autre'];
+try {
+    $documents = db_all("SELECT * FROM dossier_eleve WHERE id_eleve=? ORDER BY type_document, date_ajout DESC", [$id]);
+} catch (\Throwable $e) {
+    $documents = null;
+}
+$peut_gerer_dossier = in_array(role_connecte(), ['ADMIN', 'PROVISEUR', 'FONDATEUR', 'CENSEUR', 'SG', 'SECRETAIRE'], true);
+
 $titre_page = 'Fiche élève';
 require_once __DIR__ . '/../../../../noyau/layout/header.php';
 ?>
@@ -66,6 +76,54 @@ require_once __DIR__ . '/../../../../noyau/layout/header.php';
         <?php endif; ?>
       </div>
     </div>
+    <?php if ($documents !== null): ?>
+    <div class="card mt-2">
+      <div class="card-body">
+        <div class="d-flex align-items-center justify-content-between">
+          <div class="section-titre mb-0"><i class="bi bi-folder2-open me-1"></i>Dossier de l'élève</div>
+          <?php if ($peut_gerer_dossier): ?>
+          <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#modalDossier">
+            <i class="bi bi-plus-lg me-1"></i>Ajouter un document
+          </button>
+          <?php endif; ?>
+        </div>
+        <?php if (!$documents): ?>
+          <p class="text-muted mb-0 mt-1" style="font-size:.78rem">Aucune pièce jointe (acte de naissance, carnet de vaccination, bulletin, document de transfert, photo 4×4…).</p>
+        <?php else: ?>
+          <div class="table-responsive mt-1">
+            <table class="table table-sm table-abz mb-0" style="font-size:.8rem">
+              <thead><tr><th>Type</th><th>Libellé</th><th>Ajouté le</th><th class="text-end">Actions</th></tr></thead>
+              <tbody>
+                <?php foreach ($documents as $d): ?>
+                  <tr>
+                    <td><span class="badge-code"><?= h(libelle_type_dossier($d['type_document'])) ?></span></td>
+                    <td><?= h($d['libelle'] ?: '—') ?></td>
+                    <td style="color:#6b7280"><?= h(date('d/m/Y', strtotime($d['date_ajout']))) ?></td>
+                    <td class="text-end text-nowrap">
+                      <a href="<?= APP_URL ?>/secondaire/commun/pages/eleves/dossier_fichier.php?id=<?= (int) $d['id'] ?>" target="_blank"
+                         class="btn btn-sm" style="background:#eef2ff;color:#1e4fd8;padding:3px 7px" title="Voir">
+                        <i class="bi bi-eye" style="font-size:.78rem"></i>
+                      </a>
+                      <?php if ($peut_gerer_dossier): ?>
+                      <form method="post" action="<?= APP_URL ?>/secondaire/commun/pages/eleves/dossier_supprimer.php" class="d-inline"
+                            onsubmit="return confirm('Retirer ce document du dossier ?')">
+                        <?= csrf_champ() ?>
+                        <input type="hidden" name="id" value="<?= (int) $d['id'] ?>">
+                        <button class="btn btn-sm btn-light text-danger" style="padding:3px 7px" title="Retirer">
+                          <i class="bi bi-trash" style="font-size:.78rem"></i>
+                        </button>
+                      </form>
+                      <?php endif; ?>
+                    </td>
+                  </tr>
+                <?php endforeach; ?>
+              </tbody>
+            </table>
+          </div>
+        <?php endif; ?>
+      </div>
+    </div>
+    <?php endif; ?>
   </div>
   <div class="col-lg-4">
     <div class="card">
@@ -81,5 +139,40 @@ require_once __DIR__ . '/../../../../noyau/layout/header.php';
     </div>
   </div>
 </div>
+
+<?php if ($documents !== null && $peut_gerer_dossier): ?>
+<!-- Ajout d'un document au dossier de l'élève -->
+<div class="modal fade" id="modalDossier" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form method="post" action="<?= APP_URL ?>/secondaire/commun/pages/eleves/dossier_upload.php" enctype="multipart/form-data">
+        <?= csrf_champ() ?>
+        <input type="hidden" name="id_eleve" value="<?= (int) $id ?>">
+        <div class="modal-header py-2">
+          <h6 class="modal-title fw-bold"><i class="bi bi-folder2-open me-1 text-primary"></i>Ajouter un document</h6>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <label class="form-label">Type de document</label>
+          <select name="type_document" class="form-select form-select-sm mb-2" required>
+            <?php foreach ($types_dossier as $t): ?>
+              <option value="<?= $t ?>"><?= h(libelle_type_dossier($t)) ?></option>
+            <?php endforeach; ?>
+          </select>
+          <label class="form-label">Libellé (optionnel)</label>
+          <input type="text" name="libelle" class="form-control form-control-sm mb-2" placeholder="Ex. Bulletin 1er trimestre">
+          <label class="form-label">Fichier</label>
+          <input type="file" name="fichier" accept=".pdf,.jpg,.jpeg,.png" class="form-control form-control-sm" required>
+          <div class="form-text" style="font-size:.68rem">PDF, JPG ou PNG — 750 Ko max.</div>
+        </div>
+        <div class="modal-footer py-2">
+          <button class="btn btn-primary btn-sm"><i class="bi bi-upload me-1"></i>Ajouter</button>
+          <button type="button" class="btn btn-light btn-sm" data-bs-dismiss="modal">Annuler</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+<?php endif; ?>
 
 <?php require_once __DIR__ . '/../../../../noyau/layout/footer.php'; ?>

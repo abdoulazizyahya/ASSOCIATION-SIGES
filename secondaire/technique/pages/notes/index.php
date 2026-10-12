@@ -17,7 +17,6 @@ $role        = role_connecte();
 $is_admin    = in_array($role, ['ADMIN','PROVISEUR','FONDATEUR','CENSEUR'], true) || $role === 'MEMBRE_ASSOCIATION';
 $is_ens      = ($role === 'ENSEIGNANT');
 $onglet      = $_GET['onglet'] ?? 'classe';
-if ($onglet === 'releve_vierge') $onglet = 'classe';   // pas encore porté (voir la barre d'onglets)
 $annee_act   = get_annee_active();
 $id_annee    = (int)($annee_act['id'] ?? 0);
 $val_annee   = $annee_act['libelle'] ?? '';
@@ -490,9 +489,12 @@ if (!$es_partiel) {
       <i class="bi bi-exclamation-triangle me-1"></i>Non saisies
     </a>
   </li>
-  <?php /* Onglet « Relevé vierge » d'ABZ_MBE : masqué tant que
-           pdf_releve_vierge.php / excel_releve_vierge.php et leur page de
-           vérification par QR ne sont pas portés dans SIGES (multi-école). */ ?>
+  <li class="nav-item">
+    <a class="nav-link <?= $onglet==='releve_vierge'?'active':'' ?>" data-ajax-nav
+       href="<?= APP_URL ?>/secondaire/technique/pages/notes/index.php?onglet=releve_vierge<?= $id_cl_rv?"&classe_rv=$id_cl_rv":'' ?>">
+      <i class="bi bi-file-earmark-spreadsheet me-1"></i>Relevé vierge
+    </a>
+  </li>
 </ul>
 
 
@@ -1331,11 +1333,11 @@ document.addEventListener('DOMContentLoaded', function(){
     </form>
     <div class="mt-3">
       <a class="btn btn-sm" style="background:#1a2744;color:#fff" target="_blank"
-         href="<?= APP_URL ?>/secondaire/general/pages/notes/pdf_releve_vierge.php?classe=<?= $id_cl_rv ?>&dl=1">
+         href="<?= APP_URL ?>/secondaire/technique/pages/notes/pdf_releve_vierge.php?classe=<?= $id_cl_rv ?>&dl=1">
         <i class="bi bi-file-earmark-pdf me-1"></i>Télécharger en PDF
       </a>
       <a class="btn btn-sm btn-outline-success ms-2"
-         href="<?= APP_URL ?>/secondaire/general/pages/notes/excel_releve_vierge.php?classe=<?= $id_cl_rv ?>">
+         href="<?= APP_URL ?>/secondaire/technique/pages/notes/excel_releve_vierge.php?classe=<?= $id_cl_rv ?>">
         <i class="bi bi-file-earmark-excel me-1"></i>Télécharger en Excel
       </a>
     </div>
@@ -1356,7 +1358,7 @@ document.addEventListener('DOMContentLoaded', function(){
     </span>
   </div>
   <div class="card-body p-0">
-    <iframe src="<?= APP_URL ?>/secondaire/general/pages/notes/pdf_releve_vierge.php?classe=<?= $id_cl_rv ?>"
+    <iframe src="<?= APP_URL ?>/secondaire/technique/pages/notes/pdf_releve_vierge.php?classe=<?= $id_cl_rv ?>"
             style="width:100%;height:80vh;border:none;display:block" title="Aperçu relevé vierge"></iframe>
   </div>
 </div>

@@ -3507,6 +3507,59 @@ function notifications_tout_marquer_lu(int $id_utilisateur): void {
     db_exec("UPDATE notification SET lue=1 WHERE id_utilisateur=?", [$id_utilisateur]);
 }
 
+// ==== Validité des documents enseignants (porté d'ABZ_MBE, migration secondaire v14) ====
+/**
+ * Réglage de validité d'un type de document ('attestation'|'prise'|'reprise')
+ * — secondaire/commun/pages/enseignants/validite_documents.php. Pas de ligne
+ * (ou table absente : base pas encore migrée) = jamais expiré.
+ * @return array{actif:bool, duree_valeur:int, duree_unite:string}
+ */
+function get_reglage_validite_document(string $type_document): array {
+    static $cache = [];
+    if (array_key_exists($type_document, $cache)) return $cache[$type_document];
+    $defaut = ['actif' => false, 'duree_valeur' => 3, 'duree_unite' => 'mois'];
+    try {
+        $r = db_one("SELECT * FROM reglage_validite_document WHERE type_document = ?", [$type_document]);
+    } catch (\Throwable $e) {
+        $r = null;
+    }
+    if ($r) {
+        $defaut['actif']        = (bool) $r['actif'];
+        $defaut['duree_valeur'] = (int) $r['duree_valeur'];
+        $defaut['duree_unite']  = $r['duree_unite'];
+    }
+    return $cache[$type_document] = $defaut;
+}
+
+/**
+ * Validité du DERNIER document VALIDÉ (enseignant, type) — elle démarre à
+ * la signature du Proviseur (demande_document.date_proviseur), jamais à la
+ * date d'impression. null si aucune demande validée ; expire_le=null si
+ * aucune durée n'est activée pour ce type (jamais expiré).
+ * @return array{date_validation:string, expire_le:?string, expire:bool}|null
+ */
+function demande_validite_info(string $mat, string $type_document): ?array {
+    if (!$mat) return null;
+    $d = db_one(
+        "SELECT date_proviseur FROM demande_document
+         WHERE matricule_ens=? AND type_document=? AND statut='validee' AND date_proviseur IS NOT NULL
+         ORDER BY date_proviseur DESC LIMIT 1",
+        [$mat, $type_document]
+    );
+    if (!$d) return null;
+    $reglage = get_reglage_validite_document($type_document);
+    if (!$reglage['actif']) {
+        return ['date_validation' => $d['date_proviseur'], 'expire_le' => null, 'expire' => false];
+    }
+    $expire_dt = new DateTime($d['date_proviseur']);
+    $expire_dt->modify('+' . $reglage['duree_valeur'] . ' ' . ($reglage['duree_unite'] === 'jour' ? 'days' : 'months'));
+    return [
+        'date_validation' => $d['date_proviseur'],
+        'expire_le'       => $expire_dt->format('Y-m-d H:i:s'),
+        'expire'          => new DateTime() >= $expire_dt,
+    ];
+}
+
 // ==== libelle_type_demande ====
 /** Libellé lisible d'un type de document de demande. */
 function libelle_type_demande(string $type): string {

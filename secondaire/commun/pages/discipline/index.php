@@ -51,11 +51,17 @@ $trim_actif = db_one(
 );
 $id_trim = (int)($trim_actif['id'] ?? 0);
 
-$onglet = in_array($_GET['onglet'] ?? '', ['absences', 'exclusions', 'retards'], true)
+$onglet = in_array($_GET['onglet'] ?? '', ['absences', 'exclusions', 'retards', 'fiche_presence'], true)
     ? $_GET['onglet'] : 'absences';
 
 $id_classe = (int)($_GET['classe'] ?? ($classes_access[0]['id'] ?? 0));
-if (!in_array($id_classe, $ids_classes_ok, true)) $id_classe = $classes_access[0]['id'] ?? 0;
+// "Toutes les classes" (classe=0) n'est une valeur valide que pour l'onglet
+// Fiche de présence — les autres onglets (saisie) exigent une classe précise.
+if ($id_classe === 0 && $onglet === 'fiche_presence') {
+    // valeur acceptée telle quelle
+} elseif (!in_array($id_classe, $ids_classes_ok, true)) {
+    $id_classe = $classes_access[0]['id'] ?? 0;
+}
 
 // CSRF
 if (empty($_SESSION['csrf_discipline'])) {
@@ -119,7 +125,7 @@ require_once __DIR__ . '/../../../../noyau/layout/header.php';
 <?php else: ?>
 
 <ul class="nav nav-tabs mb-3">
-  <?php foreach (['absences' => "Heures d'absence", 'exclusions' => 'Exclusions', 'retards' => 'Retards'] as $key => $label): ?>
+  <?php foreach (['absences' => "Heures d'absence", 'exclusions' => 'Exclusions', 'retards' => 'Retards', 'fiche_presence' => 'Fiche de présence'] as $key => $label): ?>
     <li class="nav-item">
       <a class="nav-link <?= $onglet === $key ? 'active' : '' ?>"
          href="?onglet=<?= $key ?>&classe=<?= $id_classe ?>"><?= h($label) ?></a>
@@ -131,27 +137,61 @@ require_once __DIR__ . '/../../../../noyau/layout/header.php';
   <div class="card-body py-2">
     <form method="get" class="row g-2 align-items-end">
       <input type="hidden" name="onglet" value="<?= h($onglet) ?>">
+      <?php $nb_options_classe = count($classes_access) + ($onglet === 'fiche_presence' ? 1 : 0); ?>
       <div class="col-md-4">
         <label class="form-label mb-1" style="font-size:.78rem;font-weight:600;color:#1a3c6b">Classe</label>
-        <select name="classe" class="form-select form-select-sm" onchange="this.form.submit()" <?= count($classes_access) <= 1 ? 'disabled' : '' ?>>
+        <select name="classe" class="form-select form-select-sm" onchange="this.form.submit()" <?= $nb_options_classe <= 1 ? 'disabled' : '' ?>>
+          <?php if ($onglet === 'fiche_presence'): ?>
+            <option value="0" <?= $id_classe === 0 ? 'selected' : '' ?>>— Toutes les classes —</option>
+          <?php endif; ?>
           <?php foreach ($classes_access as $c): ?>
             <option value="<?= $c['id'] ?>" <?= $id_classe == $c['id'] ? 'selected' : '' ?>><?= h($c['designation']) ?></option>
           <?php endforeach; ?>
         </select>
-        <?php if (count($classes_access) <= 1): ?>
+        <?php if ($nb_options_classe <= 1): ?>
           <input type="hidden" name="classe" value="<?= $id_classe ?>">
         <?php endif; ?>
       </div>
+      <?php if ($onglet !== 'fiche_presence'): // trimestre inutile sur une fiche vierge, sans saisie liée ?>
       <div class="col-md-4">
         <span class="badge" style="background:#dbe4f5;color:#1a3c6b;font-size:.78rem;padding:6px 12px">
           <i class="bi bi-calendar3 me-1"></i><?= h($trim_actif['libelle'] ?? '') ?> (en cours)
         </span>
       </div>
+      <?php endif; ?>
     </form>
   </div>
 </div>
 
-<?php if (empty($eleves)): ?>
+<?php if ($onglet === 'fiche_presence'):
+  $classe_lbl = 'Toutes les classes';
+  if ($id_classe) {
+      $classe_lbl = '';
+      foreach ($classes_access as $c) { if ($c['id'] == $id_classe) { $classe_lbl = $c['designation']; break; } }
+  }
+?>
+  <div class="card" style="border-color:#c7d8f0">
+    <div class="card-header py-2 d-flex align-items-center justify-content-between flex-wrap gap-2" style="background:#f0f4ff">
+      <span class="fw-semibold" style="color:#1a3c6b">
+        <i class="bi bi-clipboard2-check me-1"></i>Fiche de présence — <?= h($classe_lbl) ?>
+      </span>
+      <div class="d-flex gap-2 flex-wrap">
+        <a class="btn btn-sm" style="background:#1a3c6b;color:#fff" target="_blank"
+           href="<?= APP_URL ?>/secondaire/commun/pages/discipline/pdf_fiche_presence.php?classe=<?= $id_classe ?>&dl=1">
+          <i class="bi bi-file-earmark-pdf me-1"></i>Télécharger en PDF
+        </a>
+        <a class="btn btn-sm btn-outline-success"
+           href="<?= APP_URL ?>/secondaire/commun/pages/discipline/excel_fiche_presence.php?classe=<?= $id_classe ?>">
+          <i class="bi bi-file-earmark-excel me-1"></i>Télécharger en Excel
+        </a>
+      </div>
+    </div>
+    <div class="card-body p-0">
+      <iframe src="<?= APP_URL ?>/secondaire/commun/pages/discipline/pdf_fiche_presence.php?classe=<?= $id_classe ?>"
+              style="width:100%;height:80vh;border:none;display:block" title="Aperçu fiche de présence"></iframe>
+    </div>
+  </div>
+<?php elseif (empty($eleves)): ?>
   <div class="alert alert-info">Aucun élève actif dans cette classe.</div>
 <?php else: ?>
 

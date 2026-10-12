@@ -408,3 +408,82 @@ function pdf_copyright(FPDF $pdf, float $page_w, float $page_h, float $marge_bas
     $pdf->Text($x, $y, $texte);
     $pdf->SetTextColor(0, 0, 0);
 }
+
+// ── Portés d'ABZ_MBE (12/10/2026) : documents expirés, fiche de présence, relevé vierge ──
+// Mention "DOCUMENT EXPIRE" en diagonale, DESSINÉE PAR-DESSUS le contenu
+// (contrairement à pdf_filigrane(), qui reste en fond) — appelée en dernier,
+// juste avant Output(), sur un document dont demande_validite_info()
+// (fonctions.php) a signalé l'expiration : la consultation (visualisation)
+// reste possible, mais le document ne doit plus jamais être confondu avec un
+// document valable une fois imprimé/exporté (voir secondaire/commun/pages/enseignants/
+// pdf_attestation.php et pdf_prise_service.php, qui bloquent déjà le
+// téléchargement — cette mention est la protection visuelle qui reste même
+// si la page est malgré tout imprimée depuis le visualiseur du navigateur).
+function pdf_filigrane_expire(FPDF $pdf, float $page_w, float $page_h, string $texte = 'DOCUMENT EXPIRE - NON VALABLE'): void {
+    $pdf->SetTextColor(190, 20, 20);
+    $taille = max(18, min(40, $page_w * 0.62));
+    $pdf->SetFont('Arial', 'B', $taille);
+    $w_txt = $pdf->GetStringWidth($texte);
+    $angle = 35; // degrés, diagonale bas-gauche -> haut-droit
+    $rad   = deg2rad($angle);
+    // Origine choisie pour que le CENTRE du texte (une fois pivoté) tombe
+    // au centre de la page.
+    $x = $page_w / 2 - ($w_txt / 2) * cos($rad);
+    $y = $page_h / 2 + ($w_txt / 2) * sin($rad);
+    $pdf->RotatedText($x, $y, $texte, $angle);
+    $pdf->SetTextColor(0, 0, 0);
+}
+
+// Pied de page "Copyright © SIGES ABZ - {année scolaire}" (gauche) +
+// "Page X / Y" (droite), séparés du contenu par un mince filet horizontal —
+// modèle fourni par l'utilisateur pour la fiche de présence et le relevé
+// vierge (secondaire/commun/pages/discipline/pdf_fiche_presence.php,
+// secondaire/technique/pages/notes/pdf_releve_vierge.php). Utilise AliasNbPages()/PageNo() pour
+// le nombre total de pages : l'appelant doit avoir appelé
+// $pdf->AliasNbPages() une fois avant AddPage() pour que "{nb}" soit
+// remplacé automatiquement à la fermeture du document.
+function pdf_pied_copyright(FPDF $pdf, string $val_annee, float $page_w, float $page_h, float $marge = 8): void {
+    $y = $page_h - $marge - 4;
+    $pdf->SetDrawColor(180, 180, 180);
+    $pdf->Line($marge, $y, $page_w - $marge, $y);
+    $pdf->SetY($y + 0.8);
+    $pdf->SetFont('Arial', '', 7);
+    $pdf->SetTextColor(90, 90, 90);
+    $pdf->SetX($marge);
+    $pdf->Cell(($page_w - 2 * $marge) / 2, 4, pdf_u('Copyright © SIGES ABZ - ' . $val_annee), 0, 0, 'L');
+    $pdf->Cell(($page_w - 2 * $marge) / 2, 4, pdf_u('Page ' . $pdf->PageNo() . ' / {nb}'), 0, 0, 'R');
+    $pdf->SetTextColor(0, 0, 0);
+    $pdf->SetDrawColor(0, 0, 0);
+}
+
+// Variante de pdf_pied_copyright() avec un QR code de vérification
+// d'authenticité à gauche du filet — même principe que les bulletins/
+// attestations (verif_lib.php, verif_attestation_lib.php) appliqué
+// à la fiche de présence et au relevé vierge : $qr_chemin est un PNG déjà
+// généré (tempnam + QRCode::render_image(), voir secondaire/commun/pages/discipline/
+// pdf_fiche_presence.php) ; passer null revient exactement à
+// pdf_pied_copyright() (aucun changement pour les appelants existants).
+function pdf_pied_copyright_qr(FPDF $pdf, string $val_annee, float $page_w, float $page_h, float $marge = 8, ?string $qr_chemin = null, float $qr_size = 16): void {
+    if (!$qr_chemin || !is_file($qr_chemin)) {
+        pdf_pied_copyright($pdf, $val_annee, $page_w, $page_h, $marge);
+        return;
+    }
+    $y_top = $page_h - $marge - $qr_size;
+    $pdf->SetDrawColor(180, 180, 180);
+    $pdf->Line($marge, $y_top - 1.5, $page_w - $marge, $y_top - 1.5);
+    $pdf->Image($qr_chemin, $marge, $y_top, $qr_size, $qr_size, 'PNG');
+
+    $tx = $marge + $qr_size + 3;
+    $tw = $page_w - $marge - $tx;
+    $pdf->SetFont('Arial', '', 7);
+    $pdf->SetTextColor(90, 90, 90);
+    $pdf->SetXY($tx, $y_top + 1);
+    $pdf->Cell($tw, 4, pdf_u('Copyright © SIGES ABZ - ' . $val_annee), 0, 2, 'L');
+    $pdf->SetX($tx);
+    $pdf->Cell($tw, 4, pdf_u('Page ' . $pdf->PageNo() . ' / {nb}'), 0, 2, 'L');
+    $pdf->SetX($tx);
+    $pdf->SetFont('Arial', 'I', 6.5);
+    $pdf->Cell($tw, 4, pdf_u("Scanner le QR pour verifier l'authenticite"), 0, 0, 'L');
+    $pdf->SetTextColor(0, 0, 0);
+    $pdf->SetDrawColor(0, 0, 0);
+}

@@ -96,6 +96,10 @@ require_once __DIR__ . '/../../../../noyau/layout/header.php';
     <div class="sub"><?= $total ?> élève(s) <?= $statut === 'actif' ? 'actif(s)' : 'désactivé(s)' ?></div>
   </div>
   <div class="d-flex gap-2">
+    <a href="<?= APP_URL ?>/secondaire/commun/pages/eleves/excel.php<?= $id_classe ? '?classe=' . $id_classe : '' ?>"
+       class="btn btn-outline-success btn-sm" title="Exporter la liste (classe filtrée ou toutes) au format Excel">
+      <i class="bi bi-file-earmark-arrow-down me-1"></i>Exporter Excel
+    </a>
     <?php if (in_array(role_connecte(), ['ADMIN', 'PROVISEUR', 'FONDATEUR', 'SECRETAIRE'], true)): ?>
     <a href="<?= APP_URL ?>/secondaire/commun/pages/eleves/import.php" class="btn btn-outline-primary btn-sm" data-ajax-nav>
       <i class="bi bi-file-earmark-excel me-1"></i>Importer

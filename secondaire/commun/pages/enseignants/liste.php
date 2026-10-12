@@ -25,9 +25,16 @@ require_once __DIR__ . '/../../../../noyau/layout/header.php';
     <h4><i class="bi bi-person-badge me-1 text-primary"></i>Enseignants</h4>
     <div class="sub"><?= count($enseignants) ?> membre(s) du personnel</div>
   </div>
-  <a href="<?= APP_URL ?>/secondaire/commun/pages/enseignants/form.php" class="btn btn-primary btn-sm">
-    <i class="bi bi-plus-lg me-1"></i>Nouveau membre
-  </a>
+  <div class="d-flex gap-2 flex-wrap">
+    <?php $u_lot = APP_URL . '/secondaire/commun/pages/enseignants/pdf_dossier_lot.php' . ($q !== '' ? '?q=' . urlencode($q) : ''); ?>
+    <button type="button" class="btn btn-outline-primary btn-sm"
+            onclick="afficherApercu(<?= h(json_encode($u_lot)) ?>, <?= h(json_encode($q !== '' ? 'Dossiers administratifs — résultats de la recherche' : 'Dossiers administratifs — tous')) ?>, 'dossier_enseignant', 'portrait')">
+      <i class="bi bi-files me-1"></i><?= $q !== '' ? 'Dossiers (résultats)' : 'Tous les dossiers' ?>
+    </button>
+    <a href="<?= APP_URL ?>/secondaire/commun/pages/enseignants/form.php" class="btn btn-primary btn-sm">
+      <i class="bi bi-plus-lg me-1"></i>Nouveau membre
+    </a>
+  </div>
 </div>
 
 <?= flash_html() ?>
@@ -85,6 +92,18 @@ require_once __DIR__ . '/../../../../noyau/layout/header.php';
                  class="btn btn-sm btn-light" style="padding:3px 7px">
                 <i class="bi bi-pencil" style="font-size:.78rem"></i>
               </a>
+              <!-- Documents administratifs (portés d'ABZ_MBE) : aperçu avant impression -->
+              <div class="dropdown d-inline">
+                <button class="btn btn-sm btn-light dropdown-toggle" style="padding:3px 7px" data-bs-toggle="dropdown" title="Documents">
+                  <i class="bi bi-file-earmark-text" style="font-size:.78rem"></i>
+                </button>
+                <ul class="dropdown-menu dropdown-menu-end" style="font-size:.8rem">
+                  <?php foreach (['attestation' => 'Attestation de présence', 'prise_service' => 'Prise de service',
+                                  'reprise_service' => 'Reprise de service', 'dossier' => 'Dossier administratif'] as $t => $lib): ?>
+                    <li><a class="dropdown-item" href="<?= APP_URL ?>/secondaire/commun/pages/enseignants/apercu.php?id=<?= urlencode((string) $e['matricule_ens']) ?>&type=<?= $t ?>"><?= h($lib) ?></a></li>
+                  <?php endforeach; ?>
+                </ul>
+              </div>
             </td>
           </tr>
         <?php endforeach; endif; ?>
