@@ -1,7 +1,7 @@
 <?php
 // bd/lib/audit_vue.php — libellés et rendu HTML des lignes du journal
 // d'audit. Partagé par association/journal.php (réseau) et
-// pages/utilisateurs/journal.php (vue directeur / fondateur).
+// primaire/pages/utilisateurs/journal.php (vue directeur / fondateur).
 // Suppose h() disponible (fonctions.php).
 
 function audit_vue_evenement(string $e): string
@@ -82,7 +82,7 @@ function audit_vue_action(string $a): string
  * information utile en plus de la date/l'acteur/l'appareil déjà dans les
  * autres colonnes). Échec de connexion reste affiché AVEC sa raison sur la
  * même ligne (« Échec de connexion – mot de passe incorrect ») : signal de
- * sécurité, pas du bruit — voir login.php / association/login.php qui
+ * sécurité, pas du bruit — voir compte/login.php / association/login.php qui
  * distinguent désormais identifiant/mot de passe incorrect dans `cible`
  * (le message affiché À L'UTILISATEUR, lui, reste volontairement vague :
  * anti-énumération de comptes, le journal n'est visible que des rôles

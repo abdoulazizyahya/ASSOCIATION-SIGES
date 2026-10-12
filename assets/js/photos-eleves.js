@@ -1,7 +1,7 @@
 // assets/js/photos-eleves.js — outils communs aux photos d'élèves par classe
-// (onglet « Photos par classe » de pages/eleves/liste.php et séance photo au
-// téléphone pages/eleves/photos_seance.php).
-// Format final identique au recadrage de pages/eleves/form.php : portrait
+// (onglet « Photos par classe » de primaire/pages/eleves/liste.php et séance photo au
+// téléphone primaire/pages/eleves/photos_seance.php).
+// Format final identique au recadrage de primaire/pages/eleves/form.php : portrait
 // 3:4, 300×400 px, JPEG — réduit DANS LE NAVIGATEUR avant l'envoi (≈ 30-60 Ko
 // au lieu de plusieurs Mo pour une photo de téléphone) : envoi rapide même en
 // connexion mobile, base de données (BLOB Photo_elv) qui ne gonfle pas.

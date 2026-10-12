@@ -5,9 +5,9 @@
 //  Piste arabe : « Matières par niveau » + « Barème par niveau »
 //  (Oral/Écrit/Pratique). Voir bd/migration_v46.sql.
 // =====================================================================
-require_once __DIR__ . '/../config.php';
-require_once __DIR__ . '/../connexion.php';
-require_once __DIR__ . '/../fonctions.php';
+require_once __DIR__ . '/../config/config.php';
+require_once __DIR__ . '/../noyau/connexion.php';
+require_once __DIR__ . '/../noyau/fonctions.php';
 
 header('Content-Type: text/plain; charset=utf-8');
 echo "=== Migration v46 — jaynitaare_v2 (mysqli) ===\n\n";

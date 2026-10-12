@@ -12,7 +12,7 @@
 // page ni bloquer une connexion.
 
 if (!function_exists('assoc_exec')) {
-    require_once __DIR__ . '/../../connexion_assoc.php';
+    require_once __DIR__ . '/../../noyau/connexion_assoc.php';
 }
 
 // ─────────────────────────────────────────────────────────────────────
@@ -103,12 +103,12 @@ function audit_geo(?string $ip): array
     if (!filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE)) {
         return $vide;
     }
-    if (!function_exists('annuaire_dispo') || !annuaire_dispo()) return $vide;
+    if (!function_exists('audit_dispo') || !audit_dispo()) return $vide;
 
     // Cache (30 jours)
     $c = null;
     try {
-        $c = assoc_one("SELECT pays, region, ville, operateur, maj_le FROM geo_ip_cache WHERE ip = ?", [$ip]);
+        $c = audit_one("SELECT pays, region, ville, operateur, maj_le FROM geo_ip_cache WHERE ip = ?", [$ip]);
     } catch (\Throwable $e) {
         return $vide;   // table pas encore créée
     }
@@ -141,7 +141,7 @@ function audit_geo(?string $ip): array
     // Écrit le cache dans tous les cas (échec compris : maj_le repoussé →
     // on ne re-frappe pas l'API à chaque connexion pour une IP muette).
     try {
-        assoc_exec(
+        audit_exec(
             "INSERT INTO geo_ip_cache (ip, pays, region, ville, operateur, ok, maj_le)
              VALUES (?, ?, ?, ?, ?, ?, NOW())
              ON DUPLICATE KEY UPDATE pays = VALUES(pays), region = VALUES(region),
@@ -188,7 +188,7 @@ function _audit_http_get(string $url): ?string
 //  de la machine (jamais transmis par un navigateur à un site, quelle que
 //  soit la techno : vie privée). Sert uniquement à RECONNAÎTRE le même
 //  navigateur d'une connexion à l'autre, pour que le compte puisse lui
-//  donner un nom depuis « Mon compte » (profil.php > Mes appareils) — voir
+//  donner un nom depuis « Mon compte » (compte/profil.php > Mes appareils) — voir
 //  appareil_connu (connexion_assoc.php).
 // ─────────────────────────────────────────────────────────────────────
 function appareil_device_id(): string
@@ -217,7 +217,7 @@ function appareil_device_id(): string
 // ─────────────────────────────────────────────────────────────────────
 function audit_log(string $evenement, array $ctx = []): void
 {
-    if (!function_exists('annuaire_dispo') || !annuaire_dispo()) return;
+    if (!function_exists('audit_dispo') || !audit_dispo()) return;
     if (function_exists('ecole_session_demarrer')) ecole_session_demarrer();
 
     // ── Acteur ──
@@ -258,7 +258,7 @@ function audit_log(string $evenement, array $ctx = []): void
     $device = appareil_device_id();
 
     try {
-        assoc_exec(
+        audit_exec(
             "INSERT INTO journal_audit
                (evenement, action, cible, acteur_type, acteur_id, acteur_login, acteur_nom, role,
                 id_etablissement, ip, ua_navigateur, ua_os, ua_appareil, ua_modele, ua_brut,
@@ -285,7 +285,7 @@ function audit_log(string $evenement, array $ctx = []): void
     // depuis « Mon compte ») : seule la dernière vue + le dernier UA bougent.
     if ($type === 'membre' || $type === 'user') {
         try {
-            assoc_exec(
+            audit_exec(
                 "INSERT INTO appareil_connu
                    (device_id, acteur_type, acteur_id, ua_appareil, ua_modele, ua_navigateur, ua_os, premiere_connexion, derniere_connexion)
                  VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), NOW())

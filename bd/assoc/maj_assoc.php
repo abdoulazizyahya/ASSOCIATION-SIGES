@@ -12,8 +12,8 @@
 //  installation ; ce script ne sert qu'aux bases existantes.)
 // =====================================================================
 
-require_once __DIR__ . '/../../config.php';
-require_once __DIR__ . '/../../connexion_assoc.php';
+require_once __DIR__ . '/../../config/config.php';
+require_once __DIR__ . '/../../noyau/connexion_assoc.php';
 
 if (PHP_SAPI !== 'cli') header('Content-Type: text/plain; charset=utf-8');
 if (!annuaire_dispo()) { die("Annuaire absent — rien à mettre à jour.\n"); }
@@ -186,7 +186,7 @@ if (!table_existe('geo_ip_cache')) {
 // ── Secondaire : etablissement.type_enseignement (primaire/secondaire) ──
 //  Figé à la création de l'établissement — détermine le schéma école
 //  chargé (bd/assoc/schema_ref_ecole.sql vs schema_ref_ecole_secondaire.sql)
-//  et le module de pages utilisé (pages/ vs secondaire/). Toutes les écoles
+//  et le module de pages utilisé (primaire/pages/ vs secondaire/). Toutes les écoles
 //  existantes restent 'primaire' (comportement inchangé).
 if (!col_existe('etablissement', 'type_enseignement')) {
     mysqli_query($link_assoc,
@@ -199,7 +199,7 @@ if (!col_existe('etablissement', 'type_enseignement')) {
 //  journal_audit.device_id relie chaque ligne à un cookie durable côté
 //  navigateur (bd/lib/audit.php::appareil_device_id()) ; appareil_connu
 //  porte le nom que le compte donne lui-même à son appareil (« Mon compte »,
-//  profil.php) — jamais le nom système, inaccessible à un site web.
+//  compte/profil.php) — jamais le nom système, inaccessible à un site web.
 if (!col_existe('journal_audit', 'device_id')) {
     mysqli_query($link_assoc, "ALTER TABLE `journal_audit` ADD COLUMN `device_id` varchar(40) DEFAULT NULL AFTER `geo_operateur`");
     mysqli_query($link_assoc, "ALTER TABLE `journal_audit` ADD KEY `k_appareil` (`device_id`,`acteur_type`,`acteur_id`)");

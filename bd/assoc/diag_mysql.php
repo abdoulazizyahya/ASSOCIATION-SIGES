@@ -12,8 +12,8 @@
 //  À SUPPRIMER après usage.
 // =====================================================================
 
-require_once __DIR__ . '/../../config.php';
-require_once __DIR__ . '/../../connexion_assoc.php';
+require_once __DIR__ . '/../../config/config.php';
+require_once __DIR__ . '/../../noyau/connexion_assoc.php';
 
 mysqli_report(MYSQLI_REPORT_OFF);   // on gère les erreurs à la main
 

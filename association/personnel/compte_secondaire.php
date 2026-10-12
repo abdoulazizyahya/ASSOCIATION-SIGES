@@ -12,9 +12,9 @@
 // connexion_assoc.php) — sans cette page, une école secondaire n'a
 // littéralement aucun moyen d'être utilisée (bug réel constaté le
 // 15/09/2026 : 0 ligne dans `utilisateur` pour la 1ʳᵉ école secondaire créée).
-require_once __DIR__ . '/../../config.php';
-require_once __DIR__ . '/../../connexion.php';
-require_once __DIR__ . '/../../fonctions.php';
+require_once __DIR__ . '/../../config/config.php';
+require_once __DIR__ . '/../../noyau/connexion.php';
+require_once __DIR__ . '/../../noyau/fonctions.php';
 require_once __DIR__ . '/../_layout.php';
 exiger_superadmin_association();
 
@@ -26,9 +26,9 @@ $msg = ''; $err = '';
 
 // Enseignants de l'école ciblée, pour lier (optionnel) le compte créé à une
 // fiche RH existante — utilisateur.matricule_ens (FK -> enseignant), lu par
-// login.php pour peupler $_SESSION['user']['matricule_ens'] : sans ce lien,
+// compte/login.php pour peupler $_SESSION['user']['matricule_ens'] : sans ce lien,
 // un compte ENSEIGNANT ne peut jamais être restreint à ses propres classes
-// dans secondaire/pages/notes/ (matricule_ens_courant() resterait null).
+// dans secondaire/general/pages/notes/ (matricule_ens_courant() resterait null).
 $enseignants = $id_cible
     ? avec_ecole($id_cible, fn($l) => ecole_all($l, "SELECT matricule_ens, nom_ens, prenom_ens FROM enseignant ORDER BY nom_ens, prenom_ens"))
     : [];

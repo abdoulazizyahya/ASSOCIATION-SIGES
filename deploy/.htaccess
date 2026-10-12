@@ -1,0 +1,3 @@
+# deploy/ : outils en ligne de commande, modèle .htaccess, archives de
+# déploiement (zips) — jamais servis par le web, en LAN comme en production.
+Require all denied

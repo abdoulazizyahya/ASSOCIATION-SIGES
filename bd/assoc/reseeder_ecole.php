@@ -36,8 +36,8 @@
 //    php bd/assoc/reseeder_ecole.php <CODE|--tout> [--bareme] [--classes] [--sans-backup]
 // =====================================================================
 
-require_once __DIR__ . '/../../config.php';
-require_once __DIR__ . '/../../connexion_assoc.php';
+require_once __DIR__ . '/../../config/config.php';
+require_once __DIR__ . '/../../noyau/connexion_assoc.php';
 require_once __DIR__ . '/../lib/ecole_maintenance.php';
 
 if (PHP_SAPI !== 'cli') { header('Content-Type: text/plain; charset=utf-8'); }

@@ -1,14 +1,14 @@
 <?php
 // association/etablissement_nouveau.php — un membre crée un nouvel
 // établissement : base école dédiée + inscription à l'annuaire.
-require_once __DIR__ . '/../config.php';
-require_once __DIR__ . '/../connexion.php';
-require_once __DIR__ . '/../fonctions.php';
+require_once __DIR__ . '/../config/config.php';
+require_once __DIR__ . '/../noyau/connexion.php';
+require_once __DIR__ . '/../noyau/fonctions.php';
 require_once __DIR__ . '/_layout.php';
 exiger_superadmin_association();
 
 $msg = ''; $err = ''; $ok = false; $comptes = [];
-$val = ['code' => '', 'nom' => '', 'nom_en' => '', 'sigle' => '', 'ville' => '', 'sous_domaine' => '', 'type_enseignement' => 'primaire', 'statut' => 'public'];
+$val = ['code' => '', 'nom' => '', 'nom_en' => '', 'sigle' => '', 'ville' => '', 'sous_domaine' => '', 'type_enseignement' => 'primaire', 'statut' => 'public', 'ordre_enseignement' => 'general'];
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     csrf_verifier();
@@ -17,6 +17,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $val['sous_domaine'] = strtolower($val['sous_domaine']);
     if (!in_array($val['type_enseignement'], ['primaire', 'secondaire'], true)) $val['type_enseignement'] = 'primaire';
     if (!in_array($val['statut'], ['public', 'prive'], true)) $val['statut'] = 'public';
+    if ($val['ordre_enseignement'] !== 'technique') $val['ordre_enseignement'] = 'general';
 
     $r = creer_etablissement($val + ['par' => membre_connecte()['login'] ?? '?']);
     if ($r['ok']) {
@@ -24,7 +25,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $ok = true;
         $msg = $r['message'];
         $comptes = $r['comptes'] ?? [];
-        $val = ['code' => '', 'nom' => '', 'nom_en' => '', 'sigle' => '', 'ville' => '', 'sous_domaine' => '', 'type_enseignement' => 'primaire', 'statut' => 'public'];
+        $val = ['code' => '', 'nom' => '', 'nom_en' => '', 'sigle' => '', 'ville' => '', 'sous_domaine' => '', 'type_enseignement' => 'primaire', 'statut' => 'public', 'ordre_enseignement' => 'general'];
     } else {
         $err = $r['message'];
     }
@@ -85,6 +86,24 @@ asso_haut('Nouvel établissement');
         <label class="btn btn-outline-primary btn-sm" for="type_secondaire"><i class="bi bi-mortarboard-fill me-1"></i>Secondaire</label>
       </div>
       <div class="form-text small text-muted2">Figé définitivement après création.</div>
+    </div>
+
+    <div class="col-12" id="bloc_ordre" style="<?= $val['type_enseignement'] === 'secondaire' ? '' : 'display:none' ?>">
+      <label class="form-label small d-block">Enseignement *</label>
+      <div class="btn-group w-100" role="group">
+        <input type="radio" class="btn-check" name="ordre_enseignement" id="ordre_general" value="general"
+               <?= $val['ordre_enseignement'] !== 'technique' ? 'checked' : '' ?>>
+        <label class="btn btn-outline-primary btn-sm" for="ordre_general"><i class="bi bi-book me-1"></i>Général</label>
+
+        <input type="radio" class="btn-check" name="ordre_enseignement" id="ordre_technique" value="technique"
+               <?= $val['ordre_enseignement'] === 'technique' ? 'checked' : '' ?>>
+        <label class="btn btn-outline-primary btn-sm" for="ordre_technique"><i class="bi bi-tools me-1"></i>Technique</label>
+      </div>
+      <div class="form-text small text-muted2">
+        Général : programme APC, notes par compétence. Technique : notes par séquence, matières
+        groupées en enseignement professionnel / général, filières commerciales et industrielles.
+        Figé définitivement après création.
+      </div>
     </div>
 
     <div class="col-12" id="bloc_statut" style="<?= $val['type_enseignement'] === 'secondaire' ? '' : 'display:none' ?>">
@@ -151,7 +170,9 @@ asso_haut('Nouvel établissement');
 <script>
   document.querySelectorAll('input[name="type_enseignement"]').forEach(function (r) {
     r.addEventListener('change', function () {
-      document.getElementById('bloc_statut').style.display = document.getElementById('type_secondaire').checked ? '' : 'none';
+      var sec = document.getElementById('type_secondaire').checked;
+      document.getElementById('bloc_statut').style.display = sec ? '' : 'none';
+      document.getElementById('bloc_ordre').style.display  = sec ? '' : 'none';
     });
   });
 </script>

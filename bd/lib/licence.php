@@ -31,7 +31,7 @@
 //   licence_tentatives_restantes(): int
 
 // ── Secret cryptographique ───────────────────────────────────────────
-// Défini dans config.php (valeur PAR DÉFAUT manifestement insécure) et
+// Défini dans config/config.php (valeur PAR DÉFAUT manifestement insécure) et
 // surchargeable dans config.local.php (gitignoré) — voir
 // config.local.php.example. Sert À LA FOIS à la signature anti-tamper de
 // la ligne `licence` ET au chiffrement des clés générées : compromettre
@@ -239,7 +239,7 @@ function licence_ecriture_bloquee(): bool {
     if (function_exists('est_proprietaire_association') && est_proprietaire_association()) return false;
     $script = basename($_SERVER['SCRIPT_NAME'] ?? '');
     if (in_array($script, ['configurer_securite.php', 'mot_de_passe_oublie.php'], true)) return false;
-    if (function_exists('page_courante_relative') && page_courante_relative() === 'pages/parametres/licence.php') return false;
+    if (function_exists('page_courante_relative') && page_courante_relative() === 'primaire/pages/parametres/licence.php') return false;
 
     global $link;
     if (!($link instanceof mysqli)) return false;

@@ -85,7 +85,7 @@ function initLieuCascade(opts) {
         }
         selDepartement.innerHTML = '<option value="">Chargement…</option>';
         selDepartement.disabled = true;
-        fetch(appUrl + '/ajax/departements_par_region.php?id_region=' + encodeURIComponent(idRegion))
+        fetch(appUrl + '/noyau/ajax/departements_par_region.php?id_region=' + encodeURIComponent(idRegion))
             .then(function (r) { return r.json(); })
             .then(function (deps) {
                 selDepartement.disabled = false;
@@ -107,7 +107,7 @@ function initLieuCascade(opts) {
         }
         selArrondissement.innerHTML = '<option value="">Chargement…</option>';
         selArrondissement.disabled = true;
-        fetch(appUrl + '/ajax/arrondissements_par_departement.php?id_departement=' + encodeURIComponent(idDepartement))
+        fetch(appUrl + '/noyau/ajax/arrondissements_par_departement.php?id_departement=' + encodeURIComponent(idDepartement))
             .then(function (r) { return r.json(); })
             .then(function (arrs) {
                 selArrondissement.disabled = false;

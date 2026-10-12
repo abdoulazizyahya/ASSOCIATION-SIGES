@@ -6,12 +6,12 @@
 // n'y a PAS accès, ce niveau reste un privilège système. Désactiver exige de
 // reconfirmer son propre mot de passe (opération à fort impact : plus
 // personne ne peut se connecter à cette école — voir resoudre_etablissement()
-// et login.php, déjà filtrés sur etablissement.actif=1 — et elle disparaît de
+// et compte/login.php, déjà filtrés sur etablissement.actif=1 — et elle disparaît de
 // la liste déroulante de connexion). Réactiver reste sans mot de passe,
 // comme la case à cocher déjà existante d'etablissement_modifier.php.
-require_once __DIR__ . '/../config.php';
-require_once __DIR__ . '/../connexion.php';
-require_once __DIR__ . '/../fonctions.php';
+require_once __DIR__ . '/../config/config.php';
+require_once __DIR__ . '/../noyau/connexion.php';
+require_once __DIR__ . '/../noyau/fonctions.php';
 require_once __DIR__ . '/_layout.php';
 exiger_membre_association();
 

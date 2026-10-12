@@ -28,9 +28,9 @@ if (PHP_SAPI !== 'cli') {
     die("Ce script s'exécute uniquement en ligne de commande :\n  php bd/generer_niu_eleves.php [--appliquer]\n");
 }
 
-require __DIR__ . '/../config.php';
-require __DIR__ . '/../connexion.php';
-require __DIR__ . '/../fonctions.php';
+require __DIR__ . '/../config/config.php';
+require __DIR__ . '/../noyau/connexion.php';
+require __DIR__ . '/../noyau/fonctions.php';
 
 $options   = getopt('', ['appliquer', 'annee::']);
 $appliquer = array_key_exists('appliquer', $options);

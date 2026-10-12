@@ -19,8 +19,8 @@
 //  (tape « OUI »). En mode non interactif, --oui est obligatoire.
 // =====================================================================
 
-require_once __DIR__ . '/../../config.php';
-require_once __DIR__ . '/../../connexion_assoc.php';
+require_once __DIR__ . '/../../config/config.php';
+require_once __DIR__ . '/../../noyau/connexion_assoc.php';
 require_once __DIR__ . '/../lib/ecole_maintenance.php';
 
 if (PHP_SAPI !== 'cli') { http_response_code(403); die("CLI uniquement.\n"); }

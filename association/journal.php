@@ -3,9 +3,9 @@
 // déconnexions, échecs et actions sensibles de TOUS les comptes (membres
 // de l'association ET comptes d'école), avec appareil et localisation.
 // Superadmin uniquement. Voir bd/lib/audit.php + connexion_assoc.php.
-require_once __DIR__ . '/../config.php';
-require_once __DIR__ . '/../connexion.php';
-require_once __DIR__ . '/../fonctions.php';
+require_once __DIR__ . '/../config/config.php';
+require_once __DIR__ . '/../noyau/connexion.php';
+require_once __DIR__ . '/../noyau/fonctions.php';
 require_once __DIR__ . '/_layout.php';
 require_once __DIR__ . '/../bd/lib/audit_vue.php';
 exiger_superadmin_association();

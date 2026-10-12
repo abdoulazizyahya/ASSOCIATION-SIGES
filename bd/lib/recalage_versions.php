@@ -6,7 +6,7 @@
 //  Utilisé par bd/assoc/recaler_versions.php (ligne de commande) et par
 //  association/versions.php (portail, propriétaire seul) — voir le
 //  commentaire de bd/assoc/recaler_versions.php pour la méthode.
-//  À inclure après config.php / connexion.php (fonctions assoc_*()).
+//  À inclure après config/config.php / connexion.php (fonctions assoc_*()).
 // =====================================================================
 
 // Version de départ (schéma de référence) par type d'école — PRIMAIRE :
@@ -131,8 +131,11 @@ function rv_verifier(mysqli $l, array $i): bool {
 }
 
 function rv_libelle(array $i): string {
-    $o = match ($i['type']) { 'tab' => "table {$i['table']}", 'col' => "colonne {$i['table']}.{$i['nom']}",
-                              'idx' => "index {$i['table']}.{$i['nom']}", 'enum' => "valeurs de {$i['table']}.{$i['nom']}" };
+    $o = (($__m2 = $i['type']) === 'tab' ? ("table {$i['table']}")
+        : ($__m2 === 'col' ? ("colonne {$i['table']}.{$i['nom']}")
+        : ($__m2 === 'idx' ? ("index {$i['table']}.{$i['nom']}")
+        : ($__m2 === 'enum' ? ("valeurs de {$i['table']}.{$i['nom']}")
+        : compat_match_echec($__m2)))));
     return $i['type'] === 'enum' ? $o : ($i['present'] ? $o : "$o supprimé(e)");
 }
 

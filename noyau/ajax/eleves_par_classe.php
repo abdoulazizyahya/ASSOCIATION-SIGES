@@ -1,0 +1,79 @@
+<?php
+// noyau/ajax/eleves_par_classe.php — retourne les élèves inscrits (année active)
+// d'une classe en JSON. Utilisé pour peupler dynamiquement le select
+// « Élève » quand « Classe » change, sans recharger toute la page
+// (primaire/pages/finances/versement.php).
+//
+// ⚠️ Réécrit le 10/08/2026 : la version précédente était un reste non
+// adapté d'ABZ_MBE (eleve.id/nom/prenom/matricule, table `inscription`,
+// annee_scolaire.id — rien de tout ça n'existe dans jaynitaare_v2_bd) —
+// code mort qui échouait silencieusement. Même lacune que
+// noyau/ajax/departements_par_region.php avant sa réécriture le même jour.
+//
+// ob_start() dès le début : capture tout warning/notice PHP parasite pour
+// qu'il ne casse jamais le parsing JSON côté navigateur.
+ob_start();
+
+require_once __DIR__ . '/../../config/config.php';
+require_once __DIR__ . '/../connexion.php';
+require_once __DIR__ . '/../fonctions.php';
+exiger_connexion();
+
+$id_classe = (int) ($_GET['classe'] ?? 0);
+$annee     = get_annee_active();
+
+// École secondaire (schema_ref_ecole_secondaire.sql, porté de LAM_ABZ) :
+// eleve.id/nom/prenom/matricule + table inscription(id_classe,id_annee) —
+// noms de colonnes différents du primaire (id_eleve/Nom_elv/Prenom_elv/
+// Mat_elv + table inscrire). Même bug de fond que celui documenté plus haut
+// (code non adapté d'ABZ_MBE) — même correctif : brancher sur le type.
+if (function_exists('type_enseignement_courant') && type_enseignement_courant() === 'secondaire') {
+    $id_annee = (int) ($annee['id'] ?? 0);
+    $eleves = ($id_classe && $id_annee)
+        ? db_all(
+            "SELECT e.id, e.nom, e.prenom, e.matricule FROM eleve e
+             JOIN inscription i ON i.id_eleve = e.id AND i.id_classe = ? AND i.id_annee = ?
+             WHERE e.statut = 'actif' ORDER BY e.nom, e.prenom",
+            [$id_classe, $id_annee]
+          )
+        : [];
+    $out = array_map(fn($e) => [
+        'id'    => (int) $e['id'],
+        'label' => trim($e['nom'] . ' ' . ($e['prenom'] ?? '')),
+    ], $eleves);
+    ob_end_clean();
+    header('Content-Type: application/json; charset=utf-8');
+    echo json_encode($out, JSON_UNESCAPED_UNICODE);
+    exit;
+}
+
+$val_annee = $annee['val_annee'] ?? '';
+
+// Cloisonnement enseignant : une classe hors de ses affectations renvoie
+// une liste vide (réponse JSON — jamais une page d'erreur HTML qui casserait
+// le parsing côté navigateur).
+$ids_vis = classes_ids_visibles($val_annee, 'union');
+if ($ids_vis !== null && !in_array($id_classe, $ids_vis, true)) {
+    ob_end_clean();
+    header('Content-Type: application/json; charset=utf-8');
+    echo json_encode([]);
+    exit;
+}
+
+$eleves = ($id_classe && $val_annee)
+    ? db_all(
+        "SELECT e.id_eleve, e.Nom_elv, e.Prenom_elv, e.Mat_elv FROM eleve e
+         JOIN inscrire i ON i.id_eleve = e.id_eleve AND i.IDClasses = ? AND i.val_annee = ?
+         WHERE e.statut = 'actif' ORDER BY e.Nom_elv, e.Prenom_elv",
+        [$id_classe, $val_annee]
+      )
+    : [];
+
+$out = array_map(fn($e) => [
+    'id'    => (int) $e['id_eleve'],
+    'label' => trim($e['Nom_elv'] . ' ' . ($e['Prenom_elv'] ?? '')),
+], $eleves);
+
+ob_end_clean();
+header('Content-Type: application/json; charset=utf-8');
+echo json_encode($out, JSON_UNESCAPED_UNICODE);

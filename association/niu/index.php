@@ -6,9 +6,9 @@
 //  Onglet « Générer les NIU » : génération en masse des NIU manquants,
 //    par école ou pour tout le réseau. Réglage du format (sigle par école).
 // Génération / modification d'un NIU : superadmin de l'association uniquement.
-require_once __DIR__ . '/../../config.php';
-require_once __DIR__ . '/../../connexion.php';
-require_once __DIR__ . '/../../fonctions.php';
+require_once __DIR__ . '/../../config/config.php';
+require_once __DIR__ . '/../../noyau/connexion.php';
+require_once __DIR__ . '/../../noyau/fonctions.php';
 require_once __DIR__ . '/../_layout.php';
 exiger_membre_association();
 
@@ -85,7 +85,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 // Le secondaire est exclu de TOUTE cette rubrique, à la source (pas
 // seulement de la génération automatique) : son NIU est une information de
 // fiche élève comme une autre, saisie/modifiée directement sur
-// secondaire/pages/eleves/form.php — ni listé ici, ni généré, ni doté d'un
+// secondaire/commun/pages/eleves/form.php — ni listé ici, ni généré, ni doté d'un
 // sigle NIU. Demande explicite du 21/09/2026 (amendement du 16/09/2026, qui
 // n'excluait encore que la génération automatique).
 $ecoles = assoc_all(

@@ -2,9 +2,9 @@
 // association/login.php — connexion d'un membre de l'association.
 // Limitation de débit (login_echec) + double authentification TOTP
 // optionnelle (membre.totp_actif) — voir bd/lib/totp.php.
-require_once __DIR__ . '/../config.php';
-require_once __DIR__ . '/../connexion.php';
-require_once __DIR__ . '/../fonctions.php';
+require_once __DIR__ . '/../config/config.php';
+require_once __DIR__ . '/../noyau/connexion.php';
+require_once __DIR__ . '/../noyau/fonctions.php';
 require_once __DIR__ . '/_layout.php';
 ecole_session_demarrer();
 
@@ -149,7 +149,7 @@ asso_haut('Espace association', false);
       <a href="<?= APP_URL ?>/association/mot_de_passe_oublie.php" class="small text-decoration-none">Mot de passe oublié ?</a>
     </div>
     <hr class="border-secondary my-3">
-    <a href="<?= APP_URL ?>/login.php" class="small text-decoration-none">← Connexion établissement</a>
+    <a href="<?= APP_URL ?>/compte/login.php" class="small text-decoration-none">← Connexion établissement</a>
   <?php endif; ?>
 </div>
 <?php asso_bas();

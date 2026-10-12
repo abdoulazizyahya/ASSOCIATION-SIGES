@@ -379,6 +379,7 @@ CREATE TABLE `etablissement` (
   `chef_etablissement` varchar(150) DEFAULT 'Le Proviseur',
   `chef_etablissement_en` varchar(150) DEFAULT 'The Principal',
   `statut` enum('public','prive') NOT NULL DEFAULT 'public',
+  `ordre_enseignement` enum('general','technique') NOT NULL DEFAULT 'general',
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
@@ -1088,6 +1089,34 @@ CREATE TABLE `utilisateur_question_secrete` (
 ) ENGINE=InnoDB AUTO_INCREMENT=47 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
+-- Migration secondaire v14 (dossier élève, validité des documents enseignants)
+DROP TABLE IF EXISTS `dossier_eleve`;
+CREATE TABLE `dossier_eleve` (
+  `id` int unsigned NOT NULL AUTO_INCREMENT,
+  `id_eleve` int unsigned NOT NULL,
+  `type_document` enum('acte_naissance','carnet_vaccination','bulletin','document_transfert','photo_4x4','autre') NOT NULL,
+  `libelle` varchar(150) DEFAULT NULL,
+  `fichier` varchar(255) NOT NULL,
+  `date_ajout` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `ajoute_par` int unsigned DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  KEY `idx_dossier_id_eleve` (`id_eleve`),
+  KEY `fk_dossier_utilisateur` (`ajoute_par`),
+  CONSTRAINT `fk_dossier_eleve` FOREIGN KEY (`id_eleve`) REFERENCES `eleve` (`id`) ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT `fk_dossier_utilisateur` FOREIGN KEY (`ajoute_par`) REFERENCES `utilisateur` (`id`) ON DELETE SET NULL ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+DROP TABLE IF EXISTS `reglage_validite_document`;
+CREATE TABLE `reglage_validite_document` (
+  `type_document` enum('attestation','prise','reprise') NOT NULL,
+  `actif` tinyint(1) NOT NULL DEFAULT '0',
+  `duree_valeur` int unsigned NOT NULL DEFAULT '3',
+  `duree_unite` enum('jour','mois') NOT NULL DEFAULT 'mois',
+  `maj_par` int unsigned DEFAULT NULL,
+  `maj_le` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`type_document`),
+  KEY `fk_rvd_maj_par` (`maj_par`),
+  CONSTRAINT `fk_rvd_maj_par` FOREIGN KEY (`maj_par`) REFERENCES `utilisateur` (`id`) ON DELETE SET NULL ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 DROP TABLE IF EXISTS `licence`;
 CREATE TABLE `licence` (
   `id` int NOT NULL AUTO_INCREMENT,

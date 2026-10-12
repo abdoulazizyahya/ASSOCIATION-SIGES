@@ -35,8 +35,8 @@
 // =====================================================================
 if (PHP_SAPI !== 'cli') { http_response_code(403); exit("Script en ligne de commande uniquement.\n"); }
 
-require_once __DIR__ . '/../../config.php';
-require_once __DIR__ . '/../../connexion.php';
+require_once __DIR__ . '/../../config/config.php';
+require_once __DIR__ . '/../../noyau/connexion.php';
 
 require_once __DIR__ . '/../lib/recalage_versions.php';   // logique partagée avec association/versions.php
 

@@ -48,7 +48,7 @@ if ($onglet === 'catalogue') {
                     flash_set('succes', 'Matière ajoutée.');
                 }
             }
-            rediriger('pages/matieres/liste.php?onglet=catalogue' . ($q ? '&q='.urlencode($q) : ''));
+            rediriger('primaire/pages/matieres/liste.php?onglet=catalogue' . ($q ? '&q='.urlencode($q) : ''));
         }
     }
     $like        = '%' . $q . '%';
@@ -97,7 +97,7 @@ if ($onglet === 'par_classe') {
                 }
             }
             flash_set('succes', "$added matière(s) affectée(s).");
-            rediriger("pages/matieres/liste.php?onglet=par_classe&classe_aff=$id_cl_aff");
+            rediriger("primaire/pages/matieres/liste.php?onglet=par_classe&classe_aff=$id_cl_aff");
         }
 
         if ($action === 'del_disc' && $id_cl_aff) {
@@ -108,7 +108,7 @@ if ($onglet === 'par_classe') {
             db_exec("DELETE FROM dispenser WHERE id_mat=? AND IDClasses=? AND val_annee=?",
                     [$id_mat, $id_cl_aff, $val_annee]);
             flash_set('succes', 'Matière retirée.');
-            rediriger("pages/matieres/liste.php?onglet=par_classe&classe_aff=$id_cl_aff");
+            rediriger("primaire/pages/matieres/liste.php?onglet=par_classe&classe_aff=$id_cl_aff");
         }
 
         if ($action === 'edit_disc' && $id_cl_aff) {
@@ -127,7 +127,7 @@ if ($onglet === 'par_classe') {
                         [$coef_new, (string)$ordre_new, $id_mat_old, $id_cl_aff, $id_groupe_old]);
             }
             flash_set('succes', 'Discipline mise à jour.');
-            rediriger("pages/matieres/liste.php?onglet=par_classe&classe_aff=$id_cl_aff");
+            rediriger("primaire/pages/matieres/liste.php?onglet=par_classe&classe_aff=$id_cl_aff");
         }
     }
 
@@ -193,7 +193,7 @@ if ($onglet === 'enseignants') {
                         [$matricule, $id_cl_ens, $val_annee]);
             }
             flash_set('succes', 'Professeur principal mis à jour.');
-            rediriger("pages/matieres/liste.php?onglet=enseignants&classe_ens=$id_cl_ens");
+            rediriger("primaire/pages/matieres/liste.php?onglet=enseignants&classe_ens=$id_cl_ens");
         }
     }
 
@@ -253,19 +253,19 @@ function grp_style(string $lib, string $part): string {
 <ul class="nav nav-tabs mb-3" style="border-bottom:2px solid #e5e7eb">
   <li class="nav-item">
     <a class="nav-link <?= $onglet==='catalogue'?'active':'' ?>"
-       href="<?= APP_URL ?>/pages/matieres/liste.php?onglet=catalogue">
+       href="<?= APP_URL ?>/primaire/pages/matieres/liste.php?onglet=catalogue">
       <i class="bi bi-journal-bookmark me-1"></i>Catalogue
     </a>
   </li>
   <li class="nav-item">
     <a class="nav-link <?= $onglet==='par_classe'?'active':'' ?>"
-       href="<?= APP_URL ?>/pages/matieres/liste.php?onglet=par_classe<?= $id_cl_aff?"&classe_aff=$id_cl_aff":'' ?>">
+       href="<?= APP_URL ?>/primaire/pages/matieres/liste.php?onglet=par_classe<?= $id_cl_aff?"&classe_aff=$id_cl_aff":'' ?>">
       <i class="bi bi-diagram-3 me-1"></i>Matières par classe
     </a>
   </li>
   <li class="nav-item">
     <a class="nav-link <?= $onglet==='enseignants'?'active':'' ?>"
-       href="<?= APP_URL ?>/pages/matieres/liste.php?onglet=enseignants<?= $id_cl_ens?"&classe_ens=$id_cl_ens":'' ?>">
+       href="<?= APP_URL ?>/primaire/pages/matieres/liste.php?onglet=enseignants<?= $id_cl_ens?"&classe_ens=$id_cl_ens":'' ?>">
       <i class="bi bi-person-badge me-1"></i>Affectation enseignants
     </a>
   </li>
@@ -355,7 +355,7 @@ function grp_style(string $lib, string $part): string {
                       onclick="editerMat(<?= $m['id'] ?>,<?= h(json_encode($m['libelle'])) ?>,<?= h(json_encode($m['libelle_en']??'')) ?>,<?= h(json_encode($m['code']??'')) ?>,<?= (int)$m['ordre'] ?>)">
                 <i class="bi bi-pencil" style="font-size:.78rem"></i>
               </button>
-              <a href="<?= APP_URL ?>/pages/matieres/supprimer.php?id=<?= $m['id'] ?>&csrf=<?= csrf_generer() ?>"
+              <a href="<?= APP_URL ?>/primaire/pages/matieres/supprimer.php?id=<?= $m['id'] ?>&csrf=<?= csrf_generer() ?>"
                  class="btn btn-sm btn-light text-danger" style="padding:3px 7px"
                  onclick="return confirm('Supprimer « <?= h(addslashes($m['libelle'])) ?> » ?')">
                 <i class="bi bi-trash" style="font-size:.78rem"></i>
@@ -368,7 +368,7 @@ function grp_style(string $lib, string $part): string {
   </div>
 </div>
 <?php if ($total_pages > 1): ?>
-  <div class="mt-2"><?= pagination_html($page, $total_pages, APP_URL.'/pages/matieres/liste.php?onglet=catalogue'.($q?'&q='.urlencode($q):'')) ?></div>
+  <div class="mt-2"><?= pagination_html($page, $total_pages, APP_URL.'/primaire/pages/matieres/liste.php?onglet=catalogue'.($q?'&q='.urlencode($q):'')) ?></div>
 <?php endif; ?>
 
 <script>

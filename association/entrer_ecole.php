@@ -11,9 +11,9 @@
 //   Superviseur : LECTURE SEULE, toujours, quelle que soit son attribution.
 //     Utilisateurs/Paramètres école masqués par défaut (configurable depuis
 //     association/acces.php, rôle « MEMBRE_ASSOCIATION »).
-require_once __DIR__ . '/../config.php';
-require_once __DIR__ . '/../connexion.php';
-require_once __DIR__ . '/../fonctions.php';
+require_once __DIR__ . '/../config/config.php';
+require_once __DIR__ . '/../noyau/connexion.php';
+require_once __DIR__ . '/../noyau/fonctions.php';
 exiger_membre_association();
 
 $id = (int) ($_GET['id'] ?? 0);
@@ -109,4 +109,4 @@ unset($_SESSION['user_id']); // pas de compte école : est_connecte() reste faux
 basculer_base_ecole($e);
 journaliser_action($ecriture ? 'visite_ecole_ecriture' : 'visite_ecole', $id, $e['nom']);
 
-header('Location: ' . APP_URL . '/dashboard.php');
+header('Location: ' . APP_URL . '/noyau/dashboard.php');

@@ -3,9 +3,9 @@
 // pour une école donnée : ce qui est fait, ce qui manque, avec les liens
 // d'action. Lisible par tout membre ; les liens d'action supposent le
 // superadmin (les pages cibles le vérifient).
-require_once __DIR__ . '/../config.php';
-require_once __DIR__ . '/../connexion.php';
-require_once __DIR__ . '/../fonctions.php';
+require_once __DIR__ . '/../config/config.php';
+require_once __DIR__ . '/../noyau/connexion.php';
+require_once __DIR__ . '/../noyau/fonctions.php';
 require_once __DIR__ . '/_layout.php';
 exiger_membre_association();
 
@@ -57,7 +57,7 @@ asso_haut('Démarrage — ' . $e['nom']);
 
   <div class="small text-muted2 mt-3">
     Après ces étapes : le fondateur et le directeur se connectent sur
-    <span class="font-monospace"><?= h(APP_URL) ?>/login.php</span> en choisissant « <?= h($e['nom']) ?> »
+    <span class="font-monospace"><?= h(APP_URL) ?>/compte/login.php</span> en choisissant « <?= h($e['nom']) ?> »
     et finalisent la configuration dans l'école (Configurations, classes, matières, barèmes).
   </div>
 </div>

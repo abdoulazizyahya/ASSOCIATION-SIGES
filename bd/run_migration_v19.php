@@ -7,10 +7,10 @@
 //  Crée reglage_mention_bulletin : seuils des mentions automatiques du
 //  bulletin (Tableau d'honneur, Encouragement, Félicitation, Avertissement/
 //  Blâme travail, Avertissement/Blâme conduite), configurables par
-//  l'administrateur (pages/parametres/index.php, onglet "Mentions").
+//  l'administrateur (primaire/pages/parametres/index.php, onglet "Mentions").
 // =====================================================================
-require_once __DIR__ . '/../config.php';
-require_once __DIR__ . '/../connexion.php';
+require_once __DIR__ . '/../config/config.php';
+require_once __DIR__ . '/../noyau/connexion.php';
 
 header('Content-Type: text/plain; charset=utf-8');
 echo "=== Migration v19 — ABZ_MBE (mysqli) ===\n\n";

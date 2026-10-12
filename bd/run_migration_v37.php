@@ -5,8 +5,8 @@
 //  Notes zéro automatiques, éligibilité au classement, annulation de
 //  trimestre (piste française). Voir bd/migration_v37.sql pour le détail.
 // =====================================================================
-require_once __DIR__ . '/../config.php';
-require_once __DIR__ . '/../connexion.php';
+require_once __DIR__ . '/../config/config.php';
+require_once __DIR__ . '/../noyau/connexion.php';
 
 header('Content-Type: text/plain; charset=utf-8');
 echo "=== Migration v37 — jaynitaare_v2 (mysqli) ===\n\n";

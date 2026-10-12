@@ -8,8 +8,8 @@
 //  de compétences par niveau). Aucune donnée n'est modifiée dans les
 //  tables existantes (héritées du legacy, jamais altérées par ce projet).
 // =====================================================================
-require_once __DIR__ . '/../config.php';
-require_once __DIR__ . '/../connexion.php';   // fournit $link + helpers db_*
+require_once __DIR__ . '/../config/config.php';
+require_once __DIR__ . '/../noyau/connexion.php';   // fournit $link + helpers db_*
 
 header('Content-Type: text/plain; charset=utf-8');
 echo "=== Migration v1 — jaynitaare_v2 (mysqli) ===\n\n";

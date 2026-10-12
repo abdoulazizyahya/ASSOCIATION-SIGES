@@ -1,8 +1,8 @@
 <?php
 // association/index.php — portail : liste des établissements de l'association
-require_once __DIR__ . '/../config.php';
-require_once __DIR__ . '/../connexion.php';
-require_once __DIR__ . '/../fonctions.php';
+require_once __DIR__ . '/../config/config.php';
+require_once __DIR__ . '/../noyau/connexion.php';
+require_once __DIR__ . '/../noyau/fonctions.php';
 require_once __DIR__ . '/_layout.php';
 exiger_membre_association();
 
@@ -32,8 +32,21 @@ asso_haut('Établissements de l\'association');
             <img src="<?= h($filigrane_url) ?>" alt="" aria-hidden="true" class="ecole-filigrane-img">
           </div>
         <?php endif; ?>
+        <?php
+          // Secondaire : général ou technique (etablissement.ordre_enseignement
+          // de la base école, migration v13 secondaire) — base absente ou pas
+          // encore migrée : rien d'affiché en plus.
+          $technique = false;
+          if ($e['type_enseignement'] === 'secondaire') {
+              try {
+                  $technique = (avec_ecole((int) $e['id'], function ($l) {
+                      return ecole_one($l, "SELECT ordre_enseignement FROM etablissement LIMIT 1");
+                  })['ordre_enseignement'] ?? '') === 'technique';
+              } catch (\Throwable $ex) { $technique = false; }
+          }
+        ?>
         <div class="ecole-filigrane <?= $e['actif'] ? 'ecole-filigrane--reserve' : '' ?>" aria-hidden="true">
-          <?= $e['type_enseignement'] === 'secondaire' ? 'SECONDAIRE' : 'PRIMAIRE' ?>
+          <?= $e['type_enseignement'] === 'secondaire' ? ($technique ? 'TECHNIQUE' : 'SECONDAIRE') : 'PRIMAIRE' ?>
         </div>
         <div class="d-flex align-items-start gap-2">
           <div class="flex-grow-1">

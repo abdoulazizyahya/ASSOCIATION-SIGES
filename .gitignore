@@ -8,6 +8,7 @@
 /assets/uploads/qr_bulletins/
 /assets/uploads/qr_honneur/
 /assets/uploads/qr_recus/
+/assets/uploads/qr_cache/
 
 # ── Données personnelles élèves (photos, dossiers) — jamais en dépôt,
 # même privé : à restaurer depuis un backup séparé si besoin ──────────
@@ -41,6 +42,7 @@
 # domaine, jeton de sauvegarde…) — jamais en dépôt. Modèle versionné :
 # config.local.php.example ────────────────────────────────────────────
 /config.local.php
+/config/config.local.php
 
 # Fichiers verrouillage Office (~$...) — jamais versionnés
 ~$*
@@ -49,8 +51,12 @@
 # statique promeducamsiges.html est REGÉNÉRÉE (bd/assoc/generer_accueil.php,
 # + auto à la création/modif/suppression d'une école) → non versionnée.
 /promeducamsiges.html
+/docs/promeducamsiges.html
 
 # ── .htaccess racine : en LAN, une seule ligne (DirectoryIndex accueil.php
 # index.php) ; en prod, copie de deploy/htaccess-prod.txt. Spécifique au
 # poste → non versionné (le modèle prod reste dans deploy/). ───────────
 /.htaccess
+
+# Archives de déploiement (zips envoyés sur l'hébergeur) : locales, jamais versionnées
+/deploy/archives/

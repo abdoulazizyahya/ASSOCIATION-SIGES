@@ -7,9 +7,9 @@
 // chaque migration, logique partagée bd/lib/recalage_versions.php), et
 // corrige l'enregistrement. Ne modifie JAMAIS les bases écoles : seule la
 // ligne schema_version_etab de l'annuaire est écrite.
-require_once __DIR__ . '/../config.php';
-require_once __DIR__ . '/../connexion.php';
-require_once __DIR__ . '/../fonctions.php';
+require_once __DIR__ . '/../config/config.php';
+require_once __DIR__ . '/../noyau/connexion.php';
+require_once __DIR__ . '/../noyau/fonctions.php';
 require_once __DIR__ . '/../bd/lib/recalage_versions.php';
 require_once __DIR__ . '/_layout.php';
 exiger_proprietaire_association();
@@ -20,11 +20,9 @@ $msg = ''; $lignes = [];
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     csrf_verifier();
     $code   = trim((string) ($_POST['code'] ?? ''));
-    $cibles = match ($_POST['op'] ?? '') {
-        'recaler_une'  => $code !== '' ? rv_analyser($code) : [],
-        'recaler_tout' => rv_analyser(),
-        default        => [],
-    };
+    $cibles = (($__m1 = $_POST['op'] ?? '') === 'recaler_une' ? ($code !== '' ? rv_analyser($code) : [])
+        : ($__m1 === 'recaler_tout' ? (rv_analyser())
+        : ([])));
     foreach ($cibles as $r) {
         if ($r['actuel'] === $r['reelle']) continue;
         if (rv_recaler($r)) {

@@ -5,10 +5,10 @@
 //      http://localhost/ABZ_MBE/bd/run_migration_v13.php
 //
 //  Seuils du Conseil de Classe persistés par classe/année (table
-//  critere_conseil) — voir pages/conseil_classe/index.php.
+//  critere_conseil) — voir primaire/pages/conseil_classe/index.php.
 // =====================================================================
-require_once __DIR__ . '/../config.php';
-require_once __DIR__ . '/../connexion.php';
+require_once __DIR__ . '/../config/config.php';
+require_once __DIR__ . '/../noyau/connexion.php';
 
 header('Content-Type: text/plain; charset=utf-8');
 echo "=== Migration v13 — ABZ_MBE (mysqli) ===\n\n";

@@ -6,9 +6,9 @@
 //  2 questions secrètes (question_secrete + user_question_secrete). Voir
 //  bd/migration_v45.sql.
 // =====================================================================
-require_once __DIR__ . '/../config.php';
-require_once __DIR__ . '/../connexion.php';
-require_once __DIR__ . '/../fonctions.php';
+require_once __DIR__ . '/../config/config.php';
+require_once __DIR__ . '/../noyau/connexion.php';
+require_once __DIR__ . '/../noyau/fonctions.php';
 
 header('Content-Type: text/plain; charset=utf-8');
 echo "=== Migration v45 — jaynitaare_v2 (mysqli) ===\n\n";

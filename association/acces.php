@@ -4,9 +4,9 @@
 // sur chaque menu / sous-menu. Superadmin uniquement.
 // Stockage : promeducam_assoc.acces_regle — appliqué côté école par
 // ecole_contexte.php::regles_centrales() / niveau_central().
-require_once __DIR__ . '/../config.php';
-require_once __DIR__ . '/../connexion.php';
-require_once __DIR__ . '/../fonctions.php';
+require_once __DIR__ . '/../config/config.php';
+require_once __DIR__ . '/../noyau/connexion.php';
+require_once __DIR__ . '/../noyau/fonctions.php';
 require_once __DIR__ . '/_layout.php';
 exiger_superadmin_association();
 
@@ -24,7 +24,7 @@ $cible   = trim($_GET['cible'] ?? $_POST['cible'] ?? '');
 
 $etab = $id_etab ? assoc_one("SELECT * FROM etablissement WHERE id = ?", [$id_etab]) : null;
 // Menu et rôles du TYPE de l'école choisie : une école secondaire a son
-// propre menu (secondaire/pages/…) et ses propres rôles — avec le menu du
+// propre menu (secondaire/commun/pages/…) et ses propres rôles — avec le menu du
 // primaire, les règles posées ici ne correspondaient à aucune de ses pages.
 $secondaire = ($etab['type_enseignement'] ?? 'primaire') === 'secondaire';
 $ROLES = $secondaire
@@ -56,7 +56,7 @@ if ($secondaire && $etab) {
         $GLOBALS['statut_ecole_menu'] = 'public';
     }
 }
-$menu = require __DIR__ . '/../layout/' . ($secondaire ? 'menu_secondaire.php' : 'menu.php');
+$menu = require __DIR__ . '/../noyau/layout/' . ($secondaire ? 'menu_secondaire.php' : 'menu.php');
 $statut_page = $GLOBALS['statut_ecole_menu'] ?? null;
 unset($GLOBALS['statut_ecole_menu']);
 

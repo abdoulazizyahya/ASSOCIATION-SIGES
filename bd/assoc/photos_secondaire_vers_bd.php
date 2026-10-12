@@ -17,8 +17,8 @@
 //    /bd/assoc/photos_secondaire_vers_bd.php?token=XXX&go=1     (applique)
 //    php bd/assoc/photos_secondaire_vers_bd.php [--go]
 // =====================================================================
-require_once __DIR__ . '/../../config.php';
-require_once __DIR__ . '/../../connexion_assoc.php';
+require_once __DIR__ . '/../../config/config.php';
+require_once __DIR__ . '/../../noyau/connexion_assoc.php';
 
 $est_cli = (PHP_SAPI === 'cli');
 if (!$est_cli) {

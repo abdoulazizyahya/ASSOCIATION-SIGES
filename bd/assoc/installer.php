@@ -18,8 +18,8 @@
 //   le même mot de passe sert au 1er compte DIRECTEUR « admin » de l'école)
 // =====================================================================
 
-require_once __DIR__ . '/../../config.php';
-require_once __DIR__ . '/../../connexion_assoc.php';   // charger_schema_ecole()
+require_once __DIR__ . '/../../config/config.php';
+require_once __DIR__ . '/../../noyau/connexion_assoc.php';   // charger_schema_ecole()
 
 $est_cli = (PHP_SAPI === 'cli');
 if (!$est_cli) header('Content-Type: text/plain; charset=utf-8');
@@ -72,7 +72,7 @@ if (!$a_etab) {
     ]);
     out("OK  École n°1 initialisée ($nb_tables tables : schéma + référence + classes + année + barème).");
 
-    // Compte DIRECTEUR « admin » pour se connecter à l'école (login.php
+    // Compte DIRECTEUR « admin » pour se connecter à l'école (compte/login.php
     // joint `user` -> `enseignant`).
     if (!(int) mysqli_fetch_row(mysqli_query($le, "SELECT COUNT(*) FROM user"))[0]) {
         mysqli_query($le,

@@ -8,8 +8,8 @@
 //  et signature_position (position/taille par type de document), puis
 //  copie l'ancienne etablissement.signature (v20) vers signature_titulaire.
 // =====================================================================
-require_once __DIR__ . '/../config.php';
-require_once __DIR__ . '/../connexion.php';
+require_once __DIR__ . '/../config/config.php';
+require_once __DIR__ . '/../noyau/connexion.php';
 
 header('Content-Type: text/plain; charset=utf-8');
 echo "=== Migration v21 — ABZ_MBE (mysqli) ===\n\n";

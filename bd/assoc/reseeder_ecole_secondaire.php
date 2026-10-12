@@ -19,7 +19,7 @@
 //          ex. php bd/assoc/reseeder_ecole_secondaire.php promeducam_minhadjoul_mouslim
 // =====================================================================
 
-require_once __DIR__ . '/../../config.php';
+require_once __DIR__ . '/../../config/config.php';
 
 if (PHP_SAPI !== 'cli') { header('Content-Type: text/plain; charset=utf-8'); }
 $db = $argv[1] ?? '';

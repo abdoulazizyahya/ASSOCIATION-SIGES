@@ -11,8 +11,8 @@
 //    (versements — paiement échelonné par frais), apee_config
 //    (métadonnées de signature pour les reçus APEE).
 // =====================================================================
-require_once __DIR__ . '/../config.php';
-require_once __DIR__ . '/../connexion.php';   // fournit $link + helpers db_*
+require_once __DIR__ . '/../config/config.php';
+require_once __DIR__ . '/../noyau/connexion.php';   // fournit $link + helpers db_*
 
 header('Content-Type: text/plain; charset=utf-8');
 echo "=== Migration v12 — ABZ_MBE (mysqli) ===\n\n";
