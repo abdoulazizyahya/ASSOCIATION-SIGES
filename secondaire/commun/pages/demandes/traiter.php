@@ -56,7 +56,7 @@ if ($agit_comme_censeur) {
         db_exec("UPDATE demande_document SET statut='en_attente_proviseur', id_censeur=?, date_censeur=NOW(), commentaire_censeur=? WHERE id=?",
                 [$uid, $commentaire ?: null, $id]);
         notifier((int)$id_ens_user, "Votre demande de $type_lib a été approuvée par le Censeur et est en attente de validation du Proviseur.", 'secondaire/commun/pages/demandes/index.php');
-        notifier_role('PROVISEUR', "Une demande de $type_lib est en attente de votre validation.", 'secondaire/commun/pages/demandes/index.php');
+        notifier_role('PROVISEUR', "Une demande de $type_lib est en attente de votre validation.", 'secondaire/commun/pages/demandes/index.php', ['ADMIN']);
         flash_set('succes', 'Demande approuvée et transmise au Proviseur.');
     } else {
         db_exec("UPDATE demande_document SET statut='rejetee_censeur', id_censeur=?, date_censeur=NOW(), commentaire_censeur=? WHERE id=?",

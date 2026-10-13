@@ -70,7 +70,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $nom_ens = trim(($e['civilite_ens']??'').' '.strtoupper($e['nom_ens']).' '.($e['prenom_ens']??''));
     notifier_role('CENSEUR',
         "Nouvelle demande de ".libelle_type_demande($type)." de la part de $nom_ens.",
-        'secondaire/commun/pages/demandes/index.php');
+        'secondaire/commun/pages/demandes/index.php', ['ADMIN']);   // école sans Censeur : l'administrateur, qui peut traiter à sa place
 
     flash_set('succes', 'Votre demande a été soumise et transmise au Censeur pour vérification.');
     rediriger('secondaire/commun/pages/demandes/index.php');

@@ -3468,11 +3468,20 @@ function notifier(int $id_utilisateur, string $message, string $lien = ''): void
 
 // ==== notifier_role ====
 /** Crée la même notification pour tous les utilisateurs actifs d'un rôle donné. */
-function notifier_role(string $role, string $message, string $lien = ''): void {
+// $repli : rôles notifiés à la place quand AUCUN compte actif n'a ce rôle
+// (ex. école sans Censeur : la demande ne doit pas attendre en silence).
+// Retourne le nombre de comptes notifiés.
+function notifier_role(string $role, string $message, string $lien = '', array $repli = []): int {
     $users = db_all("SELECT id FROM utilisateur WHERE role=? AND actif=1", [$role]);
     foreach ($users as $u) {
         notifier((int)$u['id'], $message, $lien);
     }
+    if (!$users && $repli) {
+        $n = 0;
+        foreach ($repli as $r) $n += notifier_role($r, $message, $lien);
+        return $n;
+    }
+    return count($users);
 }
 
 // ==== notifications_non_lues_count ====
