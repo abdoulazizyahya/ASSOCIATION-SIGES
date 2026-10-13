@@ -462,15 +462,70 @@ function acces_page_lecture_seule(): bool {
  */
 function compte_gerable(string $fonction_cible, int $id_user_cible): bool {
     if (function_exists('est_visite_association') && est_visite_association()) return true;
+    // Compte propriétaire (fiche au statut 'systeme') : intouchable, sauf par lui-même.
+    if ($id_user_cible !== (int) ($_SESSION['user_id'] ?? 0) && !est_compte_systeme_connecte()
+        && db_val("SELECT e.statut_ens FROM user u JOIN enseignant e ON e.matricule_ens=u.matricule_ens WHERE u.id_user=?", [$id_user_cible]) === 'systeme') {
+        return false;
+    }
     if (function_exists('est_fondateur') && est_fondateur()) return true;
     if (role_connecte() !== 'DIRECTEUR') return false;
     if ($id_user_cible === (int) ($_SESSION['user_id'] ?? 0)) return true;
     return !in_array($fonction_cible, ['DIRECTEUR', 'FONDATEUR'], true);
 }
 
+// ==== Comptes masqués (13/10/2026) ====
+// Compte PROPRIÉTAIRE / superadmin de l'école (créé par défaut, voir
+// creer_compte_proprietaire_ecole()) : invisible et intouchable pour TOUS
+// les autres comptes de l'école ; le compte Fondateur est en plus invisible
+// pour le chef d'établissement (Proviseur / Directeur) et les rôles inférieurs.
+// Seuls le titulaire lui-même et une visite du portail association voient tout.
+
+function est_compte_systeme_connecte(): bool {
+    return !empty($_SESSION['user']['compte_systeme']);
+}
+
+function voit_tous_les_comptes(): bool {
+    return est_compte_systeme_connecte() || (function_exists('est_visite_association') && est_visite_association());
+}
+
+/** Condition SQL (primaire) : fiche du personnel hors compte propriétaire. */
+function sql_hors_compte_systeme(string $alias = 'e'): string {
+    $p = $alias !== '' ? $alias . '.' : '';
+    return "COALESCE({$p}statut_ens, 'actif') <> 'systeme'";
+}
+
+/** Secondaire : ce compte (ligne utilisateur) apparaît-il dans la liste de la personne connectée ? */
+function sec_compte_visible(array $u): bool {
+    if ((int) ($u['id'] ?? 0) === (int) ($_SESSION['user_id'] ?? 0)) return true;
+    if (voit_tous_les_comptes()) return true;
+    if (!empty($u['compte_systeme'])) return false;
+    if (($u['role'] ?? '') === 'FONDATEUR' && !in_array(role_connecte(), ['ADMIN', 'FONDATEUR'], true)) return false;
+    return true;
+}
+
+/** Secondaire : la personne connectée peut-elle modifier / supprimer ce compte ? */
+function sec_compte_gerable(array $u): bool {
+    if ((int) ($u['id'] ?? 0) === (int) ($_SESSION['user_id'] ?? 0)) return true;
+    if (!sec_compte_visible($u)) return false;
+    if (voit_tous_les_comptes() || in_array(role_connecte(), ['ADMIN', 'FONDATEUR'], true)) return true;
+    // Proviseur / Principal : jamais un compte de rang égal ou supérieur.
+    return role_connecte() === 'PROVISEUR' && !in_array($u['role'] ?? '', ['ADMIN', 'FONDATEUR', 'PROVISEUR'], true);
+}
+
+/** Secondaire : rôles que la personne connectée peut attribuer. */
+function sec_roles_attribuables(): array {
+    $tous = ['ADMIN', 'PROVISEUR', 'CENSEUR', 'SG', 'SECRETAIRE', 'ENSEIGNANT', 'INTENDANT', 'FONDATEUR'];
+    if (voit_tous_les_comptes() || in_array(role_connecte(), ['ADMIN', 'FONDATEUR'], true)) return $tous;
+    return array_values(array_diff($tous, ['ADMIN', 'FONDATEUR', 'PROVISEUR']));
+}
+
 /** Même règle pour une FICHE du personnel (matricule_ens) : modification, activation. */
 function fiche_gerable(int $matricule_ens, ?string $fct = null): bool {
     if (function_exists('est_visite_association') && est_visite_association()) return true;
+    if ((string) $matricule_ens !== (string) matricule_ens_courant() && !est_compte_systeme_connecte()
+        && db_val("SELECT statut_ens FROM enseignant WHERE matricule_ens=?", [$matricule_ens]) === 'systeme') {
+        return false;   // fiche du compte propriétaire
+    }
     if (function_exists('est_fondateur') && est_fondateur()) return true;
     if (role_connecte() !== 'DIRECTEUR') return false;
     if ((string) $matricule_ens === (string) matricule_ens_courant()) return true;

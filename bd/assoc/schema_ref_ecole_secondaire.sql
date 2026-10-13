@@ -1064,6 +1064,7 @@ CREATE TABLE `utilisateur` (
   `mot_de_passe` varchar(255) NOT NULL,
   `role` enum('ADMIN','PROVISEUR','CENSEUR','SG','SECRETAIRE','ENSEIGNANT','INTENDANT','FONDATEUR') NOT NULL DEFAULT 'SECRETAIRE',
   `actif` tinyint(1) NOT NULL DEFAULT '1',
+  `compte_systeme` tinyint(1) NOT NULL DEFAULT 0,
   `matricule_ens` int DEFAULT NULL,
   `cree_le` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
   `email` varchar(150) DEFAULT NULL,

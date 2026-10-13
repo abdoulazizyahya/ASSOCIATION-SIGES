@@ -2,9 +2,9 @@
 require_once __DIR__ . '/../../../../config/config.php';
 require_once __DIR__ . '/../../../../noyau/connexion.php';
 require_once __DIR__ . '/../../../../noyau/fonctions.php';
-exiger_role(['ADMIN', 'FONDATEUR']);
+exiger_role(['ADMIN', 'FONDATEUR', 'PROVISEUR']);   // Proviseur : sans voir le Fondateur ni le compte propriétaire (sec_compte_visible())
 
-$users = db_all("SELECT * FROM utilisateur ORDER BY nom, prenom");
+$users = array_values(array_filter(db_all("SELECT * FROM utilisateur ORDER BY nom, prenom"), 'sec_compte_visible'));
 
 $titre_page = 'Utilisateurs';
 require_once __DIR__ . '/../../../../noyau/layout/header.php';
@@ -52,10 +52,12 @@ require_once __DIR__ . '/../../../../noyau/layout/header.php';
               <?php endif; ?>
             </td>
             <td class="text-end">
+              <?php if (sec_compte_gerable($u)): ?>
               <a href="<?= APP_URL ?>/secondaire/commun/pages/utilisateurs/form.php?id=<?= $u['id'] ?>" class="btn btn-sm btn-light" style="padding:3px 7px">
                 <i class="bi bi-pencil" style="font-size:.78rem"></i>
               </a>
-              <?php if ($u['id'] != ($_SESSION['user_id'] ?? null)): ?>
+              <?php endif; ?>
+              <?php if ($u['id'] != ($_SESSION['user_id'] ?? null) && sec_compte_gerable($u)): ?>
               <a href="<?= APP_URL ?>/secondaire/commun/pages/utilisateurs/supprimer.php?id=<?= $u['id'] ?>&csrf=<?= csrf_generer() ?>"
                  class="btn btn-sm btn-light text-danger" style="padding:3px 7px"
                  onclick="return confirm('Supprimer cet utilisateur ?')">

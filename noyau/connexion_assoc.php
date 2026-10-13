@@ -317,61 +317,96 @@ function charger_schema_ecole(mysqli &$l, array $seed, string $type = 'primaire'
     return $nbTables;
 }
 
-// Crée les 3 comptes par défaut d'une école NEUVE, primaire ou secondaire —
-// FONDATEUR, DIRECTEUR (PROVISEUR côté secondaire) et FINANCIER (COMPTABLE
-// côté primaire, INTENDANT côté secondaire, mêmes rôles déjà autorisés sur
-// capacite_finances()/le module Paiements secondaire). Demande explicite du
-// 21/09/2026 : toute nouvelle école doit repartir avec ces 3 comptes déjà en
-// place — jusqu'ici seul un compte DIRECTEUR (installation/install.php) ou AUCUN compte
-// (creer_etablissement(), association > Nouvel établissement — la page
-// renvoyait vers "Personnel > Affecter" pour le créer à la main après coup)
-// n'existait à la création.
-// Mot de passe = identifiant pour les 3 comptes (demande explicite du
-// 22/09/2026) — plus simple à communiquer au personnel, à changer depuis
-// Sécurité dès la première connexion.
+// Comptes par défaut d'une école NEUVE (mot de passe = identifiant, à
+// changer depuis Mon compte — demandes du 21/09, 22/09 et 13/10/2026) :
+//   primaire   : FONDATEUR, DIRECTEUR, FINANCIER (COMPTABLE) ;
+//   secondaire : PROVISEUR (« principal » si l'école est privée), CENSEUR,
+//                SECRÉTAIRE, INTENDANT, et FONDATEUR seulement si privée.
+// + dans les deux cas le compte PROPRIÉTAIRE (creer_compte_proprietaire_ecole()).
 // $l : connexion mysqli AVEC la base école déjà sélectionnée (schéma chargé).
-// $directeur_login : si fourni (installation/install.php — la personne qui installe a
-// choisi son propre identifiant dans le formulaire), réutilisé tel quel pour
-// le compte DIRECTEUR/PROVISEUR plutôt que le défaut "directeur".
-// Retour : liste de ['role'=>'FONDATEUR'|'DIRECTEUR'|'FINANCIER', 'login'=>string,
-// 'pwd'=>string] (= 'login').
-function creer_comptes_defaut_ecole(mysqli $l, string $type, ?string $directeur_login = null): array {
-    $secondaire = $type === 'secondaire';
-    $comptes = [
-        ['role' => 'FONDATEUR', 'login' => 'fondateur', 'nom' => 'Fondateur', 'prenom' => 'Général',
-            'fonction_primaire' => 'FONDATEUR', 'role_secondaire' => 'FONDATEUR'],
-        ['role' => 'DIRECTEUR', 'login' => $directeur_login ?: 'directeur', 'nom' => 'Directeur', 'prenom' => 'Général',
-            'fonction_primaire' => 'DIRECTEUR', 'role_secondaire' => 'PROVISEUR'],
-        ['role' => 'FINANCIER', 'login' => 'financier', 'nom' => 'Agent', 'prenom' => 'Financier',
-            'fonction_primaire' => 'COMPTABLE', 'role_secondaire' => 'INTENDANT'],
+// $directeur_login : identifiant choisi à l'installation (installation/install.php)
+// pour le chef d'établissement, à la place du défaut.
+// $statut : 'public' | 'prive' (secondaire).
+// Retour : liste de ['role'=>…, 'login'=>…, 'pwd'=>…] (comptes à mot de passe = identifiant).
+function comptes_defaut_definitions(string $type, string $statut = 'public', ?string $directeur_login = null): array {
+    if ($type === 'secondaire') {
+        $prive = $statut === 'prive';
+        $c = [
+            ['role' => 'PROVISEUR',  'login' => $directeur_login ?: ($prive ? 'principal' : 'proviseur'),
+             'nom' => $prive ? 'Principal' : 'Proviseur', 'prenom' => 'Général'],
+            ['role' => 'CENSEUR',    'login' => 'censeur',    'nom' => 'Censeur',    'prenom' => 'Général'],
+            ['role' => 'SECRETAIRE', 'login' => 'secretaire', 'nom' => 'Secrétaire', 'prenom' => 'Général'],
+            ['role' => 'INTENDANT',  'login' => 'intendant',  'nom' => 'Intendant',  'prenom' => 'Général'],
+        ];
+        if ($prive) $c[] = ['role' => 'FONDATEUR', 'login' => 'fondateur', 'nom' => 'Fondateur', 'prenom' => 'Général'];
+        return $c;
+    }
+    return [
+        ['role' => 'FONDATEUR', 'login' => 'fondateur', 'nom' => 'Fondateur', 'prenom' => 'Général'],
+        ['role' => 'DIRECTEUR', 'login' => $directeur_login ?: 'directeur', 'nom' => 'Directeur', 'prenom' => 'Général'],
+        ['role' => 'COMPTABLE', 'login' => 'financier', 'nom' => 'Agent', 'prenom' => 'Financier'],
     ];
+}
 
+// Identifiant déjà pris dans cette base école ?
+function compte_login_existe(mysqli $l, string $type, string $login): bool {
+    $sql = $type === 'secondaire' ? "SELECT COUNT(*) FROM utilisateur WHERE login=?" : "SELECT COUNT(*) FROM user WHERE login_user=?";
+    $st = mysqli_prepare($l, $sql);
+    mysqli_stmt_bind_param($st, 's', $login);
+    mysqli_stmt_execute($st);
+    $n = (int) mysqli_fetch_row(mysqli_stmt_get_result($st))[0];
+    mysqli_stmt_close($st);
+    return $n > 0;
+}
+
+// Crée UN compte d'école. $systeme : compte propriétaire, masqué des autres
+// comptes (secondaire : utilisateur.compte_systeme ; primaire : fiche du
+// personnel au statut 'systeme', écartée des listes du personnel).
+function creer_compte_ecole(mysqli $l, string $type, string $role, string $login, string $hash,
+                            string $nom, string $prenom, bool $systeme = false): void {
+    if ($type === 'secondaire') {
+        $sys = $systeme ? 1 : 0;
+        $st = mysqli_prepare($l,
+            "INSERT INTO utilisateur (nom, prenom, login, mot_de_passe, role, actif, compte_systeme) VALUES (?, ?, ?, ?, ?, 1, ?)");
+        mysqli_stmt_bind_param($st, 'sssssi', $nom, $prenom, $login, $hash, $role, $sys);
+        mysqli_stmt_execute($st);
+        mysqli_stmt_close($st);
+        return;
+    }
+    $statut = $systeme ? 'systeme' : 'actif';
+    $st = mysqli_prepare($l, "INSERT INTO enseignant (nom_ens, prenom_ens, id_fonction, statut_ens) VALUES (?, ?, ?, ?)");
+    mysqli_stmt_bind_param($st, 'ssss', $nom, $prenom, $role, $statut);
+    mysqli_stmt_execute($st);
+    $matricule = mysqli_insert_id($l);
+    mysqli_stmt_close($st);
+    $st = mysqli_prepare($l, "INSERT INTO user (login_user, pwd_user, matricule_ens) VALUES (?, ?, ?)");
+    mysqli_stmt_bind_param($st, 'ssi', $login, $hash, $matricule);
+    mysqli_stmt_execute($st);
+    mysqli_stmt_close($st);
+}
+
+// Compte PROPRIÉTAIRE / superadmin de l'école (COMPTE_PROPRIETAIRE_LOGIN /
+// _HASH, config/config.php) : rôle le plus élevé de l'école (ADMIN au
+// secondaire, FONDATEUR au primaire), masqué des autres comptes, jamais
+// forcé à changer de mot de passe. Ne fait rien si l'identifiant existe
+// déjà (renvoie false).
+function creer_compte_proprietaire_ecole(mysqli $l, string $type): bool {
+    if (!defined('COMPTE_PROPRIETAIRE_LOGIN') || COMPTE_PROPRIETAIRE_LOGIN === ''
+        || !defined('COMPTE_PROPRIETAIRE_HASH') || COMPTE_PROPRIETAIRE_HASH === '') return false;
+    if (compte_login_existe($l, $type, COMPTE_PROPRIETAIRE_LOGIN)) return false;
+    creer_compte_ecole($l, $type, $type === 'secondaire' ? 'ADMIN' : 'FONDATEUR',
+        COMPTE_PROPRIETAIRE_LOGIN, COMPTE_PROPRIETAIRE_HASH, 'Propriétaire', 'SIGES', true);
+    return true;
+}
+
+function creer_comptes_defaut_ecole(mysqli $l, string $type, ?string $directeur_login = null, string $statut = 'public'): array {
     $resultats = [];
-    foreach ($comptes as $c) {
-        $hash = password_hash($c['login'], PASSWORD_DEFAULT);
-
-        if ($secondaire) {
-            $st = mysqli_prepare($l,
-                "INSERT INTO utilisateur (nom, prenom, login, mot_de_passe, role, actif) VALUES (?, ?, ?, ?, ?, 1)");
-            mysqli_stmt_bind_param($st, 'sssss', $c['nom'], $c['prenom'], $c['login'], $hash, $c['role_secondaire']);
-            mysqli_stmt_execute($st);
-            mysqli_stmt_close($st);
-        } else {
-            $st = mysqli_prepare($l,
-                "INSERT INTO enseignant (nom_ens, prenom_ens, id_fonction, statut_ens) VALUES (?, ?, ?, 'actif')");
-            mysqli_stmt_bind_param($st, 'sss', $c['nom'], $c['prenom'], $c['fonction_primaire']);
-            mysqli_stmt_execute($st);
-            $matricule = mysqli_insert_id($l);
-            mysqli_stmt_close($st);
-
-            $st = mysqli_prepare($l, "INSERT INTO user (login_user, pwd_user, matricule_ens) VALUES (?, ?, ?)");
-            mysqli_stmt_bind_param($st, 'ssi', $c['login'], $hash, $matricule);
-            mysqli_stmt_execute($st);
-            mysqli_stmt_close($st);
-        }
-
+    foreach (comptes_defaut_definitions($type, $statut, $directeur_login) as $c) {
+        if (compte_login_existe($l, $type, $c['login'])) continue;
+        creer_compte_ecole($l, $type, $c['role'], $c['login'], password_hash($c['login'], PASSWORD_DEFAULT), $c['nom'], $c['prenom']);
         $resultats[] = ['role' => $c['role'], 'login' => $c['login'], 'pwd' => $c['login']];
     }
+    creer_compte_proprietaire_ecole($l, $type);
     return $resultats;
 }
 
@@ -647,7 +682,7 @@ function creer_etablissement(array $in): array {
                 return ['ok' => false, 'message' => "La base du pool « $db » n'est pas vide — abandon. Nettoyez-la ou retirez-la du pool.", 'id' => null, 'db_name' => null];
             }
             charger_schema_ecole($l, $seed, $type);
-            $comptes = creer_comptes_defaut_ecole($l, $type);
+            $comptes = creer_comptes_defaut_ecole($l, $type, null, $statut);
             mysqli_close($l);
         } else {
             // Serveur dédié / LAN : on crée la base.
@@ -664,7 +699,7 @@ function creer_etablissement(array $in): array {
             mysqli_query($srv, "CREATE DATABASE `$db` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci");
             mysqli_select_db($srv, $db);
             charger_schema_ecole($srv, $seed, $type);
-            $comptes = creer_comptes_defaut_ecole($srv, $type);
+            $comptes = creer_comptes_defaut_ecole($srv, $type, null, $statut);
             mysqli_close($srv);
         }
     } catch (\Throwable $e) {
@@ -717,7 +752,7 @@ function creer_etablissement(array $in): array {
 
     return [
         'ok'      => true,
-        'message' => "Établissement « $nom » créé (base $db, type $type, schéma v$vmax). Comptes FONDATEUR/DIRECTEUR/FINANCIER créés — voir ci-dessous.",
+        'message' => "Établissement « $nom » créé (base $db, type $type, schéma v$vmax). Comptes par défaut créés (mot de passe = identifiant) — voir ci-dessous.",
         'id'      => $id,
         'db_name' => $db,
         'comptes' => $comptes,
@@ -1233,6 +1268,7 @@ function audit_journal(array $f, int $page = 1, int $par_page = 50, ?int $id_eta
         $w[] = "(j.acteur_login LIKE ? OR j.acteur_nom LIKE ?)";
         $p[] = '%' . $f['acteur'] . '%'; $p[] = '%' . $f['acteur'] . '%';
     }
+    if (!empty($f['exclure_login'])) { $w[] = "COALESCE(j.acteur_login, '') <> ?"; $p[] = $f['exclure_login']; }   // compte propriétaire masqué aux écoles
     if (!empty($f['type']))      { $w[] = "j.acteur_type = ?"; $p[] = $f['type']; }
     if (!empty($f['role']))      { $w[] = "j.role = ?";        $p[] = $f['role']; }
     if (!empty($f['evenement'])) { $w[] = "j.evenement = ?";   $p[] = $f['evenement']; }

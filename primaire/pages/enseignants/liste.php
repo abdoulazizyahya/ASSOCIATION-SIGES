@@ -10,6 +10,7 @@ $q      = trim($_GET['q'] ?? '');
 $statut = in_array($_GET['statut'] ?? '', ['actif', 'inactif', 'tous'], true) ? $_GET['statut'] : 'actif';
 
 $where  = ['1=1'];
+if (!voit_tous_les_comptes()) $where[] = sql_hors_compte_systeme('');   // fiche du compte propriétaire
 $params = [];
 if ($q !== '') {
     $where[] = "(nom_ens LIKE ? OR prenom_ens LIKE ? OR mat_ens LIKE ?)";

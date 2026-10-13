@@ -2,10 +2,18 @@
 require_once __DIR__ . '/../../../../config/config.php';
 require_once __DIR__ . '/../../../../noyau/connexion.php';
 require_once __DIR__ . '/../../../../noyau/fonctions.php';
-exiger_role(['ADMIN', 'FONDATEUR']);
+exiger_role(['ADMIN', 'FONDATEUR', 'PROVISEUR']);   // Proviseur : sans voir le Fondateur ni le compte propriétaire (sec_compte_visible())
 
 $id   = (int)($_GET['id'] ?? 0);
 $user = $id ? db_one("SELECT * FROM utilisateur WHERE id=?", [$id]) : null;
+// Compte invisible ou hors de portée (Fondateur, compte propriétaire, rang égal ou supérieur) : refusé.
+if ($id && (!$user || !sec_compte_gerable($user))) {
+    flash_set('erreur', 'Compte introuvable ou hors de votre périmètre.');
+    rediriger('secondaire/commun/pages/utilisateurs/liste.php');
+}
+$est_soi = $id && $id === (int) ($_SESSION['user_id'] ?? 0);
+$roles_possibles = sec_roles_attribuables();
+if ($est_soi && !in_array($user['role'], $roles_possibles, true)) $roles_possibles = [$user['role']];   // son propre rôle ne change pas
 
 // POST
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -19,6 +27,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $mdp    = post('mot_de_passe');
     $mdp_hash = $mdp ? password_hash($mdp, PASSWORD_DEFAULT) : null;
 
+    if (!in_array($role, $roles_possibles, true)) {
+        flash_set('erreur', 'Rôle non autorisé pour votre profil.');
+        rediriger('secondaire/commun/pages/utilisateurs/form.php' . ($id ? "?id=$id" : ''));
+    }
     if (!$nom || !$login || !$role) {
         flash_set('erreur', 'Nom, identifiant et rôle sont obligatoires.');
         rediriger('secondaire/commun/pages/utilisateurs/form.php' . ($id ? "?id=$id" : ''));
@@ -87,7 +99,7 @@ require_once __DIR__ . '/../../../../noyau/layout/header.php';
           // (inexistant dans l'ENUM, provoquerait une erreur SQL) et omettait
           // SG/ENSEIGNANT/INTENDANT ; corrigé ici (bug source, pas un choix
           // de conception à reproduire).
-          foreach (['ADMIN','PROVISEUR','CENSEUR','SG','SECRETAIRE','ENSEIGNANT','INTENDANT'] as $r): ?>
+          foreach ($roles_possibles as $r): ?>
             <option value="<?= $r ?>" <?= ($user['role'] ?? '') === $r ? 'selected' : '' ?>><?= h(libelle_role($r)) ?></option>
           <?php endforeach; ?>
         </select>

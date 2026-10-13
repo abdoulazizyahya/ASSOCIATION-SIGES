@@ -68,8 +68,10 @@ asso_haut('Nouvel établissement');
       Crée une base de données dédiée <span class="font-monospace"><?= h(DB_PREFIXE_ECOLE) ?>_&lt;nom simplifié&gt;</span>,
       y installe le schéma de référence à jour, puis inscrit l'école à l'annuaire.
     <?php endif; ?>
-    Crée aussi automatiquement les 3 comptes par défaut (FONDATEUR, DIRECTEUR, FINANCIER — affichés
-    ci-dessus une fois l'établissement créé).
+    Crée aussi automatiquement les comptes par défaut (mot de passe = identifiant, affichés ci-dessus une
+    fois l'établissement créé) — primaire : Fondateur, Directeur, Agent financier ; secondaire :
+    Proviseur (Principal si privé), Censeur, Secrétaire, Intendant, et Fondateur si l'école est privée —
+    ainsi que le compte propriétaire, masqué aux autres comptes de l'école.
   </p>
   <form method="post" class="row g-2">
     <input type="hidden" name="csrf" value="<?= h(csrf_generer()) ?>">

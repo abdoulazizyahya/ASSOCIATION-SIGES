@@ -47,6 +47,25 @@ Crée la base `promeducam_<slug du nom>` à partir de `bd/assoc/schema_ref_ecole
 de schéma. **Ensuite** : le superadmin affecte 1 `FONDATEUR` et 1 `DIRECTEUR` via
 `/association/personnel/affecter.php`.
 
+### Comptes créés automatiquement
+
+Mot de passe = identifiant, changement demandé à la première connexion :
+- **primaire** : `fondateur`, `directeur`, `financier` ;
+- **secondaire** : `proviseur` (`principal` si l'école est privée), `censeur`, `secretaire`,
+  `intendant`, et `fondateur` si l'école est privée.
+
+Plus le **compte propriétaire** (`COMPTE_PROPRIETAIRE_LOGIN` dans `config/config.php`, mot de
+passe stocké uniquement sous forme d'empreinte bcrypt dans `COMPTE_PROPRIETAIRE_HASH`) : ADMIN au
+secondaire, FONDATEUR au primaire. Il n'est jamais forcé à changer son mot de passe, et il est
+masqué aux autres comptes de l'école (listes des utilisateurs et du personnel, journal
+d'activité, statistiques) : `utilisateur.compte_systeme = 1` au secondaire,
+`enseignant.statut_ens = 'systeme'` au primaire. Au secondaire, le Proviseur gère les comptes
+mais ne voit ni le Fondateur ni le compte propriétaire.
+
+Écoles existantes : `php bd/assoc/comptes_par_defaut.php` (aperçu) puis `--go`. Un rôle déjà
+tenu n'est pas recréé, un identifiant déjà pris reçoit un suffixe (`fondateur2`), et un compte
+propriétaire déjà présent est seulement marqué compte système (mot de passe inchangé).
+
 ### Données de référence (`seed_ref_ecole.sql`)
 
 Chargées automatiquement à la **création**, au **vidage** et à la **création de base** d'une
@@ -350,7 +369,10 @@ les anciens sur le serveur. Dans l'ordre :
    code convertit déjà les anciennes valeurs — mais recommandé.
 6. Migrations (`/bd/assoc/migrer_toutes_ecoles.php`, puis portail > Migrations pour les écoles
    secondaires : v13 = ordre d'enseignement général / technique, v14 = dossier élève et validité
-   des documents enseignants, v15 = mode de délivrance des documents enseignants).
+   des documents enseignants, v15 = mode de délivrance des documents enseignants, v16 =
+   `utilisateur.compte_systeme`, compte propriétaire masqué).
+6 bis. Lancer `/bd/assoc/comptes_par_defaut.php?token=…` (aperçu) puis `&go=1` : donne aux
+   écoles existantes les comptes par défaut manquants et le compte propriétaire (voir §2).
 7. Tester : connexion d'une école de chaque type, un bulletin PDF, un QR imprimé.
 
 ### 8.7 Mise en service

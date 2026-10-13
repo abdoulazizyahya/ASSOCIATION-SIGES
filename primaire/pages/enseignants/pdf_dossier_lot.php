@@ -26,7 +26,7 @@ $dep    = trim($_GET['dep'] ?? '');
 $dl     = ($_GET['dl'] ?? '0') === '1';
 
 // ── Construction du filtre (requête préparée) ────────────────────────
-$conds = []; $params = [];
+$conds = [sql_hors_compte_systeme('')]; $params = [];   // jamais la fiche du compte propriétaire
 if ($q !== '') {
     $conds[] = "(nom_ens LIKE ? OR prenom_ens LIKE ? OR matricule_ens LIKE ?)";
     array_push($params, "%$q%", "%$q%", "%$q%");

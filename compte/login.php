@@ -59,7 +59,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $secondaire = type_enseignement_courant() === 'secondaire';
 
         if ($secondaire) {
-            $u = db_one("SELECT id, login, mot_de_passe, role, actif, nom, prenom, matricule_ens FROM utilisateur WHERE login = ? LIMIT 1", [$login]);
+            $col_sys = db_colonne_existe('utilisateur', 'compte_systeme') ? ', compte_systeme' : '';   // migration secondaire v16
+            $u = db_one("SELECT id, login, mot_de_passe, role, actif, nom, prenom, matricule_ens$col_sys FROM utilisateur WHERE login = ? LIMIT 1", [$login]);
             $u_id = $u['id'] ?? null; $u_pwd_hash = $u['mot_de_passe'] ?? ''; $u_actif = (int) ($u['actif'] ?? 0);
         } else {
             // user.actif (migration_v54) : compte désactivé => connexion refusée,
@@ -68,7 +69,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $col_actif = $a_statut ? ', u.actif' : '';
             $u = db_one(
                 "SELECT u.id_user, u.login_user, u.pwd_user, u.matricule_ens $col_actif,
-                        e.nom_ens, e.prenom_ens, e.id_fonction
+                        e.nom_ens, e.prenom_ens, e.id_fonction, e.statut_ens
                  FROM user u
                  JOIN enseignant e ON e.matricule_ens = u.matricule_ens
                  WHERE u.login_user = ? LIMIT 1",
@@ -103,6 +104,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'role'          => $u['role'],
                 'login'         => $u['login'],
                 'matricule_ens' => $u['matricule_ens'],
+                'compte_systeme' => (int) ($u['compte_systeme'] ?? 0) === 1,
             ] : [
                 'id'            => $u_id,
                 'matricule_ens' => $u['matricule_ens'],
@@ -110,6 +112,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'prenom'        => $u['prenom_ens'],
                 'role'          => $u['id_fonction'],
                 'login'         => $u['login_user'],
+                'compte_systeme' => ($u['statut_ens'] ?? '') === 'systeme',
             ];
             session_regenerate_id(true);
             audit_log('connexion', ['id_etab' => $id_etab_ctx, 'role' => $_SESSION['user']['role']]);
@@ -119,7 +122,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             // (demande explicite du 24/09/2026) : un bandeau reste ensuite
             // disponible sur les autres pages tant que ce n'est pas fait
             // (noyau/layout/header.php + compte/questions_securite_reporter.php).
-            $dest = (function_exists('utilisateur_a_questions') && !utilisateur_a_questions($u_id))
+            // Compte propriétaire : jamais d'étape imposée après la connexion.
+            $dest = (empty($_SESSION['user']['compte_systeme']) && function_exists('utilisateur_a_questions') && !utilisateur_a_questions($u_id))
                 ? '/compte/configurer_securite.php'
                 : '/noyau/dashboard.php';
             // Retour vers la page demandée avant connexion — posé uniquement

@@ -34,6 +34,7 @@ $crit = [
     'depuis'    => preg_match('/^\d{4}-\d{2}-\d{2}$/', $_GET['depuis'] ?? '') ? $_GET['depuis'] : null,
     'jusqua'    => preg_match('/^\d{4}-\d{2}-\d{2}$/', $_GET['jusqua'] ?? '') ? $_GET['jusqua'] : null,
 ];
+if (!voit_tous_les_comptes() && defined('COMPTE_PROPRIETAIRE_LOGIN')) $crit['exclure_login'] = COMPTE_PROPRIETAIRE_LOGIN;   // activité du compte propriétaire masquée
 $page = max(1, (int) ($_GET['page'] ?? 1));
 $j    = $dispo ? audit_journal($crit, $page, 60, $id_etab)
               : ['lignes' => [], 'total' => 0, 'page' => 1, 'pages' => 1];
@@ -41,7 +42,7 @@ $j    = $dispo ? audit_journal($crit, $page, 60, $id_etab)
 // Valeurs de filtre restreintes à cette école.
 $filtres = ['role' => [], 'action' => [], 'appareil' => []];
 if ($dispo) {
-    foreach (audit_journal(['evenement' => null], 1, 1000, $id_etab)['lignes'] as $l) {
+    foreach (audit_journal(['evenement' => null, 'exclure_login' => $crit['exclure_login'] ?? null], 1, 1000, $id_etab)['lignes'] as $l) {
         if (!empty($l['role']))        $filtres['role'][$l['role']] = 1;
         if (!empty($l['action']))      $filtres['action'][$l['action']] = 1;
         if (!empty($l['ua_appareil'])) $filtres['appareil'][$l['ua_appareil']] = 1;

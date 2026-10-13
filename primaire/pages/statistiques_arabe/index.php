@@ -398,6 +398,7 @@ $total_evalues = $total_inscrits - $total_gap;
 $ens_list = db_all(
     "SELECT e.matricule_ens, e.nom_ens, e.prenom_ens, e.civilite_ens, e.id_fonction, COUNT(DISTINCT d.IDClasses) AS nb_classes
      FROM enseignant e LEFT JOIN dispenser d ON d.matricule_ens = e.matricule_ens AND d.val_annee = ?
+     WHERE " . sql_hors_compte_systeme('e') . "
      GROUP BY e.matricule_ens, e.nom_ens, e.prenom_ens, e.civilite_ens, e.id_fonction ORDER BY e.nom_ens",
     [$val_annee]
 );

@@ -115,7 +115,7 @@ $menu = [
         ['Mon compte',        'compte/profil.php',                              'key',          []],
         ['Directeur',         'secondaire/commun/pages/fondateur/directeur.php', 'person-badge', ['FONDATEUR']],
         ['Configurations',    'secondaire/commun/pages/parametres/index.php',   'gear',        ['ADMIN','PROVISEUR', 'FONDATEUR']],
-        ['Utilisateurs',      'secondaire/commun/pages/utilisateurs/liste.php', 'person-gear', ['ADMIN', 'FONDATEUR']],
+        ['Utilisateurs',      'secondaire/commun/pages/utilisateurs/liste.php', 'person-gear', ['ADMIN', 'FONDATEUR', 'PROVISEUR']],
         ['Journal d\'audit',  'secondaire/commun/pages/utilisateurs/journal.php','shield-check',['ADMIN','PROVISEUR', 'FONDATEUR']],
         ['Licence',           'secondaire/commun/pages/parametres/licence.php', 'award',       []],
     ],

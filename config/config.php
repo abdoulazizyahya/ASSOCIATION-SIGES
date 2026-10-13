@@ -38,6 +38,16 @@ defined('DB_NAME') || define('DB_NAME', 'promeducam_jaynitaare');   // repli « 
 defined('DB_USER') || define('DB_USER', 'root');
 defined('DB_PASS') || define('DB_PASS', '');
 
+// Compte PROPRIÉTAIRE / superadministrateur créé par défaut dans CHAQUE école
+// (primaire et secondaire) : identifiant ci-dessous, mot de passe défini à
+// l'installation — seule son EMPREINTE bcrypt figure ici, jamais le mot de
+// passe en clair (dépôt versionné). Masqué de tous les autres comptes de
+// l'école ; modifiable par son titulaire (Mon compte), jamais forcé à la
+// première connexion. Pour le changer partout : redéfinir ces deux
+// constantes dans config.local.php puis relancer bd/assoc/comptes_par_defaut.php.
+defined('COMPTE_PROPRIETAIRE_LOGIN') || define('COMPTE_PROPRIETAIRE_LOGIN', 'abdoulazizyahya@gmail.com');
+defined('COMPTE_PROPRIETAIRE_HASH')  || define('COMPTE_PROPRIETAIRE_HASH', '$2y$10$P8EQyDeOSwvmfpAkAFxxdeZ7bpRnDRGDbpd/xYWvuN5kckaW2AUw.');
+
 // ── Multi-établissement ──────────────────────────────────────
 // Base centrale « annuaire » de l'association (écoles, NIU, personnel,
 // comptes membres). Optionnelle : tant que bd/assoc/installer.php n'a pas

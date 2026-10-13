@@ -175,7 +175,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             //    saisi dans ce formulaire, mot de passe = identifiant) et FINANCIER —
             //    mêmes 3 comptes que crée creer_etablissement() (association > Nouvel
             //    établissement), voir connexion_assoc.php::creer_comptes_defaut_ecole().
-            $comptes = creer_comptes_defaut_ecole($le, $type, $val['login']);
+            $comptes = creer_comptes_defaut_ecole($le, $type, $val['login'], $val['statut']);
             mysqli_close($le);
 
             if ($reseau) {

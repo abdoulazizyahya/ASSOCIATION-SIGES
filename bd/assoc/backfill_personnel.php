@@ -32,7 +32,8 @@ foreach (assoc_all("SELECT id, code, nom FROM etablissement ORDER BY id") as $e)
                     en.date_naiss_ens, en.tel_ens, en.mail_ens, en.id_fonction, en.statut_ens,
                     u.id_user
              FROM enseignant en
-             LEFT JOIN user u ON u.matricule_ens = en.matricule_ens");
+             LEFT JOIN user u ON u.matricule_ens = en.matricule_ens
+             WHERE COALESCE(en.statut_ens, 'actif') <> 'systeme'");   // jamais le compte propriétaire
         return mysqli_fetch_all($r, MYSQLI_ASSOC);
     });
     echo str_pad($e['code'], 8) . " {$e['nom']} : " . count($agents) . " agent(s)\n";
