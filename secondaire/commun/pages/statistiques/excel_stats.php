@@ -86,11 +86,11 @@ if ($logo_src_path && generer_filigrane_excel($logo_src_path, $filigrane_path)) 
 $lettre = fn(int $c) => Coordinate::stringFromColumnIndex($c);
 $col_total = max(10, count($bilan_cols) * 3 + 1);
 
-$texte_etab = "REGION DE L'ADAMAOUA\n" .
-    ($etab['departement_fr'] ?? 'DEPARTEMENT DE LA VINA') . "\n" .
-    ($etab['arrondissement_fr'] ?? 'ARRONDISSEMENT DE MBE') . "\n" .
+$texte_etab = ($etab['region_fr'] ?? '') . "\n" .
+    ($etab['departement_fr'] ?? '') . "\n" .
+    ($etab['arrondissement_fr'] ?? '') . "\n" .
     '***********';
-$nom_etab = strtoupper($etab['nom_fr'] ?? 'LYCEE TECHNIQUE DE MBE');
+$nom_etab = strtoupper($etab['nom_fr'] ?? '');
 $tiers = max(1, (int) floor($col_total / 3));
 foreach ([[1, $tiers], [2 * $tiers + 1, $col_total]] as [$c1, $c2]) {
     $sheet->mergeCells("{$lettre($c1)}1:{$lettre($c2)}4");

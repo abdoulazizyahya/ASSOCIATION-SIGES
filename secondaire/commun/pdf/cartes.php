@@ -164,16 +164,16 @@ function dessiner_carte_1(FPDF $pdf, array $el, array $etab, array $annee,
     $pdf->SetXY($xFr, $y + 0.3);
     $pdf->MultiCell($colW, 1.9, pdf_u(
         "REPUBLIQUE DU CAMEROUN\nPaix-Travail-Patrie\n" .
-        ($etab['region_fr'] ?? "RÉGION DE L'ADAMAOUA") . "\n" .
-        ($etab['departement_fr'] ?? 'DEPARTEMENT DE LA VINA') . "\n" .
-        ($etab['arrondissement_fr'] ?? 'ARRONDISSEMENT DE MBE')
+        ($etab['region_fr'] ?? '') . "\n" .
+        ($etab['departement_fr'] ?? '') . "\n" .
+        ($etab['arrondissement_fr'] ?? '')
     ), 0, 'L');
     $pdf->SetXY($xEn, $y + 0.3);
     $pdf->MultiCell($colW, 1.9, pdf_u(
         "REPUBLIC OF CAMEROON\nPeace-Work-Fatherland\n" .
-        ($etab['region_en'] ?? 'ADAMAWA REGION') . "\n" .
-        ($etab['division_en'] ?? 'VINA DIVISION') . "\n" .
-        ($etab['subdivision_en'] ?? 'MBE SUBDIVISION')
+        ($etab['region_en'] ?? '') . "\n" .
+        ($etab['division_en'] ?? '') . "\n" .
+        ($etab['subdivision_en'] ?? '')
     ), 0, 'L');
 
     $logo_path = !empty($etab['logo']) ? __DIR__ . '/../../../assets/uploads/' . $etab['logo'] : '';
@@ -183,7 +183,7 @@ function dessiner_carte_1(FPDF $pdf, array $el, array $etab, array $annee,
     } else {
         $pdf->SetFont('Arial', 'B', $fsHead + 1);
         $pdf->SetXY($xLogo, $y + $hLettre / 2 - 2);
-        $pdf->Cell($logoW, 4, pdf_u($etab['sigle'] ?? 'MBE'), 0, 0, 'C');
+        $pdf->Cell($logoW, 4, pdf_u($etab['sigle'] ?? ''), 0, 0, 'C');
     }
 
     // ── Titre établissement (grand, bleu, aligné à gauche) ────────────
@@ -428,16 +428,16 @@ function dessiner_carte_2(FPDF $pdf, array $el, array $etab, array $annee,
     $pdf->SetXY($xFr, $y + 0.3);
     $pdf->MultiCell($colW, 1.9, pdf_u(
         "REPUBLIQUE DU CAMEROUN\nPaix - Travail - Patrie\n" .
-        ($etab['region_fr'] ?? "RÉGION DE L'ADAMAOUA") . "\n" .
-        ($etab['departement_fr'] ?? 'DEPARTEMENT DE LA VINA') . "\n" .
-        ($etab['arrondissement_fr'] ?? 'ARRONDISSEMENT DE MBE')
+        ($etab['region_fr'] ?? '') . "\n" .
+        ($etab['departement_fr'] ?? '') . "\n" .
+        ($etab['arrondissement_fr'] ?? '')
     ), 0, 'C');
     $pdf->SetXY($xEn, $y + 0.3);
     $pdf->MultiCell($colW, 1.9, pdf_u(
         "REPUBLIC OF CAMEROON\nPeace - Work - Fatherland\n" .
-        ($etab['region_en'] ?? 'ADAMAWA REGION') . "\n" .
-        ($etab['division_en'] ?? 'VINA DIVISION') . "\n" .
-        ($etab['subdivision_en'] ?? 'MBE SUBDIVISION')
+        ($etab['region_en'] ?? '') . "\n" .
+        ($etab['division_en'] ?? '') . "\n" .
+        ($etab['subdivision_en'] ?? '')
     ), 0, 'C');
 
     // ── Titre encadré bleu ─────────────────────────────────────────────
@@ -690,7 +690,7 @@ function dessiner_carte_4(FPDF $pdf, array $el, array $etab, array $annee,
     $pdf->SetTextColor(60, 60, 65);
     $pdf->SetFont('Arial', 'B', $fsEtab);
     $pdf->SetXY($x + $pad, $yCur);
-    $pdf->Cell($cW - 2 * $pad, $cH * 0.05, pdf_u(mb_strtoupper($etab['sigle'] ?? 'MBE') . ' — ' . ($etab['nom_fr'] ?? '')), 0, 1, 'C');
+    $pdf->Cell($cW - 2 * $pad, $cH * 0.05, pdf_u(mb_strtoupper($etab['sigle'] ?? '') . ' — ' . ($etab['nom_fr'] ?? '')), 0, 1, 'C');
     $pdf->SetFont('Arial', 'I', max(3.5, $fsEtab - 1));
     $pdf->SetX($x + $pad);
     $pdf->Cell($cW - 2 * $pad, $cH * 0.04, pdf_u("Carte d'identité scolaire"), 0, 0, 'C');
@@ -784,7 +784,7 @@ function dessiner_carte_5(FPDF $pdf, array $el, array $etab, array $annee,
     $pdf->SetTextColor(0);
     $pdf->SetFont('Arial', 'B', $fsH);
     $pdf->SetXY($x + $pad + $chip + 1, $y + 0.8);
-    $pdf->Cell($cW - 2 * $pad - $chip - 1, $hHead * 0.5, pdf_u(mb_strtoupper($etab['sigle'] ?? 'MBE') . ' — ' . ($etab['nom_fr'] ?? '')), 0, 1, 'L');
+    $pdf->Cell($cW - 2 * $pad - $chip - 1, $hHead * 0.5, pdf_u(mb_strtoupper($etab['sigle'] ?? '') . ' — ' . ($etab['nom_fr'] ?? '')), 0, 1, 'L');
     $pdf->SetFont('Arial', 'I', max(4, $fsH - 1.5));
     $pdf->SetX($x + $pad);
     $pdf->Cell($cW - 2 * $pad, $hHead * 0.4, pdf_u("Carte d'identité scolaire / School identity card"), 0, 0, 'L');

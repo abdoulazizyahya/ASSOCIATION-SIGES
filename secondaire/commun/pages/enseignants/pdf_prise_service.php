@@ -55,6 +55,10 @@ if ($acces_public) {
 }
 
 $dl = !$doc_expire && (($_GET['dl'] ?? '0') === '1');
+// Mode « impression par l'enseignant » (Paramètres > Documents enseignants) :
+// le document est signé À LA MAIN par le Proviseur — l'enseignant (ou une
+// consultation publique par QR) n'appose jamais sa signature électronique.
+$signature_interdite = ($acces_public || ($role ?? '') === 'ENSEIGNANT') && demande_est_autonome((string) $mat, $type);
 
 $e = db_one("SELECT * FROM enseignant WHERE matricule_ens=?", [$mat]);
 if (!$e) die('Enseignant introuvable.');
@@ -106,12 +110,12 @@ $y0 = 10;
 $pdf->SetXY($ml,$y0); $pdf->SetFont('Arial','',8);
 $pdf->MultiCell($col3,2.7,ud(
     "REPUBLIQUE DU CAMEROUN\nPaix – Travail – Patrie\n**********\n".
-    ($etab['region_fr']??"REGION DE L'ADAMAOUA")."\n**********\n".
-    ($etab['departement_fr']??'DEPARTEMENT DE LA VINA')."\n**********\n".
-    ($etab['arrondissement_fr']??'ARRONDISSEMENT DE MBE')."\n**********\n".
-    strtoupper($etab['nom_fr']??'LYCEE TECHNIQUE DE MBE')."\n".
-    "BP ".($etab['boite_postale']??'32')."\n".
-    "E-mail : ".($etab['email']??'lyceetechniquembe@yahoo.fr')
+    ($etab['region_fr']??'')."\n**********\n".
+    ($etab['departement_fr']??'')."\n**********\n".
+    ($etab['arrondissement_fr']??'')."\n**********\n".
+    strtoupper($etab['nom_fr']??'')."\n".
+    "BP ".($etab['boite_postale']??'')."\n".
+    "E-mail : ".($etab['email']??'')
 ), 0,'C');
 $ycol = $pdf->GetY();
 
@@ -121,24 +125,24 @@ if ($logo_path && is_file($logo_path)) {
     $pdf->Image($logo_path,$logo_x,$y0,22);
 } else {
     $pdf->SetFont('Arial','B',10); $pdf->SetXY($logo_x,$y0+4);
-    $pdf->Cell(22,12,ud($etab['sigle']??'LTM'),1,0,'C');
+    $pdf->Cell(22,12,ud($etab['sigle']??''),1,0,'C');
 }
 
 $xr = $ml+$col3*2; $pdf->SetXY($xr,$y0); $pdf->SetFont('Arial','',8);
 $pdf->MultiCell($col3,2.7,ud(
     "REPUBLIC OF CAMEROON\nPeace – Work – Fatherland\n**********\n".
-    ($etab['region_en']??'ADAMAWA REGION')."\n**********\n".
-    ($etab['division_en']??'VINA DIVISION')."\n**********\n".
-    ($etab['subdivision_en']??'MBE SUBDIVISION')."\n**********\n".
-    strtoupper($etab['nom_en']??'GTHS OF MBE')."\n".
-    "P.O. BOX ".($etab['boite_postale']??'32')."\n".
-    "E-mail : ".($etab['email']??'lyceetechniquembe@yahoo.fr')
+    ($etab['region_en']??'')."\n**********\n".
+    ($etab['division_en']??'')."\n**********\n".
+    ($etab['subdivision_en']??'')."\n**********\n".
+    strtoupper($etab['nom_en']??'')."\n".
+    "P.O. BOX ".($etab['boite_postale']??'')."\n".
+    "E-mail : ".($etab['email']??'')
 ), 0,'C');
 $ycol2 = $pdf->GetY();
 $pdf->SetY(max($ycol,$ycol2)+2);
 
 $pdf->SetX($ml); $pdf->SetFont('Arial','',8);
-$pdf->Cell($uw,5,ud('MATRICULE: '.($etab['immatriculation']??'2JH1TEFD110316102')),0,1,'C');
+$pdf->Cell($uw,5,ud('MATRICULE: '.($etab['immatriculation']??'')),0,1,'C');
 
 // ── TITRE — Comic Sans MS 12 / Courier New 12 dans le modèle (Comic Sans
 // n'étant pas une police coeur PDF, remplacée par Arial à LA MÊME taille
@@ -152,16 +156,16 @@ $pdf->SetX($ml);$pdf->SetFont('Courier','B',9);
 $pdf->Cell($uw,5,'*********************************',0,1,'C');
 
 $pdf->Ln(1);$pdf->SetX($ml);$pdf->SetFont('Courier','',10);
-$pdf->Cell($uw,5,ud('N°_________________/CP - RS/H.52.03/LT-MBE'),0,1,'C');
+$pdf->Cell($uw,5,ud('N°_________________/CP - RS/H.52.03/'.(get_etablissement()['sigle'] ?? '')),0,1,'C');
 
 // ── "Le Proviseur ..., soussigné" — Verdana Bold 11 / Courier New 9 dans
 // le modèle (Verdana absente des polices coeur, remplacée par Arial Bold à
 // la même taille) — centré (contrairement aux autres documents du projet,
 // alignés à gauche : mesuré ainsi dans ce modèle précis). ───────────────
 $pdf->Ln(3);$pdf->SetX($ml);$pdf->SetFont('Arial','B',11);
-$pdf->Cell($uw,6,ud('Le Proviseur du '.strtoupper($etab['nom_fr']??'LYCEE TECHNIQUE DE MBE').', soussigné'),0,1,'C');
+$pdf->Cell($uw,6,ud('Le Proviseur du '.strtoupper($etab['nom_fr']??'').', soussigné'),0,1,'C');
 $pdf->SetX($ml);$pdf->SetFont('Courier','',9);
-$pdf->Cell($uw,5,ud('The principal of '.strtoupper($etab['nom_en']??'Government Technical High School MBE').', the undersigned'),0,1,'C');
+$pdf->Cell($uw,5,ud('The principal of '.strtoupper($etab['nom_en']??'').', the undersigned'),0,1,'C');
 
 // ── CORPS — Times 11 pour l'intitulé français (police du modèle :
 // TimesNewRomanPSMT 11.04) ; chaque champ occupe DEUX lignes comme dans le
@@ -286,7 +290,7 @@ if ($pdf->GetY() + 24 > $pdf->GetPageHeight() - 18) {
 }
 $y_sig_block = $pdf->GetY();
 $pdf->SetX($ml+$uw*0.55);$pdf->SetFont('Times','',12);
-$pdf->Cell($uw*0.45,6,ud('MBE, Le………………….'),0,1,'R');
+$pdf->Cell($uw*0.45,6,ud((get_etablissement()['ville'] ?? '').', Le………………….'),0,1,'R');
 $pdf->SetX($ml+$uw*0.55);$pdf->SetFont('Times','B',18);
 $pdf->Cell($uw*0.45,9,'Le Proviseur',0,1,'C');
 $pdf->SetX($ml+$uw*0.55);$pdf->SetFont('Times','',14);
@@ -294,7 +298,7 @@ $pdf->Cell($uw*0.45,7,'The principal',0,1,'C');
 // Signature numérique (uniquement si demandée à l'impression — jamais
 // automatique — et si l'admin en a configuré une dans les paramètres) :
 // placée dans l'espace blanc réservé à la signature manuscrite.
-if (($_GET['signature'] ?? '0') === '1') {
+if (($_GET['signature'] ?? '0') === '1' && !$signature_interdite) {
     $sig_w = 26;
     $ph = $pdf->GetPageHeight();
     $sx = $ml+$uw*0.55+($uw*0.45-$sig_w)/2;

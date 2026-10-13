@@ -193,16 +193,16 @@ function entete_releve(FPDF $pdf, array $etab, float $ml, float $uw): void {
     $col3 = $uw / 3;
     $y0   = $pdf->GetY();
     $texte_etab =
-        "REGION DE L'ADAMAOUA\n" .
-        ($etab['departement_fr'] ?? 'DEPARTEMENT DE LA VINA') . "\n" .
-        ($etab['arrondissement_fr'] ?? 'ARRONDISSEMENT DE MBE') . "\n" .
+        ($etab['region_fr'] ?? '') . "\n" .
+        ($etab['departement_fr'] ?? '') . "\n" .
+        ($etab['arrondissement_fr'] ?? '') . "\n" .
         "***********\n";
     $pdf->SetXY($ml, $y0);
     $pdf->SetFont('Arial', '', 8);
     $pdf->MultiCell($col3, 4, u($texte_etab), 0, 'C');
     $pdf->SetFont('Arial', 'B', 10);
     $pdf->SetX($ml);
-    $pdf->MultiCell($col3, 5, u(strtoupper($etab['nom_fr'] ?? 'LYCEE TECHNIQUE DE MBE')), 0, 'C');
+    $pdf->MultiCell($col3, 5, u(strtoupper($etab['nom_fr'] ?? '')), 0, 'C');
 
     $xr = $ml + $col3 * 2;
     $pdf->SetXY($xr, $y0);
@@ -210,7 +210,7 @@ function entete_releve(FPDF $pdf, array $etab, float $ml, float $uw): void {
     $pdf->MultiCell($col3, 4, u($texte_etab), 0, 'C');
     $pdf->SetFont('Arial', 'B', 10);
     $pdf->SetX($xr);
-    $pdf->MultiCell($col3, 5, u(strtoupper($etab['nom_fr'] ?? 'LYCEE TECHNIQUE DE MBE')), 0, 'C');
+    $pdf->MultiCell($col3, 5, u(strtoupper($etab['nom_fr'] ?? '')), 0, 'C');
 
     $logo_path = !empty($etab['logo']) ? __DIR__ . '/../../../../assets/uploads/' . $etab['logo'] : '';
     $logo_w = 18;

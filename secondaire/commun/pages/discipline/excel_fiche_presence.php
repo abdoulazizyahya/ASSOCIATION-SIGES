@@ -86,19 +86,19 @@ function genererFeuilleFichePresence(Spreadsheet $spreadsheet, int $idx, array $
     $col_d_debut = 2 * $tiers + 1; $col_d_fin = $col_total;
 
     $texte_fr = "REPUBLIQUE DU CAMEROUN\n" .
-        ($etab['region_fr']         ?? "REGION DE L'ADAMAOUA") . "\n" .
-        ($etab['departement_fr']    ?? 'DEPARTEMENT DE LA VINA') . "\n" .
-        ($etab['arrondissement_fr'] ?? 'ARRONDISSEMENT DE MBE');
+        ($etab['region_fr']         ?? '') . "\n" .
+        ($etab['departement_fr']    ?? '') . "\n" .
+        ($etab['arrondissement_fr'] ?? '');
     $texte_en = "REPUBLIC OF CAMEROON\n" .
-        ($etab['region_en']      ?? 'ADAMAWA REGION') . "\n" .
-        ($etab['division_en']    ?? 'VINA DIVISION') . "\n" .
-        ($etab['subdivision_en'] ?? 'MBE SUBDIVISION');
+        ($etab['region_en']      ?? '') . "\n" .
+        ($etab['division_en']    ?? '') . "\n" .
+        ($etab['subdivision_en'] ?? '');
 
     $sheet->mergeCells("{$lettre($col_g_debut)}1:{$lettre($col_g_fin)}3");
     $rt = new RichText();
     $r1 = $rt->createTextRun($texte_fr . "\n");
     $r1->getFont()->setSize(7);
-    $r2 = $rt->createTextRun(strtoupper($etab['nom_fr'] ?? 'LYCEE TECHNIQUE DE MBE'));
+    $r2 = $rt->createTextRun(strtoupper($etab['nom_fr'] ?? ''));
     $r2->getFont()->setBold(true)->setSize(10);
     $sheet->getCell("{$lettre($col_g_debut)}1")->setValue($rt);
     $sheet->getStyle("{$lettre($col_g_debut)}1")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER)->setVertical(Alignment::VERTICAL_CENTER)->setWrapText(true);
@@ -107,7 +107,7 @@ function genererFeuilleFichePresence(Spreadsheet $spreadsheet, int $idx, array $
     $rt2 = new RichText();
     $r3 = $rt2->createTextRun($texte_en . "\n");
     $r3->getFont()->setSize(7);
-    $r4 = $rt2->createTextRun(strtoupper($etab['nom_en'] ?? 'GTHS OF MBE'));
+    $r4 = $rt2->createTextRun(strtoupper($etab['nom_en'] ?? ''));
     $r4->getFont()->setBold(true)->setSize(10);
     $sheet->getCell("{$lettre($col_d_debut)}1")->setValue($rt2);
     $sheet->getStyle("{$lettre($col_d_debut)}1")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER)->setVertical(Alignment::VERTICAL_CENTER)->setWrapText(true);

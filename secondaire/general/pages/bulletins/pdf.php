@@ -486,7 +486,7 @@ if ($logo_path && is_file($logo_path)) {
 } else {
     $pdf->SetFont('Arial', 'B', 10);
     $pdf->SetXY($logo_x, $y0 + ($logo_bande_h - 16) / 2);
-    $pdf->Cell($logo_w, 16, u($etab['sigle'] ?? 'LTM'), 1, 0, 'C');
+    $pdf->Cell($logo_w, 16, u($etab['sigle'] ?? ''), 1, 0, 'C');
 }
 
 $xr = $ml + $col3 * 2;
@@ -494,12 +494,12 @@ $pdf->SetXY($xr, $y0);
 $pdf->SetFont('Arial', '', 6.5);
 $pdf->MultiCell($col3, 3.0, u(
     "REPUBLIC OF CAMEROON\nPeace - Work - Fatherland\n***************\n" .
-    ($etab['region_en'] ?? 'ADAMAWA REGION') . "\n" .
-    ($etab['division_en'] ?? 'VINA DIVISION') . "\n" .
-    ($etab['subdivision_en'] ?? 'MBE SUBDIVISION') . "\n" .
-    strtoupper($etab['nom_en'] ?? 'GTHS OF MBE') . "\n" .
-    "P.O. BOX. " . ($etab['boite_postale'] ?? '32') . " Mbe  Phone: " . ($etab['telephone'] ?? '') . "\n" .
-    ($etab['email'] ?? 'lyceetechniquembe@yahoo.fr')
+    ($etab['region_en'] ?? '') . "\n" .
+    ($etab['division_en'] ?? '') . "\n" .
+    ($etab['subdivision_en'] ?? '') . "\n" .
+    strtoupper($etab['nom_en'] ?? '') . "\n" .
+    "P.O. BOX. " . ($etab['boite_postale'] ?? '') . " " . ($etab['ville'] ?? '') . "  Phone: " . ($etab['telephone'] ?? '') . "\n" .
+    ($etab['email'] ?? '')
 ),
 0, 'C');
 
@@ -514,7 +514,7 @@ if ($logo_path && is_file($logo_path)) {
 }
 $pdf->SetFont('Arial', 'I', 6.5);
 $pdf->SetX($ml);
-$pdf->Cell($uw, 3.2, u('IMMATRICULATION : ' . ($etab['immatriculation'] ?? '2JH1TEFD110316102')), 0, 1, 'C');
+$pdf->Cell($uw, 3.2, u('IMMATRICULATION : ' . ($etab['immatriculation'] ?? '')), 0, 1, 'C');
 
 // ── 2. Titre (bandeau en pilule, comme le modèle) ──────────────────
 // Bandeau titre compacté (demande explicite : gagner de la place du haut
@@ -1364,7 +1364,7 @@ $pdf->MultiCell($w_obs, $h_obs_box, '', 1, 'L');
 // hauteur réelle. Police agrandie (demande explicite).
 $pdf->SetFont('Arial', '', 8.5);
 $pdf->SetXY($x_obs, $y_dec2 + 6);
-$pdf->Cell($w_obs, 5.5, u('Mbé, le ' . date('d-m-Y') . '.'), 0, 1, 'C');
+$pdf->Cell($w_obs, 5.5, u((get_etablissement()['ville'] ?? '') . ', le ' . date('d-m-Y') . '.'), 0, 1, 'C');
 $pdf->SetX($x_obs);
 $pdf->SetFont('Arial', 'I', 7.5);
 $pdf->Cell($w_obs, 4.5, 'On', 0, 1, 'C');

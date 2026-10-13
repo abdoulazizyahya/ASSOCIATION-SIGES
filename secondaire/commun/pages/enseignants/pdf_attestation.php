@@ -41,6 +41,10 @@ if ($acces_public) {
     }
 }
 $dl = !$doc_expire && (($_GET['dl'] ?? '0') === '1');
+// Mode « impression par l'enseignant » (Paramètres > Documents enseignants) :
+// le document est signé À LA MAIN par le Proviseur — l'enseignant (ou une
+// consultation publique par QR) n'appose jamais sa signature électronique.
+$signature_interdite = ($acces_public || ($role ?? '') === 'ENSEIGNANT') && demande_est_autonome((string) $mat, 'attestation');
 
 $e = db_one("SELECT * FROM enseignant WHERE matricule_ens=?", [$mat]);
 if (!$e) die('Enseignant introuvable.');
@@ -84,11 +88,11 @@ $y0 = 10;
 $pdf->SetXY($ml,$y0); $pdf->SetFont('Arial','',7.5);
 $pdf->MultiCell($col3,4, ud(
     "REPUBLIQUE DU CAMEROUN\nPaix - Travail - Patrie\n**********\n".
-    ($etab['region_fr']??"REGION DE L'ADAMAOUA")."\n**********\n".
-    ($etab['departement_fr']??'DEPARTEMENT DE LA VINA')."\n**********\n".
-    ($etab['arrondissement_fr']??'ARRONDISSEMENT DE MBE')."\n**********\n".
-    strtoupper($etab['nom_fr']??'LYCEE TECHNIQUE DE MBE')."\n".
-    "BP ".($etab['boite_postale']??'32')." e-mail : ".($etab['email']??'lyceetechniquembe@yahoo.fr')
+    ($etab['region_fr']??'')."\n**********\n".
+    ($etab['departement_fr']??'')."\n**********\n".
+    ($etab['arrondissement_fr']??'')."\n**********\n".
+    strtoupper($etab['nom_fr']??'')."\n".
+    "BP ".($etab['boite_postale']??'')." e-mail : ".($etab['email']??'')
 ), 0,'C');
 $ycol = $pdf->GetY();
 
@@ -99,29 +103,29 @@ if ($logo_path && is_file($logo_path)) {
     $pdf->Image($logo_path,$logo_x,$y0,22);
 } else {
     $pdf->SetFont('Arial','B',10); $pdf->SetXY($logo_x,$y0+4);
-    $pdf->Cell(22,12,ud($etab['sigle']??'LTM'),1,0,'C');
+    $pdf->Cell(22,12,ud($etab['sigle']??''),1,0,'C');
 }
 
 // Colonne droite anglais
 $xr = $ml+$col3*2; $pdf->SetXY($xr,$y0); $pdf->SetFont('Arial','',7.5);
 $pdf->MultiCell($col3,4,ud(
     "REPUBLIC OF CAMEROON\nPeace – Work – Fatherland\n**********\n".
-    ($etab['region_en']??'ADAMAWA REGION')."\n**********\n".
-    ($etab['division_en']??'VINA DIVISION')."\n**********\n".
-    ($etab['subdivision_en']??'MBE SUBDIVISION')."\n**********\n".
-    strtoupper($etab['nom_en']??'GTHS OF MBE')."\n".
-    "P.O. BOX ".($etab['boite_postale']??'32')."  e-mail : ".($etab['email']??'lyceetechniquembe@yahoo.fr')
+    ($etab['region_en']??'')."\n**********\n".
+    ($etab['division_en']??'')."\n**********\n".
+    ($etab['subdivision_en']??'')."\n**********\n".
+    strtoupper($etab['nom_en']??'')."\n".
+    "P.O. BOX ".($etab['boite_postale']??'')."  e-mail : ".($etab['email']??'')
 ), 0,'C');
 $ycol2 = $pdf->GetY();
 $pdf->SetY(max($ycol,$ycol2)+2);
 
 // Matricule établissement
 $pdf->SetX($ml); $pdf->SetFont('Arial','B',8);
-$pdf->Cell($uw,5,ud('MATRICULE : '.($etab['immatriculation']??'2JH1TEFD110316102')),0,1,'C');
+$pdf->Cell($uw,5,ud('MATRICULE : '.($etab['immatriculation']??'')),0,1,'C');
 
 // ── N° document ───────────────────────────────────────────────────
 $pdf->Ln(2);$pdf->SetX($ml);$pdf->SetFont('Arial','',8);
-$pdf->Cell($uw,5,ud('N°_____________/APEP/H.52.03/LT-MBE'),0,1,'R');
+$pdf->Cell($uw,5,ud('N°_____________/APEP/H.52.03/'.(get_etablissement()['sigle'] ?? '')),0,1,'R');
 
 // ── TITRE ─────────────────────────────────────────────────────────
 $pdf->Ln(3);
@@ -135,7 +139,7 @@ $pdf->Cell($uw,5,'*********************************',0,1,'C');
 // ── TEXTE ─────────────────────────────────────────────────────────
 $pdf->Ln(4);$pdf->SetFont('Arial','',9.5);
 $pdf->SetX($ml);
-$pdf->MultiCell($uw,6,ud("Le Proviseur du ".strtoupper($etab['nom_fr']??'LYCEE TECHNIQUE DE MBE').", soussigne\nThe principal of ".strtoupper($etab['nom_en']??'Government Technical High School MBE').", the undersigned"),0,'L');
+$pdf->MultiCell($uw,6,ud("Le Proviseur du ".strtoupper($etab['nom_fr']??'').", soussigne\nThe principal of ".strtoupper($etab['nom_en']??'').", the undersigned"),0,'L');
 
 $pdf->Ln(3);$pdf->SetX($ml);
 $pdf->MultiCell($uw,6,ud("Atteste que M./Mme/Mlle : ".str_pad(strtoupper(($e['civilite_ens']??'').' '.($e['nom_ens']??'').' '.($e['prenom_ens']??'')),60,'_')."\nTestifies that Mr./Mme/Miss"),0,'L');
@@ -205,13 +209,13 @@ $pdf->MultiCell($uw,5.5,ud("En foi de quoi la presente attestation de presence e
 $pdf->Ln(6);
 $y_sig_block = $pdf->GetY();
 $pdf->SetX($ml+$uw*0.6);$pdf->SetFont('Arial','',9);
-$pdf->Cell($uw*0.35,5,ud("Mbe, le/on ".date('d/m/Y').'.'),0,1,'R');
+$pdf->Cell($uw*0.35,5,ud((get_etablissement()['ville'] ?? '').", le/on ".date('d/m/Y').'.'),0,1,'R');
 $pdf->SetX($ml+$uw*0.6);$pdf->SetFont('Arial','B',9);
 $pdf->Cell($uw*0.35,5,'Le Proviseur / The Principal',0,1,'C');
 // Signature numérique (uniquement si demandée à l'impression — jamais
 // automatique — et si l'admin en a configuré une dans les paramètres) :
 // placée dans l'espace blanc réservé à la signature manuscrite.
-if (($_GET['signature'] ?? '0') === '1') {
+if (($_GET['signature'] ?? '0') === '1' && !$signature_interdite) {
     $sig_w = 24;
     $ph = $pdf->GetPageHeight();
     $sx = $ml+$uw*0.6+($uw*0.35-$sig_w)/2;

@@ -227,8 +227,8 @@ function pdf_entete(FPDF $pdf, array $etab, float $page_w, float $marge = 10, ?f
     $pdf->SetTextColor(0, 0, 0);
     $pdf->MultiCell($col, $lh1, pdf_u(
         "REPUBLIQUE DU CAMEROUN\n" .
-        ($etab['region_fr']         ?? "RÉGION DE L'ADAMAOUA") . "\n" .
-        ($etab['departement_fr']    ?? 'DÉPARTEMENT DE LA VINA') . "\n" .
+        ($etab['region_fr']         ?? '') . "\n" .
+        ($etab['departement_fr']    ?? '') . "\n" .
         ($etab['arrondissement_fr'] ?? 'ARRONDISSEMENT DE MBÉ')
     ), 0, 'C');
     // Nom long : 2 lignes max, police réduite si besoin (pdf_texte_ajuste()).
@@ -249,7 +249,7 @@ function pdf_entete(FPDF $pdf, array $etab, float $page_w, float $marge = 10, ?f
     } else {
         $pdf->SetFont('Arial', 'B', 9 * $echelle);
         $pdf->SetXY($logo_x, $y0 + 3);
-        $pdf->Cell($taille_logo, 8 * $echelle, pdf_u($etab['sigle'] ?? 'MBE'), 1, 0, 'C');
+        $pdf->Cell($taille_logo, 8 * $echelle, pdf_u($etab['sigle'] ?? ''), 1, 0, 'C');
     }
 
     // ── Droite (anglais) ──────────────────────────────────
@@ -259,11 +259,11 @@ function pdf_entete(FPDF $pdf, array $etab, float $page_w, float $marge = 10, ?f
     $pdf->SetTextColor(0, 0, 0);
     $pdf->MultiCell($col, $lh1, pdf_u(
         "REPUBLIC OF CAMEROON\n" .
-        ($etab['region_en']      ?? 'ADAMAWA REGION') . "\n" .
-        ($etab['division_en']    ?? 'VINA DIVISION') . "\n" .
-        ($etab['subdivision_en'] ?? 'MBE SUBDIVISION')
+        ($etab['region_en']      ?? '') . "\n" .
+        ($etab['division_en']    ?? '') . "\n" .
+        ($etab['subdivision_en'] ?? '')
     ), 0, 'C');
-    pdf_texte_ajuste($pdf, $xr, $pdf->GetY(), $col, mb_strtoupper($etab['nom_en'] ?? 'GTHS OF MBE'), 8.5 * $echelle, 6 * $echelle, 2);
+    pdf_texte_ajuste($pdf, $xr, $pdf->GetY(), $col, mb_strtoupper($etab['nom_en'] ?? ''), 8.5 * $echelle, 6 * $echelle, 2);
     $pdf->SetFont('Arial', '', 6.5 * $echelle);
     $pdf->SetX($xr);
     $pdf->MultiCell($col, $lh3, pdf_u(

@@ -350,7 +350,7 @@ les anciens sur le serveur. Dans l'ordre :
    code convertit déjà les anciennes valeurs — mais recommandé.
 6. Migrations (`/bd/assoc/migrer_toutes_ecoles.php`, puis portail > Migrations pour les écoles
    secondaires : v13 = ordre d'enseignement général / technique, v14 = dossier élève et validité
-   des documents enseignants).
+   des documents enseignants, v15 = mode de délivrance des documents enseignants).
 7. Tester : connexion d'une école de chaque type, un bulletin PDF, un QR imprimé.
 
 ### 8.7 Mise en service

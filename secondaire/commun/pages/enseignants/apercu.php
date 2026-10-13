@@ -18,6 +18,7 @@ $est_staff = (in_array($role, ['ADMIN','PROVISEUR','FONDATEUR','CENSEUR'], true)
 // pdf_prise_service.php pour le blocage effectif impression/export).
 $validite   = null;
 $doc_expire = false;
+$mode_autonome = false;   // impression par l'enseignant, signature manuscrite (Paramètres > Documents enseignants)
 
 if ($est_staff) {
     $mat  = $_GET['id']   ?? '';
@@ -35,6 +36,7 @@ if ($est_staff) {
     }
     $validite   = demande_validite_info($mat, $type_document);
     $doc_expire = $validite['expire'] ?? false;
+    $mode_autonome = demande_est_autonome((string) $mat, $type_document);
 } else {
     flash_set('erreur','Accès réservé.'); rediriger('noyau/dashboard.php');
 }
@@ -92,6 +94,11 @@ require_once __DIR__ . '/../../../../noyau/layout/header.php';
   </h4>
 </div>
 
+<?php if ($mode_autonome && !$doc_expire): ?>
+<div class="alert alert-info py-2 px-3" style="font-size:.82rem">
+  <i class="bi bi-printer me-1"></i>Imprimez ce document, puis remettez-le au <strong>Proviseur</strong> pour signature et cachet.
+</div>
+<?php endif; ?>
 <?php if ($doc_expire): ?>
 <div class="alert alert-danger d-flex align-items-center gap-2 py-2" style="font-size:.85rem">
   <i class="bi bi-exclamation-triangle-fill"></i>
@@ -131,7 +138,7 @@ require_once __DIR__ . '/../../../../noyau/layout/header.php';
       <?php endif; ?>
 
       <div class="border-start ms-1 ps-2 d-flex align-items-center gap-2">
-        <?php if ($etab_sig_ens && !$doc_expire): ?>
+        <?php if ($etab_sig_ens && !$doc_expire && !$mode_autonome): ?>
         <div class="chk-signature form-check form-check-inline mb-0" style="user-select:none">
           <input class="form-check-input" type="checkbox" id="chkSigEns" onchange="appliquerSigEns()">
           <label class="form-check-label small" for="chkSigEns">Signature numérique</label>

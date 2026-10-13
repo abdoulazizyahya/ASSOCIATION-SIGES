@@ -73,8 +73,8 @@ function prive_dessiner_recu_eleve(FPDF $pdf, int $id_eleve, int $id_classe, int
         $pdf->SetTextColor(0);
         $texteAjuste('REPUBLIQUE DU CAMEROUN', 23.35, 7.55 + $offY, 124, '', 8);
         $texteAjuste('REPUBLIC OF CAMEROON', 149.39, 7.55 + $offY, 52, '', 8);
-        $texteAjuste($etab_brut['region_fr'] ?: "REGION DE L'ADAMAOUA", 26.06, 10.95 + $offY, 121, '', 8);
-        $texteAjuste($etab_brut['region_en'] ?: 'ADAMAWA REGION', 154.25, 10.95 + $offY, 47, '', 8);
+        $texteAjuste(($etab_brut['region_fr'] ?? ''), 26.06, 10.95 + $offY, 121, '', 8);
+        $texteAjuste(($etab_brut['region_en'] ?? ''), 154.25, 10.95 + $offY, 47, '', 8);
         $texteAjuste($etab_brut['nom_fr'] ?: 'ÉTABLISSEMENT', 14.21, 14.45 + $offY, 124, 'B', 9);
         $texteAjuste($etab_brut['nom_en'] ?: 'SCHOOL', 140.25, 14.45 + $offY, 65, 'B', 9);
 

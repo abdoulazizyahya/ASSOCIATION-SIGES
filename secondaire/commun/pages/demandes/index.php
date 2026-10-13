@@ -48,7 +48,7 @@ if ($role === 'ENSEIGNANT') {
         "SELECT d.*, e.nom_ens, e.prenom_ens, e.civilite_ens
          FROM demande_document d JOIN enseignant e ON e.matricule_ens=d.matricule_ens
          WHERE d.statut NOT IN ('en_attente_censeur','en_attente_proviseur')
-         ORDER BY GREATEST(COALESCE(d.date_censeur,'1970-01-01'),COALESCE(d.date_proviseur,'1970-01-01')) DESC
+         ORDER BY GREATEST(COALESCE(d.date_censeur,'1970-01-01'),COALESCE(d.date_proviseur,'1970-01-01'),d.date_demande) DESC
          LIMIT 50"
     );
 } else {
@@ -104,6 +104,16 @@ require_once __DIR__ . '/../../../../noyau/layout/header.php';
               <?php if ($d['motif']): ?><br>Motif : <?= h($d['motif']) ?><?php endif; ?>
             </div>
 
+            <?php if (($d['mode_traitement'] ?? 'validation') === 'autonome'): ?>
+            <!-- Mode « impression par l'enseignant » : pas de circuit, signature manuscrite. -->
+            <div class="step mb-2">
+              <span class="on">Demande</span>
+              <i class="bi bi-arrow-right"></i>
+              <span class="on">Impression</span>
+              <i class="bi bi-arrow-right"></i>
+              <span>Signature du Proviseur (à la main)</span>
+            </div>
+            <?php else: ?>
             <div class="step mb-2">
               <span class="<?= in_array($d['statut'],['en_attente_proviseur','validee']) ? 'on' : ($d['statut']==='rejetee_censeur'?'ko':'') ?>">Censeur</span>
               <i class="bi bi-arrow-right"></i>
@@ -111,6 +121,7 @@ require_once __DIR__ . '/../../../../noyau/layout/header.php';
               <i class="bi bi-arrow-right"></i>
               <span class="<?= $validee ? 'on' : '' ?>">Disponible</span>
             </div>
+            <?php endif; ?>
 
             <?php if ($rejetee): ?>
               <div class="alert alert-danger py-1 px-2 mb-2" style="font-size:.78rem">
@@ -134,6 +145,14 @@ require_once __DIR__ . '/../../../../noyau/layout/header.php';
   <?php endif; ?>
 
 <?php else: /* CENSEUR / PROVISEUR / ADMIN */ ?>
+
+  <?php if (mode_documents_enseignant() === 'autonome'): ?>
+  <div class="alert alert-info py-2 px-3" style="font-size:.82rem">
+    <i class="bi bi-printer me-1"></i><strong>Impression par l'enseignant</strong> (Paramètres &gt; Documents enseignants) :
+    les nouvelles demandes ne passent plus par la validation ; l'enseignant imprime son document et le remet au Proviseur
+    pour signature manuscrite. Les demandes déjà en cours ci-dessous restent à traiter.
+  </div>
+  <?php endif; ?>
 
   <div class="card mb-3" style="border-color:#c7d8f0">
     <div class="card-header py-2" style="background:#f0f4ff">
@@ -195,7 +214,9 @@ require_once __DIR__ . '/../../../../noyau/layout/header.php';
           <?php if (empty($historique)): ?>
           <tr><td colspan="5" class="text-center text-muted py-4">Aucun historique pour le moment.</td></tr>
           <?php endif; ?>
-          <?php foreach ($historique as $d): [$lib_statut, $classe, $icone] = libelle_statut_demande($d['statut']); ?>
+          <?php foreach ($historique as $d): [$lib_statut, $classe, $icone] = libelle_statut_demande($d['statut']);
+            // Mode « impression par l'enseignant » : pas de circuit Censeur / Proviseur.
+            if (($d['mode_traitement'] ?? 'validation') === 'autonome') [$lib_statut, $classe, $icone] = ['Imprimé par l\'enseignant le ' . date('d/m/Y', strtotime($d['date_demande'])), 'info', 'printer']; ?>
           <tr>
             <td class="fw-semibold"><?= h(($d['civilite_ens']?$d['civilite_ens'].' ':'').strtoupper($d['nom_ens']).' '.($d['prenom_ens']??'')) ?></td>
             <td><?= h(libelle_type_demande($d['type_document'])) ?></td>

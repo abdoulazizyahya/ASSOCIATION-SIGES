@@ -386,7 +386,7 @@ foreach ($qualifies as $q) {
         /*$pdf->MultiCell($col3, 3.6, u("REPUBLIQUE DU CAMEROUN\nREGION DE L'ADAMAOUA\nDEPARTEMENT DE LA VINA\nARRONDISSEMENT DE MBE"), 0, 'L');
         $pdf->SetFont('Arial', 'B', 9.5);
         $pdf->SetX($ml);
-        $pdf->Cell($col3, 5, u(strtoupper($etab['nom_fr'] ?? 'LYCEE TECHNIQUE DE MBE')), 0, 1, 'L');
+        $pdf->Cell($col3, 5, u(strtoupper($etab['nom_fr'] ?? '')), 0, 1, 'L');
         $pdf->SetFont('Arial', '', 7);
         $pdf->SetX($ml);
         $pdf->Cell($col3, 3.5, u('B.P. ' . ($etab['boite_postale'] ?? '') . '  Tel.: ' . ($etab['telephone'] ?? '')), 0, 1, 'L');
@@ -412,19 +412,19 @@ foreach ($qualifies as $q) {
         $pdf->SetFont('Arial', '', 9);
         $pdf->MultiCell($col3, 3.5, u(
 			"REPUBLIC OF CAMEROON\nPeace - Work - Fatherland\n***************\n" .
-			($etab['region_en'] ?? 'ADAMAWA REGION') . "\n" .
-			($etab['division_en'] ?? 'VINA DIVISION') . "\n" .
-			($etab['subdivision_en'] ?? 'MBE SUBDIVISION') . "\n" .
-			strtoupper($etab['nom_en'] ?? 'GTHS OF MBE') . "\n" .
-			"P.O. BOX. " . ($etab['boite_postale'] ?? '32') . " Mbe  Phone: " . ($etab['telephone'] ?? '') . "\n" .
-			($etab['email'] ?? 'lyceetechniquembe@yahoo.fr')
+			($etab['region_en'] ?? '') . "\n" .
+			($etab['division_en'] ?? '') . "\n" .
+			($etab['subdivision_en'] ?? '') . "\n" .
+			strtoupper($etab['nom_en'] ?? '') . "\n" .
+			"P.O. BOX. " . ($etab['boite_postale'] ?? '') . " " . ($etab['ville'] ?? '') . "  Phone: " . ($etab['telephone'] ?? '') . "\n" .
+			($etab['email'] ?? '')
 		),
 		0, 'C');
 
 		$pdf->SetY(max($pdf->GetY(), 33)-2.5);
 		$pdf->SetFont('Arial', 'I', 9);
 		$pdf->SetX($ml);
-		$pdf->Cell($uw, 4, u('IMMATRICULATION : ' . ($etab['immatriculation'] ?? '2JH1TEFD110316102')), 0, 1, 'C');
+		$pdf->Cell($uw, 4, u('IMMATRICULATION : ' . ($etab['immatriculation'] ?? '')), 0, 1, 'C');
 
 
         $photo_w = 38; $photo_h = 38;
@@ -580,7 +580,7 @@ foreach ($qualifies as $q) {
         $pdf->SetTextColor(255, 255, 255);
         $pdf->SetXY($ml + 28, 10);
         $pdf->SetFont('Arial', '', 7.5);
-        $pdf->Cell($uw - 56, 3.5, u(strtoupper($etab['nom_fr'] ?? 'LYCEE TECHNIQUE DE MBE') . ' — ' . strtoupper($etab['nom_en'] ?? 'GTHS OF MBE')), 0, 1, 'C');
+        $pdf->Cell($uw - 56, 3.5, u(strtoupper($etab['nom_fr'] ?? '') . ' — ' . strtoupper($etab['nom_en'] ?? '')), 0, 1, 'C');
         $pdf->SetX($ml + 28);
         $pdf->SetFont('Arial', 'B', 20);
         $pdf->Cell($uw - 56, 12, u('TABLEAU D\'HONNEUR'), 0, 1, 'C');
@@ -665,7 +665,7 @@ foreach ($qualifies as $q) {
 
         $pdf->SetFont('Arial', 'I', 9.5);
         $pdf->SetXY($x_card2 + $w_card + 10, $y_card + 9);
-        $pdf->Cell($uw - ($x_card2 + $w_card + 10 - $ml), 5, u('Mbe, le ' . date('d/m/Y')), 0, 1, 'L');
+        $pdf->Cell($uw - ($x_card2 + $w_card + 10 - $ml), 5, u((get_etablissement()['ville'] ?? '') . ', le ' . date('d/m/Y')), 0, 1, 'L');
 
         // Signatures — traits colorés fins au lieu de texte souligné.
         $y_sig = $y_card + $h_card + 16;
@@ -724,7 +724,7 @@ foreach ($qualifies as $q) {
         $pdf->SetFont('Times', '', 9);
         $pdf->Cell($uw, 4.5, u("REPUBLIQUE DU CAMEROUN — Paix - Travail - Patrie"), 0, 1, 'C');
         $pdf->SetFont('Times', 'B', 12);
-        $pdf->Cell($uw, 6, u(strtoupper($etab['nom_fr'] ?? 'LYCEE TECHNIQUE DE MBE')), 0, 1, 'C');
+        $pdf->Cell($uw, 6, u(strtoupper($etab['nom_fr'] ?? '')), 0, 1, 'C');
         $pdf->SetFont('Times', 'I', 8.5);
         $pdf->Cell($uw, 4.5, u('Annee scolaire ' . $val_annee), 0, 1, 'C');
 
@@ -787,7 +787,7 @@ foreach ($qualifies as $q) {
         $y_sig = $ph - 38;
         $pdf->SetY($y_sig - 6);
         $pdf->SetFont('Times', 'I', 9.5);
-        $pdf->Cell($uw, 5, u('Fait a Mbe, le ' . date('d/m/Y')), 0, 1, 'R');
+        $pdf->Cell($uw, 5, u('Fait a ' . (get_etablissement()['ville'] ?? '') . ', le ' . date('d/m/Y')), 0, 1, 'R');
         $w3 = $uw / 3;
         $pdf->SetFont('Times', 'BU', 9.5);
         $pdf->SetXY($ml, $y_sig);

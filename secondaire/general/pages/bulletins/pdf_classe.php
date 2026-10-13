@@ -444,11 +444,11 @@ foreach ($eleves as $el) {
     $pdf->SetFont('Arial', '', 6.5);
     $pdf->MultiCell($col3, 3.5, uc(
         "REPUBLIQUE DU CAMEROUN\nPaix - Travail - Patrie\n***************\n" .
-        ($etab['region_fr'] ?? "REGION DE L'ADAMAOUA") . "\n" .
-        ($etab['departement_fr'] ?? 'DEPARTEMENT DE LA VINA') . "\n" .
-        ($etab['arrondissement_fr'] ?? 'ARRONDISSEMENT DE MBE') . "\n" .
-        strtoupper($etab['nom_fr'] ?? 'LYCEE TECHNIQUE DE MBE') . "\n" .
-        "B.P. " . ($etab['boite_postale'] ?? '32') . " Mbe  Tel.: " . ($etab['telephone'] ?? '') . "\n" .
+        ($etab['region_fr'] ?? '') . "\n" .
+        ($etab['departement_fr'] ?? '') . "\n" .
+        ($etab['arrondissement_fr'] ?? '') . "\n" .
+        strtoupper($etab['nom_fr'] ?? '') . "\n" .
+        "B.P. " . ($etab['boite_postale'] ?? '') . " " . ($etab['ville'] ?? '') . "  Tel.: " . ($etab['telephone'] ?? '') . "\n" .
         ($etab['email'] ?? '')
     ), 0, 'C');
 
@@ -469,7 +469,7 @@ foreach ($eleves as $el) {
     } else {
         $pdf->SetFont('Arial', 'B', 10);
         $pdf->SetXY($logo_x, $y0 + ($logo_bande_h - 16) / 2);
-        $pdf->Cell($logo_w, 16, uc($etab['sigle'] ?? 'LTM'), 1, 0, 'C');
+        $pdf->Cell($logo_w, 16, uc($etab['sigle'] ?? ''), 1, 0, 'C');
     }
 
     $xr = $ml + $col3 * 2;
@@ -477,11 +477,11 @@ foreach ($eleves as $el) {
     $pdf->SetFont('Arial', '', 6.5);
     $pdf->MultiCell($col3, 3.5, uc(
         "REPUBLIC OF CAMEROON\nPeace - Work - Fatherland\n***************\n" .
-        ($etab['region_en'] ?? 'ADAMAWA REGION') . "\n" .
-        ($etab['division_en'] ?? 'VINA DIVISION') . "\n" .
-        ($etab['subdivision_en'] ?? 'MBE SUBDIVISION') . "\n" .
-        strtoupper($etab['nom_en'] ?? 'GTHS OF MBE') . "\n" .
-        "P.O. BOX. " . ($etab['boite_postale'] ?? '32') . " Mbe  Phone: " . ($etab['telephone'] ?? '') . "\n" .
+        ($etab['region_en'] ?? '') . "\n" .
+        ($etab['division_en'] ?? '') . "\n" .
+        ($etab['subdivision_en'] ?? '') . "\n" .
+        strtoupper($etab['nom_en'] ?? '') . "\n" .
+        "P.O. BOX. " . ($etab['boite_postale'] ?? '') . " " . ($etab['ville'] ?? '') . "  Phone: " . ($etab['telephone'] ?? '') . "\n" .
         ($etab['email'] ?? '')
     ),
     0, 'C');
@@ -956,7 +956,7 @@ foreach ($eleves as $el) {
     // Police agrandie (demande explicite).
     $pdf->SetFont('Arial', '', 8.5);
     $pdf->SetXY($ml + $wDec, $yd2 + 6);
-    $pdf->Cell($wObs, 5.5, uc('Mbé, le ' . date('d-m-Y') . '.'), 0, 1, 'C');
+    $pdf->Cell($wObs, 5.5, uc((get_etablissement()['ville'] ?? '') . ', le ' . date('d-m-Y') . '.'), 0, 1, 'C');
     $pdf->SetX($ml + $wDec);
     $pdf->SetFont('Arial', 'I', 7.5);
     $pdf->Cell($wObs, 4.5, 'On', 0, 1, 'C');

@@ -209,6 +209,7 @@ CREATE TABLE `demande_document` (
   `motif` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `val_annee` varchar(10) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `statut` enum('en_attente_censeur','en_attente_proviseur','rejetee_censeur','rejetee_proviseur','validee') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'en_attente_censeur',
+  `mode_traitement` enum('validation','autonome') NOT NULL DEFAULT 'validation',
   `date_demande` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `id_censeur` int unsigned DEFAULT NULL,
   `date_censeur` datetime DEFAULT NULL,
@@ -380,6 +381,7 @@ CREATE TABLE `etablissement` (
   `chef_etablissement_en` varchar(150) DEFAULT 'The Principal',
   `statut` enum('public','prive') NOT NULL DEFAULT 'public',
   `ordre_enseignement` enum('general','technique') NOT NULL DEFAULT 'general',
+  `mode_documents_enseignant` enum('validation','autonome') NOT NULL DEFAULT 'validation',
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;

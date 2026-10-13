@@ -196,10 +196,10 @@ $pdf->SetXY($ml, $y0);
 $pdf->SetFont('Arial', '', 6.5);
 $pdf->MultiCell($col3, 3.5, u(
     "REPUBLIQUE DU CAMEROUN\nPaix - Travail - Patrie\n***************\n" .
-    ($etab['region_fr'] ?? "REGION DE L'ADAMAOUA") . "\n" .
-    ($etab['departement_fr'] ?? 'DEPARTEMENT DE LA VINA') . "\n" .
-    ($etab['arrondissement_fr'] ?? 'ARRONDISSEMENT DE MBE') . "\n" .
-    strtoupper($etab['nom_fr'] ?? 'LYCEE TECHNIQUE DE MBE') . "\n" .
+    ($etab['region_fr'] ?? '') . "\n" .
+    ($etab['departement_fr'] ?? '') . "\n" .
+    ($etab['arrondissement_fr'] ?? '') . "\n" .
+    strtoupper($etab['nom_fr'] ?? '') . "\n" .
     "B.P. " . ($etab['boite_postale'] ?? '') . " Tel.: " . ($etab['telephone'] ?? '') . "\n" .
     ($etab['email'] ?? '')
 ), 0, 'C');
@@ -221,10 +221,10 @@ $pdf->SetXY($xr, $y0);
 $pdf->SetFont('Arial', '', 6.5);
 $pdf->MultiCell($col3, 3.5, u(
     "REPUBLIC OF CAMEROON\nPeace - Work - Fatherland\n***************\n" .
-    ($etab['region_en'] ?? 'ADAMAWA REGION') . "\n" .
-    ($etab['division_en'] ?? 'VINA DIVISION') . "\n" .
-    ($etab['subdivision_en'] ?? 'MBE SUBDIVISION') . "\n" .
-    strtoupper($etab['nom_en'] ?? 'GTHS OF MBE') . "\n" .
+    ($etab['region_en'] ?? '') . "\n" .
+    ($etab['division_en'] ?? '') . "\n" .
+    ($etab['subdivision_en'] ?? '') . "\n" .
+    strtoupper($etab['nom_en'] ?? '') . "\n" .
     "P.O. BOX. " . ($etab['boite_postale'] ?? '') . " Phone: " . ($etab['telephone'] ?? '') . "\n" .
     ($etab['email'] ?? '')
 ), 0, 'C');
@@ -387,7 +387,7 @@ $pdf->Ln(10);
 
 $pdf->SetFont('Arial', '', 9);
 $pdf->SetX($ml);
-$pdf->Cell($uw, 5, u('Mbe, le .................................'), 0, 1, 'R');
+$pdf->Cell($uw, 5, u((get_etablissement()['ville'] ?? '') . ', le .................................'), 0, 1, 'R');
 $pdf->Ln(2);
 // Deux colonnes : Professeur Principal (signataire du bulletin/de la classe,
 // sans image possible — nom variable par classe/enseignant) + contre-signature

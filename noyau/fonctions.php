@@ -3507,6 +3507,44 @@ function notifications_tout_marquer_lu(int $id_utilisateur): void {
     db_exec("UPDATE notification SET lue=1 WHERE id_utilisateur=?", [$id_utilisateur]);
 }
 
+// ==== Délivrance des documents enseignants (migration secondaire v15) ====
+/**
+ * Mode de délivrance de l'attestation de présence effective et des
+ * certificats de prise / reprise de service, choisi par le propriétaire ou
+ * un superadmin (Paramètres > Documents enseignants) :
+ *   'validation' : demande → Censeur → Proviseur, avec notifications ;
+ *   'autonome'   : l'enseignant demande puis imprime lui-même, et fait
+ *                  signer le document à la main par le Proviseur.
+ * Base pas encore migrée : 'validation' (comportement historique).
+ */
+function mode_documents_enseignant(): string {
+    return (get_etablissement()['mode_documents_enseignant'] ?? 'validation') === 'autonome' ? 'autonome' : 'validation';
+}
+
+/** Dernière demande DÉLIVRÉE (validée par le circuit ou imprimable en mode autonome), ou null. */
+function demande_derniere_delivree(string $mat, string $type_document): ?array {
+    if (!$mat) return null;
+    try {
+        return db_one(
+            "SELECT *, COALESCE(date_proviseur, date_demande) AS date_ref FROM demande_document
+             WHERE matricule_ens=? AND type_document=? AND statut='validee'
+             ORDER BY COALESCE(date_proviseur, date_demande) DESC, id DESC LIMIT 1",
+            [$mat, $type_document]
+        );
+    } catch (\Throwable $e) {
+        return null;
+    }
+}
+
+/**
+ * Le document de cet enseignant est-il délivré en mode autonome ? Dans ce
+ * cas la signature ÉLECTRONIQUE du Proviseur n'est jamais apposée par
+ * l'enseignant : il imprime, puis fait signer à la main.
+ */
+function demande_est_autonome(string $mat, string $type_document): bool {
+    return (demande_derniere_delivree($mat, $type_document)['mode_traitement'] ?? 'validation') === 'autonome';
+}
+
 // ==== Validité des documents enseignants (porté d'ABZ_MBE, migration secondaire v14) ====
 /**
  * Réglage de validité d'un type de document ('attestation'|'prise'|'reprise')
@@ -3540,13 +3578,11 @@ function get_reglage_validite_document(string $type_document): array {
  */
 function demande_validite_info(string $mat, string $type_document): ?array {
     if (!$mat) return null;
-    $d = db_one(
-        "SELECT date_proviseur FROM demande_document
-         WHERE matricule_ens=? AND type_document=? AND statut='validee' AND date_proviseur IS NOT NULL
-         ORDER BY date_proviseur DESC LIMIT 1",
-        [$mat, $type_document]
-    );
+    $d = demande_derniere_delivree($mat, $type_document);
     if (!$d) return null;
+    // Mode autonome : pas de signature électronique du Proviseur, la
+    // validité court depuis la demande (le document est imprimé aussitôt).
+    $d['date_proviseur'] = $d['date_proviseur'] ?: $d['date_demande'];
     $reglage = get_reglage_validite_document($type_document);
     if (!$reglage['actif']) {
         return ['date_validation' => $d['date_proviseur'], 'expire_le' => null, 'expire' => false];

@@ -49,9 +49,9 @@ if ($logo_src_path && generer_filigrane_excel($logo_src_path, $filigrane_path)) 
 $lettre = fn(int $c) => Coordinate::stringFromColumnIndex($c);
 $col_total = 6;
 
-$texte_etab = "REGION DE L'ADAMAOUA\n" .
-    ($etab['departement_fr'] ?? 'DEPARTEMENT DE LA VINA') . "\n" .
-    ($etab['arrondissement_fr'] ?? 'ARRONDISSEMENT DE MBE') . "\n" .
+$texte_etab = ($etab['region_fr'] ?? '') . "\n" .
+    ($etab['departement_fr'] ?? '') . "\n" .
+    ($etab['arrondissement_fr'] ?? '') . "\n" .
     '***********';
 $nom_etab = strtoupper($etab['nom_fr'] ?? 'ÉTABLISSEMENT');
 $tiers = max(1, (int) floor($col_total / 3));

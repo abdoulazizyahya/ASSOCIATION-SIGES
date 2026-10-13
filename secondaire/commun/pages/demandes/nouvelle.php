@@ -45,9 +45,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     $annee_act = get_annee_active();
+
+    // Mode « impression par l'enseignant » (Paramètres > Documents
+    // enseignants) : pas de circuit Censeur / Proviseur, pas de
+    // notification — le document est aussitôt disponible ; l'enseignant
+    // l'imprime et le soumet au Proviseur pour signature manuscrite.
+    if (mode_documents_enseignant() === 'autonome') {
+        db_exec(
+            "INSERT INTO demande_document (matricule_ens, type_document, motif, val_annee, statut, mode_traitement)
+             VALUES (?,?,?,?, 'validee', 'autonome')",
+            [$mat, $type, $motif ?: null, $annee_act['libelle'] ?? null]
+        );
+        flash_set('succes', 'Votre document est prêt : imprimez-le, puis soumettez-le au Proviseur pour signature.');
+        rediriger('secondaire/commun/pages/enseignants/apercu.php?id=' . urlencode((string) $mat) . '&type='
+            . ['attestation' => 'attestation', 'prise' => 'prise_service', 'reprise' => 'reprise_service'][$type]);
+    }
+
     db_exec(
-        "INSERT INTO demande_document (matricule_ens, type_document, motif, val_annee, statut)
-         VALUES (?,?,?,?, 'en_attente_censeur')",
+        "INSERT INTO demande_document (matricule_ens, type_document, motif, val_annee, statut, mode_traitement)
+         VALUES (?,?,?,?, 'en_attente_censeur', 'validation')",
         [$mat, $type, $motif ?: null, $annee_act['libelle'] ?? null]
     );
 
@@ -108,7 +124,16 @@ require_once __DIR__ . '/../../../../noyau/layout/header.php';
         <textarea name="motif" class="form-control form-control-sm" rows="2" placeholder="ex : dossier de bourse, démarche administrative…"></textarea>
       </div>
 
-      <button type="submit" class="btn btn-abz-primary"><i class="bi bi-send me-1"></i>Soumettre la demande</button>
+      <?php if (mode_documents_enseignant() === 'autonome'): ?>
+        <div class="alert alert-info py-2 px-3 mb-3" style="font-size:.8rem">
+          <i class="bi bi-printer me-1"></i>Votre document sera <strong>disponible immédiatement</strong> :
+          imprimez-le puis remettez-le au Proviseur pour <strong>signature</strong>.
+        </div>
+        <button type="submit" class="btn btn-abz-primary"><i class="bi bi-printer me-1"></i>Obtenir mon document</button>
+      <?php else: ?>
+        <div class="text-muted mb-3" style="font-size:.78rem"><i class="bi bi-diagram-3 me-1"></i>Votre demande sera vérifiée par le Censeur puis validée par le Proviseur ; vous serez notifié(e) à chaque étape.</div>
+        <button type="submit" class="btn btn-abz-primary"><i class="bi bi-send me-1"></i>Soumettre la demande</button>
+      <?php endif; ?>
     </form>
   </div>
 </div>

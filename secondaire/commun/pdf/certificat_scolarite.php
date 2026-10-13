@@ -81,10 +81,10 @@ pdf_filigrane($pdf, $etab, $pw, $ph);
 // base ("RÉGION DE L'ADAMAOUA" → "ADAMAOUA", "ADAMAWA REGION" → "ADAMAWA"),
 // pour composer "DELEGATION REGIONALE DU {nom}" / "REGIONAL DELEGATION OF
 // {nom}" comme sur le modèle de référence.
-$region_fr_nom = trim((string) preg_replace('/^(RÉGION|REGION)\s+DE\s+(L\')?/iu', '', $etab['region_fr'] ?? "RÉGION DE L'ADAMAOUA"));
-$dept_fr_nom   = trim((string) preg_replace('/^(DÉPARTEMENT|DEPARTEMENT)\s+DE\s+(LA\s+|DE\s+)?/iu', '', $etab['departement_fr'] ?? 'DÉPARTEMENT DE LA VINA'));
-$region_en_nom = trim((string) preg_replace('/\s+REGION$/iu', '', $etab['region_en'] ?? 'ADAMAWA REGION'));
-$division_en_nom = trim((string) preg_replace('/\s+DIVISION$/iu', '', $etab['division_en'] ?? 'VINA DIVISION'));
+$region_fr_nom = trim((string) preg_replace('/^(RÉGION|REGION)\s+DE\s+(L\')?/iu', '', $etab['region_fr'] ?? ''));
+$dept_fr_nom   = trim((string) preg_replace('/^(DÉPARTEMENT|DEPARTEMENT)\s+DE\s+(LA\s+|DE\s+)?/iu', '', $etab['departement_fr'] ?? ''));
+$region_en_nom = trim((string) preg_replace('/\s+REGION$/iu', '', $etab['region_en'] ?? ''));
+$division_en_nom = trim((string) preg_replace('/\s+DIVISION$/iu', '', $etab['division_en'] ?? ''));
 
 $col3 = $uw / 3;
 $y0   = 15;
@@ -105,7 +105,7 @@ if ($logo_path && is_file($logo_path)) {
 } else {
     $pdf->SetFont('Arial', 'B', 10);
     $pdf->SetXY($logo_x, $y0 + 2);
-    $pdf->Cell(20, 16, u($etab['sigle'] ?? 'LTM'), 1, 0, 'C');
+    $pdf->Cell(20, 16, u($etab['sigle'] ?? ''), 1, 0, 'C');
 }
 
 $pdf->SetXY($ml + 2 * $col3, $y0);
@@ -124,16 +124,16 @@ pdf_texte_ajuste($pdf, $ml, $y_nom, $col3, mb_strtoupper($etab['nom_fr'] ?? APP_
 $pdf->SetFont('Arial', '', 6.5);
 $pdf->SetX($ml);
 $pdf->MultiCell($col3, 3, u(
-    "B.P. " . ($etab['boite_postale'] ?? '32') . " " . ($etab['ville'] ?? 'Mbe') . "  Tel: " . ($etab['telephone'] ?? '') . "\n" .
+    "B.P. " . ($etab['boite_postale'] ?? '') . " " . ($etab['ville'] ?? '') . "  Tel: " . ($etab['telephone'] ?? '') . "\n" .
     ($etab['email'] ?? '')
 ), 0, 'C');
 $y_left_fin = $pdf->GetY();
 
-pdf_texte_ajuste($pdf, $ml + 2 * $col3, $y_nom, $col3, mb_strtoupper($etab['nom_en'] ?? 'GTHS OF MBE'), 9, 6, 2);
+pdf_texte_ajuste($pdf, $ml + 2 * $col3, $y_nom, $col3, mb_strtoupper($etab['nom_en'] ?? ''), 9, 6, 2);
 $pdf->SetFont('Arial', '', 6.5);
 $pdf->SetX($ml + 2 * $col3);
 $pdf->MultiCell($col3, 3, u(
-    "P.O. BOX. " . ($etab['boite_postale'] ?? '32') . " " . ($etab['ville'] ?? 'Mbe') . "  Phone: " . ($etab['telephone'] ?? '') . "\n" .
+    "P.O. BOX. " . ($etab['boite_postale'] ?? '') . " " . ($etab['ville'] ?? '') . "  Phone: " . ($etab['telephone'] ?? '') . "\n" .
     ($etab['email'] ?? '')
 ), 0, 'C');
 $y_right_fin = $pdf->GetY();
@@ -177,7 +177,7 @@ $pdf->Ln(14);
 $pdf->Ln(3);
 $pdf->SetFont('Arial', '', 9);
 $pdf->SetX($ml);
-$pdf->Cell($uw, 5, u('N° _____________/CS/' . ($etab['sigle'] ?? 'LTM') . '/' . date('y')), 0, 1, 'R');
+$pdf->Cell($uw, 5, u('N° _____________/CS/' . ($etab['sigle'] ?? '') . '/' . date('y')), 0, 1, 'R');
 
 // ── Corps (paragraphe légal bilingue complet) ────────────────────────
 $sexe   = ($eleve['sexe'] ?? 'M') === 'F' ? ['Née', 'inscrite'] : ['Né', 'inscrit'];
@@ -213,7 +213,7 @@ $pdf->SetX($ml);
 $pdf->Cell($uw, 4.6, pdf_police_ajustee($pdf, u('PROVISEUR DU ' . strtoupper($etab['nom_fr'] ?? APP_NOM)), 'B', 11.5, $uw), 0, 1, 'C');
 $pdf->SetFont('Arial', 'I', 9.5);
 $pdf->SetX($ml);
-$pdf->Cell($uw, 3.3, pdf_police_ajustee($pdf, u('PRINCIPAL OF THE ' . strtoupper($etab['nom_en'] ?? 'GTHS OF MBE')), 'I', 9.5, $uw), 0, 1, 'C');
+$pdf->Cell($uw, 3.3, pdf_police_ajustee($pdf, u('PRINCIPAL OF THE ' . strtoupper($etab['nom_en'] ?? '')), 'I', 9.5, $uw), 0, 1, 'C');
 
 $pdf->Ln(3);
 $champ = function (string $fr, string $val, string $en) use ($pdf, $ml, $uw): void {
@@ -285,7 +285,7 @@ $pdf->MultiCell($uw, 3.5, u(
 $pdf->Ln(8);
 $pdf->SetFont('Arial', '', 11);
 $pdf->SetX($ml + $uw * 0.55);
-$pdf->Cell($uw * 0.45, 4.6, u(($etab['ville'] ?? 'Mbe') . ', le ' . date('d/m/Y') . '.'), 0, 1, 'C');
+$pdf->Cell($uw * 0.45, 4.6, u(($etab['ville'] ?? '') . ', le ' . date('d/m/Y') . '.'), 0, 1, 'C');
 $pdf->SetFont('Arial', 'I', 9);
 $pdf->SetX($ml + $uw * 0.55);
 $pdf->Cell($uw * 0.45, 3.3, 'On', 0, 1, 'C');

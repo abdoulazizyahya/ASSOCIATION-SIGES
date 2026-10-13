@@ -318,7 +318,7 @@ if ($logo_path && is_file($logo_path)) {
 } else {
     $pdf->SetFont('Arial', 'B', 10);
     $pdf->SetXY($logo_x, $y0 + 2);
-    $pdf->Cell(20, 16, u($etab['sigle'] ?? 'LTM'), 1, 0, 'C');
+    $pdf->Cell(20, 16, u($etab['sigle'] ?? ''), 1, 0, 'C');
 }
 
 $xr = $ml + $col3 * 2;
@@ -326,19 +326,19 @@ $pdf->SetXY($xr, $y0);
 $pdf->SetFont('Arial', '', 6.5);
 $pdf->MultiCell($col3, 3.5, u(
     "REPUBLIC OF CAMEROON\nPeace - Work - Fatherland\n***************\n" .
-    ($etab['region_en'] ?? 'ADAMAWA REGION') . "\n" .
-    ($etab['division_en'] ?? 'VINA DIVISION') . "\n" .
-    ($etab['subdivision_en'] ?? 'MBE SUBDIVISION') . "\n" .
-    strtoupper($etab['nom_en'] ?? 'GTHS OF MBE') . "\n" .
-    "P.O. BOX. " . ($etab['boite_postale'] ?? '32') . " Mbe  Phone: " . ($etab['telephone'] ?? '') . "\n" .
-    ($etab['email'] ?? 'lyceetechniquembe@yahoo.fr')
+    ($etab['region_en'] ?? '') . "\n" .
+    ($etab['division_en'] ?? '') . "\n" .
+    ($etab['subdivision_en'] ?? '') . "\n" .
+    strtoupper($etab['nom_en'] ?? '') . "\n" .
+    "P.O. BOX. " . ($etab['boite_postale'] ?? '') . " " . ($etab['ville'] ?? '') . "  Phone: " . ($etab['telephone'] ?? '') . "\n" .
+    ($etab['email'] ?? '')
 ),
 0, 'C');
 
 $pdf->SetY(max($pdf->GetY(), 33));
 $pdf->SetFont('Arial', 'I', 7);
 $pdf->SetX($ml);
-$pdf->Cell($uw, 4, u('IMMATRICULATION : ' . ($etab['immatriculation'] ?? '2JH1TEFD110316102')), 0, 1, 'C');
+$pdf->Cell($uw, 4, u('IMMATRICULATION : ' . ($etab['immatriculation'] ?? '')), 0, 1, 'C');
 
 // ── 2. Titre ─────────────────────────────────────────────────────
 $pdf->SetFont('Arial', 'BI', 12);
@@ -683,7 +683,7 @@ $pdf->MultiCell($w_obs, count($decisions) * $h_bas, '', 1, 'L');
 $pdf->Ln(2);
 $pdf->SetFont('Arial', '', 7);
 $pdf->SetX($ml + $uw * 0.55);
-$pdf->Cell($uw * 0.45, 5, u('Mbe, le ' . date('d-m-Y') . '.'), 0, 1, 'R');
+$pdf->Cell($uw * 0.45, 5, u((get_etablissement()['ville'] ?? '') . ', le ' . date('d-m-Y') . '.'), 0, 1, 'R');
 $pdf->SetX($ml + $uw * 0.6);
 $pdf->SetFont('Arial', 'B', 7);
 $pdf->Cell($uw * 0.35, 5, u(strtoupper($etab['chef_etablissement'] ?? 'LE PROVISEUR') . ','), 0, 1, 'C');

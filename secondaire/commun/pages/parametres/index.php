@@ -347,6 +347,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
+// ══════════════════════════════════════════════════
+//  POST — Délivrance des documents enseignants (migration secondaire v15)
+//  Réservé au propriétaire / superadmin de l'association : contrôle ICI,
+//  côté serveur, en plus du formulaire désactivé pour les autres comptes.
+// ══════════════════════════════════════════════════
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && post('action') === 'mode_documents_enregistrer') {
+    if (!$est_superadmin) {
+        flash_set('erreur', 'Seul le propriétaire ou un superadministrateur de l\'association peut modifier ce réglage.');
+        rediriger('secondaire/commun/pages/parametres/index.php?onglet=documents');
+    }
+    $mode = post('mode_documents_enseignant') === 'autonome' ? 'autonome' : 'validation';
+    db_exec("UPDATE etablissement SET mode_documents_enseignant=? WHERE id=?", [$mode, $etab['id']]);
+    if (function_exists('journaliser_action')) {
+        journaliser_action('mode_documents_enseignant', (int) (ecole_courante()['id'] ?? 0), $mode);
+    }
+    flash_set('succes', $mode === 'autonome'
+        ? 'Les enseignants imprimeront désormais eux-mêmes leurs documents (signature manuscrite du Proviseur).'
+        : 'Les demandes de documents passent désormais par la validation du Censeur puis du Proviseur.');
+    rediriger('secondaire/commun/pages/parametres/index.php?onglet=documents');
+}
+
 // ── Données ────────────────────────────────────────────────────
 $annees     = db_all("SELECT * FROM annee_scolaire ORDER BY libelle DESC");
 $annee_act  = get_annee_active();
@@ -392,6 +413,7 @@ require_once __DIR__ . '/../../../../noyau/layout/header.php';
       'evaluations'       => ['bi-list-check', 'Évaluations'],
       'mentions'          => ['bi-award',      'Mentions'],
       'couleurs_bulletin' => ['bi-palette2',   'Couleurs bulletin'],
+      'documents'         => ['bi-file-earmark-text', 'Documents enseignants'],
       'reglages'          => ['bi-palette',    'Apparence'],
   ] as $key => [$ico, $label]): ?>
   <li class="nav-item">
@@ -1194,11 +1216,11 @@ td.comp{text-align:left}
         <div class="cbk-tag-frame" data-cbk-role="bordure_marque" tabindex="0" role="button" aria-label="Couleur : Bordure / couleur de marque">Cadre</div>
 
         <div class="cbk-hdr3">
-          <div class="col">RÉPUBLIQUE DU CAMEROUN<b>Paix – Travail – Patrie</b>***<br>Région de l'Adamaoua<br>Département de la Vina<br>Arrondissement de Mbé<br><b>LYCÉE TECHNIQUE DE MBÉ</b>B.P. 32 Mbé — Tél. : 699 00 00 00</div>
-          <div class="cbk-logo">LTM</div>
-          <div class="col">REPUBLIC OF CAMEROON<b>Peace – Work – Fatherland</b>***<br>Adamawa Region<br>Vina Division<br>Mbe Subdivision<br><b>GTHS OF MBE</b>P.O. Box 32 Mbe — Phone: 699 00 00 00</div>
+          <div class="col">RÉPUBLIQUE DU CAMEROUN<b>Paix – Travail – Patrie</b>***<br><?= h($etab['region_fr'] ?? '') ?><br><?= h($etab['departement_fr'] ?? '') ?><br><?= h($etab['arrondissement_fr'] ?? '') ?><br><b><?= h(mb_strtoupper($etab['nom_fr'] ?? '')) ?></b>B.P. <?= h($etab['boite_postale'] ?? '') ?> <?= h($etab['ville'] ?? '') ?> — Tél. : <?= h($etab['telephone'] ?? '') ?></div>
+          <div class="cbk-logo"><?= h($etab['sigle'] ?? '') ?></div>
+          <div class="col">REPUBLIC OF CAMEROON<b>Peace – Work – Fatherland</b>***<br><?= h($etab['region_en'] ?? '') ?><br><?= h($etab['division_en'] ?? '') ?><br><?= h($etab['subdivision_en'] ?? '') ?><br><b><?= h(mb_strtoupper($etab['nom_en'] ?? '')) ?></b>P.O. Box <?= h($etab['boite_postale'] ?? '') ?> <?= h($etab['ville'] ?? '') ?> — Phone: <?= h($etab['telephone'] ?? '') ?></div>
         </div>
-        <div class="cbk-immat">IMMATRICULATION : 2JH1TEFD110316102</div>
+        <div class="cbk-immat">IMMATRICULATION : <?= h($etab['immatriculation'] ?? '') ?></div>
 
         <div class="cbk-title-pill">
           <div class="main" data-cbk-role="bandeau_titre" tabindex="0" role="button" aria-label="Couleur : Bandeau titre (pilule d'en-tête)">BULLETIN SCOLAIRE DU 1er TRIMESTRE</div>
@@ -1561,6 +1583,62 @@ td.comp{text-align:left}
 })();
 </script>
 <?php endif; ?>
+
+<?php elseif ($onglet === 'documents'): ?>
+<!-- ══════════════════════════════════════════════════
+     ONGLET — Délivrance des documents enseignants
+     (attestation de présence effective, prise / reprise de service)
+══════════════════════════════════════════════════ -->
+<?php
+  $mode_doc  = mode_documents_enseignant();
+  try {
+      $nb_en_cours = (int) db_val("SELECT COUNT(*) FROM demande_document WHERE statut IN ('en_attente_censeur','en_attente_proviseur')");
+  } catch (\Throwable $e) { $nb_en_cours = 0; }
+?>
+<div class="card" style="max-width:820px">
+  <div class="card-body">
+    <div class="section-titre"><i class="bi bi-file-earmark-text me-1"></i>Délivrance des documents enseignants</div>
+    <p class="text-muted" style="font-size:.8rem">
+      Attestation de présence effective, certificats de prise et de reprise de service demandés par les enseignants
+      (menu Ressources humaines &gt; Demandes de documents).
+    </p>
+    <?php if (!$est_superadmin): ?>
+      <div class="alert alert-secondary py-2 px-3" style="font-size:.8rem">
+        <i class="bi bi-lock me-1"></i>Réglage modifiable uniquement par le <strong>propriétaire</strong> ou un
+        <strong>superadministrateur</strong> de l'association.
+      </div>
+    <?php endif; ?>
+    <form method="post">
+      <?= csrf_champ() ?>
+      <input type="hidden" name="action" value="mode_documents_enregistrer">
+      <?php foreach ([
+          'validation' => ['bi-diagram-3', 'Demande avec validation (Censeur puis Proviseur)',
+                           "L'enseignant fait sa demande ; le Censeur la vérifie, le Proviseur la valide. Chacun est notifié à chaque étape ; le document devient imprimable une fois validé (signature numérique du Proviseur possible)."],
+          'autonome'   => ['bi-printer', "Impression par l'enseignant",
+                           "L'enseignant fait sa demande et imprime aussitôt ses documents, qu'il remet ensuite au Proviseur pour signature manuscrite. Pas de validation ni de notification ; la signature numérique n'est pas proposée à l'enseignant."],
+      ] as $val => [$ico, $titre, $desc]): ?>
+      <label class="d-flex gap-2 align-items-start border rounded p-2 mb-2 <?= $mode_doc === $val ? 'border-primary bg-light' : '' ?>" style="cursor:pointer">
+        <input type="radio" class="form-check-input mt-1" name="mode_documents_enseignant" value="<?= $val ?>"
+               <?= $mode_doc === $val ? 'checked' : '' ?> <?= $est_superadmin ? '' : 'disabled' ?>>
+        <span>
+          <span class="fw-semibold" style="font-size:.85rem"><i class="bi <?= $ico ?> me-1"></i><?= h($titre) ?></span>
+          <?php if ($mode_doc === $val): ?><span class="badge bg-primary ms-1" style="font-size:.65rem">actif</span><?php endif; ?>
+          <br><span class="text-muted" style="font-size:.78rem"><?= h($desc) ?></span>
+        </span>
+      </label>
+      <?php endforeach; ?>
+      <?php if ($nb_en_cours > 0): ?>
+        <div class="text-muted mb-2" style="font-size:.76rem">
+          <i class="bi bi-info-circle me-1"></i><?= $nb_en_cours ?> demande(s) actuellement dans le circuit de validation :
+          elles restent à traiter par le Censeur / le Proviseur quel que soit le mode choisi.
+        </div>
+      <?php endif; ?>
+      <?php if ($est_superadmin): ?>
+        <button class="btn btn-primary btn-sm"><i class="bi bi-check-lg me-1"></i>Enregistrer</button>
+      <?php endif; ?>
+    </form>
+  </div>
+</div>
 
 <?php elseif ($onglet === 'reglages'): ?>
 <!-- ══════════════════════════════════════════════════
