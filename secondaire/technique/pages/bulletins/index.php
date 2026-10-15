@@ -231,9 +231,9 @@ $peut_configurer_sig_bull = signature_role_autorisee('chef_etablissement', role_
 
 function pdf_url_bull(int $id_eleve, string $vue, int $id_trim, int $id_seq, int $id_annee, bool $dl=false): string {
     if ($vue === 'annee') {
-        $base = APP_URL.'/primaire/pages/bulletins/pdf_annuel.php?eleve='.$id_eleve.'&annee='.$id_annee;
+        $base = APP_URL.'/secondaire/technique/pages/bulletins/pdf_annuel.php?eleve='.$id_eleve.'&annee='.$id_annee;
     } else {
-        $base = APP_URL.'/primaire/pages/bulletins/pdf.php?eleve='.$id_eleve.'&annee='.$id_annee;
+        $base = APP_URL.'/secondaire/technique/pages/bulletins/pdf.php?eleve='.$id_eleve.'&annee='.$id_annee;
         $base .= $vue === 'trim' ? '&trim='.$id_trim : '&seq='.$id_seq;
     }
     if ($dl) $base .= '&dl=1';
@@ -241,9 +241,9 @@ function pdf_url_bull(int $id_eleve, string $vue, int $id_trim, int $id_seq, int
 }
 function url_classe_bull(int $id_classe, string $vue, int $id_trim, int $id_seq, int $id_annee, string $ordre, bool $dl=false): string {
     if ($vue === 'annee') {
-        $base = APP_URL.'/primaire/pages/bulletins/pdf_annuel_classe.php?classe='.$id_classe.'&annee='.$id_annee.'&ordre='.$ordre;
+        $base = APP_URL.'/secondaire/technique/pages/bulletins/pdf_annuel_classe.php?classe='.$id_classe.'&annee='.$id_annee.'&ordre='.$ordre;
     } else {
-        $base = APP_URL.'/primaire/pages/bulletins/pdf_classe.php?classe='.$id_classe.'&annee='.$id_annee.'&ordre='.$ordre;
+        $base = APP_URL.'/secondaire/technique/pages/bulletins/pdf_classe.php?classe='.$id_classe.'&annee='.$id_annee.'&ordre='.$ordre;
         $base .= $vue === 'trim' ? '&trim='.$id_trim : '&seq='.$id_seq;
     }
     if ($dl) $base .= '&dl=1';
