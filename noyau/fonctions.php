@@ -2512,6 +2512,30 @@ function finances_du_par_eleve(string $val_annee, ?int $id_classe = null, ?strin
     return $eleves;
 }
 
+/**
+ * Changement de classe d'un élève (primaire) : ses paiements de l'année suivent la nouvelle
+ * classe. paiement_frais.classe fige la classe du jour du versement, or les états
+ * (par classe, impayés, répartition…) filtrent sur cette colonne — sans ce report, le
+ * paiement restait compté dans l'ancienne classe et l'élève apparaissait impayé dans la
+ * nouvelle (constaté le 16/10/2026). Les frais étant définis par niveau, un paiement d'un
+ * frais de l'ancien niveau est rattaché au frais du MÊME NOM du nouveau niveau.
+ * Retour : ['deplaces' => n, 'frais_sans_equivalent' => [libellés]].
+ */
+function finances_suivre_changement_classe(int $id_eleve, string $val_annee, int $nouvelle_classe): array {
+    $n = db_exec("UPDATE paiement_frais SET classe=? WHERE id_eleve=? AND val_annee=? AND classe<>?",
+                 [$nouvelle_classe, $id_eleve, $val_annee, $nouvelle_classe]);
+    $niveau = (string) db_val("SELECT Niveau FROM classe WHERE IDClasses=?", [$nouvelle_classe]);
+    $orphelins = [];
+    foreach (db_all("SELECT p.id_pay, o.nom_obligation FROM paiement_frais p JOIN obligation o ON o.id_obligation=p.id_obligation
+                     WHERE p.id_eleve=? AND p.val_annee=? AND o.niveau_obligation<>?", [$id_eleve, $val_annee, $niveau]) as $p) {
+        $equiv = db_val("SELECT id_obligation FROM obligation WHERE niveau_obligation=? AND UPPER(TRIM(nom_obligation))=UPPER(TRIM(?)) LIMIT 1",
+                        [$niveau, $p['nom_obligation']]);
+        if ($equiv) db_exec("UPDATE paiement_frais SET id_obligation=? WHERE id_pay=?", [(int) $equiv, (int) $p['id_pay']]);
+        else $orphelins[] = $p['nom_obligation'];
+    }
+    return ['deplaces' => $n, 'frais_sans_equivalent' => array_values(array_unique($orphelins))];
+}
+
 // ── PAIEMENT PRIVÉ (secondaire) ──────────────────────────────
 // Port du module Finances/Dépenses du PRIMAIRE (primaire/pages/finances/*,
 // primaire/pages/depenses/*) sous secondaire/commun/pages/paiements_prives/ +

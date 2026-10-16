@@ -155,6 +155,12 @@ if ($id_classe) {
             $noms_cl = array_column(db_all("SELECT IDClasses, DesignationClasses FROM classe WHERE IDClasses IN (?, ?)",
                                            [$classe_avant, (int) $id_classe]), 'DesignationClasses', 'IDClasses');
             $msg .= ' Classe changée avec succès : ' . ($noms_cl[$classe_avant] ?? '?') . ' → ' . ($noms_cl[(int) $id_classe] ?? '?') . '.';
+            // Les paiements de l'année suivent l'élève dans sa nouvelle classe (16/10/2026).
+            $suivi = finances_suivre_changement_classe($id, $val_annee, (int) $id_classe);
+            if ($suivi['deplaces']) $msg .= ' ' . $suivi['deplaces'] . ' paiement(s) reporté(s) dans la nouvelle classe.';
+            if ($suivi['frais_sans_equivalent'])
+                $msg .= ' Attention : aucun frais équivalent dans le nouveau niveau pour « ' . implode(' », « ', $suivi['frais_sans_equivalent'])
+                      . ' » — ces paiements restent rattachés au frais de l\'ancien niveau (Finances → Frais exigibles).';
         }
     } else {
         db_exec("INSERT INTO inscrire (id_eleve, IDClasses, val_annee, Date_Inscrire, Statut_elv) VALUES (?, ?, ?, CURDATE(), ?)", [$id, $id_classe, $val_annee, $statut_insc]);
