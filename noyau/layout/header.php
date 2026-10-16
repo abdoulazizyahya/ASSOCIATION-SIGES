@@ -125,6 +125,9 @@ foreach ($menu as $items) {
 
 function lien_actif(string $url): string {
     global $page_courante, $dossier_courant, $dossiers_fichiers;
+    // Une page peut désigner l'entrée de menu qui la représente (module à onglets répartis
+    // sur plusieurs fichiers, ex. Emploi du temps — secondaire/commun/pages/emploi_temps/_edt_lib.php).
+    if (!empty($GLOBALS['menu_lien_actif'])) return strtok($url, '?') === $GLOBALS['menu_lien_actif'] ? 'active' : '';
     $parts   = explode('/', $url);
     $fichier = pathinfo(end($parts), PATHINFO_FILENAME);
     $dossier = count($parts) > 1 ? $parts[count($parts) - 2] : '';

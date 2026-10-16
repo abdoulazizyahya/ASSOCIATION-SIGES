@@ -73,6 +73,15 @@ require_once __DIR__ . '/../../../../noyau/layout/header.php';
       </div>
     </div>
 
+    <?php
+    // Emploi du temps de l'année (module secondaire/commun/pages/emploi_temps, migration v17) —
+    // ignoré sans bruit sur une base pas encore migrée.
+    try {
+        require_once __DIR__ . '/../emploi_temps/_edt_lib.php';
+        echo edt_fiche_enseignant_html($mat);
+    } catch (\Throwable $e) { /* tables edt_* absentes */ }
+    ?>
+
     <?php if ($peut_gerer_paie): ?>
     <div class="card mb-2">
       <div class="card-body">

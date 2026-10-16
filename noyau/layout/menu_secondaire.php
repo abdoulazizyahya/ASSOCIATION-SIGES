@@ -51,6 +51,16 @@ $menu = [
     'Discipline' => [
         ['Discipline', 'secondaire/commun/pages/discipline/index.php', 'shield-exclamation', ['ADMIN','CENSEUR','PROVISEUR','FONDATEUR','SG','ENSEIGNANT']],
     ],
+    // Module Emploi du temps (migration secondaire v17, 15/10/2026) : construit
+    // par le Censeur (écriture ADMIN/PROVISEUR/CENSEUR, voir _edt_lib.php),
+    // consulté par l'équipe de direction ; l'enseignant voit le sien une fois publié.
+    'EMPLOI DU TEMPS' => [
+        // 3 étapes, chacune avec ses onglets dans la page (pas de doublon menu / onglets, 16/10/2026)
+        ['Préparation',          'secondaire/commun/pages/emploi_temps/parametres.php', 'sliders',        ['ADMIN','PROVISEUR','FONDATEUR','CENSEUR']],
+        ['Construction',         'secondaire/commun/pages/emploi_temps/saisie.php',     'magic',          ['ADMIN','PROVISEUR','FONDATEUR','CENSEUR','SG']],
+        ['Consulter / imprimer', 'secondaire/commun/pages/emploi_temps/consulter.php',  'calendar3-week', ['ADMIN','PROVISEUR','FONDATEUR','CENSEUR','SG','SECRETAIRE','INTENDANT']],
+        ['Mon emploi du temps',  'secondaire/commun/pages/emploi_temps/consulter.php?moi=1', 'calendar-week', ['ENSEIGNANT']],
+    ],
     // « PAIEMENT PRIVÉ » : porté du module Finances/Dépenses du PRIMAIRE
     // (primaire/pages/finances/*, primaire/pages/depenses/*) sous secondaire/commun/pages/
     // paiements_prives/ + secondaire/commun/pages/depenses_privees/, comptabilité
