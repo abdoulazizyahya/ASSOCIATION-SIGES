@@ -138,7 +138,10 @@ if (function_exists('type_enseignement_courant')) {
                                 'verif/scolarite.php', 'verif/bulletin.php'], true) || str_starts_with($_rel, 'noyau/ajax/')
                 // Toute page publique de vérification de QR (dossier verif/)
                 // (verif/paiement.php des reçus du secondaire, etc.).
-                || str_starts_with($_rel, 'verif/');
+                || str_starts_with($_rel, 'verif/')
+                // Emploi du temps : module commun au primaire et au secondaire (migration
+                // primaire v63, 17/10/2026) — type-aware à travers edt_t() / edt_primaire().
+                || str_starts_with($_rel, 'secondaire/commun/pages/emploi_temps/');
     if (!$_commun) {
         $_secondaire = type_enseignement_courant() === 'secondaire';
         if ($_secondaire && !str_starts_with($_rel, 'secondaire/')) {

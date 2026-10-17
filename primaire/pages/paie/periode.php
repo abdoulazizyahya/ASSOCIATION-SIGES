@@ -8,6 +8,7 @@ require_once __DIR__ . '/../../../noyau/connexion.php';
 require_once __DIR__ . '/../../../noyau/fonctions.php';
 require_once __DIR__ . '/../../../noyau/paie_fonctions.php';
 exiger_role(['DIRECTEUR', 'FONDATEUR', 'COMPTABLE']);  // vue accordée à tous ; l'écriture reste réservée à COMPTABLE (ecriture_module_permise)
+exiger_paie_geree();   // école publique : pas de paie (17/10/2026)
 
 $id_periode = (int) ($_GET['id'] ?? 0);
 $periode = db_one("SELECT * FROM periode_paie WHERE id=?", [$id_periode]);

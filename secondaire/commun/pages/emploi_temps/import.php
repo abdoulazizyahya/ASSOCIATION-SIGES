@@ -42,7 +42,7 @@ function edt_classeur(int $a, bool $avecDonnees): Spreadsheet {
     $wsM = $ss->createSheet(); $wsM->setTitle("Mode d'emploi");
 
     $classes = edt_classes(); $ens = edt_enseignants(); $salles = edt_salles();
-    $mats = array_values(array_unique(array_column(db_all("SELECT DISTINCT TRIM(m.libelle) l FROM matiere m JOIN discipline d ON d.id_mat=m.id ORDER BY l"), 'l')));
+    $mats = array_values(array_unique(array_column(db_all("SELECT DISTINCT TRIM(m.libelle) l FROM " . edt_t('matiere') . " m JOIN " . edt_t('discipline') . " d ON d.id_mat=m.id ORDER BY l"), 'l')));
     $wsL->fromArray([['Classes', 'Matières', 'Enseignants', 'Salles']], null, 'A1'); $ent($wsL, 'A1:D1');
     foreach ($classes as $i => $c) $wsL->setCellValue('A' . ($i + 2), $c['designation']);
     foreach ($mats as $i => $m) $wsL->setCellValue('B' . ($i + 2), $m);
@@ -183,7 +183,9 @@ function edt_import_analyser(int $a, string $fichier): array {
         $contient = array_filter($ensIdx, fn($e) => count($e['t']) >= 2 && !array_diff($e['t'], $t));
         return count($contient) === 1 ? current($contient)['id'] : null;
     };
-    $catalogue = []; foreach (db_all("SELECT id, TRIM(libelle) l FROM matiere WHERE actif=1") as $m) $catalogue[edt_norm($m['l'])] ??= (int) $m['id'];
+    $catalogue = []; foreach (db_all("SELECT id, TRIM(libelle) l FROM " . edt_t('matiere') . " WHERE actif=1") as $m) $catalogue[edt_norm($m['l'])] ??= (int) $m['id'];
+    // primaire : l'intitulé SIGES complet (groupe de compétences, matière arabe) est aussi reconnu
+    if (edt_primaire()) foreach (db_all("SELECT id, TRIM(libelle_long) l FROM edt_matiere WHERE actif=1 AND libelle_long IS NOT NULL") as $m) $catalogue[edt_norm($m['l'])] ??= (int) $m['id'];
     $progs = [];
     $trouverMat = function (int $c, string $lib) use (&$progs, $catalogue): ?int {
         $progs[$c] ??= edt_programme_classe($c);
@@ -274,9 +276,13 @@ function edt_import_enregistrer(int $a, array $an, array $opt): array {
             if ($nom === '') continue;
             $id = db_val("SELECT matricule_ens FROM enseignant WHERE UPPER(TRIM(CONCAT(nom_ens,' ',IFNULL(prenom_ens,''))))=? LIMIT 1", [$nom]);
             if (!$id) {
-                db_exec("INSERT INTO enseignant (nom_ens, tel_ens, matiere_enseignee, id_fonction) VALUES (?,?,?,'ENSEIGNANT')",
-                        [$nom, ($p['tel'] ?? '') ?: null, ($p['disc'] ?? '') ?: null]);
+                if (edt_primaire())   // primaire : pas de « matière enseignée » ; fiche active + compte par défaut, comme une fiche créée à la main
+                    db_exec("INSERT INTO enseignant (nom_ens, tel_ens, id_fonction, statut_ens) VALUES (?,?,'ENSEIGNANT','actif')", [$nom, ($p['tel'] ?? '') ?: null]);
+                else
+                    db_exec("INSERT INTO enseignant (nom_ens, tel_ens, matiere_enseignee, id_fonction) VALUES (?,?,?,'ENSEIGNANT')",
+                            [$nom, ($p['tel'] ?? '') ?: null, ($p['disc'] ?? '') ?: null]);
                 $id = db_last_id();
+                if (edt_primaire()) prim_creer_compte_fiche((int) $id); else sec_creer_compte_fiche((int) $id);
                 $stat['ens_crees'][] = $nom;
             }
             $nouveaux[edt_norm($nom)] = (int) $id;
@@ -298,7 +304,7 @@ function edt_import_enregistrer(int $a, array $an, array $opt): array {
     // une seule requête au lieu d'une par créneau, puis insertions par lots.
     $occ = [];
     $nomMat = [];
-    foreach (db_all("SELECT id, TRIM(libelle) l FROM matiere") as $m) $nomMat[(int) $m['id']] = $m['l'];
+    foreach (db_all("SELECT id, TRIM(libelle) l FROM " . edt_t('matiere') . "") as $m) $nomMat[(int) $m['id']] = $m['l'];
     foreach (db_all("SELECT id_classe, sous_groupe, jour, id_creneau, id_mat, matricule_ens FROM edt_seance WHERE id_annee=?", [$a]) as $s)
         $occ[$s['id_classe'] . '|' . $s['sous_groupe'] . '|' . $s['jour'] . '|' . $s['id_creneau']] = ['mat' => (int) $s['id_mat'], 'ens' => $s['matricule_ens'] !== null ? (int) $s['matricule_ens'] : null];
     $lot = [];
@@ -336,8 +342,11 @@ function edt_import_enregistrer(int $a, array $an, array $opt): array {
                  ON DUPLICATE KEY UPDATE heures_dues=COALESCE(VALUES(heures_dues),heures_dues), discipline=COALESCE(VALUES(discipline),discipline), grade=COALESCE(VALUES(grade),grade)",
                 [$a, $p['ens'], $p['hd'], $p['disc'] ?: null, $p['grade'] ?: null]);
         // Fiche Ressources humaines : complète les champs vides, sans jamais écraser une saisie existante
-        db_exec("UPDATE enseignant SET tel_ens=COALESCE(NULLIF(tel_ens,''), ?), matiere_enseignee=COALESCE(NULLIF(matiere_enseignee,''), ?) WHERE matricule_ens=?",
-                [($p['tel'] ?? '') ?: null, ($p['disc'] ?? '') ?: null, $p['ens']]);
+        if (edt_primaire())
+            db_exec("UPDATE enseignant SET tel_ens=COALESCE(NULLIF(tel_ens,''), ?) WHERE matricule_ens=?", [($p['tel'] ?? '') ?: null, $p['ens']]);
+        else
+            db_exec("UPDATE enseignant SET tel_ens=COALESCE(NULLIF(tel_ens,''), ?), matiere_enseignee=COALESCE(NULLIF(matiere_enseignee,''), ?) WHERE matricule_ens=?",
+                    [($p['tel'] ?? '') ?: null, ($p['disc'] ?? '') ?: null, $p['ens']]);
         $stat['profs']++;
     }
     if ($opt['sync']) edt_synchroniser_dispenser($a);
@@ -401,7 +410,7 @@ echo edt_css();
     <?php if ($analyse['inconnus']): ?>
     <div class="form-check"><input class="form-check-input" type="checkbox" name="creer_ens" value="1" id="o5" checked><label class="form-check-label" for="o5">Ajouter dans <b>Ressources humaines</b> les <?= count($analyse['inconnus']) ?> enseignant(s) absent(s) du personnel : <span class="text-muted"><?= h(implode(', ', array_column($analyse['inconnus'], 'nom'))) ?></span> (sinon leurs cours sont importés sans enseignant)</label></div>
     <?php endif; ?>
-    <div class="form-check mb-3"><input class="form-check-input" type="checkbox" name="sync" value="1" id="o4" checked><label class="form-check-label" for="o4">Mettre à jour les enseignants affectés (module Matières : notes et bulletins)</label></div>
+    <div class="form-check mb-3"><input class="form-check-input" type="checkbox" name="sync" value="1" id="o4" checked><label class="form-check-label" for="o4">Mettre à jour les enseignants affectés (<?= h(edt_lib_affectations()) ?> : notes et bulletins)</label></div>
     <button class="btn btn-primary"><i class="bi bi-check2-circle"></i> Valider l'import</button> <a class="btn btn-light" href="import.php">Annuler</a>
   </form>
 </div></div>

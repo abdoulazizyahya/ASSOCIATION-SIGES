@@ -73,7 +73,7 @@ require_once __DIR__ . '/../../../../noyau/layout/header.php';
       </div>
       <div class="card-body">
         <?php $info = [
-          ['Matricule', $e['matricule_ens']],
+          ['Matricule', $e['matricule'] ?: '—'],
           ['Nom et Prénom', ($e['civilite_ens']??'').' '.strtoupper($e['nom_ens']).' '.($e['prenom_ens']??'')],
           ['Sexe', $e['sexe_ens']??'—'],
           ['Date de naissance', $e['date_naiss']?date('d/m/Y',strtotime($e['date_naiss'])):'—'],

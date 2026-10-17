@@ -15,7 +15,7 @@ $es_partiel = isset($_GET['partiel']);
 
 $role      = role_connecte();
 $is_admin  = in_array($role, ['SUPERADMIN', 'ADMIN','PROVISEUR','CENSEUR']);
-$is_ens    = ($role === 'ENSEIGNANT');
+$is_ens    = sec_vue_enseignant();   // ENSEIGNANT, ou SG qui a des cours (17/10/2026)
 $mat_ens   = $is_ens ? get_matricule_ens_connecte() : null;
 
 $annee_act = get_annee_active();

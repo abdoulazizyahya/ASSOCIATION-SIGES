@@ -515,8 +515,132 @@ function sec_compte_gerable(array $u): bool {
 /** Secondaire : rôles que la personne connectée peut attribuer. */
 function sec_roles_attribuables(): array {
     $tous = ['ADMIN', 'PROVISEUR', 'CENSEUR', 'SG', 'SECRETAIRE', 'ENSEIGNANT', 'INTENDANT', 'FONDATEUR'];
+    // École publique : pas de fondateur, donc pas de compte fondateur (17/10/2026)
+    if ((get_etablissement()['statut'] ?? 'public') !== 'prive') $tous = array_values(array_diff($tous, ['FONDATEUR']));
     if (voit_tous_les_comptes() || in_array(role_connecte(), ['ADMIN', 'FONDATEUR'], true)) return $tous;
     return array_values(array_diff($tous, ['ADMIN', 'FONDATEUR', 'PROVISEUR']));
+}
+
+// ── Comptes du personnel (secondaire, 17/10/2026) ─────────────────────────
+// Gérés depuis Ressources humaines → Enseignants (fiche de chaque membre), plus
+// depuis Paramètres → Utilisateurs. Un compte est créé automatiquement avec la
+// fiche : identifiant tiré du nom, mot de passe = identifiant (à changer à la
+// première connexion), rôle déduit de la fonction.
+
+/** Rôle par défaut d'après la fonction saisie sur la fiche (« Censeur », « SG »…). */
+function sec_role_depuis_fonction(?string $fonction): string {
+    $f = mb_strtolower(trim((string) $fonction));
+    $f = preg_replace('/\p{Mn}+/u', '', \Normalizer::normalize($f, \Normalizer::FORM_D) ?: $f);
+    if (fonction_est_chef($fonction))                                    return 'PROVISEUR';
+    if (str_contains($f, 'censeur'))                                     return 'CENSEUR';
+    if ($f === 'sg' || str_contains($f, 'surveillant'))                  return 'SG';
+    if (str_contains($f, 'secretaire'))                                  return 'SECRETAIRE';
+    if (str_contains($f, 'intendant') || str_contains($f, 'econome'))    return 'INTENDANT';
+    return 'ENSEIGNANT';
+}
+
+/** Identifiant libre tiré d'un des mots du nom (minuscules, sans accent), sinon nom + chiffre. */
+function sec_login_libre(string $nom, ?string $prenom = null, int $sauf_id = 0): string {
+    $ascii = function (string $s): string {
+        $s = \Normalizer::normalize(mb_strtolower($s), \Normalizer::FORM_D) ?: mb_strtolower($s);
+        return preg_replace('/[^a-z0-9]/', '', preg_replace('/\p{Mn}+/u', '', $s));
+    };
+    $pris = fn(string $l) => (bool) db_val("SELECT 1 FROM utilisateur WHERE LOWER(login)=? AND id<>?", [$l, $sauf_id]);
+    $mots = array_values(array_filter(array_map($ascii, preg_split('/[\s\-\']+/u', trim($nom . ' ' . $prenom))), fn($m) => strlen($m) >= 2));
+    foreach ($mots as $m) if (!$pris($m)) return $m;
+    $base = $mots[0] ?? 'personnel';
+    for ($n = 2; $pris($base . $n); $n++);
+    return $base . $n;
+}
+
+/** Compte lié à une fiche du personnel (null si aucun). */
+function sec_compte_de_fiche(int $matricule_ens): ?array {
+    return db_one("SELECT * FROM utilisateur WHERE matricule_ens=? ORDER BY compte_systeme, id LIMIT 1", [$matricule_ens]);
+}
+
+/**
+ * Crée le compte par défaut d'une fiche du personnel qui n'en a pas : identifiant
+ * libre, mot de passe = identifiant, rôle d'après la fonction (ramené à
+ * ENSEIGNANT si la personne connectée ne peut pas l'attribuer, ou si l'école a
+ * déjà un chef d'établissement). Retourne le compte, ou null s'il existait déjà.
+ */
+function sec_creer_compte_fiche(int $matricule_ens): ?array {
+    if (sec_compte_de_fiche($matricule_ens)) return null;
+    $e = db_one("SELECT nom_ens, prenom_ens, mail_ens, id_fonction FROM enseignant WHERE matricule_ens=?", [$matricule_ens]);
+    if (!$e) return null;
+    $role = sec_role_depuis_fonction($e['id_fonction']);
+    if (!in_array($role, sec_roles_attribuables(), true) || ($role === 'PROVISEUR' && refus_second_chef() !== '')) $role = 'ENSEIGNANT';
+    $login = sec_login_libre((string) $e['nom_ens'], $e['prenom_ens']);
+    db_exec("INSERT INTO utilisateur (nom, prenom, login, email, mot_de_passe, role, actif, compte_systeme, matricule_ens) VALUES (?,?,?,?,?,?,1,0,?)",
+            [$e['nom_ens'], $e['prenom_ens'], $login, $e['mail_ens'], password_hash($login, PASSWORD_DEFAULT), $role, $matricule_ens]);
+    return sec_compte_de_fiche($matricule_ens);
+}
+
+/** Rôles qui suivent automatiquement la fonction de la fiche (17/10/2026). */
+const SEC_ROLES_SUIVANT_FONCTION = ['SG', 'CENSEUR'];
+
+/**
+ * Fonction SG / Censeur → le compte prend ce rôle ; fonction qui ne l'est plus
+ * → un compte SG / Censeur redevient Enseignant. Ne touche jamais
+ * un compte d'un autre rôle (administrateur, proviseur, secrétaire, intendant…).
+ * Retourne le nouveau rôle si le compte a changé, sinon null.
+ */
+function sec_aligner_role_fiche(int $matricule_ens): ?string {
+    $u = sec_compte_de_fiche($matricule_ens);
+    if (!$u || !empty($u['compte_systeme'])) return null;
+    $attendu = sec_role_depuis_fonction((string) db_val("SELECT id_fonction FROM enseignant WHERE matricule_ens=?", [$matricule_ens]));
+    $suivis  = array_merge(SEC_ROLES_SUIVANT_FONCTION, ['ENSEIGNANT']);
+    if (!in_array($u['role'], $suivis, true)) return null;
+    // fonction qui n'est plus SG / Censeur (ex. Secrétaire) : retour au rôle Enseignant, jamais de droits conservés
+    if (!in_array($attendu, SEC_ROLES_SUIVANT_FONCTION, true)) $attendu = 'ENSEIGNANT';
+    if ($attendu === $u['role']) return null;
+    db_exec("UPDATE utilisateur SET role=? WHERE id=?", [$attendu, $u['id']]);
+    return $attendu;
+}
+
+// ── Comptes du personnel — PRIMAIRE (17/10/2026, mêmes règles que le secondaire) ──
+// Table `user` (login_user, pwd_user, actif, matricule_ens) ; le rôle EST la fonction
+// de la fiche (enseignant.id_fonction), il suit donc toujours la fiche.
+
+/** Identifiant libre (primaire) tiré d'un des mots du nom. */
+function prim_login_libre(string $nom, ?string $prenom = null, int $sauf_id = 0): string {
+    $ascii = function (string $s): string {
+        $s = \Normalizer::normalize(mb_strtolower($s), \Normalizer::FORM_D) ?: mb_strtolower($s);
+        return preg_replace('/[^a-z0-9]/', '', preg_replace('/\p{Mn}+/u', '', $s));
+    };
+    $pris = fn(string $l) => (bool) db_val("SELECT 1 FROM user WHERE LOWER(login_user)=? AND id_user<>?", [$l, $sauf_id]);
+    $mots = array_values(array_filter(array_map($ascii, preg_split('/[\s\-\']+/u', trim($nom . ' ' . $prenom))), fn($m) => strlen($m) >= 2));
+    foreach ($mots as $m) if (!$pris($m)) return $m;
+    $base = $mots[0] ?? 'personnel';
+    for ($n = 2; $pris($base . $n); $n++);
+    return $base . $n;
+}
+
+/** Compte (primaire) lié à une fiche du personnel, ou null. */
+function prim_compte_de_fiche(int $matricule_ens): ?array {
+    return db_one("SELECT * FROM user WHERE matricule_ens=? ORDER BY id_user LIMIT 1", [$matricule_ens]);
+}
+
+/** Crée le compte par défaut (identifiant tiré du nom, mot de passe = identifiant). Null s'il existait. */
+function prim_creer_compte_fiche(int $matricule_ens): ?array {
+    if (prim_compte_de_fiche($matricule_ens)) return null;
+    $e = db_one("SELECT nom_ens, prenom_ens, statut_ens FROM enseignant WHERE matricule_ens=?", [$matricule_ens]);
+    if (!$e || ($e['statut_ens'] ?? '') === 'systeme') return null;
+    $login = prim_login_libre((string) $e['nom_ens'], $e['prenom_ens']);
+    db_exec("INSERT INTO user (login_user, pwd_user, actif, matricule_ens) VALUES (?, ?, 1, ?)",
+            [$login, password_hash($login, PASSWORD_DEFAULT), $matricule_ens]);
+    return prim_compte_de_fiche($matricule_ens);
+}
+
+/** École privée ? (primaire : etablissement.statut, migration v62 ; privé si absent). */
+function ecole_est_privee(): bool {
+    $sec = function_exists('type_enseignement_courant') && type_enseignement_courant() === 'secondaire';
+    return (get_etablissement()['statut'] ?? ($sec ? 'public' : 'prive')) === 'prive';
+}
+
+/** Peut-on gérer les comptes (créer, réinitialiser, modifier) ? Administrateur, propriétaire, fondateur, proviseur. */
+function sec_peut_gerer_comptes(): bool {
+    return voit_tous_les_comptes() || in_array(role_connecte(), ['ADMIN', 'FONDATEUR', 'PROVISEUR'], true);
 }
 
 /** Même règle pour une FICHE du personnel (matricule_ens) : modification, activation. */
@@ -565,6 +689,30 @@ function matricule_ens_courant(): ?string {
 function get_matricule_ens_connecte(): ?int {
     $mat = matricule_ens_courant();
     return $mat !== null ? (int) $mat : null;
+}
+
+/**
+ * Secondaire : la personne connectée a-t-elle des cours cette année (dispenser) ?
+ * Un proviseur, un censeur ou un SG peut aussi être affecté dans une classe
+ * et dispenser un cours (17/10/2026).
+ */
+function sec_enseigne_connecte(): bool {
+    static $r = null;
+    if ($r !== null) return $r;
+    $mat = matricule_ens_courant();
+    if ($mat === null) return $r = false;
+    $va = (string) (get_annee_active()['val_annee'] ?? '');
+    return $r = (bool) db_val("SELECT 1 FROM dispenser WHERE matricule_ens=? AND val_annee=? LIMIT 1", [(int) $mat, $va]);
+}
+
+/**
+ * Pages pédagogiques (notes, absences, bulletins, statistiques…) : vue « enseignant »,
+ * limitée à ses propres classes et matières. Un SG qui enseigne y accède comme un
+ * enseignant ; le proviseur et le censeur y ont déjà accès à toutes les classes.
+ */
+function sec_vue_enseignant(): bool {
+    $role = role_connecte();
+    return $role === 'ENSEIGNANT' || ($role === 'SG' && sec_enseigne_connecte());
 }
 
 /**
@@ -1206,14 +1354,18 @@ function get_etablissement(): array {
 }
 
 /**
- * L'école gère-t-elle elle-même les salaires ? Non pour une école secondaire
- * PUBLIQUE (personnel payé par l'État) : grille salariale, paie, avances et
- * bulletins de paie y sont masqués et inaccessibles (17/10/2026). Le primaire
- * (pas de colonne statut) et le secondaire privé gardent la paie.
+ * L'école gère-t-elle elle-même les salaires ? Non pour une école PUBLIQUE, primaire
+ * ou secondaire (personnel payé par l'État) : grille salariale, paie, avances,
+ * bulletins de paie, contrats et congés y sont masqués et inaccessibles (17/10/2026).
  */
 function paie_geree_par_ecole(): bool {
-    if (function_exists('type_enseignement_courant') && type_enseignement_courant() !== 'secondaire') return true;
-    return (get_etablissement()['statut'] ?? 'public') === 'prive';
+    return ecole_est_privee();   // primaire comme secondaire (17/10/2026) : école publique = pas de paie
+}
+/** Contrats et congés du personnel : écoles privées uniquement (17/10/2026), comme la paie. */
+function exiger_ecole_privee(string $quoi): void {
+    if (paie_geree_par_ecole()) return;
+    flash_set('info', "École publique : $quoi du personnel ne sont pas gérés dans SIGES.");
+    rediriger(type_enseignement_courant() === 'secondaire' ? 'secondaire/commun/pages/enseignants/liste.php' : 'primaire/pages/enseignants/liste.php');
 }
 /** Garde des pages de paie : école publique → retour au tableau de bord. */
 function exiger_paie_geree(): void {
@@ -2299,6 +2451,7 @@ function libelle_role(string $role): string {
 function fonctions_assignables(): array {
     $superadmin = function_exists('est_superadmin_association') && est_superadmin_association();
     $exclues    = $superadmin ? ['SUPERADMIN', 'PROPRIETAIRE'] : ['SUPERADMIN', 'PROPRIETAIRE', 'FONDATEUR'];
+    if (!ecole_est_privee()) $exclues[] = 'FONDATEUR';   // école publique : pas de fondateur (17/10/2026)
     return array_values(array_diff(
         array_column(db_all("SELECT id_fonction FROM fonction ORDER BY id_fonction"), 'id_fonction'),
         $exclues

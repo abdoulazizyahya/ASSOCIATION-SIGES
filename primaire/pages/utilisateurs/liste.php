@@ -3,6 +3,7 @@ require_once __DIR__ . '/../../../config/config.php';
 require_once __DIR__ . '/../../../noyau/connexion.php';
 require_once __DIR__ . '/../../../noyau/fonctions.php';
 exiger_role(['DIRECTEUR']);
+$GLOBALS['menu_lien_actif'] = 'primaire/pages/enseignants/liste.php';   // rattaché à Ressources humaines → Enseignant(e)s (17/10/2026)
 
 // Changement de rôle (privilège système) — demande explicite du 22/08/2026 :
 // avant ce chantier, le SEUL moyen de changer le "rôle" d'un compte était de

@@ -303,6 +303,10 @@ function charger_schema_ecole(mysqli &$l, array $seed, string $type = 'primaire'
     mysqli_stmt_bind_param($st, 'ssss', $seed['nom'], $seed['nom_en'], $seed['sigle'], $seed['ville']);
     mysqli_stmt_execute($st);
     mysqli_stmt_close($st);
+    // Statut public / privé du primaire (migration v62, 17/10/2026) : décide du compte fondateur.
+    $statut_p = ($seed['statut'] ?? '') === 'public' ? 'public' : 'prive';
+    $col = mysqli_query($l, "SHOW COLUMNS FROM etablissement LIKE 'statut'");
+    if ($col && mysqli_num_rows($col)) mysqli_query($l, "UPDATE etablissement SET statut='$statut_p' WHERE IDEtablissement=1");
 
     // Provisionnement « école neuve » : classes standard + année scolaire
     // active + barème de travail dérivé du gabarit. Best-effort — un échec
@@ -341,11 +345,14 @@ function comptes_defaut_definitions(string $type, string $statut = 'public', ?st
         if ($prive) $c[] = ['role' => 'FONDATEUR', 'login' => 'fondateur', 'nom' => 'Fondateur', 'prenom' => 'Général'];
         return $c;
     }
-    return [
-        ['role' => 'FONDATEUR', 'login' => 'fondateur', 'nom' => 'Fondateur', 'prenom' => 'Général'],
+    // Primaire : le Directeur reste ; compte fondateur pour une école PRIVÉE seulement
+    // (une école publique n'a pas de fondateur, 17/10/2026).
+    $c = [
         ['role' => 'DIRECTEUR', 'login' => $directeur_login ?: 'directeur', 'nom' => 'Directeur', 'prenom' => 'Général'],
         ['role' => 'COMPTABLE', 'login' => 'financier', 'nom' => 'Agent', 'prenom' => 'Financier'],
     ];
+    if ($statut === 'prive') array_unshift($c, ['role' => 'FONDATEUR', 'login' => 'fondateur', 'nom' => 'Fondateur', 'prenom' => 'Général']);
+    return $c;
 }
 
 // Identifiant déjà pris dans cette base école ?

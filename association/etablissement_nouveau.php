@@ -108,7 +108,7 @@ asso_haut('Nouvel établissement');
       </div>
     </div>
 
-    <div class="col-12" id="bloc_statut" style="<?= $val['type_enseignement'] === 'secondaire' ? '' : 'display:none' ?>">
+    <div class="col-12" id="bloc_statut">
       <label class="form-label small d-block">Statut *</label>
       <div class="btn-group w-100" role="group">
         <input type="radio" class="btn-check" name="statut" id="statut_public" value="public"
@@ -120,8 +120,7 @@ asso_haut('Nouvel établissement');
         <label class="btn btn-outline-primary btn-sm" for="statut_prive">Privé</label>
       </div>
       <div class="form-text small text-muted2">
-        Détermine le libellé affiché (Proviseur/Principal) et lequel des deux modules Paiements
-        (public ou privé) est visible — jamais les deux à la fois.
+        Privé : un compte fondateur est créé ; une école publique n'a pas de fondateur. Au secondaire, détermine aussi le libellé (Proviseur/Principal) et le module Paiements visible.
       </div>
     </div>
 
@@ -173,7 +172,6 @@ asso_haut('Nouvel établissement');
   document.querySelectorAll('input[name="type_enseignement"]').forEach(function (r) {
     r.addEventListener('change', function () {
       var sec = document.getElementById('type_secondaire').checked;
-      document.getElementById('bloc_statut').style.display = sec ? '' : 'none';
       document.getElementById('bloc_ordre').style.display  = sec ? '' : 'none';
     });
   });

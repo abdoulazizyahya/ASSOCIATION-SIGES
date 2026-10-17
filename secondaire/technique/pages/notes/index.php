@@ -8,14 +8,16 @@ header('Cache-Control: no-store, no-cache, must-revalidate');
 require_once __DIR__ . '/../../../../config/config.php';
 require_once __DIR__ . '/../../../../noyau/connexion.php';
 require_once __DIR__ . '/../../../../noyau/fonctions.php';
-exiger_role(['ADMIN', 'PROVISEUR', 'FONDATEUR', 'CENSEUR', 'ENSEIGNANT']);
+exiger_role(['ADMIN', 'PROVISEUR', 'FONDATEUR', 'CENSEUR', 'ENSEIGNANT', 'SG']);
+// SG : seulement s'il a des cours (17/10/2026) — contrôlé avant toute écriture (auto_activer_sequences)
+if (role_connecte() === 'SG' && !sec_vue_enseignant()) { flash_set('erreur', 'Les notes sont réservées aux personnes qui ont des cours.'); rediriger('noyau/dashboard.php'); }
 if (!est_technique()) rediriger('secondaire/general/pages/notes/index.php');
 
 auto_activer_sequences();
 
 $role        = role_connecte();
 $is_admin    = in_array($role, ['ADMIN','PROVISEUR','FONDATEUR','CENSEUR'], true) || $role === 'MEMBRE_ASSOCIATION';
-$is_ens      = ($role === 'ENSEIGNANT');
+$is_ens      = sec_vue_enseignant();   // ENSEIGNANT, ou SG qui a des cours (17/10/2026)
 $onglet      = $_GET['onglet'] ?? 'classe';
 $annee_act   = get_annee_active();
 $id_annee    = (int)($annee_act['id'] ?? 0);

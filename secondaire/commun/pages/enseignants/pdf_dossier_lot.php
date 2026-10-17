@@ -28,8 +28,8 @@ $dl     = ($_GET['dl'] ?? '0') === '1';
 // ── Construction du filtre (requête préparée) ────────────────────────
 $conds = []; $params = [];
 if ($q !== '') {
-    $conds[] = "(nom_ens LIKE ? OR prenom_ens LIKE ? OR matricule_ens LIKE ?)";
-    array_push($params, "%$q%", "%$q%", "%$q%");
+    $conds[] = "(nom_ens LIKE ? OR prenom_ens LIKE ? OR matricule LIKE ? OR id_fonction LIKE ? OR tel_ens LIKE ?)";
+    array_push($params, ...array_fill(0, 5, "%$q%"));
 }
 if ($region !== '') { $conds[] = "region_origine = ?";      $params[] = $region; }
 if ($dep !== '')    { $conds[] = "departement_origine = ?"; $params[] = $dep; }

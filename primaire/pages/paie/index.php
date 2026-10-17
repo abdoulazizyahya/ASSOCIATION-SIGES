@@ -14,6 +14,7 @@ require_once __DIR__ . '/../../../noyau/paie_fonctions.php';
 // refuser l'accès en l'ouvrant — incohérence corrigée en retirant l'accès
 // partiel plutôt qu'en l'étendant (données sensibles, accès Directeur voulu).
 exiger_role(['DIRECTEUR', 'FONDATEUR', 'COMPTABLE']);  // vue accordée à tous ; l'écriture reste réservée à COMPTABLE (ecriture_module_permise)
+exiger_paie_geree();   // école publique : pas de paie (17/10/2026)
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     csrf_verifier();

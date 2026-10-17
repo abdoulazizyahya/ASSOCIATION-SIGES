@@ -8,6 +8,7 @@ require_once __DIR__ . '/../../../../noyau/connexion.php';
 require_once __DIR__ . '/../../../../noyau/fonctions.php';
 require_once __DIR__ . '/../../../../noyau/paie_fonctions.php';
 exiger_role(['ADMIN', 'PROVISEUR', 'FONDATEUR', 'CENSEUR']);
+exiger_ecole_privee('les contrats');   // école publique : non géré (17/10/2026)
 
 $mat = (int) ($_GET['mat'] ?? 0);
 $ens = db_one("SELECT matricule_ens, nom_ens, prenom_ens FROM enseignant WHERE matricule_ens=?", [$mat]);

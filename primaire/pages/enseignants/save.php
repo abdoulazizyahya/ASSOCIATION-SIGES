@@ -31,7 +31,8 @@ $num_cni        = post('num_cni') ?: null;
 $situation      = post('situation') ?: null;
 $tel            = post('tel') ?: null;
 $mail           = post('mail') ?: null;
-$mat_ens        = post('mat_ens') ?: null;
+// Matricule (alphanumérique, ex. JP23444, 402683, 561345-M) : majuscules, unique quand renseigné (17/10/2026)
+$mat_ens        = mb_strtoupper(preg_replace('/\s+/', ' ', trim(post('mat_ens')))) ?: null;
 $matricule_cnps = post('matricule_cnps') ?: null;
 $nb_enfants     = max(0, (int) post('nb_enfants'));
 $nb_pers_charge = max(0, (int) post('nb_pers_charge'));
@@ -43,6 +44,11 @@ $date_recrut    = post('date_recrutement') ?: null;
 $mode_paiement  = post('mode_paiement') ?: null;
 $nom_banque     = post('nom_banque') ?: null;
 $compte_bancaire = post('compte_bancaire') ?: null;
+// École publique : ces champs ne sont pas affichés (17/10/2026) — on garde les valeurs en base.
+if (!paie_geree_par_ecole() && $mat_existant) {
+    $av = db_one("SELECT mode_paiement, nom_banque, compte_bancaire FROM enseignant WHERE matricule_ens=?", [$mat_existant]) ?? [];
+    [$mode_paiement, $nom_banque, $compte_bancaire] = [$av['mode_paiement'] ?? null, $av['nom_banque'] ?? null, $av['compte_bancaire'] ?? null];
+}
 $statut_ens     = post('statut_ens') === 'inactif' ? 'inactif' : 'actif';
 
 // Cascade région/département/arrondissement — même paire de colonnes que
@@ -74,6 +80,10 @@ if (!in_array($fonction, fonctions_assignables(), true)) {
 // Un seul directeur par école (fonctions.php::refus_second_chef()).
 if ($fonction === 'DIRECTEUR' && ($refus = refus_second_chef($mat_existant ? (int) $mat_existant : null)) !== '') {
     flash_set('erreur', $refus);
+    rediriger('primaire/pages/enseignants/form.php' . ($mat_existant ? '?mat=' . $mat_existant : ''));
+}
+if ($mat_ens !== null && ($autre = db_one("SELECT CONCAT_WS(' ', UPPER(nom_ens), prenom_ens) AS n FROM enseignant WHERE mat_ens=? AND matricule_ens<>?", [$mat_ens, (int) $mat_existant]))) {
+    flash_set('erreur', 'Le matricule « ' . $mat_ens . ' » est déjà attribué à ' . trim($autre['n']) . '.');
     rediriger('primaire/pages/enseignants/form.php' . ($mat_existant ? '?mat=' . $mat_existant : ''));
 }
 if ($id_grade && !db_val("SELECT COUNT(*) FROM grade_enseignant WHERE code_grade=?", [$id_grade])) {
@@ -113,7 +123,11 @@ if ($mat_existant) {
         ]
     );
     $mat = (int) db_last_id();
-    $msg = 'Membre du personnel créé — matricule interne ' . $mat . '.';
+    $msg = 'Membre du personnel créé.';
+    // Compte de connexion créé d'office (17/10/2026) : identifiant tiré du nom, mot de passe identique.
+    if ($compte = prim_creer_compte_fiche($mat)) {
+        $msg .= ' Compte de connexion créé : identifiant « ' . $compte['login_user'] . ' », mot de passe identique (à changer à la première connexion).';
+    }
 }
 
 flash_set('succes', $msg);

@@ -13,7 +13,7 @@ require_once __DIR__ . '/header_pdf.php';
 
 $role     = role_connecte();
 $is_admin = in_array($role, ['ADMIN', 'PROVISEUR', 'FONDATEUR', 'CENSEUR']) || $role === 'MEMBRE_ASSOCIATION';
-$is_ens   = ($role === 'ENSEIGNANT');
+$is_ens   = sec_vue_enseignant();   // ENSEIGNANT, ou SG qui a des cours (17/10/2026)
 $mat_ens  = $is_ens ? get_matricule_ens_connecte() : null;
 if (!$is_admin && !$is_ens) die('Acces non autorise.');
 

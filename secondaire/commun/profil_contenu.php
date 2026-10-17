@@ -97,7 +97,7 @@ $rc = $role_colors[$compte['role'] ?? ''] ?? ['bg' => '#f3f4f6', 'txt' => '#3741
 
         <?php if (!empty($compte['matricule_ens'])): ?>
         <div class="mt-2 pt-2 border-top" style="font-size:.75rem;color:#6b7280">
-          <i class="bi bi-person-badge me-1"></i>Fiche liée : matricule <?= h((string) $compte['matricule_ens']) ?>
+          <i class="bi bi-person-badge me-1"></i>Fiche du personnel liée<?php $__m = db_val("SELECT matricule FROM enseignant WHERE matricule_ens=?", [(int) $compte['matricule_ens']]); if ($__m): ?> : matricule <?= h($__m) ?><?php endif; ?>
           <a href="<?= APP_URL ?>/secondaire/commun/pages/enseignants/mon_profil.php" class="d-block mt-1" style="font-size:.72rem">
             <i class="bi bi-pencil-square me-1"></i>Modifier mes informations
           </a>

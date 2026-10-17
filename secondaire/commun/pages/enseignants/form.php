@@ -50,11 +50,16 @@ require_once __DIR__ . '/../../../../noyau/layout/header.php';
             <?php endforeach; ?>
           </select>
         </div>
-        <div class="col-md-5">
+        <div class="col-md-3">
+          <label class="form-label">Matricule</label>
+          <input type="text" name="matricule" class="form-control text-uppercase" maxlength="30" value="<?= $ve('matricule') ?>"
+                 pattern="[A-Za-z0-9][A-Za-z0-9 ./\-]{0,29}" placeholder="ex. JP23444, 402683, 561345-M" title="Lettres, chiffres, tiret, point ou barre oblique">
+        </div>
+        <div class="col-md-4">
           <label class="form-label">Nom <span class="text-danger">*</span></label>
           <input type="text" name="nom" class="form-control" required value="<?= $ve('nom_ens') ?>">
         </div>
-        <div class="col-md-5">
+        <div class="col-md-3">
           <label class="form-label">Prénom(s)</label>
           <input type="text" name="prenom" class="form-control" value="<?= $ve('prenom_ens') ?>">
         </div>

@@ -9,7 +9,8 @@ require_once __DIR__ . '/_edt_lib.php';
 exiger_role(EDT_ROLES_GESTION);
 
 $a = edt_annee_id();
-$onglet = in_array($_GET['onglet'] ?? '', ['grille', 'regles', 'salles', 'annee'], true) ? $_GET['onglet'] : 'grille';
+$onglets_ok = array_merge(['grille', 'regles', 'salles', 'annee'], edt_primaire() ? ['cours'] : []);
+$onglet = in_array($_GET['onglet'] ?? '', $onglets_ok, true) ? $_GET['onglet'] : 'grille';
 $ecrire = edt_peut_ecrire();
 $retour = fn(string $o) => rediriger("secondaire/commun/pages/emploi_temps/parametres.php?onglet=$o");
 $types = edt_types_contraintes();
@@ -17,6 +18,17 @@ $types = edt_types_contraintes();
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && $ecrire) {
     csrf_verifier();
     $act = post('action');
+
+    // ── Cours (primaire) : libellé court et état de chaque cours du catalogue ──
+    if ($act === 'cours' && edt_primaire()) {
+        foreach ($_POST['m_id'] ?? [] as $i => $mid) {
+            $lib = mb_substr(trim($_POST['m_lib'][$i] ?? ''), 0, 60);
+            if ($lib === '') continue;
+            db_exec("UPDATE edt_matiere SET libelle=?, actif=? WHERE id=?", [$lib, in_array((string) $mid, $_POST['m_actif'] ?? [], true) ? 1 : 0, (int) $mid]);
+        }
+        flash_set('succes', 'Cours enregistrés.');
+        $retour('cours');
+    }
 
     // ── Grille horaire ────────────────────────────────────────────────
     if ($act === 'grille') {
@@ -198,12 +210,39 @@ function ajouterCr(){const tb=document.querySelector('#tabCr tbody');const tr=do
 tr.innerHTML='<td><input type="hidden" name="cr_id[]" value="0"><input class="form-control form-control-sm" name="cr_lib[]" placeholder="10ème H"></td><td><input type="time" class="form-control form-control-sm" name="cr_deb[]"></td><td><input type="time" class="form-control form-control-sm" name="cr_fin[]"></td><td><select class="form-select form-select-sm" name="cr_type[]"><option value="cours">Cours</option><option value="pause">Pause</option></select></td><td><button type="button" class="btn btn-sm btn-outline-danger" onclick="this.closest(\'tr\').remove()"><i class="bi bi-x"></i></button></td>';tb.appendChild(tr);}
 </script>
 
+<?php elseif ($onglet === 'cours'):
+    // Primaire (migration v63) : catalogue des cours = groupes de compétences + matières arabes
+    edt_prim_sync_matieres();
+    $cours_cat = db_all("SELECT m.*, (SELECT COUNT(DISTINCT d.IDClasses) FROM " . edt_t('discipline') . " d WHERE d.id_mat=m.id) nb_classes
+                         FROM edt_matiere m ORDER BY m.source, m.id");
+?>
+<p class="text-muted small mb-2">Libellé court affiché dans les grilles et sur les fiches imprimées. Les cours viennent des groupes de compétences
+  (piste française) et des matières arabes de SIGES ; décochez un cours qui ne doit pas apparaître dans l'emploi du temps.</p>
+<form method="post">
+  <?= csrf_champ() ?><input type="hidden" name="action" value="cours">
+  <div class="table-responsive"><table class="table table-sm table-abz align-middle" style="font-size:.82rem">
+    <thead><tr><th>Piste</th><th style="width:220px">Libellé court</th><th>Intitulé SIGES</th><th class="text-center">Classes</th><th class="text-center">Actif</th></tr></thead>
+    <tbody>
+    <?php foreach ($cours_cat as $m): ?>
+      <tr>
+        <td><span class="badge <?= $m['source'] === 'ar' ? 'bg-success' : 'bg-primary' ?>"><?= $m['source'] === 'ar' ? 'Arabe' : 'Française' ?></span></td>
+        <td><input type="hidden" name="m_id[]" value="<?= (int) $m['id'] ?>"><input class="form-control form-control-sm" name="m_lib[]" maxlength="60" value="<?= h($m['libelle']) ?>" <?= $ecrire ? '' : 'disabled' ?>></td>
+        <td class="text-muted"><?= h($m['libelle_long']) ?></td>
+        <td class="text-center"><?= (int) $m['nb_classes'] ?></td>
+        <td class="text-center"><input class="form-check-input" type="checkbox" name="m_actif[]" value="<?= (int) $m['id'] ?>" <?= $m['actif'] ? 'checked' : '' ?> <?= $ecrire ? '' : 'disabled' ?>></td>
+      </tr>
+    <?php endforeach; ?>
+    </tbody>
+  </table></div>
+  <?php if ($ecrire): ?><button class="btn btn-sm btn-primary"><i class="bi bi-check-lg me-1"></i>Enregistrer</button><?php endif; ?>
+</form>
+
 <?php elseif ($onglet === 'regles'):
     $regles = db_all("SELECT * FROM edt_contrainte WHERE id_annee=? ORDER BY actif DESC, type, id", [$a]);
-    $mats = db_all("SELECT DISTINCT m.id, TRIM(m.libelle) libelle FROM matiere m JOIN discipline d ON d.id_mat=m.id WHERE m.actif=1 ORDER BY libelle");
-    $groupes = db_all("SELECT DISTINCT libelle_groupe_comp l FROM groupe ORDER BY l");
+    $mats = db_all("SELECT DISTINCT m.id, TRIM(m.libelle) libelle FROM " . edt_t('matiere') . " m JOIN " . edt_t('discipline') . " d ON d.id_mat=m.id WHERE m.actif=1 ORDER BY libelle");
+    $groupes = db_all("SELECT DISTINCT libelle_groupe_comp l FROM " . edt_t('groupe') . " gr ORDER BY l");
     $ens = edt_enseignants(); $classes = edt_classes(); $salles = edt_salles();
-    $niveaux = db_all("SELECT code_niveau, libelle_niv FROM niveau ORDER BY id_cycle, ordre_niveau");
+    $niveaux = db_all("SELECT code_niveau, libelle_niv FROM " . edt_t('niveau') . " nv ORDER BY id_cycle, ordre_niveau");
     $nomCible = function (array $r) use ($mats, $ens, $classes, $salles, $niveaux) {
         $id = (string) $r['cible_id'];
         $f = fn($list, $k, $l) => ($x = current(array_filter($list, fn($e) => (string) $e[$k] === $id))) ? $x[$l] : $id;
@@ -304,7 +343,7 @@ if(document.querySelector('#rType'))majRegle();
 </div>
 
 <?php else:
-    $annees = db_all("SELECT id, libelle FROM annee_scolaire WHERE id<>? ORDER BY libelle DESC", [$a]);
+    $annees = db_all("SELECT id, libelle FROM " . edt_t('annee_scolaire') . " an WHERE an.id<>? ORDER BY libelle DESC", [$a]);
 ?>
 <div class="row g-3">
   <?php if (!$ecrire): ?><div class="col-12"><div class="alert alert-light border small">Réservé au Censeur, au Proviseur et à l'administrateur.</div></div><?php endif; ?>

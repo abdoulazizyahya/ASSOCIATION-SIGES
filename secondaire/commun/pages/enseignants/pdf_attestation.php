@@ -149,7 +149,7 @@ $blank = fn(string $val='', int $len=40): string => $val ? str_pad($val,$len) : 
 
 $pdf->Ln(2);$pdf->SetX($ml);
 $pdf->Cell($uw/2,6,ud("Grade : ".$blank($e['id_grade']??'',30)),0,0,'L');
-$pdf->Cell($uw/2,6,ud("Matricule/ID No. : ".$blank($e['matricule_ens'],24)),0,1,'L');
+$pdf->Cell($uw/2,6,ud("Matricule/ID No. : ".$blank((string) ($e['matricule'] ?? ''),24)),0,1,'L');
 
 $pdf->SetX($ml);
 $pdf->Cell($uw/2,6,ud("Ne(e)/Born le/on : ").$blank($fmt_date($e['date_naiss']??null),20),0,0,'L');

@@ -194,7 +194,7 @@ require_once __DIR__ . '/../../../../noyau/layout/header.php';
 
   <div class="col-md-3">
     <label class="form-label">Matricule</label>
-    <input type="text" value="<?= h($mat) ?>" class="form-control form-control-sm" readonly>
+    <input type="text" value="<?= h($v('matricule') ?: '—') ?>" class="form-control form-control-sm" readonly title="Saisi par l'administration sur la fiche du personnel">
   </div>
   <div class="col-md-1">
     <label class="form-label">Civilité</label>

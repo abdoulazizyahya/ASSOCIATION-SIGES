@@ -15,11 +15,99 @@
 // sous-groupe) ou une salle à deux endroits au même moment. Exception : un
 // COURS COMMUN (même code_commun) — une seule séance partagée par plusieurs
 // classes, avec le même enseignant.
+//
+// PRIMAIRE (migration v63, 17/10/2026) : même module. Les tables du secondaire
+// lues ici (classe, matiere, discipline…) sont remplacées par des sous-requêtes (edt_t())
+// à travers edt_t() : cours = groupes de compétences + matières arabes
+// (catalogue edt_matiere, id 1000+ = arabe), enseignant = « Affectation des
+// classes » (enseignat_classe / enseignat_classe_arabe), année = 2026 pour 2026/2027.
 
 const EDT_JOURS = [1 => 'Lundi', 2 => 'Mardi', 3 => 'Mercredi', 4 => 'Jeudi', 5 => 'Vendredi', 6 => 'Samedi'];
 const EDT_JOURS_COURTS = [1 => 'Lun', 2 => 'Mar', 3 => 'Mer', 4 => 'Jeu', 5 => 'Ven', 6 => 'Sam'];
-const EDT_ROLES_ECRITURE = ['ADMIN', 'PROVISEUR', 'CENSEUR'];
-const EDT_ROLES_GESTION  = ['ADMIN', 'PROVISEUR', 'FONDATEUR', 'CENSEUR', 'SG'];
+// Rôles des deux ordres (aucun rôle n'existe dans les deux) : DIRECTEUR = primaire.
+const EDT_ROLES_ECRITURE = ['ADMIN', 'PROVISEUR', 'CENSEUR', 'DIRECTEUR'];
+const EDT_ROLES_GESTION  = ['ADMIN', 'PROVISEUR', 'FONDATEUR', 'CENSEUR', 'SG', 'DIRECTEUR'];
+const EDT_PRIM_ARABE = 1000;   // décalage des matières arabes dans edt_matiere / edt_t('discipline')
+
+function edt_primaire(): bool {
+    return function_exists('type_enseignement_courant') && type_enseignement_courant() !== 'secondaire';
+}
+/**
+ * Source d'une table de référence : la table du secondaire, ou au primaire une
+ * sous-requête qui présente ses données sous la même forme (s'utilise comme
+ * « FROM " . edt_t('classe') . " c »). Pas de vues SQL : sur un serveur qui héberge
+ * de nombreuses écoles, les requêtes préparées sur des vues échouent (MySQL 1615,
+ * cache de définitions saturé).
+ */
+function edt_t(string $nom): string {
+    static $prim = null;
+    $prim ??= edt_primaire();
+    if (!$prim) return $nom;
+    $an = "(SELECT val_annee FROM annee_scolaire WHERE Etat_annee_scolaire = 1 LIMIT 1)";
+    $ar = EDT_PRIM_ARABE;
+    return match ($nom) {
+        'matiere' => 'edt_matiere',
+        'annee_scolaire' => "(SELECT CAST(LEFT(a.val_annee, 4) AS UNSIGNED) AS id, a.val_annee AS libelle, a.Etat_annee_scolaire AS active FROM annee_scolaire a)",
+        'classe' => "(SELECT c.IDClasses AS id, c.DesignationClasses AS designation, c.Niveau AS code_niveau, NULL AS libelle_section,
+                             NULL AS id_filiere, 0 AS archivee, COALESCE(n.OrdreNiveau, 99) AS ordre
+                        FROM classe c LEFT JOIN niveau n ON n.LibelleNiveau = c.Niveau)",
+        'niveau' => "(SELECT LibelleNiveau AS code_niveau, LibelleNiveau AS libelle_niv, 0 AS id_cycle, OrdreNiveau AS ordre_niveau FROM niveau)",
+        'groupe' => "(SELECT id_groupe_comp, TRIM(libelle_groupe_comp) AS libelle_groupe_comp FROM groupe_competence
+                      UNION ALL SELECT $ar + id_groupe, TRIM(nom_groupe_fr) FROM groupe_matiere_arabe)",
+        // programme de la classe pour l'année active : disciplines de l'année, à défaut celui du niveau ; piste arabe décalée
+        'discipline' => "(SELECT DISTINCT d.IDClasses, cp.id_groupe_comp AS id_mat, 1 AS coef, cp.id_groupe_comp AS id_groupe, g.ordre_affichage AS ordre
+                            FROM discipline d JOIN competence cp ON cp.id_comp = d.id_comp JOIN groupe_competence g ON g.id_groupe_comp = cp.id_groupe_comp
+                           WHERE d.actif = 1 AND d.annee_scol = $an
+                          UNION
+                          SELECT cl.IDClasses, gn.id_groupe_comp, 1, gn.id_groupe_comp, g.ordre_affichage
+                            FROM classe cl JOIN groupe_competence_niveau gn ON gn.code_niveau = cl.Niveau AND gn.actif = 1
+                            JOIN groupe_competence g ON g.id_groupe_comp = gn.id_groupe_comp
+                           WHERE NOT EXISTS (SELECT 1 FROM discipline d2 WHERE d2.IDClasses = cl.IDClasses AND d2.actif = 1 AND d2.annee_scol = $an)
+                          UNION
+                          SELECT da.IDClasses, $ar + da.id_mat, 1, $ar + m.id_groupe, 100 + da.id_mat
+                            FROM discipline_arabe da JOIN matiere_arabe m ON m.id_mat = da.id_mat
+                           WHERE da.actif = 1 AND da.annee_scol = $an
+                          UNION
+                          SELECT cl.IDClasses, $ar + mn.id_mat, 1, $ar + m.id_groupe, 100 + mn.ordre
+                            FROM classe cl JOIN matiere_niveau_arabe mn ON mn.code_niveau = cl.Niveau AND mn.actif = 1
+                            JOIN matiere_arabe m ON m.id_mat = mn.id_mat
+                           WHERE NOT EXISTS (SELECT 1 FROM discipline_arabe d3 WHERE d3.IDClasses = cl.IDClasses AND d3.actif = 1 AND d3.annee_scol = $an))",
+        // enseignant « principal » de la classe = titulaire de la piste française
+        'enseignat_principal' => "(SELECT matricule_ens, IDClasses, val_annee FROM enseignat_classe)",
+        default => $nom,
+    };
+}
+/** Où sont tenues les affectations enseignant ↔ classe (texte des pages). */
+function edt_lib_affectations(): string {
+    return edt_primaire() ? 'Affectation des classes' : 'module Matières';
+}
+/** Signatures du PDF (fiche) : Censeur + Proviseur / Principal au secondaire, Directeur au primaire. */
+function edt_signataires(): array {
+    if (edt_primaire()) return ['', 'Le Directeur'];
+    return ['Le Censeur', (get_etablissement()['statut'] ?? 'public') === 'prive' ? 'Le Principal' : 'Le Proviseur'];
+}
+/** Établissement pour l'en-tête du PDF (header_pdf.php attend les colonnes du secondaire). */
+function edt_etablissement_pdf(): array {
+    $e = get_etablissement();
+    if (!edt_primaire()) return $e;
+    return $e + [
+        'nom_fr' => $e['Nom_Etab_Fr'] ?? '', 'nom_en' => $e['Nom_Etab_An'] ?? '', 'sigle' => $e['Initial_Etab'] ?? '',
+        'ville' => $e['ville_etab'] ?? '', 'region_fr' => $e['region_etab_fr'] ?? '', 'departement_fr' => $e['departement_fr'] ?? '',
+        'arrondissement_fr' => $e['arrondissement_fr'] ?? '', 'region_en' => $e['region_etab_en'] ?? '',
+        'division_en' => $e['departement_en'] ?? '', 'subdivision_en' => $e['arrondissement_en'] ?? '',
+        'boite_postale' => $e['boite_postal'] ?? '', 'telephone' => $e['tel_etab'] ?? '', 'email' => $e['email_etab'] ?? '',
+    ];
+}
+/** Primaire : ajoute au catalogue les groupes de compétences / matières arabes créés depuis (libellé long par défaut). */
+function edt_prim_sync_matieres(): void {
+    if (!edt_primaire()) return;
+    try {
+        db_exec("INSERT IGNORE INTO edt_matiere (id, libelle, libelle_long, source)
+                 SELECT id_groupe_comp, LEFT(TRIM(libelle_groupe_comp), 40), TRIM(libelle_groupe_comp), 'fr' FROM groupe_competence");
+        db_exec("INSERT IGNORE INTO edt_matiere (id, libelle, libelle_long, source)
+                 SELECT " . EDT_PRIM_ARABE . " + id_mat, LEFT(TRIM(COALESCE(NULLIF(matiere_fr, ''), matiere_ar)), 40), TRIM(COALESCE(NULLIF(matiere_fr, ''), matiere_ar)), 'ar' FROM matiere_arabe");
+    } catch (\Throwable $e) { /* lecture seule ou migration v63 absente */ }
+}
 
 // Types de règles : libellé, cibles possibles, paramètres attendus, aide
 function edt_types_contraintes(): array {
@@ -81,7 +169,11 @@ function edt_libelle_cible_type(string $t): string {
 function edt_peut_ecrire(): bool {
     return in_array(role_connecte(), EDT_ROLES_ECRITURE, true) && !(function_exists('est_lecture_seule') && est_lecture_seule());
 }
-function edt_annee_id(): int { return (int) (get_annee_active()['id'] ?? 0); }
+function edt_annee_id(): int {
+    // primaire : pas d'id d'année, on prend la première année du libellé (2026/2027 → 2026), comme edt_t('annee_scolaire')
+    if (edt_primaire()) return (int) substr((string) (get_annee_active()['val_annee'] ?? ''), 0, 4);
+    return (int) (get_annee_active()['id'] ?? 0);
+}
 
 function edt_param(int $a, string $cle, $defaut = null) {
     $v = db_val("SELECT valeur FROM edt_parametre WHERE id_annee=? AND cle=?", [$a, $cle]);
@@ -178,9 +270,12 @@ function edt_formater_cases(array $cases): string {
 
 // ── Référentiels ───────────────────────────────────────────────────────
 function edt_classes(): array {
-    return db_all("SELECT c.id, c.designation, c.code_niveau, c.libelle_section, c.id_filiere FROM classe c WHERE c.archivee=0 ORDER BY c.ordre, c.designation");
+    return db_all("SELECT c.id, c.designation, c.code_niveau, c.libelle_section, c.id_filiere FROM " . edt_t('classe') . " c WHERE c.archivee=0 ORDER BY c.ordre, c.designation");
 }
 function edt_enseignants(): array {
+    if (edt_primaire())   // primaire : pas de « matière enseignée » ; ni fiches inactives ni compte propriétaire
+        return db_all("SELECT e.matricule_ens, TRIM(CONCAT(e.nom_ens,' ',IFNULL(e.prenom_ens,''))) AS nom, e.tel_ens, e.id_grade, NULL AS matiere_enseignee
+                       FROM enseignant e WHERE COALESCE(e.statut_ens, 'actif') = 'actif' ORDER BY e.nom_ens, e.prenom_ens");
     return db_all("SELECT e.matricule_ens, TRIM(CONCAT(e.nom_ens,' ',IFNULL(e.prenom_ens,''))) AS nom, e.tel_ens, e.id_grade, e.matiere_enseignee
                    FROM enseignant e ORDER BY e.nom_ens, e.prenom_ens");
 }
@@ -190,8 +285,8 @@ function edt_salles(bool $actives = true): array {
 /** Matières du programme d'une classe (table discipline) avec groupe et coefficient. */
 function edt_programme_classe(int $id_classe): array {
     return db_all("SELECT d.id_mat, TRIM(m.libelle) libelle, d.coef, d.id_groupe, g.libelle_groupe_comp groupe
-                   FROM discipline d JOIN matiere m ON m.id=d.id_mat LEFT JOIN groupe g ON g.id_groupe_comp=d.id_groupe
-                   WHERE d.IDClasses=? ORDER BY d.id_groupe, d.ordre+0, m.libelle", [$id_classe]);
+                   FROM " . edt_t('discipline') . " d JOIN " . edt_t('matiere') . " m ON m.id=d.id_mat LEFT JOIN " . edt_t('groupe') . " g ON g.id_groupe_comp=d.id_groupe
+                   WHERE d.IDClasses=?" . (edt_primaire() ? ' AND m.actif=1' : '') . " ORDER BY d.id_groupe, d.ordre+0, m.libelle", [$id_classe]);
 }
 function edt_couleur(int $id): string {
     $pal = ['#dbeafe', '#dcfce7', '#fef3c7', '#fce7f3', '#e0e7ff', '#ccfbf1', '#ffedd5', '#ede9fe', '#fee2e2', '#e0f2fe', '#ecfccb', '#f5f5f4', '#fae8ff', '#d1fae5'];
@@ -242,8 +337,8 @@ final class EdtModele {
         foreach ($this->cours as $id => $c) $this->rangId[$c['rang']] = $id;
         $this->jours = edt_jours_ouvres($annee);
         foreach (edt_classes() as $c) $this->classes[(int) $c['id']] = $c;
-        foreach (db_all("SELECT id, TRIM(libelle) libelle FROM matiere") as $m) $this->mat[(int) $m['id']] = $m['libelle'];
-        foreach (db_all("SELECT d.IDClasses, d.id_mat, g.libelle_groupe_comp FROM discipline d LEFT JOIN groupe g ON g.id_groupe_comp=d.id_groupe") as $d)
+        foreach (db_all("SELECT id, TRIM(libelle) libelle FROM " . edt_t('matiere') . "") as $m) $this->mat[(int) $m['id']] = $m['libelle'];
+        foreach (db_all("SELECT d.IDClasses, d.id_mat, g.libelle_groupe_comp FROM " . edt_t('discipline') . " d LEFT JOIN " . edt_t('groupe') . " g ON g.id_groupe_comp=d.id_groupe") as $d)
             $this->groupeCm[$d['IDClasses'] . '|' . $d['id_mat']] = (string) $d['libelle_groupe_comp'];
         foreach (edt_enseignants() as $e) $this->ens[(int) $e['matricule_ens']] = $e['nom'];
         foreach (edt_salles(false) as $s) $this->salles[(int) $s['id']] = $s['nom'];
@@ -462,7 +557,7 @@ function edt_services(int $a, ?int $id_classe = null, ?int $ens = null): array {
     return db_all("SELECT s.*, TRIM(m.libelle) matiere, c.designation classe, TRIM(CONCAT(e.nom_ens,' ',IFNULL(e.prenom_ens,''))) enseignant, sa.nom salle,
                      (SELECT COUNT(*) FROM edt_seance q WHERE q.id_annee=s.id_annee AND q.id_classe=s.id_classe AND q.id_mat=s.id_mat
                         AND (q.matricule_ens<=>s.matricule_ens)) AS places
-                   FROM edt_service s JOIN matiere m ON m.id=s.id_mat JOIN classe c ON c.id=s.id_classe
+                   FROM edt_service s JOIN " . edt_t('matiere') . " m ON m.id=s.id_mat JOIN " . edt_t('classe') . " c ON c.id=s.id_classe
                    LEFT JOIN enseignant e ON e.matricule_ens=s.matricule_ens LEFT JOIN edt_salle sa ON sa.id=s.id_salle
                    WHERE " . implode(' AND ', $w) . " ORDER BY c.ordre, m.libelle", $p);
 }
@@ -482,7 +577,7 @@ function edt_charges_enseignants(int $a): array {
 
 /** Recopie l'enseignant principal de chaque service dans `dispenser` (affectations utilisées par les notes). */
 function edt_synchroniser_dispenser(int $a): int {
-    $annee = db_one("SELECT libelle FROM annee_scolaire WHERE id=?", [$a]);
+    $annee = db_one("SELECT libelle FROM " . edt_t('annee_scolaire') . " an WHERE an.id=?", [$a]);
     if (!$annee) return 0;
     $n = 0;
     $rows = db_all("SELECT id_classe, id_mat, matricule_ens, SUM(heures) h FROM edt_service WHERE id_annee=? AND matricule_ens IS NOT NULL
@@ -492,6 +587,15 @@ function edt_synchroniser_dispenser(int $a): int {
         $k = $r['id_classe'] . '|' . $r['id_mat'];
         if (isset($vu[$k])) continue;
         $vu[$k] = true;
+        if (edt_primaire()) {
+            // primaire : « Affectation des classes » — piste française ou arabe selon le cours
+            $t = (int) $r['id_mat'] >= EDT_PRIM_ARABE ? 'enseignat_classe_arabe' : 'enseignat_classe';
+            if (!db_val("SELECT 1 FROM $t WHERE matricule_ens=? AND IDClasses=? AND val_annee=?", [$r['matricule_ens'], $r['id_classe'], $annee['libelle']])) {
+                db_exec("INSERT INTO $t (matricule_ens, IDClasses, val_annee) VALUES (?,?,?)", [$r['matricule_ens'], $r['id_classe'], $annee['libelle']]);
+                $n++;
+            }
+            continue;
+        }
         $n += db_exec("INSERT INTO dispenser (matricule_ens, IDClasses, id_mat, val_annee) VALUES (?,?,?,?)
                        ON DUPLICATE KEY UPDATE matricule_ens=VALUES(matricule_ens)", [$r['matricule_ens'], $r['id_classe'], $r['id_mat'], $annee['libelle']]) > 0 ? 1 : 0;
     }
@@ -534,7 +638,7 @@ function edt_generer(int $a, array $classes, array $opt = []): array {
     $demandes = [];
     $communsVus = [];
     $prePlaces = [];
-    foreach (db_all("SELECT s.*, c.code_niveau FROM edt_service s JOIN classe c ON c.id=s.id_classe WHERE s.id_annee=? AND s.heures>0", [$a]) as $s) {
+    foreach (db_all("SELECT s.*, c.code_niveau FROM edt_service s JOIN " . edt_t('classe') . " c ON c.id=s.id_classe WHERE s.id_annee=? AND s.heures>0", [$a]) as $s) {
         if (!isset($setC[(int) $s['id_classe']])) continue;
         $groupe = [(int) $s['id_classe']];
         if ($s['code_commun']) {
@@ -843,7 +947,7 @@ function edt_regles_recommandees(int $a): int {
         $n++;
     };
     $add('creneaux_interdits', 'tous', null, ['cases' => 'Mer 7-9'], 'obligatoire', 'A.P.P.S.');
-    foreach (db_all("SELECT id FROM matiere WHERE actif=1 AND (libelle LIKE 'Math%' OR libelle LIKE 'Sciences physiques%' OR libelle LIKE 'Physique%' OR libelle LIKE 'PCT%' OR libelle LIKE 'Mathématique%')") as $m)
+    foreach (db_all("SELECT id FROM " . edt_t('matiere') . " WHERE actif=1 AND (libelle LIKE 'Math%' OR libelle LIKE 'Sciences physiques%' OR libelle LIKE 'Physique%' OR libelle LIKE 'PCT%' OR libelle LIKE 'Mathématique%')") as $m)
         $add('plage_horaire', 'matiere', (string) $m['id'], ['debut' => '07:30', 'fin' => '12:40'], 'obligatoire', 'Matière fondamentale en matinée');
     $add('max_heures_jour_matiere', 'groupe', 'ENSEIGNEMENT GÉNÉRAL', ['max' => 2], 'obligatoire', 'Enseignement général : 2 h maximum par jour');
     $add('jours_non_consecutifs', 'groupe', 'ENSEIGNEMENT GÉNÉRAL', [], 'souhaitee', 'Matières générales réparties sur des jours non consécutifs');
@@ -860,6 +964,7 @@ function edt_regles_recommandees(int $a): int {
 const EDT_ETAPES = [
     'preparation' => ['parametres.php', [
         'grille'   => ['Grille horaire', 'clock', 'parametres.php?onglet=grille'],
+        'cours'    => ['Cours', 'journal-bookmark', 'parametres.php?onglet=cours'],   // primaire seulement : libellés courts (edt_matiere)
         'regles'   => ['Règles', 'list-check', 'parametres.php?onglet=regles'],
         'salles'   => ['Salles', 'building', 'parametres.php?onglet=salles'],
         'services' => ['Services', 'person-lines-fill', 'services.php?onglet=classe'],
@@ -883,6 +988,7 @@ const EDT_ETAPES = [
 
 /** Titre de page + onglets de l'étape. */
 function edt_onglets(string $etape, string $actif): string {
+    edt_prim_sync_matieres();   // primaire : nouveaux groupes de compétences / matières arabes ajoutés au catalogue
     $titres = ['preparation' => ['Préparation', 'sliders'], 'construction' => ['Construction', 'magic']];
     [$titre, $ico] = $titres[$etape];
     $h = '<div class="page-titre"><h4><i class="bi bi-' . $ico . ' me-1 text-primary"></i>Emploi du temps — ' . $titre
@@ -890,6 +996,7 @@ function edt_onglets(string $etape, string $actif): string {
     $h .= '<ul class="nav nav-tabs mb-3 no-print">';
     $n = 0;
     foreach (EDT_ETAPES[$etape][1] as $k => [$lib, $i, $url]) {
+        if ($k === 'cours' && !edt_primaire()) continue;
         $n++;
         $num = $etape === 'preparation' && $k !== 'annee' && $k !== 'import' ? '<span class="badge rounded-pill bg-light text-dark border me-1">' . $n . '</span>' : '';
         $h .= '<li class="nav-item"><a class="nav-link' . ($k === $actif ? ' active' : '') . '" href="' . $url . '">' . $num . '<i class="bi bi-' . $i . ' me-1"></i>' . h($lib) . '</a></li>';

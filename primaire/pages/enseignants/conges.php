@@ -13,6 +13,7 @@ require_once __DIR__ . '/../../../noyau/paie_fonctions.php';
 // que les données élèves (SECRETAIRE y a accès, pas ici), déjà le cas avant
 // ce module.
 exiger_role(['DIRECTEUR']);
+exiger_ecole_privee('les congés');   // école publique : non géré (17/10/2026)
 
 $mat = (int) ($_GET['mat'] ?? 0);
 $ens = db_one("SELECT matricule_ens, nom_ens, prenom_ens FROM enseignant WHERE matricule_ens=?", [$mat]);

@@ -15,7 +15,7 @@
 //    - un groupe entier   → 'grp:Nom du groupe'
 //    - une entrée précise → son url (ex. 'primaire/pages/eleves/liste.php')
 
-return [
+$menu = [
     'Principal' => [
         ['Tableau de bord', 'noyau/dashboard.php', 'speedometer2', []],
     ],
@@ -89,6 +89,15 @@ return [
     // RH : la fiche du personnel (Enseignant(e)s) est de la STRUCTURE —
     // DIRECTEUR/FONDATEUR. La grille salariale, la paie et les avances sont
     // de l'argent → agent financier (FONDATEUR en lecture).
+    // Emploi du temps (migration v63, 17/10/2026) : même module que le secondaire
+    // (secondaire/commun/pages/emploi_temps/), construit par le Directeur ; cours =
+    // groupes de compétences + matières arabes, enseignants = « Affectation des classes ».
+    'EMPLOI DU TEMPS' => [
+        ['Préparation',          'secondaire/commun/pages/emploi_temps/parametres.php', 'sliders',        ['DIRECTEUR','FONDATEUR']],
+        ['Construction',         'secondaire/commun/pages/emploi_temps/saisie.php',     'magic',          ['DIRECTEUR','FONDATEUR']],
+        ['Consulter / imprimer', 'secondaire/commun/pages/emploi_temps/consulter.php',  'calendar3-week', ['DIRECTEUR','FONDATEUR','SECRETAIRE']],
+        ['Mon emploi du temps',  'secondaire/commun/pages/emploi_temps/consulter.php?moi=1', 'calendar-week', ['ENSEIGNANT']],
+    ],
     'Ressources humaines' => [
         ['Enseignant(e)s',        'primaire/pages/enseignants/liste.php', 'person-badge',   ['DIRECTEUR','FONDATEUR','SECRETAIRE']],
         ['Grille salariale',      'primaire/pages/paie/grille.php',       'table',          ['COMPTABLE','FONDATEUR']],
@@ -102,7 +111,8 @@ return [
         ['Mon compte',        'compte/profil.php',                    'key', []],
         ['Directeur',         'primaire/pages/fondateur/directeur.php', 'person-badge', ['FONDATEUR']],
         ['Configurations',    'primaire/pages/parametres/index.php',    'gear',        ['DIRECTEUR','FONDATEUR']],
-        ['Utilisateurs',      'primaire/pages/utilisateurs/liste.php',  'person-gear', ['DIRECTEUR']],
+        // « Utilisateurs » retiré (17/10/2026) : comptes gérés dans Ressources humaines → Enseignant(e)s
+        // (fiche de chaque membre ; bouton « Tous les comptes » de la liste, privilèges compris).
         ['Journal d\'audit',  'primaire/pages/utilisateurs/journal.php','shield-check',['DIRECTEUR','FONDATEUR']],
         // Licence (bd/lib/licence.php) : ouvert à TOUS ([] = tout rôle voit
         // l'entrée) — la page elle-même ne montre le statut qu'en lecture
@@ -124,3 +134,15 @@ return [
         ['Catégories de dépenses', 'primaire/pages/depenses/categories.php',  'tags',           ['DIRECTEUR','FONDATEUR','SECRETAIRE','COMPTABLE']],
     ],
 ];
+
+// École PUBLIQUE (etablissement.statut, migration v62, 17/10/2026) : personnel payé par
+// l'État — aucune entrée de paie dans Ressources humaines (pas de fondateur non plus).
+// $GLOBALS['statut_ecole_menu'] : imposé quand le menu d'une autre école est construit
+// hors de celle-ci (portail Privilèges), comme noyau/layout/menu_secondaire.php.
+$statut_ecole = $GLOBALS['statut_ecole_menu']
+    ?? (function_exists('get_etablissement') ? (get_etablissement()['statut'] ?? 'prive') : 'prive');
+if ($statut_ecole === 'public') {
+    $menu['Ressources humaines'] = array_values(array_filter($menu['Ressources humaines'],
+        fn($e) => !str_contains($e[1] ?? '', 'primaire/pages/paie/')));
+}
+return $menu;

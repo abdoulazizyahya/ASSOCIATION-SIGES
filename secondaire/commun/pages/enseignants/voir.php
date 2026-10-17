@@ -13,9 +13,9 @@ $mat = (int) ($_GET['id'] ?? 0);
 $ens = $mat ? db_one("SELECT * FROM enseignant WHERE matricule_ens=?", [$mat]) : null;
 if (!$ens) { flash_set('erreur', 'Membre du personnel introuvable.'); rediriger('secondaire/commun/pages/enseignants/liste.php'); }
 
-$peut_gerer_rh   = in_array(role_connecte(), ['ADMIN', 'PROVISEUR', 'FONDATEUR', 'INTENDANT'], true);
-// École publique : rien sur le salaire (personnel payé par l'État, 17/10/2026) — contrats et congés restent
-$peut_gerer_paie = $peut_gerer_rh && paie_geree_par_ecole();
+// École publique : ni salaire, ni contrats, ni congés (personnel de l'État, 17/10/2026) — écoles privées uniquement
+$peut_gerer_rh   = in_array(role_connecte(), ['ADMIN', 'PROVISEUR', 'FONDATEUR', 'INTENDANT'], true) && paie_geree_par_ecole();
+$peut_gerer_paie = $peut_gerer_rh;
 $grade = $ens['id_grade'] ? grade_par_code($ens['id_grade']) : null;
 $contrat_actif = db_one("SELECT * FROM contrat_enseignant WHERE matricule_ens=? AND actif=1 ORDER BY date_debut DESC LIMIT 1", [$mat]);
 $nb_contrats   = (int) db_val("SELECT COUNT(*) FROM contrat_enseignant WHERE matricule_ens=?", [$mat]);
@@ -38,7 +38,7 @@ require_once __DIR__ . '/../../../../noyau/layout/header.php';
     <h4 class="mb-0" style="font-size:1.05rem;font-weight:700">
       <?= h(($ens['civilite_ens'] ? $ens['civilite_ens'] . ' ' : '') . mb_strtoupper($ens['nom_ens']) . ' ' . ($ens['prenom_ens'] ?? '')) ?>
     </h4>
-    <div class="sub"><span class="badge-code"><?= h((string) $ens['matricule_ens']) ?></span></div>
+    <?php if ($ens['matricule']): ?><div class="sub"><span class="badge-code">Matricule <?= h($ens['matricule']) ?></span></div><?php endif; ?>
   </div>
   <a href="<?= APP_URL ?>/secondaire/commun/pages/enseignants/form.php?id=<?= (int) $ens['matricule_ens'] ?>" class="btn btn-primary btn-sm ms-auto">
     <i class="bi bi-pencil me-1"></i>Modifier
@@ -146,6 +146,71 @@ require_once __DIR__ . '/../../../../noyau/layout/header.php';
         <div class="text-muted" style="font-size:.78rem"><?= h($ens['id_fonction'] ?: '—') ?></div>
       </div>
     </div>
+
+    <?php
+    // Compte de connexion (17/10/2026) : géré ici plutôt que dans Paramètres → Utilisateurs.
+    if (sec_peut_gerer_comptes()):
+        $cpt = sec_compte_de_fiche($mat);
+        $cpt_gerable = $cpt && sec_compte_gerable($cpt);
+        $cpt_soi = $cpt && (int) $cpt['id'] === (int) ($_SESSION['user_id'] ?? 0);
+        $role_suggere = sec_role_depuis_fonction($ens['id_fonction']);
+    ?>
+    <div class="card mb-2" id="compte">
+      <div class="card-header fw-semibold"><i class="bi bi-key me-1"></i>Compte de connexion</div>
+      <div class="card-body" style="font-size:.83rem">
+        <?php if (!$cpt): ?>
+          <p class="text-muted mb-2">Aucun compte : cette personne ne peut pas se connecter.</p>
+          <form method="post" action="<?= APP_URL ?>/secondaire/commun/pages/enseignants/compte.php">
+            <?= csrf_champ() ?><input type="hidden" name="action" value="creer"><input type="hidden" name="mat" value="<?= $mat ?>">
+            <button class="btn btn-primary btn-sm w-100"><i class="bi bi-person-plus me-1"></i>Créer le compte</button>
+          </form>
+          <div class="form-text" style="font-size:.72rem">Identifiant tiré du nom, mot de passe identique, rôle <?= h(libelle_role($role_suggere)) ?>.</div>
+        <?php else: ?>
+          <div class="mb-1"><span class="text-muted">Identifiant :</span> <code class="fw-bold"><?= h($cpt['login']) ?></code></div>
+          <div class="mb-1"><span class="text-muted">Rôle :</span> <?= h(libelle_role($cpt['role'])) ?></div>
+          <div class="mb-2"><span class="text-muted">État :</span>
+            <span class="badge <?= $cpt['actif'] ? 'bg-success' : 'bg-secondary' ?>"><?= $cpt['actif'] ? 'Actif' : 'Désactivé' ?></span></div>
+          <?php if ($role_suggere !== $cpt['role'] && $role_suggere !== 'ENSEIGNANT' && $cpt_gerable && !$cpt_soi): ?>
+            <div class="alert alert-warning py-1 px-2 mb-2" style="font-size:.75rem">
+              Fonction « <?= h($ens['id_fonction']) ?> » : le rôle attendu est <b><?= h(libelle_role($role_suggere)) ?></b>.
+            </div>
+          <?php endif; ?>
+          <?php if ($cpt_gerable): ?>
+            <form method="post" action="<?= APP_URL ?>/secondaire/commun/pages/enseignants/compte.php" class="mb-1"
+                  onsubmit="return confirm('Remettre le mot de passe à « <?= h($cpt['login']) ?> » (identique à l’identifiant) ?')">
+              <?= csrf_champ() ?><input type="hidden" name="action" value="reinitialiser">
+              <input type="hidden" name="mat" value="<?= $mat ?>"><input type="hidden" name="id" value="<?= (int) $cpt['id'] ?>">
+              <button class="btn btn-outline-warning btn-sm w-100"><i class="bi bi-arrow-counterclockwise me-1"></i>Réinitialiser le mot de passe</button>
+            </form>
+            <button class="btn btn-outline-primary btn-sm w-100" type="button" data-bs-toggle="collapse" data-bs-target="#cptModif">
+              <i class="bi bi-pencil me-1"></i>Modifier le compte
+            </button>
+            <form method="post" action="<?= APP_URL ?>/secondaire/commun/pages/enseignants/compte.php" class="collapse mt-2" id="cptModif">
+              <?= csrf_champ() ?><input type="hidden" name="action" value="modifier">
+              <input type="hidden" name="mat" value="<?= $mat ?>"><input type="hidden" name="id" value="<?= (int) $cpt['id'] ?>">
+              <label class="form-label mb-0" style="font-size:.75rem">Identifiant</label>
+              <input type="text" name="login" class="form-control form-control-sm mb-1" value="<?= h($cpt['login']) ?>" required pattern="[a-z0-9._\-]{3,80}">
+              <label class="form-label mb-0" style="font-size:.75rem">Rôle</label>
+              <select name="role" class="form-select form-select-sm mb-1" <?= $cpt_soi ? 'disabled' : '' ?>>
+                <?php foreach (array_unique(array_merge([$cpt['role']], sec_roles_attribuables())) as $r): ?>
+                  <option value="<?= h($r) ?>" <?= $r === $cpt['role'] ? 'selected' : '' ?>><?= h(libelle_role($r)) ?><?= $r === $role_suggere && $r !== $cpt['role'] ? ' (selon la fonction)' : '' ?></option>
+                <?php endforeach; ?>
+              </select>
+              <label class="form-label mb-0" style="font-size:.75rem">Nouveau mot de passe <span class="text-muted">(vide = inchangé)</span></label>
+              <input type="password" name="mot_de_passe" class="form-control form-control-sm mb-1" autocomplete="new-password" minlength="4">
+              <div class="form-check mb-2">
+                <input class="form-check-input" type="checkbox" name="actif" value="1" id="cptActif" <?= $cpt['actif'] ? 'checked' : '' ?> <?= $cpt_soi ? 'disabled' : '' ?>>
+                <label class="form-check-label" for="cptActif">Compte actif</label>
+              </div>
+              <button class="btn btn-primary btn-sm w-100"><i class="bi bi-check-lg me-1"></i>Enregistrer</button>
+            </form>
+          <?php else: ?>
+            <p class="text-muted mb-0" style="font-size:.75rem">Compte de rang égal ou supérieur au vôtre : géré par l'administrateur.</p>
+          <?php endif; ?>
+        <?php endif; ?>
+      </div>
+    </div>
+    <?php endif; ?>
 
     <?php if ($peut_gerer_rh): ?>
     <div class="card mb-2">

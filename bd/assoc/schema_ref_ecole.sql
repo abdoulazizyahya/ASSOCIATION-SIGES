@@ -661,6 +661,7 @@ CREATE TABLE `etablissement` (
   `logo` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `filigranne_etab` longblob,
   `signature` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `statut` enum('public','prive') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'prive',
   UNIQUE KEY `IDEtablissement` (`IDEtablissement`)
 ) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;

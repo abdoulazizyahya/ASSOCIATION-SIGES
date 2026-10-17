@@ -44,12 +44,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $ecrire) {
     if ($act === 'reprendre' && $id_classe) {
         $annee = get_annee_active()['val_annee'];
         $n = 0;
-        foreach (db_all("SELECT matricule_ens, id_mat FROM dispenser WHERE IDClasses=? AND val_annee=?", [$id_classe, $annee]) as $d) {
+        // primaire : titulaire de la classe (« Affectation des classes ») pour chaque cours de sa piste
+        $reprise = edt_primaire()
+            ? db_all("SELECT ec.matricule_ens, d.id_mat FROM " . edt_t('discipline') . " d JOIN enseignat_classe ec ON ec.IDClasses=d.IDClasses AND ec.val_annee=?
+                      WHERE d.IDClasses=? AND d.id_mat < " . EDT_PRIM_ARABE . "
+                      UNION
+                      SELECT ea.matricule_ens, d.id_mat FROM " . edt_t('discipline') . " d JOIN enseignat_classe_arabe ea ON ea.IDClasses=d.IDClasses AND ea.val_annee=?
+                      WHERE d.IDClasses=? AND d.id_mat >= " . EDT_PRIM_ARABE, [$annee, $id_classe, $annee, $id_classe])
+            : db_all("SELECT matricule_ens, id_mat FROM dispenser WHERE IDClasses=? AND val_annee=?", [$id_classe, $annee]);
+        foreach ($reprise as $d) {
             if (db_val("SELECT COUNT(*) FROM edt_service WHERE id_annee=? AND id_classe=? AND id_mat=?", [$a, $id_classe, $d['id_mat']])) continue;
             db_exec("INSERT INTO edt_service (id_annee,id_classe,id_mat,matricule_ens,heures) VALUES (?,?,?,?,0)", [$a, $id_classe, $d['id_mat'], $d['matricule_ens']]);
             $n++;
         }
-        flash_set('succes', "$n enseignant(s) repris du module Matières — complétez les heures.");
+        flash_set('succes', "$n enseignant(s) repris " . edt_lib_affectations() . " — complétez les heures.");
         rediriger("secondaire/commun/pages/emploi_temps/services.php?onglet=classe&classe=$id_classe");
     }
     if ($act === 'enseignants') {
@@ -62,7 +70,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $ecrire) {
         flash_set('succes', 'Heures dues enregistrées.');
         rediriger('secondaire/commun/pages/emploi_temps/services.php?onglet=enseignants' . (isset($_GET['tous']) ? '&tous=1' : ''));
     }
-    if ($act === 'sync') { $n = edt_synchroniser_dispenser($a); flash_set('succes', "Affectations du module Matières mises à jour ($n)."); rediriger("secondaire/commun/pages/emploi_temps/services.php?onglet=$onglet&classe=$id_classe"); }
+    if ($act === 'sync') { $n = edt_synchroniser_dispenser($a); flash_set('succes', "Affectations mises à jour (" . edt_lib_affectations() . ", $n)."); rediriger("secondaire/commun/pages/emploi_temps/services.php?onglet=$onglet&classe=$id_classe"); }
 }
 
 $ens = edt_enseignants();
@@ -93,7 +101,7 @@ echo edt_css();
   <select class="form-select form-select-sm w-auto" name="classe" onchange="this.form.submit()"><?php foreach ($classes as $c): ?><option value="<?= $c['id'] ?>" <?= (int) $c['id'] === $id_classe ? 'selected' : '' ?>><?= h($c['designation']) ?></option><?php endforeach; ?></select>
   <span class="ms-3 small">Volume prévu : <b><?= rtrim(rtrim(number_format($total, 1, ',', ''), '0'), ',') ?> h</b> · placé dans la grille : <b><?= $places ?> h</b></span>
   <?php if ($ecrire): ?>
-  <button form="fReprendre" class="btn btn-sm btn-outline-secondary ms-auto" title="Créer les services à partir des enseignants déjà affectés dans le module Matières"><i class="bi bi-arrow-down-circle"></i> Reprendre les affectations</button>
+  <button form="fReprendre" class="btn btn-sm btn-outline-secondary ms-auto" title="Créer les services à partir des enseignants déjà affectés (<?= h(edt_lib_affectations()) ?>)"><i class="bi bi-arrow-down-circle"></i> Reprendre les affectations</button>
   <?php endif; ?>
 </div></form>
 <?php if ($ecrire): ?><form id="fReprendre" method="post"><?= csrf_champ() ?><input type="hidden" name="action" value="reprendre"></form><?php endif; ?>
@@ -126,7 +134,7 @@ echo edt_css();
   <?php if ($ecrire): ?>
   <div class="card-footer d-flex flex-wrap gap-3 align-items-center">
     <button class="btn btn-primary btn-sm"><i class="bi bi-check2"></i> Enregistrer les services</button>
-    <div class="form-check"><input class="form-check-input" type="checkbox" name="sync" value="1" id="sync" checked><label class="form-check-label small" for="sync">Mettre aussi à jour les enseignants affectés (module Matières : notes, bulletins)</label></div>
+    <div class="form-check"><input class="form-check-input" type="checkbox" name="sync" value="1" id="sync" checked><label class="form-check-label small" for="sync">Mettre aussi à jour les enseignants affectés (<?= h(edt_lib_affectations()) ?> : notes, bulletins)</label></div>
     <span class="small text-muted ms-auto">Une ligne sans heures ni enseignant est ignorée. « Code commun » : même code sur plusieurs classes = une seule séance commune.</span>
   </div>
   <?php endif; ?>

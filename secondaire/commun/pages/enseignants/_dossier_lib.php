@@ -208,13 +208,13 @@ function dossier_render_one(FPDF $pdf, array $e, array $etab, string $val_annee)
 
     $nom_complet = trim(($e['civilite_ens'] ?? '').' '.strtoupper($e['nom_ens'] ?? '').' '.($e['prenom_ens'] ?? ''));
     $pdf->nomComplet = $nom_complet;
-    $pdf->mat        = $mat;
+    $pdf->mat        = (string) ($e['matricule'] ?? '');   // matricule officiel (v19), jamais l'identifiant interne
     $pdf->newDossier = true;   // force l'en-tête complet pour ce dossier
     $pdf->AddPage();
 
     // 1. État civil
     d_section($pdf, 'ETAT CIVIL', 'Personal details');
-    d_row($pdf, 'Matricule/ID', dossier_val($e['matricule_ens']), 'Civilité/Title', dossier_val($e['civilite_ens']));
+    d_row($pdf, 'Matricule/ID', dossier_val($e['matricule'] ?? null), 'Civilité/Title', dossier_val($e['civilite_ens']));
     d_row($pdf, 'Nom/Surname', dossier_val(strtoupper($e['nom_ens'] ?? '')), 'Prénom/First name', dossier_val($e['prenom_ens']));
     d_row($pdf, 'Sexe/Gender', dossier_val($e['sexe_ens']), 'Sit.matrim./Marital', dossier_val($e['situation_matrimoniale']));
     d_row($pdf, 'Date naiss./D.O.B.', dossier_fmt_date($e['date_naiss']), 'Lieu naiss./Birthplace', dossier_val($e['lieu_naiss']));

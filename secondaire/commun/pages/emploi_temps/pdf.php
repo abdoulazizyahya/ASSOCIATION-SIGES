@@ -26,7 +26,7 @@ if (!$gestion) {                                   // un enseignant n'imprime qu
 $couleur = ($_GET['couleur'] ?? '1') !== '0';
 
 $mod = new EdtModele($a);
-$etab = get_etablissement();
+$etab = edt_etablissement_pdf();   // primaire : colonnes ramenées au format du secondaire
 $annee = get_annee_active()['val_annee'];
 $creneaux = edt_creneaux($a);
 $jours = edt_jours_ouvres($a);
@@ -96,10 +96,12 @@ foreach ($cibles as $cid) {
         $ligne([['DISCIPLINE', $d['discipline'] ?? ($e['matiere_enseignee'] ?? ''), 3], ['ENSEIGNANT', $mod->ens[$cid] ?? '', 5], ['GRADE', $d['grade'] ?? ($e['id_grade'] ?? ''), 2]]);
         $ligne([['HEURES DUES', $dues !== null ? $fmt($dues) : '', 2], ['HEURES FAITES', $fmt($faites), 2], ['HEURES SUPPLÉMENTAIRES', $dues !== null && $faites > $dues ? $fmt($faites - $dues) : '', 3], ['N° TEL', $e['tel_ens'] ?? '', 3]]);
     } else {
-        $pp = db_val("SELECT TRIM(CONCAT(e.nom_ens,' ',IFNULL(e.prenom_ens,''))) FROM enseignat_principal p JOIN enseignant e ON e.matricule_ens=p.matricule_ens WHERE p.IDClasses=? AND p.val_annee=?", [$cid, $annee]);
-        $eff = (int) db_val("SELECT COUNT(*) FROM inscription i JOIN eleve e ON e.id=i.id_eleve WHERE i.id_classe=? AND i.id_annee=? AND e.statut='actif'", [$cid, $a]);
+        $pp = db_val("SELECT TRIM(CONCAT(e.nom_ens,' ',IFNULL(e.prenom_ens,''))) FROM " . edt_t('enseignat_principal') . " p JOIN enseignant e ON e.matricule_ens=p.matricule_ens WHERE p.IDClasses=? AND p.val_annee=?", [$cid, $annee]);
+        $eff = edt_primaire()   // primaire : inscrire / eleve (val_annee), secondaire : inscription / eleve (id_annee)
+            ? (int) db_val("SELECT COUNT(*) FROM inscrire i JOIN eleve e ON e.id_eleve=i.id_eleve WHERE i.IDClasses=? AND i.val_annee=? AND COALESCE(e.statut,'actif')='actif'", [$cid, $annee])
+            : (int) db_val("SELECT COUNT(*) FROM inscription i JOIN eleve e ON e.id=i.id_eleve WHERE i.id_classe=? AND i.id_annee=? AND e.statut='actif'", [$cid, $a]);
         $vol = (int) db_val("SELECT COUNT(*) FROM edt_seance WHERE id_annee=? AND id_classe=? AND sous_groupe IN ('','A')", [$a, $cid]);
-        $ligne([['CLASSE', $mod->classes[$cid]['designation'] ?? '', 3], ['PROFESSEUR PRINCIPAL', $pp ?: '', 5], ['EFFECTIF', $eff ?: '', 2]]);
+        $ligne([['CLASSE', $mod->classes[$cid]['designation'] ?? '', 3], [edt_primaire() ? 'TITULAIRE' : 'PROFESSEUR PRINCIPAL', $pp ?: '', 5], ['EFFECTIF', $eff ?: '', 2]]);
         $ligne([['VOLUME HORAIRE HEBDOMADAIRE', $vol . ' h', 5], ['SECTION', $mod->classes[$cid]['libelle_section'] ?? '', 5]]);
     }
 
@@ -225,8 +227,9 @@ foreach ($cibles as $cid) {
     $pdf->SetFont('Arial', '', 9);
     $pdf->SetXY($pw - 90, $yS); $pdf->Cell(80, 4.5, pdf_u(($ville !== '' ? mb_strtoupper($ville) : '') . ', le ' . str_repeat('.', 22)), 0, 2, 'C');
     $pdf->SetFont('Arial', 'B', 9.5);
-    $pdf->SetXY(30, $yS + 4.5); $pdf->Cell(60, 5, 'Le Censeur', 0, 0, 'C');
-    $pdf->SetXY($pw - 90, $yS + 4.5); $pdf->Cell(80, 5, 'Le Proviseur', 0, 0, 'C');
+    [$sig1, $sig2] = edt_signataires();   // Censeur + Proviseur/Principal, ou Directeur (primaire)
+    if ($sig1 !== '') { $pdf->SetXY(30, $yS + 4.5); $pdf->Cell(60, 5, pdf_u($sig1), 0, 0, 'C'); }
+    $pdf->SetXY($pw - 90, $yS + 4.5); $pdf->Cell(80, 5, pdf_u($sig2), 0, 0, 'C');
 }
 if ($pdf->PageNo() === 0) exit('Aucun emploi du temps à imprimer.');
 $nom = 'emploi_du_temps_' . ($tous ? ($vue === 'classe' ? 'classes' : 'enseignants') : $vue . '_' . $cibles[0]) . '.pdf';

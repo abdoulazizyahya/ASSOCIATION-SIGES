@@ -46,8 +46,9 @@ foreach (assoc_all("SELECT id, code, nom, type_enseignement FROM etablissement O
                 echo "    ! migration v16 non appliquée — école ignorée\n";
                 return;
             }
-            $statut = 'public';
-            if ($sec) $statut = (ecole_one($l, "SELECT statut FROM etablissement LIMIT 1")['statut'] ?? 'public') === 'prive' ? 'prive' : 'public';
+            // statut public / privé (primaire : migration v62, privé si la colonne manque) — décide du compte fondateur
+            $a_statut = ecole_one($l, "SELECT 1 FROM information_schema.columns WHERE table_schema=DATABASE() AND table_name='etablissement' AND column_name='statut'");
+            $statut = $a_statut ? ((ecole_one($l, "SELECT statut FROM etablissement LIMIT 1")['statut'] ?? '') === 'prive' ? 'prive' : 'public') : ($sec ? 'public' : 'prive');
 
             // Rôles déjà tenus par un compte actif (hors compte propriétaire).
             $tenus = array_column(ecole_all($l, $sec

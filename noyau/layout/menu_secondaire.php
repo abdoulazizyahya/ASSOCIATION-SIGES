@@ -123,13 +123,29 @@ $menu = [
     // sans Mon compte/Directeur/Journal/Licence — demande explicite).
     'Paramètres' => [
         ['Mon compte',        'compte/profil.php',                              'key',          []],
-        ['Directeur',         'secondaire/commun/pages/fondateur/directeur.php', 'person-badge', ['FONDATEUR']],
+        // Secondaire : pas de « Directeur » (17/10/2026) — Proviseur (public) ou Principal (privé)
+        [$statut_ecole === 'prive' ? 'Principal' : 'Proviseur', 'secondaire/commun/pages/fondateur/directeur.php', 'person-badge', ['FONDATEUR']],
         ['Configurations',    'secondaire/commun/pages/parametres/index.php',   'gear',        ['ADMIN','PROVISEUR', 'FONDATEUR']],
-        ['Utilisateurs',      'secondaire/commun/pages/utilisateurs/liste.php', 'person-gear', ['ADMIN', 'FONDATEUR', 'PROVISEUR']],
+        // « Utilisateurs » retiré (17/10/2026) : comptes gérés dans Ressources humaines → Enseignants
+        // (fiche de chaque membre, bouton « Tous les comptes » de la liste).
         ['Journal d\'audit',  'secondaire/commun/pages/utilisateurs/journal.php','shield-check',['ADMIN','PROVISEUR', 'FONDATEUR']],
         ['Licence',           'secondaire/commun/pages/parametres/licence.php', 'award',       []],
     ],
 ];
+
+// Proviseur / censeur / SG qui dispense aussi un cours (17/10/2026) : « Mon emploi du
+// temps » pour tous ; pour le SG, les pages pédagogiques en vue enseignant (ses classes).
+// Jamais pour un menu construit hors de l'école (portail Privilèges, $GLOBALS['statut_ecole_menu']).
+if (!isset($GLOBALS['statut_ecole_menu']) && function_exists('sec_enseigne_connecte')
+    && in_array(role_connecte(), ['PROVISEUR', 'CENSEUR', 'SG'], true)) {
+    try { $enseigne = sec_enseigne_connecte(); } catch (\Throwable $e) { $enseigne = false; }
+    if ($enseigne) {
+        foreach ($menu as $g => $items) foreach ($items as $k => $it) {
+            if (($it[1] ?? '') === 'secondaire/commun/pages/emploi_temps/consulter.php?moi=1') $menu[$g][$k][3][] = role_connecte();
+            if (role_connecte() === 'SG' && $g === 'Pédagogie' && in_array('ENSEIGNANT', $it[3] ?? [], true) && !in_array('SG', $it[3], true)) $menu[$g][$k][3][] = 'SG';
+        }
+    }
+}
 
 if ($statut_ecole === 'prive') {
     unset($menu['PAIEMENT PUBLIQUE']);

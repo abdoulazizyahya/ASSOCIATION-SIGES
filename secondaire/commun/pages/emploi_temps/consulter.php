@@ -103,7 +103,7 @@ $pdf = APP_URL . '/secondaire/commun/pages/emploi_temps/pdf.php';
           echo '<div class="col-6 col-md-2"><div class="card edt-kpi"><div class="card-body py-2"><div class="small text-muted">' . h($l) . '</div><div class="fw-bold">' . h((string) $v) . '</div></div></div></div>';
       echo '</div>';
   } elseif ($vue === 'classe') {
-      $pp = db_val("SELECT TRIM(CONCAT(e.nom_ens,' ',IFNULL(e.prenom_ens,''))) FROM enseignat_principal p JOIN enseignant e ON e.matricule_ens=p.matricule_ens WHERE p.IDClasses=? AND p.val_annee=?", [$id, get_annee_active()['val_annee']]);
+      $pp = db_val("SELECT TRIM(CONCAT(e.nom_ens,' ',IFNULL(e.prenom_ens,''))) FROM " . edt_t('enseignat_principal') . " p JOIN enseignant e ON e.matricule_ens=p.matricule_ens WHERE p.IDClasses=? AND p.val_annee=?", [$id, get_annee_active()['val_annee']]);
       $vol = (int) db_val("SELECT COUNT(*) FROM edt_seance WHERE id_annee=? AND id_classe=? AND sous_groupe IN ('', 'A')", [$a, $id]);
       $prevu = (float) db_val("SELECT COALESCE(SUM(heures),0) FROM edt_service WHERE id_annee=? AND id_classe=?", [$a, $id]);
       echo '<div class="small mb-2">Professeur principal : <b>' . h($pp ?: '—') . '</b> · Volume placé : <b>' . $vol . ' h</b> / ' . rtrim(rtrim((string) $prevu, '0'), '.') . ' h prévues</div>';

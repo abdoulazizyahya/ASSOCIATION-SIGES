@@ -18,13 +18,15 @@ aiguiller_page_technique('secondaire/technique/pages/notes/index.php');   // éc
 // accès direct par URL pour SG/SECRETAIRE/INTENDANT — jamais proposés dans
 // noyau/layout/menu_secondaire.php mais pas bloqués par exiger_connexion() seule
 // côté source. N'enlève rien aux rôles qui utilisent réellement Notes.
-exiger_role(['ADMIN', 'PROVISEUR', 'FONDATEUR', 'CENSEUR', 'ENSEIGNANT']);
+exiger_role(['ADMIN', 'PROVISEUR', 'FONDATEUR', 'CENSEUR', 'ENSEIGNANT', 'SG']);
+// SG : seulement s'il a des cours (17/10/2026) — contrôlé avant toute écriture (auto_activer_sequences)
+if (role_connecte() === 'SG' && !sec_vue_enseignant()) { flash_set('erreur', 'Les notes sont réservées aux personnes qui ont des cours.'); rediriger('noyau/dashboard.php'); }
 
 auto_activer_sequences();
 
 $role        = role_connecte();
 $is_admin    = in_array($role, ['ADMIN','PROVISEUR', 'FONDATEUR','CENSEUR']) || $role === 'MEMBRE_ASSOCIATION';
-$is_ens      = ($role === 'ENSEIGNANT');
+$is_ens      = sec_vue_enseignant();   // ENSEIGNANT, ou SG qui a des cours (17/10/2026)
 $onglet      = $_GET['onglet'] ?? 'classe';
 $annee_act   = get_annee_active();
 $id_annee    = (int)($annee_act['id'] ?? 0);

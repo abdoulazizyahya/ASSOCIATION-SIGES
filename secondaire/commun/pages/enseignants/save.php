@@ -24,6 +24,17 @@ $grade      = post('grade') ?: null;
 $matiere_enseignee = post('matiere_enseignee') ?: null;
 $diplome    = post('diplome') ?: null;
 $specialite = post('specialite') ?: null;
+// Matricule officiel (migration secondaire v19) : alphanumérique, facultatif, unique.
+// Distinct de matricule_ens, l'identifiant interne jamais affiché.
+$matricule  = mb_strtoupper(preg_replace('/\s+/', ' ', trim(post('matricule')))) ?: null;
+if ($matricule !== null && !preg_match('/^[A-Z0-9][A-Z0-9 .\/\-]{0,29}$/', $matricule)) {
+    flash_set('erreur', 'Matricule invalide : lettres, chiffres, tiret, point ou barre oblique (30 caractères au plus), ex. JP23444, 402683, 561345-M.');
+    rediriger('secondaire/commun/pages/enseignants/form.php' . ($mat ? '?id=' . $mat : ''));
+}
+if ($matricule !== null && ($autre = db_one("SELECT CONCAT_WS(' ', UPPER(nom_ens), prenom_ens) AS n FROM enseignant WHERE matricule=? AND matricule_ens<>?", [$matricule, $mat]))) {
+    flash_set('erreur', 'Le matricule « ' . $matricule . ' » est déjà attribué à ' . trim($autre['n']) . '.');
+    rediriger('secondaire/commun/pages/enseignants/form.php' . ($mat ? '?id=' . $mat : ''));
+}
 
 // Champs Paie : mêmes rôles que le module Paie (secondaire/commun/pages/paie/
 // index.php) — un Censeur (autorisé sur ce formulaire par ailleurs) ne
@@ -98,6 +109,8 @@ if ($mat) {
         );
     }
     $msg = 'Membre du personnel modifié.';
+    // Fonction SG / Censeur : le compte prend ce rôle (et le perd si la fonction redevient Enseignant).
+    if ($nv = sec_aligner_role_fiche($mat)) $msg .= ' Rôle du compte aligné sur la fonction : ' . libelle_role($nv) . '.';
 } else {
     db_exec(
         "INSERT INTO enseignant (civilite_ens, nom_ens, prenom_ens, sexe_ens, date_naiss, lieu_naiss, tel_ens, mail_ens,
@@ -110,7 +123,15 @@ if ($mat) {
     );
     $mat = (int) db_last_id();
     $msg = 'Membre du personnel créé.';
+    // Compte de connexion créé d'office (17/10/2026) : identifiant tiré du nom,
+    // mot de passe = identifiant, rôle d'après la fonction (Censeur, SG…).
+    if ($compte = sec_creer_compte_fiche($mat)) {
+        $msg .= ' Compte de connexion créé : identifiant « ' . $compte['login'] . ' », mot de passe identique (à changer à la première connexion), rôle '
+              . libelle_role($compte['role']) . '.';
+    }
 }
+
+db_exec("UPDATE enseignant SET matricule=? WHERE matricule_ens=?", [$matricule, $mat]);
 
 flash_set('succes', $msg);
 rediriger('secondaire/commun/pages/enseignants/voir.php?id=' . $mat);

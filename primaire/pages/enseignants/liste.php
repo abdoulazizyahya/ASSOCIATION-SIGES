@@ -13,18 +13,57 @@ $where  = ['1=1'];
 if (!voit_tous_les_comptes()) $where[] = sql_hors_compte_systeme('');   // fiche du compte propriétaire
 $params = [];
 if ($q !== '') {
-    $where[] = "(nom_ens LIKE ? OR prenom_ens LIKE ? OR mat_ens LIKE ?)";
-    $like = "%$q%";
-    array_push($params, $like, $like, $like);
+    // nom, matricule, téléphone, identifiant du compte (u = table user, jointe plus bas)
+    $where[] = "(nom_ens LIKE ? OR prenom_ens LIKE ? OR mat_ens LIKE ? OR tel_ens LIKE ? OR u.login_user LIKE ?)";
+    array_push($params, ...array_fill(0, 5, "%$q%"));
 }
 if ($statut !== 'tous') {
     $where[] = "COALESCE(statut_ens,'actif') = ?";
     $params[] = $statut;
 }
 
+// Tri par colonne et pagination (17/10/2026, comme au secondaire) ; compte de connexion
+// (table user) joint pour la colonne « Compte » et la recherche par identifiant.
+$join_compte = "LEFT JOIN (SELECT matricule_ens, MIN(id_user) AS id_user FROM user WHERE matricule_ens IS NOT NULL GROUP BY matricule_ens) uc
+                  ON uc.matricule_ens = enseignant.matricule_ens
+                LEFT JOIN user u ON u.id_user = uc.id_user";
+$tris = [
+    'matricule' => ["NULLIF(mat_ens, '') IS NULL", 'mat_ens'],
+    'nom'       => [null, 'nom_ens', 'prenom_ens'],
+    'fonction'  => [null, 'id_fonction'],
+    'tel'       => ["NULLIF(tel_ens, '') IS NULL", 'tel_ens'],
+    'compte'    => ['u.login_user IS NULL', 'u.login_user'],
+    'statut'    => [null, "COALESCE(statut_ens, 'actif')"],
+];
+$tri  = isset($tris[$_GET['tri'] ?? '']) ? $_GET['tri'] : 'fonction';
+$sens = ($_GET['sens'] ?? '') === 'desc' ? 'DESC' : 'ASC';
+[$vide, $cols] = [$tris[$tri][0], array_slice($tris[$tri], 1)];
+$ordre = ($vide ? $vide . ', ' : '') . implode(', ', array_map(fn($c) => "$c $sens", $cols)) . ', nom_ens, prenom_ens';
+$pp_choix = [25, 50, 100, 0];   // 0 = tout afficher
+$pp       = in_array((int) ($_GET['pp'] ?? 25), $pp_choix, true) ? (int) ($_GET['pp'] ?? 25) : 25;
+$sql_where = implode(' AND ', $where);
+$total    = (int) db_val("SELECT COUNT(*) FROM enseignant $join_compte WHERE $sql_where", $params);
+$nb_pages = $pp ? max(1, (int) ceil($total / $pp)) : 1;
+$page     = min($nb_pages, max(1, (int) ($_GET['page'] ?? 1)));
 $enseignants = db_all(
-    "SELECT * FROM enseignant WHERE " . implode(' AND ', $where) . " ORDER BY id_fonction, nom_ens", $params
+    "SELECT enseignant.*, u.id_user, u.login_user, u.actif AS compte_actif FROM enseignant $join_compte
+     WHERE $sql_where ORDER BY $ordre" . ($pp ? ' LIMIT ' . $pp . ' OFFSET ' . (($page - 1) * $pp) : ''), $params
 );
+$gere_comptes = in_array(role_connecte(), ['DIRECTEUR', 'FONDATEUR'], true) || voit_tous_les_comptes();
+$sans_compte  = $gere_comptes ? (int) db_val("SELECT COUNT(*) FROM enseignant e WHERE COALESCE(e.statut_ens,'actif')='actif'
+                                              AND NOT EXISTS (SELECT 1 FROM user x WHERE x.matricule_ens=e.matricule_ens)") : 0;
+$url_liste = function (array $chg = []) use ($q, $statut, $tri, $sens, $pp): string {
+    $p = array_merge(['onglet' => 'liste', 'q' => $q, 'statut' => $statut === 'actif' ? null : $statut, 'tri' => $tri === 'fonction' ? null : $tri,
+                      'sens' => $sens === 'DESC' ? 'desc' : null, 'pp' => $pp === 25 ? null : $pp], $chg);
+    return APP_URL . '/primaire/pages/enseignants/liste.php?' . http_build_query(array_filter($p, fn($v) => $v !== null && $v !== ''));
+};
+$th_tri = function (string $cle, string $libelle) use ($tri, $sens, $url_liste): string {
+    $actif = $tri === $cle;
+    $icone = $actif ? ($sens === 'ASC' ? 'bi-caret-up-fill' : 'bi-caret-down-fill') : 'bi-chevron-expand opacity-50';
+    $url   = $url_liste(['tri' => $cle, 'sens' => $actif && $sens === 'ASC' ? 'desc' : null, 'page' => null]);
+    return '<th><a data-ajax-nav href="' . h($url) . '" class="text-decoration-none text-reset" title="Trier par ' . h(mb_strtolower($libelle)) . '">'
+         . h($libelle) . ' <i class="bi ' . $icone . '" style="font-size:.65rem"></i></a></th>';
+};
 
 // ── Onglet 2 : Affectation des classes — DEUX grilles indépendantes :
 // piste française (enseignat_classe) et piste arabe (enseignat_classe_arabe).
@@ -73,12 +112,26 @@ if (!$es_partiel) {
 <div class="page-titre">
   <div>
     <h4><i class="bi bi-person-badge me-1 text-primary"></i>Personnel</h4>
-    <div class="sub"><?= count($enseignants) ?> membre(s) du personnel</div>
+    <div class="sub"><?= $total ?> membre(s) du personnel</div>
   </div>
   <?php if ($onglet === 'liste'): ?>
-  <a href="<?= APP_URL ?>/primaire/pages/enseignants/form.php" class="btn btn-primary btn-sm">
-    <i class="bi bi-person-plus me-1"></i>Nouveau membre du personnel
-  </a>
+  <div class="d-flex gap-2 flex-wrap">
+    <?php if ($gere_comptes): ?>
+    <?php if ($sans_compte): ?>
+    <form method="post" action="<?= APP_URL ?>/primaire/pages/enseignants/compte.php" class="d-inline"
+          onsubmit="return confirm('Créer un compte pour les <?= $sans_compte ?> membre(s) actif(s) sans compte ? (identifiant tiré du nom, mot de passe identique)')">
+      <?= csrf_champ() ?><input type="hidden" name="action" value="creer_manquants">
+      <button class="btn btn-outline-success btn-sm"><i class="bi bi-person-plus me-1"></i>Créer les comptes manquants (<?= $sans_compte ?>)</button>
+    </form>
+    <?php endif; ?>
+    <a href="<?= APP_URL ?>/primaire/pages/utilisateurs/liste.php" class="btn btn-outline-secondary btn-sm" title="Tous les comptes et les privilèges par utilisateur">
+      <i class="bi bi-people me-1"></i>Tous les comptes
+    </a>
+    <?php endif; ?>
+    <a href="<?= APP_URL ?>/primaire/pages/enseignants/form.php" class="btn btn-primary btn-sm">
+      <i class="bi bi-person-plus me-1"></i>Nouveau membre du personnel
+    </a>
+  </div>
   <?php endif; ?>
 </div>
 
@@ -106,7 +159,7 @@ if (!$es_partiel) {
       <div class="col-md-4">
         <div class="input-group input-group-sm">
           <span class="input-group-text"><i class="bi bi-search"></i></span>
-          <input type="text" name="q" class="form-control" placeholder="Nom, matricule…" value="<?= h($q) ?>">
+          <input type="text" name="q" class="form-control" placeholder="Nom, matricule, téléphone, identifiant…" value="<?= h($q) ?>">
         </div>
       </div>
       <div class="col-md-3">
@@ -116,6 +169,13 @@ if (!$es_partiel) {
           <option value="tous" <?= $statut === 'tous' ? 'selected' : '' ?>>Tous</option>
         </select>
       </div>
+      <div class="col-auto">
+        <select name="pp" class="form-select form-select-sm" data-ajax-nav-auto title="Lignes par page">
+          <?php foreach ($pp_choix as $n): ?><option value="<?= $n ?>" <?= $n === $pp ? 'selected' : '' ?>><?= $n ? $n . ' par page' : 'Tout' ?></option><?php endforeach; ?>
+        </select>
+      </div>
+      <?php if ($tri !== 'fonction'): ?><input type="hidden" name="tri" value="<?= h($tri) ?>"><?php endif; ?>
+      <?php if ($sens === 'DESC'): ?><input type="hidden" name="sens" value="desc"><?php endif; ?>
       <div class="col-auto d-flex gap-1">
         <button class="btn btn-primary btn-sm"><i class="bi bi-search"></i></button>
         <?php if ($q): ?><a data-ajax-nav href="<?= APP_URL ?>/primaire/pages/enseignants/liste.php?onglet=liste&statut=<?= $statut ?>" class="btn btn-outline-secondary btn-sm"><i class="bi bi-x-lg"></i></a><?php endif; ?>
@@ -129,12 +189,13 @@ if (!$es_partiel) {
     <table class="table table-abz table-hover align-middle mb-0">
       <thead>
         <tr>
-          <th>Nom</th><th>Fonction</th><th>Grade</th><th>Sexe</th><th>Téléphone</th><th>Statut</th><th class="text-end">Actions</th>
+          <?= $th_tri('matricule', 'Matricule') ?><?= $th_tri('nom', 'Nom') ?><?= $th_tri('fonction', 'Fonction') ?><th>Grade</th>
+          <?= $th_tri('tel', 'Téléphone') ?><?php if ($gere_comptes): ?><?= $th_tri('compte', 'Compte') ?><?php endif; ?><?= $th_tri('statut', 'Statut') ?><th class="text-end">Actions</th>
         </tr>
       </thead>
       <tbody>
         <?php if (empty($enseignants)): ?>
-          <tr><td colspan="7" class="text-center text-muted py-4">
+          <tr><td colspan="<?= $gere_comptes ? 8 : 7 ?>" class="text-center text-muted py-4">
             <i class="bi bi-inbox" style="font-size:2rem;opacity:.3;display:block;margin-bottom:.4rem"></i>Aucun membre du personnel trouvé.
           </td></tr>
         <?php else: foreach ($enseignants as $e):
@@ -142,6 +203,7 @@ if (!$es_partiel) {
           $grade = $e['id_grade'] ? db_val("SELECT libelle_grade FROM grade_enseignant WHERE code_grade=?", [$e['id_grade']]) : null;
         ?>
           <tr>
+            <td><?php if ($e['mat_ens']): ?><span class="badge-code"><?= h($e['mat_ens']) ?></span><?php else: ?><span class="text-muted">—</span><?php endif; ?></td>
             <td>
               <div class="d-flex align-items-center gap-2">
                 <div class="avatar"><?= h(mb_strtoupper(mb_substr($e['nom_ens'], 0, 1))) ?></div>
@@ -153,8 +215,15 @@ if (!$es_partiel) {
             </td>
             <td><span class="badge-code"><?= h(libelle_role($e['id_fonction'] ?? '')) ?></span></td>
             <td style="font-size:.78rem"><?= h($grade ?: '—') ?></td>
-            <td style="font-size:.78rem"><?= h($e['sexe_ens'] ?: '—') ?></td>
             <td style="font-size:.78rem"><?= h($e['tel_ens'] ?: '—') ?></td>
+            <?php if ($gere_comptes): ?>
+            <td style="font-size:.78rem">
+              <a href="<?= APP_URL ?>/primaire/pages/enseignants/voir.php?mat=<?= (int) $e['matricule_ens'] ?>#compte" class="text-decoration-none">
+              <?php if ($e['login_user'] !== null): ?><code><?= h($e['login_user']) ?></code><?php if (!$e['compte_actif']): ?> <span class="badge bg-secondary">désactivé</span><?php endif; ?>
+              <?php else: ?><span class="badge bg-warning text-dark">sans compte</span><?php endif; ?>
+              </a>
+            </td>
+            <?php endif; ?>
             <td>
               <span class="badge" style="background:<?= $actif ? '#dcfce7' : '#fee2e2' ?>;color:<?= $actif ? '#166534' : '#991b1b' ?>;font-size:.7rem">
                 <?= $actif ? 'Actif' : 'Inactif' ?>
@@ -188,6 +257,14 @@ if (!$es_partiel) {
       </tbody>
     </table>
   </div>
+  <?php if ($total): ?>
+  <div class="card-footer bg-white d-flex justify-content-between align-items-center flex-wrap gap-2">
+    <div class="text-muted" style="font-size:.75rem">
+      <?= $pp ? (($page - 1) * $pp + 1) . '–' . min($total, $page * $pp) . ' sur ' . $total : $total . ' au total' ?>
+    </div>
+    <?= str_replace('class="page-link"', 'class="page-link" data-ajax-nav', pagination_html($page, $nb_pages, $url_liste())) ?>
+  </div>
+  <?php endif; ?>
 </div>
 
 <?php endif; // onglet liste ?>

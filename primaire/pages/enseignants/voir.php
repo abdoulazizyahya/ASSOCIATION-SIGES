@@ -40,6 +40,8 @@ $derniers_bulletins = db_all(
     [$mat]
 );
 
+// École publique : ni salaire, ni contrats, ni congés (17/10/2026) — écoles privées uniquement
+$paie_ecole = paie_geree_par_ecole();
 $titre_page = 'Fiche personnel';
 require_once __DIR__ . '/../../../noyau/layout/header.php';
 ?>
@@ -83,8 +85,7 @@ require_once __DIR__ . '/../../../noyau/layout/header.php';
       <div class="card-header fw-semibold"><i class="bi bi-info-circle me-1"></i>Identité</div>
       <div class="card-body">
         <div class="row">
-          <div class="col-md-6 mb-2"><span class="text-muted small d-block">Matricule interne</span><?= h((string) $ens['matricule_ens']) ?></div>
-          <div class="col-md-6 mb-2"><span class="text-muted small d-block">Matricule administratif</span><?= h($ens['mat_ens'] ?: '—') ?></div>
+          <div class="col-md-6 mb-2"><span class="text-muted small d-block">Matricule</span><?= h($ens['mat_ens'] ?: '—') ?></div>
           <div class="col-md-6 mb-2"><span class="text-muted small d-block">Matricule CNPS</span><?= h($ens['matricule_cnps'] ?: '—') ?></div>
           <div class="col-md-6 mb-2"><span class="text-muted small d-block">Sexe</span><?= h($ens['sexe_ens'] ?: '—') ?></div>
           <div class="col-md-6 mb-2"><span class="text-muted small d-block">Date de naissance</span><?= date_fr($ens['date_naiss_ens']) ?></div>
@@ -103,14 +104,15 @@ require_once __DIR__ . '/../../../noyau/layout/header.php';
     </div>
 
     <div class="card mb-2">
-      <div class="card-header fw-semibold"><i class="bi bi-cash-coin me-1"></i>Poste &amp; paie</div>
+      <div class="card-header fw-semibold"><i class="bi bi-<?= $paie_ecole ? 'cash-coin' : 'briefcase' ?> me-1"></i><?= $paie_ecole ? 'Poste &amp; paie' : 'Poste' ?></div>
       <div class="card-body">
         <div class="row">
           <div class="col-md-6 mb-2"><span class="text-muted small d-block">Grade</span><?= h($grade['libelle_grade'] ?? 'Non défini') ?></div>
-          <div class="col-md-6 mb-2"><span class="text-muted small d-block">Salaire de base</span><?= $grade ? number_format((float) $grade['salaire_base'], 0, ',', ' ') . ' F' : '—' ?></div>
+          <?php if ($paie_ecole): ?><div class="col-md-6 mb-2"><span class="text-muted small d-block">Salaire de base</span><?= $grade ? number_format((float) $grade['salaire_base'], 0, ',', ' ') . ' F' : '—' ?></div><?php endif; ?>
           <div class="col-md-6 mb-2"><span class="text-muted small d-block">Indice / Position grille</span><?= h($ens['indice_grille'] ?: '—') ?></div>
           <div class="col-md-6 mb-2"><span class="text-muted small d-block">Date de recrutement</span><?= date_fr($ens['date_recrutement']) ?></div>
           <div class="col-md-6 mb-2"><span class="text-muted small d-block">Ancienneté</span><?= h(anciennete_libelle($ens['date_recrutement']) ?: '—') ?></div>
+          <?php if ($paie_ecole): ?>
           <div class="col-md-6 mb-2"><span class="text-muted small d-block">Mode de paiement</span><?= h($ens['mode_paiement'] ?: '—') ?></div>
           <div class="col-md-6 mb-2"><span class="text-muted small d-block">Banque</span><?= h($ens['nom_banque'] ?: '—') ?></div>
           <div class="col-md-6 mb-2"><span class="text-muted small d-block">Compte bancaire / Mobile Money</span><?= h($ens['compte_bancaire'] ?: '—') ?></div>
@@ -118,11 +120,12 @@ require_once __DIR__ . '/../../../noyau/layout/header.php';
             <span class="text-muted small d-block">Avances dues</span>
             <span class="fw-bold" style="color:<?= $total_du > 0 ? '#dc2626' : '#16a34a' ?>"><?= number_format($total_du, 0, ',', ' ') ?> F</span>
           </div>
+          <?php endif; ?>
         </div>
       </div>
     </div>
 
-    <?php if ($derniers_bulletins): ?>
+    <?php if ($paie_ecole && $derniers_bulletins): ?>
     <div class="card">
       <div class="card-header fw-semibold"><i class="bi bi-receipt me-1"></i>Derniers bulletins de paie</div>
       <div class="table-responsive">
@@ -153,6 +156,9 @@ require_once __DIR__ . '/../../../noyau/layout/header.php';
   </div>
 
   <div class="col-lg-4">
+    <?php require __DIR__ . '/_compte_carte.php'; // compte de connexion (17/10/2026) ?>
+
+    <?php if ($paie_ecole): ?>
     <div class="card mb-2">
       <div class="card-header fw-semibold"><i class="bi bi-file-earmark-text me-1"></i>Contrat</div>
       <div class="card-body">
@@ -186,6 +192,7 @@ require_once __DIR__ . '/../../../noyau/layout/header.php';
         </a>
       </div>
     </div>
+    <?php endif; ?>
   </div>
 </div>
 

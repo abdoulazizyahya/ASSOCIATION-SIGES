@@ -390,7 +390,9 @@ $exemple_slug = install_slug(($val['mode'] === 'reseau' ? $val['nom_association'
           </label>
         </div>
         <div class="hint">Général : programme APC, notes par compétence. Technique : notes par séquence, filières commerciales et industrielles.</div>
+      </div>
 
+      <div>
         <label>Statut de l'école</label>
         <div class="choix">
           <label class="opt">
@@ -402,7 +404,7 @@ $exemple_slug = install_slug(($val['mode'] === 'reseau' ? $val['nom_association'
             Privé
           </label>
         </div>
-        <div class="hint">Détermine le libellé affiché (Proviseur/Principal) et lequel des deux modules Paiements (public ou privé) est visible.</div>
+        <div class="hint">Privé : un compte FONDATEUR est créé ; une école publique n'a pas de fondateur. Au secondaire, détermine aussi le libellé (Proviseur/Principal) et le module Paiements visible.</div>
       </div>
 
       <div id="bloc_association" style="display:none">
@@ -426,7 +428,7 @@ $exemple_slug = install_slug(($val['mode'] === 'reseau' ? $val['nom_association'
 
       <label for="login">Identifiant du compte Directeur <span style="color:#b91c1c">*</span></label>
       <input type="text" id="login" name="login" required maxlength="30" value="<?= htmlspecialchars($val['login']) ?>">
-      <div class="hint" id="hint_login">Sert aussi de compte DIRECTEUR de l'école. Mot de passe = cet identifiant (à changer depuis Sécurité). Deux autres comptes (FONDATEUR, FINANCIER) sont créés automatiquement, mêmes conditions.</div>
+      <div class="hint" id="hint_login">Sert aussi de compte DIRECTEUR de l'école. Mot de passe = cet identifiant (à changer depuis Sécurité). Le compte FINANCIER (et FONDATEUR si l'école est privée) est créé automatiquement, mêmes conditions.</div>
 
       <button type="submit">Installer</button>
     </form>
@@ -453,7 +455,7 @@ $exemple_slug = install_slug(($val['mode'] === 'reseau' ? $val['nom_association'
           labelEcole.textContent = (reseau ? 'Premier établissement' : "Nom de l'école") + ' *';
           hintLogin.textContent = reseau
             ? "Sert à la fois au compte propriétaire de l'association et au compte DIRECTEUR de l'école. Mot de passe = cet identifiant (à changer depuis Sécurité)."
-            : "Sert aussi de compte DIRECTEUR de l'école. Mot de passe = cet identifiant (à changer depuis Sécurité). Deux autres comptes (FONDATEUR, FINANCIER) sont créés automatiquement, mêmes conditions.";
+            : "Sert aussi de compte DIRECTEUR de l'école. Mot de passe = cet identifiant (à changer depuis Sécurité). Le compte FINANCIER (et FONDATEUR si l'école est privée) est créé automatiquement, mêmes conditions.";
           v.textContent = reseau
             ? (slug(nAssoc.value) || 'association') + '_assoc, ' + (slug(nAssoc.value) || 'association') + '_<école>'
             : (slug(nEcole.value) || 'ecole');

@@ -302,6 +302,7 @@ DROP TABLE IF EXISTS `enseignant`;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `enseignant` (
   `matricule_ens` int NOT NULL AUTO_INCREMENT,
+  `matricule` varchar(30) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `nom_ens` varchar(150) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `prenom_ens` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `civilite_ens` varchar(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
@@ -343,6 +344,7 @@ CREATE TABLE `enseignant` (
   `nom_banque` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `compte_bancaire` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   PRIMARY KEY (`matricule_ens`),
+  UNIQUE KEY `uq_enseignant_matricule` (`matricule`),
   KEY `id_grade` (`id_grade`)
 ) ENGINE=InnoDB AUTO_INCREMENT=53 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;

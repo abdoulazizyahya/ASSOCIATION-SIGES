@@ -49,11 +49,14 @@ if ($etab) {
 // École secondaire : son menu garde PAIEMENT PRIVÉ ou PAIEMENT PUBLIQUE
 // selon SON statut (etablissement.statut dans sa base) — lu ici, puisque
 // aucune école n'est « ouverte » dans le portail.
-if ($secondaire && $etab) {
+// Primaire aussi depuis le 17/10/2026 (migration v62 : école publique = pas de paie) ;
+// colonne absente → privé au primaire, public au secondaire.
+if ($etab) {
+    $statut_defaut = $secondaire ? 'public' : 'prive';
     try {
-        $GLOBALS['statut_ecole_menu'] = (string) (avec_ecole($id_etab, fn($l) => ecole_one($l, "SELECT statut FROM etablissement LIMIT 1"))['statut'] ?? 'public');
+        $GLOBALS['statut_ecole_menu'] = (string) (avec_ecole($id_etab, fn($l) => ecole_one($l, "SELECT statut FROM etablissement LIMIT 1"))['statut'] ?? $statut_defaut);
     } catch (\Throwable $e) {
-        $GLOBALS['statut_ecole_menu'] = 'public';
+        $GLOBALS['statut_ecole_menu'] = $statut_defaut;
     }
 }
 $menu = require __DIR__ . '/../noyau/layout/' . ($secondaire ? 'menu_secondaire.php' : 'menu.php');

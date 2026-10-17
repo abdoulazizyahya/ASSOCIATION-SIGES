@@ -23,11 +23,11 @@ foreach (edt_services($a) as $s) {
 $horsService = db_all("SELECT q.id_classe, q.id_mat, q.matricule_ens, COUNT(*) n FROM edt_seance q
                        WHERE q.id_annee=? AND NOT EXISTS (SELECT 1 FROM edt_service s WHERE s.id_annee=q.id_annee AND s.id_classe=q.id_classe AND s.id_mat=q.id_mat AND s.matricule_ens<=>q.matricule_ens)
                        GROUP BY q.id_classe, q.id_mat, q.matricule_ens", [$a]);
-$sansEns = db_all("SELECT s.*, c.designation classe, TRIM(m.libelle) matiere FROM edt_service s JOIN classe c ON c.id=s.id_classe JOIN matiere m ON m.id=s.id_mat
+$sansEns = db_all("SELECT s.*, c.designation classe, TRIM(m.libelle) matiere FROM edt_service s JOIN " . edt_t('classe') . " c ON c.id=s.id_classe JOIN " . edt_t('matiere') . " m ON m.id=s.id_mat
                    WHERE s.id_annee=? AND s.matricule_ens IS NULL AND s.heures>0 ORDER BY c.ordre", [$a]);
 $seancesSansEns = (int) db_val("SELECT COUNT(*) FROM edt_seance WHERE id_annee=? AND matricule_ens IS NULL", [$a]);
 // Matières du programme sans service
-$progSansService = db_all("SELECT c.designation classe, c.id id_classe, TRIM(m.libelle) matiere FROM discipline d JOIN classe c ON c.id=d.IDClasses AND c.archivee=0 JOIN matiere m ON m.id=d.id_mat
+$progSansService = db_all("SELECT c.designation classe, c.id id_classe, TRIM(m.libelle) matiere FROM " . edt_t('discipline') . " d JOIN " . edt_t('classe') . " c ON c.id=d.IDClasses AND c.archivee=0 JOIN " . edt_t('matiere') . " m ON m.id=d.id_mat
                            WHERE NOT EXISTS (SELECT 1 FROM edt_service s WHERE s.id_annee=? AND s.id_classe=d.IDClasses AND s.id_mat=d.id_mat) ORDER BY c.ordre, m.libelle", [$a]);
 // Heures dues
 $charges = edt_charges_enseignants($a);
@@ -121,7 +121,7 @@ foreach ($sansEns as $s) echo '<tr><td>' . h($s['classe']) . '</td><td>' . h($s[
 if (!$sansEns) echo '<tr><td class="text-success p-3"><i class="bi bi-check-circle"></i> Tous les services ont un enseignant.</td></tr>';
 echo '</tbody></table></div></div>';
 
-$section('Matières du programme sans service', '#64748b', 'journal-x', count($progSansService), 'Matières prévues au programme SIGES de la classe (module Matières) pour lesquelles aucun service n\'est saisi.');
+$section('Matières du programme sans service', '#64748b', 'journal-x', count($progSansService), 'Matières prévues au programme SIGES de la classe (' . edt_lib_affectations() . ') pour lesquelles aucun service n\'est saisi.');
 $parClasse = [];
 foreach ($progSansService as $r) $parClasse[$r['classe']][] = $r['matiere'];
 echo '<div class="table-responsive"><table class="table table-sm mb-0"><tbody>';

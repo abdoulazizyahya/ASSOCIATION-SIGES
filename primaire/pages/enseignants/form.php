@@ -165,8 +165,8 @@ if (!$es_partiel) {
               <input type="email" name="mail" class="form-control" value="<?= h($ve('mail_ens')) ?>">
             </div>
             <div class="col-md-4">
-              <label class="form-label">Matricule administratif</label>
-              <input type="text" name="mat_ens" class="form-control" value="<?= h($ve('mat_ens')) ?>" placeholder="Référence officielle (optionnel)">
+              <label class="form-label">Matricule</label>
+              <input type="text" name="mat_ens" class="form-control text-uppercase" maxlength="20" value="<?= h($ve('mat_ens')) ?>" placeholder="ex. JP23444, 402683, 561345-M">
             </div>
             <div class="col-md-6">
               <label class="form-label">Matricule CNPS</label>
@@ -182,7 +182,8 @@ if (!$es_partiel) {
 
       <div class="card">
         <div class="card-body">
-          <div class="section-titre"><i class="bi bi-cash-coin me-1"></i>Poste &amp; paie</div>
+          <?php $paie_ecole = paie_geree_par_ecole();   // école publique : pas de salaire (17/10/2026) ?>
+          <div class="section-titre"><i class="bi bi-<?= $paie_ecole ? 'cash-coin' : 'briefcase' ?> me-1"></i><?= $paie_ecole ? 'Poste &amp; paie' : 'Poste' ?></div>
           <div class="row g-compact">
             <div class="col-md-4">
               <label class="form-label">Fonction</label>
@@ -195,12 +196,12 @@ if (!$es_partiel) {
               </select>
             </div>
             <div class="col-md-4">
-              <label class="form-label">Grade <span class="badge-code">Grille salariale</span></label>
+              <label class="form-label">Grade<?php if ($paie_ecole): ?> <span class="badge-code">Grille salariale</span><?php endif; ?></label>
               <select name="id_grade" class="form-select">
                 <option value="">— Non défini —</option>
                 <?php foreach ($grades as $g): ?>
                   <option value="<?= h($g['code_grade']) ?>" <?= $ve('id_grade') === $g['code_grade'] ? 'selected' : '' ?>>
-                    <?= h($g['libelle_grade']) ?> (<?= number_format((float) $g['salaire_base'], 0, ',', ' ') ?> F)
+                    <?= h($g['libelle_grade']) ?><?php if ($paie_ecole): ?> (<?= number_format((float) $g['salaire_base'], 0, ',', ' ') ?> F)<?php endif; ?>
                   </option>
                 <?php endforeach; ?>
               </select>
@@ -213,6 +214,7 @@ if (!$es_partiel) {
               <label class="form-label">Date de recrutement</label>
               <input type="date" name="date_recrutement" class="form-control" value="<?= h($ve('date_recrutement')) ?>">
             </div>
+            <?php if ($paie_ecole): ?>
             <div class="col-md-4">
               <label class="form-label">Mode de paiement</label>
               <select name="mode_paiement" class="form-select">
@@ -230,6 +232,7 @@ if (!$es_partiel) {
               <label class="form-label">Compte bancaire / Mobile Money</label>
               <input type="text" name="compte_bancaire" class="form-control" value="<?= h($ve('compte_bancaire')) ?>">
             </div>
+            <?php endif; ?>
           </div>
         </div>
       </div>
@@ -248,7 +251,7 @@ if (!$es_partiel) {
               </select>
             </div>
           </div>
-          <?php if ($ens): ?>
+          <?php if ($ens && paie_geree_par_ecole()): ?>
           <hr>
           <div class="d-grid gap-1">
             <a href="<?= APP_URL ?>/primaire/pages/enseignants/contrats.php?mat=<?= (int) $ens['matricule_ens'] ?>" class="btn btn-outline-secondary btn-sm">
