@@ -15,6 +15,8 @@ exiger_role(['ADMIN', 'PROVISEUR', 'FONDATEUR', 'CENSEUR']);
 // la fiche mais pas voir/changer le grade salarial.
 $peut_gerer_paie = in_array(role_connecte(), ['ADMIN', 'PROVISEUR', 'FONDATEUR', 'INTENDANT'], true);
 $grades = $peut_gerer_paie ? grille_salariale() : [];
+// École publique : grade sans montant, pas de section Paie (salaires gérés par l'État, 17/10/2026)
+$paie_ecole = paie_geree_par_ecole();
 
 $mat = (int) ($_GET['id'] ?? 0);
 $ens = $mat ? db_one("SELECT * FROM enseignant WHERE matricule_ens=?", [$mat]) : null;
@@ -107,11 +109,11 @@ require_once __DIR__ . '/../../../../noyau/layout/header.php';
             <option value="">— Non défini —</option>
             <?php foreach ($grades as $g): ?>
               <option value="<?= h($g['code_grade']) ?>" <?= ($ens['id_grade'] ?? '') === $g['code_grade'] ? 'selected' : '' ?>>
-                <?= h($g['libelle_grade']) ?> (<?= number_format((float) $g['salaire_base'], 0, ',', ' ') ?> F)
+                <?= h($g['libelle_grade']) ?><?php if ($paie_ecole): ?> (<?= number_format((float) $g['salaire_base'], 0, ',', ' ') ?> F)<?php endif; ?>
               </option>
             <?php endforeach; ?>
           </select>
-          <div class="form-text" style="font-size:.72rem">Détermine le salaire de base — voir Ressources humaines &gt; Grille salariale.</div>
+          <?php if ($paie_ecole): ?><div class="form-text" style="font-size:.72rem">Détermine le salaire de base — voir Ressources humaines &gt; Grille salariale.</div><?php endif; ?>
           <?php else: ?>
           <input type="text" class="form-control" value="<?= $ve('id_grade') ?>" disabled>
           <input type="hidden" name="grade" value="<?= $ve('id_grade') ?>">
@@ -133,7 +135,7 @@ require_once __DIR__ . '/../../../../noyau/layout/header.php';
     </div>
   </div>
 
-  <?php if ($peut_gerer_paie): ?>
+  <?php if ($peut_gerer_paie && $paie_ecole): ?>
   <div class="card mt-2">
     <div class="card-body">
       <div class="section-titre"><i class="bi bi-cash-coin me-1"></i>Paie</div>

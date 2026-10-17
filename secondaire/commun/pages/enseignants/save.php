@@ -39,6 +39,20 @@ $date_recrutement = $peut_gerer_paie ? (post('date_recrutement') ?: null) : null
 $mode_paiement    = $peut_gerer_paie ? (post('mode_paiement') ?: null) : null;
 $nom_banque       = $peut_gerer_paie ? (post('nom_banque') ?: null) : null;
 $compte_bancaire  = $peut_gerer_paie ? (post('compte_bancaire') ?: null) : null;
+// École publique : la section Paie n'est pas affichée (17/10/2026) — le grade reste
+// modifiable, mais les autres champs de paie gardent leurs valeurs en base.
+if ($peut_gerer_paie && !paie_geree_par_ecole() && $mat) {
+    $av = db_one("SELECT matricule_cnps, indice_grille, nb_enfants, nb_pers_charge, date_recrutement, mode_paiement, nom_banque, compte_bancaire
+                  FROM enseignant WHERE matricule_ens=?", [$mat]) ?? [];
+    $matricule_cnps   = $av['matricule_cnps']   ?? null;
+    $indice_grille    = $av['indice_grille']    ?? null;
+    $nb_enfants       = (int) ($av['nb_enfants'] ?? 0);
+    $nb_pers_charge   = (int) ($av['nb_pers_charge'] ?? 0);
+    $date_recrutement = $av['date_recrutement'] ?? null;
+    $mode_paiement    = $av['mode_paiement']    ?? null;
+    $nom_banque       = $av['nom_banque']       ?? null;
+    $compte_bancaire  = $av['compte_bancaire']  ?? null;
+}
 
 if ($nom === '') {
     flash_set('erreur', 'Le nom est obligatoire.');

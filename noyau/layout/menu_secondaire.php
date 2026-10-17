@@ -135,5 +135,9 @@ if ($statut_ecole === 'prive') {
     unset($menu['PAIEMENT PUBLIQUE']);
 } else {
     unset($menu['PAIEMENT PRIVÉ']);
+    // École publique : le personnel est payé par l'État — aucune entrée salaire
+    // (grille, paie, avances, bulletins de paie) dans Ressources humaines (17/10/2026).
+    $menu['Ressources humaines'] = array_values(array_filter($menu['Ressources humaines'],
+        fn($e) => !str_contains($e[1] ?? '', 'secondaire/commun/pages/paie/')));
 }
 return $menu;

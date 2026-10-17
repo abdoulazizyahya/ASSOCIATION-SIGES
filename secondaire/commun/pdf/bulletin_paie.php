@@ -11,6 +11,7 @@ require_once __DIR__ . '/../../../noyau/connexion.php';
 require_once __DIR__ . '/../../../noyau/fonctions.php';
 require_once __DIR__ . '/../../../noyau/paie_fonctions.php';
 exiger_connexion();
+exiger_paie_geree();   // école publique : pas de paie (17/10/2026)
 
 require_once __DIR__ . '/fpdf.php';
 require_once __DIR__ . '/header_pdf.php';

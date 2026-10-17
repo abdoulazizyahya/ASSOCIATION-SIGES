@@ -9,6 +9,7 @@ require_once __DIR__ . '/../../../../noyau/connexion.php';
 require_once __DIR__ . '/../../../../noyau/fonctions.php';
 require_once __DIR__ . '/../../../../noyau/paie_fonctions.php';
 exiger_role(['ADMIN', 'PROVISEUR', 'CENSEUR', 'SG', 'INTENDANT', 'SECRETAIRE', 'ENSEIGNANT']);
+exiger_paie_geree();   // école publique : pas de paie (17/10/2026)
 
 $url_vue  = APP_URL . '/secondaire/commun/pages/paie/bulletin.php';
 $url_pdf  = APP_URL . '/secondaire/commun/pdf/bulletin_paie.php';

@@ -13,7 +13,9 @@ $mat = (int) ($_GET['id'] ?? 0);
 $ens = $mat ? db_one("SELECT * FROM enseignant WHERE matricule_ens=?", [$mat]) : null;
 if (!$ens) { flash_set('erreur', 'Membre du personnel introuvable.'); rediriger('secondaire/commun/pages/enseignants/liste.php'); }
 
-$peut_gerer_paie = in_array(role_connecte(), ['ADMIN', 'PROVISEUR', 'FONDATEUR', 'INTENDANT'], true);
+$peut_gerer_rh   = in_array(role_connecte(), ['ADMIN', 'PROVISEUR', 'FONDATEUR', 'INTENDANT'], true);
+// École publique : rien sur le salaire (personnel payé par l'État, 17/10/2026) — contrats et congés restent
+$peut_gerer_paie = $peut_gerer_rh && paie_geree_par_ecole();
 $grade = $ens['id_grade'] ? grade_par_code($ens['id_grade']) : null;
 $contrat_actif = db_one("SELECT * FROM contrat_enseignant WHERE matricule_ens=? AND actif=1 ORDER BY date_debut DESC LIMIT 1", [$mat]);
 $nb_contrats   = (int) db_val("SELECT COUNT(*) FROM contrat_enseignant WHERE matricule_ens=?", [$mat]);
@@ -145,7 +147,7 @@ require_once __DIR__ . '/../../../../noyau/layout/header.php';
       </div>
     </div>
 
-    <?php if ($peut_gerer_paie): ?>
+    <?php if ($peut_gerer_rh): ?>
     <div class="card mb-2">
       <div class="card-header fw-semibold"><i class="bi bi-file-earmark-text me-1"></i>Contrat</div>
       <div class="card-body">
@@ -171,6 +173,7 @@ require_once __DIR__ . '/../../../../noyau/layout/header.php';
       </div>
     </div>
 
+    <?php if ($peut_gerer_paie): ?>
     <div class="card">
       <div class="card-header fw-semibold"><i class="bi bi-cash me-1"></i>Avances sur salaire</div>
       <div class="card-body">
@@ -179,6 +182,7 @@ require_once __DIR__ . '/../../../../noyau/layout/header.php';
         </a>
       </div>
     </div>
+    <?php endif; ?>
     <?php endif; ?>
   </div>
 </div>

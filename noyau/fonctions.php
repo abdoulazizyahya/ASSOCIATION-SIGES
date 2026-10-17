@@ -1205,6 +1205,23 @@ function get_etablissement(): array {
     return $GLOBALS['_db_cache_globales'][$cle] ??= get_etablissement_sans_cache();
 }
 
+/**
+ * L'école gère-t-elle elle-même les salaires ? Non pour une école secondaire
+ * PUBLIQUE (personnel payé par l'État) : grille salariale, paie, avances et
+ * bulletins de paie y sont masqués et inaccessibles (17/10/2026). Le primaire
+ * (pas de colonne statut) et le secondaire privé gardent la paie.
+ */
+function paie_geree_par_ecole(): bool {
+    if (function_exists('type_enseignement_courant') && type_enseignement_courant() !== 'secondaire') return true;
+    return (get_etablissement()['statut'] ?? 'public') === 'prive';
+}
+/** Garde des pages de paie : école publique → retour au tableau de bord. */
+function exiger_paie_geree(): void {
+    if (paie_geree_par_ecole()) return;
+    flash_set('info', 'École publique : les salaires du personnel ne sont pas gérés dans SIGES.');
+    rediriger('noyau/dashboard.php');
+}
+
 function get_etablissement_sans_cache(): array {
     $e = db_one("SELECT * FROM etablissement LIMIT 1") ?? [];
     // École secondaire (schema_ref_ecole_secondaire.sql, porté de LAM_ABZ) :
