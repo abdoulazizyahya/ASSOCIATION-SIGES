@@ -9,7 +9,7 @@ require_once __DIR__ . '/../../../config/config.php';
 require_once __DIR__ . '/../../../noyau/connexion.php';
 require_once __DIR__ . '/../../../noyau/fonctions.php';
 exiger_role(['DIRECTEUR']);
-$GLOBALS['menu_lien_actif'] = 'primaire/pages/enseignants/liste.php';   // rattaché à Ressources humaines → Enseignant(e)s (17/10/2026)
+$GLOBALS['menu_lien_actif'] = 'primaire/pages/utilisateurs/liste.php';   // Ressources humaines → Comptes utilisateurs (23/10/2026)
 // Gestion des privilèges = DIRECTEUR local ou superadmin association en
 // visite écriture UNIQUEMENT (jamais le FONDATEUR, qui passe pourtant
 // exiger_role via son accès lecture global — il enregistre les personnes,

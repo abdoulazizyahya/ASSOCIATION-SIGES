@@ -3,7 +3,7 @@ require_once __DIR__ . '/../../../config/config.php';
 require_once __DIR__ . '/../../../noyau/connexion.php';
 require_once __DIR__ . '/../../../noyau/fonctions.php';
 exiger_role(['DIRECTEUR']);
-$GLOBALS['menu_lien_actif'] = 'primaire/pages/enseignants/liste.php';   // rattaché à Ressources humaines → Enseignant(e)s (17/10/2026)
+$GLOBALS['menu_lien_actif'] = 'primaire/pages/utilisateurs/liste.php';   // Ressources humaines → Comptes utilisateurs (23/10/2026)
 
 $id = (int)($_GET['id'] ?? 0);
 $u  = $id ? db_one(

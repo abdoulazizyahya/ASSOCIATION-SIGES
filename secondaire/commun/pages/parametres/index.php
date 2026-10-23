@@ -22,6 +22,11 @@ $sig_chef_etablissement = get_signature_titulaires()['chef_etablissement'] ?? nu
 // (voir garde POST plus bas) — variable réutilisée par le template pour
 // masquer le formulaire de création aux comptes locaux ADMIN/PROVISEUR/FONDATEUR.
 $est_superadmin = function_exists('est_superadmin_association') && est_superadmin_association();
+// Onglet « Documents enseignants » : visible SEULEMENT du propriétaire
+// (portail ou compte propriétaire de l'école) et du superadmin — masqué
+// pour tous les comptes locaux (23/10/2026).
+$voit_documents = $est_superadmin || (function_exists('est_proprietaire_ecole') && est_proprietaire_ecole());
+if ($onglet === 'documents' && !$voit_documents) $onglet = 'etablissement';
 
 // ══════════════════════════════════════════════════
 //  POST — Établissement
@@ -157,13 +162,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $aid = (int)post('id_annee');
         db_exec("UPDATE annee_scolaire SET active=0");
         db_exec("UPDATE annee_scolaire SET active=1 WHERE id=?", [$aid]);
+        // Trimestre/séquence actifs d'une AUTRE année : retirés (requêtes
+        // globales « active=1 ») ; get_trimestre_actif() active ensuite le
+        // premier trimestre et la première séquence de la nouvelle année.
+        desactiver_periodes_annee(null, $aid);
         flash_set('succes', 'Année scolaire activée.');
         rediriger('secondaire/commun/pages/parametres/index.php?onglet=annees');
     }
     if ($action === 'annee_desactiver') {
         $aid = (int)post('id_annee');
         db_exec("UPDATE annee_scolaire SET active=0 WHERE id=?", [$aid]);
-        flash_set('succes', 'Année scolaire désactivée.');
+        // Année désactivée = ses trimestres et séquences aussi (23/10/2026) :
+        // plus aucune séquence de cette année ne reste « active » ailleurs.
+        desactiver_periodes_annee($aid);
+        flash_set('succes', 'Année scolaire désactivée (ses trimestres et séquences sont masqués).');
         rediriger('secondaire/commun/pages/parametres/index.php?onglet=annees');
     }
     // FONDATEUR : seulement activer/désactiver une année (ci-dessus), jamais
@@ -353,7 +365,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 //  côté serveur, en plus du formulaire désactivé pour les autres comptes.
 // ══════════════════════════════════════════════════
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && post('action') === 'mode_documents_enregistrer') {
-    if (!$est_superadmin) {
+    if (!$voit_documents) {
         flash_set('erreur', 'Seul le propriétaire ou un superadministrateur de l\'association peut modifier ce réglage.');
         rediriger('secondaire/commun/pages/parametres/index.php?onglet=documents');
     }
@@ -378,7 +390,8 @@ $sequences  = db_all("SELECT s.*, t.libelle AS trim_lib, a.libelle AS annee_lib
                        FROM sequence s
                        JOIN trimestre t ON t.id=s.id_trim
                        JOIN annee_scolaire a ON a.id=t.id_annee
-                       ORDER BY a.libelle DESC, t.ordre, s.ordre");
+                       WHERE a.active=1
+                       ORDER BY t.ordre, s.ordre");   // année désactivée : ses séquences masquées, comme les trimestres
 $reglage_mention_actuel = get_reglage_mention_bulletin((int)($annee_act['id'] ?? 0));
 
 // Couleurs des bulletins : table pdf_couleur absente tant que la migration
@@ -415,7 +428,8 @@ require_once __DIR__ . '/../../../../noyau/layout/header.php';
       'couleurs_bulletin' => ['bi-palette2',   'Couleurs bulletin'],
       'documents'         => ['bi-file-earmark-text', 'Documents enseignants'],
       'reglages'          => ['bi-palette',    'Apparence'],
-  ] as $key => [$ico, $label]): ?>
+  ] as $key => [$ico, $label]):
+      if ($key === 'documents' && !$voit_documents) continue; ?>
   <li class="nav-item">
     <a class="nav-link <?= $onglet===$key?'active':'' ?>"
        href="<?= APP_URL ?>/secondaire/commun/pages/parametres/index.php?onglet=<?= $key ?>">
@@ -706,7 +720,9 @@ function editAnnee(id, lib) {
 ══════════════════════════════════════════════════ -->
 
 <?php
-$seq_active_now  = db_one("SELECT * FROM sequence WHERE active=1 LIMIT 1");
+$seq_active_now  = db_one("SELECT s.* FROM sequence s JOIN trimestre t ON t.id=s.id_trim
+                          JOIN annee_scolaire a ON a.id=t.id_annee AND a.active=1
+                          WHERE s.active=1 LIMIT 1");
 $trimestre_actif = get_trimestre_actif();
 $today = date('Y-m-d');
 ?>
@@ -757,11 +773,13 @@ document.getElementById('form-trim-activer').addEventListener('submit', function
 <?php
 // ── Diagnostique auto-activation ─────────────────────────────────
 $diag_today    = db_val("SELECT CURDATE()");           // date MySQL réelle
-$diag_expired  = db_all("SELECT libelle, date_fin FROM sequence
-                          WHERE date_fin IS NOT NULL AND date_fin < CURDATE() AND active=1");
-$diag_en_cours = db_one("SELECT libelle, date_debut, date_fin FROM sequence
-                          WHERE date_debut IS NOT NULL AND date_fin IS NOT NULL
-                            AND date_debut <= CURDATE() AND date_fin >= CURDATE() LIMIT 1");
+$diag_expired  = db_all("SELECT s.libelle, s.date_fin FROM sequence s JOIN trimestre t ON t.id=s.id_trim
+                          JOIN annee_scolaire a ON a.id=t.id_annee AND a.active=1
+                          WHERE s.date_fin IS NOT NULL AND s.date_fin < CURDATE() AND s.active=1");
+$diag_en_cours = db_one("SELECT s.libelle, s.date_debut, s.date_fin FROM sequence s JOIN trimestre t ON t.id=s.id_trim
+                          JOIN annee_scolaire a ON a.id=t.id_annee AND a.active=1
+                          WHERE s.date_debut IS NOT NULL AND s.date_fin IS NOT NULL
+                            AND s.date_debut <= CURDATE() AND s.date_fin >= CURDATE() LIMIT 1");
 ?>
 
 <!-- Bandeau état auto-activation -->
@@ -1602,7 +1620,7 @@ td.comp{text-align:left}
       Attestation de présence effective, certificats de prise et de reprise de service demandés par les enseignants
       (menu Ressources humaines &gt; Demandes de documents).
     </p>
-    <?php if (!$est_superadmin): ?>
+    <?php if (!$voit_documents): ?>
       <div class="alert alert-secondary py-2 px-3" style="font-size:.8rem">
         <i class="bi bi-lock me-1"></i>Réglage modifiable uniquement par le <strong>propriétaire</strong> ou un
         <strong>superadministrateur</strong> de l'association.
@@ -1619,7 +1637,7 @@ td.comp{text-align:left}
       ] as $val => [$ico, $titre, $desc]): ?>
       <label class="d-flex gap-2 align-items-start border rounded p-2 mb-2 <?= $mode_doc === $val ? 'border-primary bg-light' : '' ?>" style="cursor:pointer">
         <input type="radio" class="form-check-input mt-1" name="mode_documents_enseignant" value="<?= $val ?>"
-               <?= $mode_doc === $val ? 'checked' : '' ?> <?= $est_superadmin ? '' : 'disabled' ?>>
+               <?= $mode_doc === $val ? 'checked' : '' ?> <?= $voit_documents ? '' : 'disabled' ?>>
         <span>
           <span class="fw-semibold" style="font-size:.85rem"><i class="bi <?= $ico ?> me-1"></i><?= h($titre) ?></span>
           <?php if ($mode_doc === $val): ?><span class="badge bg-primary ms-1" style="font-size:.65rem">actif</span><?php endif; ?>
@@ -1633,7 +1651,7 @@ td.comp{text-align:left}
           elles restent à traiter par le Censeur / le Proviseur quel que soit le mode choisi.
         </div>
       <?php endif; ?>
-      <?php if ($est_superadmin): ?>
+      <?php if ($voit_documents): ?>
         <button class="btn btn-primary btn-sm"><i class="bi bi-check-lg me-1"></i>Enregistrer</button>
       <?php endif; ?>
     </form>

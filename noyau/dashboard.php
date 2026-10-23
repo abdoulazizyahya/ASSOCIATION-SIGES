@@ -338,6 +338,7 @@ require_once __DIR__ . '/layout/header.php';
 .hn span{display:block;font-size:.62rem;opacity:.8;text-transform:uppercase;letter-spacing:.02em}
 .gauge-wrap-sm{width:50px;height:50px}
 .gauge-val-sm{font-size:.7rem;color:#fff}
+.gauge-wrap-pie{width:66px;height:66px}
 </style>
 
 <div class="dash-page">
@@ -352,7 +353,7 @@ require_once __DIR__ . '/layout/header.php';
   <div class="hero-zone">
     <div class="hero-zone-head"><i class="bi bi-people-fill"></i>Effectifs</div>
     <div class="hero-zone-nums">
-      <div class="gauge-wrap gauge-wrap-sm"><canvas id="chartEffectifsPie"></canvas></div>
+      <div class="gauge-wrap gauge-wrap-pie"><canvas id="chartEffectifsPie"></canvas></div>
       <div class="hn"><b><?= $nb_eleves ?></b><span>Élèves</span></div>
       <div class="hn"><b style="color:#a9c6ff"><?= $nb_garcons ?></b><span>Garçons</span></div>
       <div class="hn"><b style="color:#ffb3cc"><?= $nb_filles ?></b><span>Filles</span></div>
@@ -364,7 +365,7 @@ require_once __DIR__ . '/layout/header.php';
   <div class="hero-zone hero-zone-finance">
     <div class="hero-zone-head"><i class="bi bi-cash-coin"></i>Finances — Paiements<?= $peut_voir_depenses ? ' &amp; Dépenses' : '' ?></div>
     <div class="hero-zone-nums">
-      <div class="gauge-wrap gauge-wrap-sm"><canvas id="chartRecouvrementTop"></canvas><div class="gauge-val gauge-val-sm"><?= $taux_recouvrement ?>%</div></div>
+      <div class="gauge-wrap gauge-wrap-pie"><canvas id="chartRecouvrementTop"></canvas></div>
       <div class="hn"><b><?= $fmt_f($total_du) ?></b><span>Total dû</span></div>
       <div class="hn"><b style="color:#7fe0ab"><?= $fmt_f($total_paye) ?></b><span>Encaissé</span></div>
       <?php if ($peut_voir_depenses): ?>
@@ -380,7 +381,7 @@ require_once __DIR__ . '/layout/header.php';
     <div class="hero-zone-head"><i class="bi bi-mortarboard-fill"></i>Pédagogie</div>
     <div class="hero-zone-nums">
       <?php if ($id_trim): ?>
-      <div class="gauge-wrap gauge-wrap-sm"><canvas id="chartReussite"></canvas><div class="gauge-val gauge-val-sm"><?= $taux_reussite_ecole ?>%</div></div>
+      <div class="gauge-wrap gauge-wrap-pie"><canvas id="chartReussite"></canvas></div>
       <div class="hn"><b><?= $fmt_moy($moy_generale_ecole) ?>/20</b><span>Moyenne</span></div>
       <div class="hn"><b><?= $nb_evalues_ecole ?></b><span>Évalués</span></div>
       <?php else: ?>
@@ -754,8 +755,51 @@ function gaugeDoughnut(id, valeur, seuilBon) {
         options: { cutout: '72%', plugins: { legend: { display: false }, tooltip: { enabled: false } }, animation: { duration: 400 } }
     });
 }
+
+// Diagramme circulaire du bandeau (Effectifs, Finances, Pédagogie) : le
+// pourcentage de chaque part est écrit sur la part (24/10/2026), texte foncé
+// sur les couleurs claires, blanc sur les foncées ; part < 8 % : seulement au survol.
+const pctSurParts = {
+    id: 'pctSurParts',
+    afterDatasetsDraw(chart) {
+        const ds = chart.data.datasets[0], tot = ds.data.reduce((a, b) => a + b, 0);
+        if (!tot) return;
+        const ctx = chart.ctx;
+        chart.getDatasetMeta(0).data.forEach((arc, i) => {
+            const p = ds.data[i] / tot * 100;
+            if (p < 8) return;
+            const { x, y } = arc.tooltipPosition();
+            const hex = ds.backgroundColor[i].replace('#', '');
+            const lum = (0.299 * parseInt(hex.substr(0, 2), 16) + 0.587 * parseInt(hex.substr(2, 2), 16) + 0.114 * parseInt(hex.substr(4, 2), 16)) / 255;
+            ctx.save();
+            ctx.font = '700 9px ' + Chart.defaults.font.family;
+            ctx.fillStyle = lum > 0.6 ? '#1a2744' : '#fff';
+            ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+            ctx.fillText(Math.round(p) + '%', x, y);
+            ctx.restore();
+        });
+    }
+};
+function camembert(id, libelles, valeurs, couleurs, unite) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    const tot = valeurs.reduce((a, b) => a + b, 0);
+    new Chart(el, {
+        type: 'pie',
+        data: { labels: libelles, datasets: [{ data: valeurs, backgroundColor: couleurs, borderColor: 'rgba(255,255,255,.85)', borderWidth: 1 }] },
+        options: {
+            plugins: {
+                legend: { display: false },
+                tooltip: { callbacks: { label: ctx => unite === null ? ctx.label + ' : ' + Math.round(ctx.parsed) + ' %' : ctx.label + ' : ' + ctx.parsed.toLocaleString('fr-FR') + unite
+                    + (tot ? ' (' + Math.round(ctx.parsed / tot * 100) + ' %)' : '') } },
+            },
+            animation: { duration: 400 },
+        },
+        plugins: [pctSurParts],
+    });
+}
 <?php if ($peut_voir_pedagogie): ?>
-gaugeDoughnut('chartReussite', <?= (float) $taux_reussite_ecole ?>, 50);
+camembert('chartReussite', ['Moyenne ≥ 10', 'Moyenne < 10'], [<?= (float) $taux_reussite_ecole ?>, <?= max(0, 100 - (float) $taux_reussite_ecole) ?>], ['#1e7c50', '#c8960a'], null);
 <?php endif; ?>
 
 <?php if ($peut_voir_pedagogie && $par_niveau_moy): ?>
@@ -781,7 +825,7 @@ new Chart(document.getElementById('chartNiveaux'), {
 <?php endif; ?>
 
 <?php if ($peut_voir_finances): ?>
-gaugeDoughnut('chartRecouvrementTop', <?= (float) $taux_recouvrement ?>, 50);
+camembert('chartRecouvrementTop', ['Encaissé', 'Reste à payer'], [<?= (float) $total_paye ?>, <?= max(0, (float) $total_du - (float) $total_paye) ?>], ['#1e7c50', '#c8960a'], ' F');
 gaugeDoughnut('chartRecouvrement', <?= (float) $taux_recouvrement ?>, 50);
 
 <?php if ($chart_recouvrement_classe): ?>
@@ -885,20 +929,7 @@ gaugeDoughnut('chartBulletins', <?= (float) $taux_bulletins_payes ?>, 100);
 
 // Répartition Garçons/Filles — diagramme circulaire compact du bandeau
 // Effectifs (remplace l'histogramme par classe, demande du 20/08/2026, suite).
-new Chart(document.getElementById('chartEffectifsPie'), {
-    type: 'doughnut',
-    data: {
-        labels: ['Garçons', 'Filles'],
-        datasets: [{ data: [<?= $nb_garcons ?>, <?= $nb_filles ?>], backgroundColor: ['#a9c6ff', '#ffb3cc'], borderWidth: 0 }]
-    },
-    options: {
-        cutout: '60%',
-        plugins: {
-            legend: { display: false },
-            tooltip: { callbacks: { label: ctx => ctx.label + ' : ' + ctx.parsed } },
-        },
-    },
-});
+camembert('chartEffectifsPie', ['Garçons', 'Filles'], [<?= (int) $nb_garcons ?>, <?= (int) $nb_filles ?>], ['#a9c6ff', '#ffb3cc'], ' élève(s)');
 </script>
 
 <?php require_once __DIR__ . '/layout/footer.php'; ?>

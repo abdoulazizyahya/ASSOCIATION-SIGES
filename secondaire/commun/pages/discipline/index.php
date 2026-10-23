@@ -47,7 +47,9 @@ $ids_classes_ok = array_column($classes_access, 'id');
 
 // ── Trimestre actif (dérivé de la séquence active) ─────────────────
 $trim_actif = db_one(
-    "SELECT t.* FROM trimestre t JOIN sequence s ON s.id_trim=t.id WHERE s.active=1 LIMIT 1"
+    "SELECT t.* FROM trimestre t JOIN sequence s ON s.id_trim=t.id
+     JOIN annee_scolaire a ON a.id=t.id_annee AND a.active=1
+     WHERE s.active=1 LIMIT 1"
 );
 $id_trim = (int)($trim_actif['id'] ?? 0);
 

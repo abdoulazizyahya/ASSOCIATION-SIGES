@@ -770,6 +770,40 @@ initAjaxZone(<?= json_encode($ajax_zone_id) ?>);
   document.addEventListener('partielCharge', function (e) { initialiserSaisieNumerique(e.target); });
 })();
 </script>
+<script>
+// Tableaux triables (24/10/2026) : <table class="table-triable">, clic sur un
+// en-tête = tri croissant puis décroissant de cette colonne. Valeur triée :
+// attribut data-tri de la cellule, sinon son texte (ordre alphabétique
+// français, nombres dans l'ordre naturel). En-tête exclu : data-sans-tri.
+(function () {
+  function trier(table, th) {
+    var idx = Array.prototype.indexOf.call(th.parentNode.children, th);
+    var corps = table.tBodies[0];
+    if (!corps) return;
+    var sens = th.dataset.sens === 'asc' ? 'desc' : 'asc';
+    table.querySelectorAll('thead th').forEach(function (t) { delete t.dataset.sens; });
+    th.dataset.sens = sens;
+    var lignes = Array.prototype.filter.call(corps.rows, function (r) { return r.cells.length > idx; });
+    var val = function (r) { var c = r.cells[idx]; return (c.dataset.tri !== undefined ? c.dataset.tri : c.textContent).trim(); };
+    lignes.sort(function (a, b) {
+      var r = val(a).localeCompare(val(b), 'fr', { numeric: true, sensitivity: 'base' });
+      return sens === 'asc' ? r : -r;
+    });
+    lignes.forEach(function (r) { corps.appendChild(r); });
+  }
+  document.addEventListener('click', function (e) {
+    var th = e.target.closest('table.table-triable thead th');
+    if (!th || th.hasAttribute('data-sans-tri')) return;
+    trier(th.closest('table'), th);
+  });
+})();
+</script>
+<style>
+table.table-triable thead th:not([data-sans-tri]){cursor:pointer;user-select:none;white-space:nowrap}
+table.table-triable thead th:not([data-sans-tri])::after{content:'\2195';opacity:.3;margin-left:4px;font-size:.75em}
+table.table-triable thead th[data-sens="asc"]::after{content:'\25B2';opacity:.8}
+table.table-triable thead th[data-sens="desc"]::after{content:'\25BC';opacity:.8}
+</style>
 <?= function_exists('db_stats_html') ? db_stats_html() : '' /* N requêtes SQL — en local uniquement */ ?>
 </body>
 </html>

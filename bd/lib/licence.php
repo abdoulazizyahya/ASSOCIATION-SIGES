@@ -282,6 +282,53 @@ function licence_renouveler_direct(string $date_debut, string $date_fin, ?string
     licence_renouveler($date_debut, $date_fin, 'direct', null, $auteur);
 }
 
+// ── Licences de PLUSIEURS écoles depuis le portail association ───────
+// (association/licences.php, propriétaire seul — 23/10/2026). Les fonctions
+// ci-dessus travaillent sur la connexion globale $link : on la fait pointer
+// le temps de $fn sur la base de l'école (avec SES identifiants MySQL, voir
+// connecter_base_ecole()), puis on rend la connexion d'origine.
+function licence_sur_ecole(array $etab, callable $fn) {
+    global $link;
+    $origine = $link;
+    $link = connecter_base_ecole($etab['db_name']);
+    try {
+        return $fn();
+    } finally {
+        @mysqli_close($link);
+        $link = $origine;
+    }
+}
+
+// État de la licence d'une école, tel que l'école elle-même le voit, plus sa
+// dernière modification (historique). Jamais d'exception.
+function licence_etat_ecole(array $etab): array {
+    try {
+        return licence_sur_ecole($etab, function () {
+            $etat = licence_etat(true);
+            $etat['historique'] = db_one("SELECT * FROM licence_historique ORDER BY id DESC LIMIT 1");
+            return $etat;
+        });
+    } catch (\Throwable $e) {
+        return ['etat' => 'expiree', 'jours_restants' => 0, 'motif' => 'base_injoignable : ' . $e->getMessage(),
+                'licence' => null, 'historique' => null];
+    }
+}
+
+// Renouvelle directement (sans clé) la licence de chaque école de $etabs.
+// Retour : [code => null (succès) | message d'erreur].
+function licence_renouveler_ecoles(array $etabs, string $date_debut, string $date_fin, ?string $auteur): array {
+    $res = [];
+    foreach ($etabs as $e) {
+        try {
+            licence_sur_ecole($e, fn() => licence_renouveler_direct($date_debut, $date_fin, $auteur));
+            $res[$e['code']] = null;
+        } catch (\Throwable $ex) {
+            $res[$e['code']] = $ex->getMessage();
+        }
+    }
+    return $res;
+}
+
 // Décode + authentifie + vérifie l'anti-rejeu + applique — dans cet
 // ordre exact (voir cahier des charges) : un format invalide compte
 // comme tentative (anti-brute-force) ; une clé DÉJÀ appliquée est

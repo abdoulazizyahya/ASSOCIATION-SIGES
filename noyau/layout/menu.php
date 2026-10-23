@@ -100,6 +100,8 @@ $menu = [
     ],
     'Ressources humaines' => [
         ['Enseignant(e)s',        'primaire/pages/enseignants/liste.php', 'person-badge',   ['DIRECTEUR','FONDATEUR','SECRETAIRE']],
+        // Remis au menu le 23/10/2026 : identifiants / mots de passe / privilèges de tous les comptes (sauf Fondateur et autre Directeur)
+        ['Comptes utilisateurs',  'primaire/pages/utilisateurs/liste.php', 'people',        ['DIRECTEUR']],
         ['Grille salariale',      'primaire/pages/paie/grille.php',       'table',          ['COMPTABLE','FONDATEUR']],
         ['Paie',                  'primaire/pages/paie/index.php',        'cash-stack',     ['COMPTABLE','FONDATEUR']],
         ['Avances sur salaire',   'primaire/pages/paie/avances.php',      'cash',           ['COMPTABLE','FONDATEUR']],

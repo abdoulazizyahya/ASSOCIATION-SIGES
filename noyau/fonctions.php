@@ -658,6 +658,17 @@ function fiche_gerable(int $matricule_ens, ?string $fct = null): bool {
     return !in_array($fct, ['DIRECTEUR', 'FONDATEUR'], true);
 }
 
+/**
+ * Le mot de passe de ce compte est-il encore l'identifiant (mot de passe par
+ * défaut) ? Seule information « lisible » d'un mot de passe chiffré. Une
+ * vérification bcrypt coûte ~0,1 s : résultat gardé en session par empreinte
+ * (une réinitialisation change l'empreinte, donc le résultat est recalculé).
+ */
+function mdp_est_identifiant(string $login, string $hash): bool {
+    $cle = md5($login . "\0" . $hash);
+    return $_SESSION['mdp_defaut'][$cle] ??= password_verify($login, $hash);
+}
+
 /** Message affiché quand compte_gerable() refuse. */
 function refus_compte_non_gerable(string $fonction_cible): string {
     return 'Le compte d\'un(e) ' . mb_strtolower(libelle_role($fonction_cible))
@@ -1672,6 +1683,16 @@ function activer_sequence(int $id_sequence): void {
     db_exec("UPDATE sequence SET active=1 WHERE id=?", [$id_sequence]);
 }
 
+// Retire l'état « actif » des trimestres et séquences d'une année désactivée
+// ($id_annee), ou de toutes les années sauf $sauf_annee (bascule d'année) —
+// secondaire. Les requêtes globales « active=1 » ne voient ainsi jamais une
+// période d'une année qui n'est plus active (23/10/2026).
+function desactiver_periodes_annee(?int $id_annee, ?int $sauf_annee = null): void {
+    [$cond, $p] = $id_annee !== null ? ['t.id_annee = ?', [$id_annee]] : ['t.id_annee <> ?', [(int) $sauf_annee]];
+    db_exec("UPDATE sequence s JOIN trimestre t ON t.id = s.id_trim SET s.active = 0 WHERE s.active = 1 AND $cond", $p);
+    db_exec("UPDATE trimestre t SET t.active = 0 WHERE t.active = 1 AND $cond", $p);
+}
+
 // École secondaire uniquement (schema_ref_ecole_secondaire.sql) : le
 // trimestre actif de l'année active, utilisé par le module Matières (onglet
 // « Compétences par trimestre », porté de LAM_ABZ). Sans repli, une école
@@ -1735,13 +1756,21 @@ function get_trimestre_actif(): array {
 // séquence choisie par le bootstrap de get_trimestre_actif() reste active.
 function auto_activer_sequences(): void {
     db_exec("UPDATE sequence SET active=0 WHERE date_fin IS NOT NULL AND date_fin < CURDATE()");
+    // Année désactivée avant le 23/10/2026 : sa séquence pouvait rester active.
+    db_exec("UPDATE sequence s JOIN trimestre t ON t.id = s.id_trim
+             JOIN annee_scolaire an ON an.id = t.id_annee AND an.active = 0
+             SET s.active = 0 WHERE s.active = 1");
     $nb_active = (int) db_val("SELECT COUNT(*) FROM sequence WHERE active=1");
     if ($nb_active === 0) {
+        // Seulement une séquence de l'année ACTIVE : jamais réactiver celle
+        // d'une année désactivée dont les dates couvriraient aujourd'hui.
         $a = db_one(
-            "SELECT id FROM sequence
-             WHERE date_debut IS NOT NULL AND date_fin IS NOT NULL
-               AND date_debut <= CURDATE() AND date_fin >= CURDATE()
-             ORDER BY date_debut DESC LIMIT 1"
+            "SELECT s.id FROM sequence s
+             JOIN trimestre t ON t.id = s.id_trim
+             JOIN annee_scolaire an ON an.id = t.id_annee AND an.active = 1
+             WHERE s.date_debut IS NOT NULL AND s.date_fin IS NOT NULL
+               AND s.date_debut <= CURDATE() AND s.date_fin >= CURDATE()
+             ORDER BY s.date_debut DESC LIMIT 1"
         );
         if ($a) db_exec("UPDATE sequence SET active=1 WHERE id=?", [$a['id']]);
     }

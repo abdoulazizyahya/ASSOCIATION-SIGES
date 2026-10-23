@@ -11,22 +11,32 @@
 //  $avec_nav = false → page d'authentification centrée, sans sidebar
 //  (association/login.php).
 
-// Entrées de navigation : [label, icône bootstrap, chemin relatif à
-// /association/, préfixes qui activent l'entrée, superadmin seulement ?,
-// propriétaire seulement ?].
+// Entrées de navigation, regroupées par rubrique (24/10/2026) :
+// [label, icône bootstrap, chemin relatif à /association/, préfixes qui
+// activent l'entrée, superadmin seulement ?, propriétaire seulement ?].
+// Une rubrique dont aucune entrée n'est visible n'affiche pas son titre.
 function _asso_nav_entrees(): array {
     return [
-        ['Établissements',  'buildings',      'index.php',           ['index.php', 'etablissement', 'ecole_bd_'], false, false],
-        ['Tableau de bord', 'speedometer2',   'noyau/dashboard.php',       ['noyau/dashboard.php'],                           true,  false],
-        ['Migrations',      'database-gear',  'migrations.php',      ['migrations.php', 'versions.php'],          true,  true],
-        ['Membres',         'people',         'membres/index.php',   ['membres/'],                               true,  false],
-        ['Privilèges',      'sliders',        'acces.php',           ['acces.php'],                              true,  false],
-        ['Journal',         'journal-text',   'journal.php',         ['journal.php'],                            true,  false],
-        ['Registre NIU',    'person-vcard',   'niu/index.php',       ['niu/'],                                   false, false],
-        ['Personnel',       'person-badge',   'personnel/liste.php', ['personnel/'],                             false, false],
-        ['Réglages',        'gear',           'parametres.php',      ['parametres.php'],                         true,  false],   // page d'entrée du site (18/10/2026)
-        ['Sécurité',        'shield-lock',    'securite.php',        ['securite.php'],                            false, false],
-        ['Accès MySQL',     'person-lock',    'acces_bd.php',        ['acces_bd.php'],                            true,  true],    // diagnostic droits cPanel (21/10/2026)
+        'Vue d\'ensemble' => [
+            ['Tableau de bord', 'speedometer2',  'dashboard.php',       ['dashboard.php'],                           true,  false],   // association/dashboard.php (pas noyau/ : 404)
+            ['Établissements',  'buildings',     'index.php',           ['index.php', 'etablissement', 'ecole_bd_'], false, false],
+        ],
+        'Gestion des écoles' => [
+            ['Licences',        'key',           'licences.php',        ['licences.php'],                            true,  true],    // toutes les écoles (23/10/2026)
+            ['Migrations',      'database-gear', 'migrations.php',      ['migrations.php', 'versions.php'],          true,  true],
+            ['Registre NIU',    'person-vcard',  'niu/index.php',       ['niu/'],                                    false, false],
+            ['Personnel',       'person-badge',  'personnel/liste.php', ['personnel/'],                              false, false],
+        ],
+        'Comptes et accès' => [
+            ['Membres',         'people',        'membres/index.php',   ['membres/'],                                true,  false],
+            ['Privilèges',      'sliders',       'acces.php',           ['acces.php'],                               true,  false],
+            ['Ma sécurité',     'shield-lock',   'securite.php',        ['securite.php'],                            false, false],
+        ],
+        'Administration' => [
+            ['Réglages du site', 'gear',         'parametres.php',      ['parametres.php'],                          true,  false],   // page d'entrée du site (18/10/2026)
+            ['Journal',         'journal-text',  'journal.php',         ['journal.php'],                             true,  false],
+            ['Accès MySQL',     'person-lock',   'acces_bd.php',        ['acces_bd.php'],                            true,  true],    // diagnostic droits cPanel (21/10/2026)
+        ],
     ];
 }
 
@@ -85,19 +95,21 @@ function asso_haut(string $titre, bool $avec_nav = true): void {
       </div>
 
       <nav class="asso-nav">
-        <div class="nav-label">Navigation</div>
-        <?php foreach (_asso_nav_entrees() as [$label, $icone, $href, $prefixes, $super_only, $prop_only]): ?>
-          <?php if ($super_only && !$superadmin) continue; ?>
-          <?php if ($prop_only && !$proprietaire) continue; ?>
-          <?php
-            $actif = false;
-            foreach ($prefixes as $pref) {
-                if ($courant === $pref || strpos($courant, $pref) === 0) { $actif = true; break; }
-            }
-          ?>
-          <a href="<?= APP_URL ?>/association/<?= $href ?>" class="<?= $actif ? 'active' : '' ?>">
-            <i class="bi bi-<?= $icone ?>"></i><span><?= h($label) ?></span>
-          </a>
+        <?php foreach (_asso_nav_entrees() as $rubrique => $entrees):
+          $visibles = array_filter($entrees, fn($e) => (!$e[4] || $superadmin) && (!$e[5] || $proprietaire));
+          if (!$visibles) continue; ?>
+          <div class="nav-label"><?= h($rubrique) ?></div>
+          <?php foreach ($visibles as [$label, $icone, $href, $prefixes]): ?>
+            <?php
+              $actif = false;
+              foreach ($prefixes as $pref) {
+                  if ($courant === $pref || strpos($courant, $pref) === 0) { $actif = true; break; }
+              }
+            ?>
+            <a href="<?= APP_URL ?>/association/<?= $href ?>" class="<?= $actif ? 'active' : '' ?>">
+              <i class="bi bi-<?= $icone ?>"></i><span><?= h($label) ?></span>
+            </a>
+          <?php endforeach; ?>
         <?php endforeach; ?>
       </nav>
 

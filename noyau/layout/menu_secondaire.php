@@ -108,6 +108,8 @@ $menu = [
     // personnel payé qui n'a pas déjà cet accès complet.
     'Ressources humaines' => [
         ['Enseignants',           'secondaire/commun/pages/enseignants/liste.php',     'person-badge',       ['ADMIN','PROVISEUR', 'FONDATEUR','CENSEUR']],
+        // Remis au menu le 23/10/2026 : identifiants / mots de passe de tous les comptes (le Proviseur ne gère pas Fondateur, Admin ni autre Proviseur)
+        ['Comptes utilisateurs',  'secondaire/commun/pages/utilisateurs/liste.php',    'people',             ['ADMIN','PROVISEUR', 'FONDATEUR']],
         ['Grille salariale',      'secondaire/commun/pages/paie/grille.php',           'table',              ['ADMIN','PROVISEUR', 'FONDATEUR','INTENDANT']],
         ['Paie',                  'secondaire/commun/pages/paie/index.php',            'cash-stack',         ['ADMIN','PROVISEUR', 'FONDATEUR','INTENDANT']],
         ['Avances sur salaire',   'secondaire/commun/pages/paie/avances.php',          'cash',               ['ADMIN','PROVISEUR', 'FONDATEUR','INTENDANT']],

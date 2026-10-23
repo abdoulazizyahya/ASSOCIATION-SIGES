@@ -3,7 +3,7 @@ require_once __DIR__ . '/../../../config/config.php';
 require_once __DIR__ . '/../../../noyau/connexion.php';
 require_once __DIR__ . '/../../../noyau/fonctions.php';
 exiger_role(['DIRECTEUR']);
-$GLOBALS['menu_lien_actif'] = 'primaire/pages/enseignants/liste.php';   // rattaché à Ressources humaines → Enseignant(e)s (17/10/2026)
+$GLOBALS['menu_lien_actif'] = 'primaire/pages/utilisateurs/liste.php';   // Ressources humaines → Comptes utilisateurs (23/10/2026)
 
 // Changement de rôle (privilège système) — demande explicite du 22/08/2026 :
 // avant ce chantier, le SEUL moyen de changer le "rôle" d'un compte était de
@@ -75,13 +75,32 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && post('action') === 'toggle_actif') 
     rediriger('primaire/pages/utilisateurs/liste.php');
 }
 
+// Réinitialisation rapide : mot de passe = identifiant (convention des comptes
+// par défaut), mêmes limites que form.php (compte_gerable() : jamais le
+// Fondateur, un autre Directeur ni le compte propriétaire), 23/10/2026.
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && post('action') === 'reinit_mdp') {
+    csrf_verifier();
+    $id_user = (int) post('id_user');
+    $cible   = db_one("SELECT u.login_user, e.id_fonction FROM user u JOIN enseignant e ON e.matricule_ens=u.matricule_ens WHERE u.id_user=?", [$id_user]);
+    if (!$cible) {
+        flash_set('erreur', 'Compte introuvable.');
+    } elseif (!compte_gerable((string) $cible['id_fonction'], $id_user)) {
+        flash_set('erreur', refus_compte_non_gerable((string) $cible['id_fonction']));
+    } else {
+        db_exec("UPDATE user SET pwd_user=? WHERE id_user=?", [password_hash($cible['login_user'], PASSWORD_DEFAULT), $id_user]);
+        journaliser_action('mot_de_passe_reinit', null, $cible['login_user']);
+        flash_set('succes', "Mot de passe de « {$cible['login_user']} » réinitialisé : il est maintenant identique à l'identifiant.");
+    }
+    rediriger('primaire/pages/utilisateurs/liste.php');
+}
+
 $roles_disponibles = fonctions_assignables();
 
 $col_actif = $a_statut ? ', u.actif' : '';
 $utilisateurs = db_all(
-    "SELECT u.id_user, u.login_user, u.matricule_ens, e.nom_ens, e.prenom_ens, e.id_fonction $col_actif
+    "SELECT u.id_user, u.login_user, u.pwd_user, u.matricule_ens, e.nom_ens, e.prenom_ens, e.id_fonction $col_actif
      FROM user u JOIN enseignant e ON e.matricule_ens=u.matricule_ens
-     ORDER BY e.id_fonction, e.nom_ens"
+     ORDER BY e.nom_ens, e.prenom_ens"   // ordre alphabétique au départ, colonnes triables (24/10/2026)
 );
 // Les comptes qu'il ne peut pas gérer (autre directeur, fondateur) ne sont
 // même pas affichés au directeur (demande du 01/10/2026).
@@ -106,20 +125,28 @@ require_once __DIR__ . '/../../../noyau/layout/header.php';
 
 <div class="card">
   <div class="table-responsive">
-    <table class="table table-abz table-hover align-middle mb-0">
+    <table class="table table-abz table-hover align-middle mb-0 table-triable">
       <thead>
         <tr>
-          <th>Identifiant</th><th>Personne</th><th>Rôle</th>
+          <th>Identifiant</th><th>Mot de passe</th><th data-sens="asc">Personne</th><th>Rôle</th>
           <?php if ($a_statut): ?><th class="text-center">Statut</th><?php endif; ?>
-          <th class="text-end">Actions</th>
+          <th class="text-end" data-sans-tri>Actions</th>
         </tr>
       </thead>
       <tbody>
         <?php if (empty($utilisateurs)): ?>
-          <tr><td colspan="<?= $a_statut ? 5 : 4 ?>" class="text-center text-muted py-4">Aucun compte trouvé.</td></tr>
+          <tr><td colspan="<?= $a_statut ? 6 : 5 ?>" class="text-center text-muted py-4">Aucun compte trouvé.</td></tr>
         <?php else: foreach ($utilisateurs as $u): ?>
           <tr>
             <td class="fw-semibold"><?= h($u['login_user']) ?></td>
+            <td style="font-size:.78rem">
+              <?php // Le mot de passe est chiffré (irréversible) : seul le mot de passe par défaut peut être montré.
+              if (mdp_est_identifiant((string) $u['login_user'], (string) $u['pwd_user'])): ?>
+                <span class="badge" style="background:#fef3c7;color:#92400e" title="Mot de passe par défaut, à faire changer">= identifiant</span>
+              <?php else: ?>
+                <span class="text-muted" title="Choisi par l'utilisateur ; non lisible, mais réinitialisable"><i class="bi bi-lock me-1"></i>personnalisé</span>
+              <?php endif; ?>
+            </td>
             <td><?= h(mb_strtoupper($u['nom_ens'])) ?> <?= h($u['prenom_ens'] ?? '') ?></td>
             <td><span class="badge-code"><?= h(libelle_role($u['id_fonction'] ?? '')) ?></span></td>
             <?php if ($a_statut): ?>
@@ -155,9 +182,18 @@ require_once __DIR__ . '/../../../noyau/layout/header.php';
                 <i class="bi bi-sliders" style="font-size:.78rem"></i>
               </a>
               <a href="<?= APP_URL ?>/primaire/pages/utilisateurs/form.php?id=<?= (int)$u['id_user'] ?>"
-                 class="btn btn-sm btn-light" style="padding:3px 7px" title="Réinitialiser le mot de passe">
+                 class="btn btn-sm btn-light" style="padding:3px 7px" title="Modifier l'identifiant / le mot de passe">
                 <i class="bi bi-key" style="font-size:.78rem"></i>
               </a>
+              <form method="post" style="display:inline">
+                <?= csrf_champ() ?>
+                <input type="hidden" name="action" value="reinit_mdp">
+                <input type="hidden" name="id_user" value="<?= (int) $u['id_user'] ?>">
+                <button type="submit" class="btn btn-sm btn-light" style="padding:3px 7px" title="Réinitialiser le mot de passe (= identifiant)"
+                        onclick="return confirm('Réinitialiser le mot de passe de « <?= h(addslashes($u['login_user'])) ?> » ? Il deviendra identique à l\'identifiant.')">
+                  <i class="bi bi-arrow-counterclockwise" style="font-size:.78rem"></i>
+                </button>
+              </form>
               <?php if ($a_statut && $u['id_user'] != ($_SESSION['user_id'] ?? 0)): ?>
               <form method="post" style="display:inline">
                 <?= csrf_champ() ?>

@@ -129,7 +129,7 @@ asso_haut('Importer une base — ' . $e['nom']);
       décochez « Établissement actif », puis revenez ici.
     </div>
   <?php else: ?>
-    <form method="post" enctype="multipart/form-data" class="row g-3">
+    <form method="post" enctype="multipart/form-data" class="row g-3" id="form-import-bd">
       <input type="hidden" name="csrf" value="<?= h(csrf_generer()) ?>">
 
       <div class="col-12">
@@ -165,6 +165,36 @@ asso_haut('Importer une base — ' . $e['nom']);
         <a href="<?= APP_URL ?>/association/etablissement.php?id=<?= (int) $e['id'] ?>" class="btn btn-outline-light btn-sm ms-2">Annuler</a>
       </div>
     </form>
+    <script>
+    // Pare-feu de l'hébergeur (ModSecurity, Camoo) : un .sql envoyé en clair
+    // (texte plein d'INSERT/DROP) est rejeté en 403 « Forbidden » avant même
+    // d'atteindre PHP (promeducam.beero.cm, 23/10/2026). Le navigateur le
+    // compresse donc en .sql.gz juste avant l'envoi : contenu binaire que le
+    // pare-feu ne lit pas, et fichier ~10 fois plus léger. Lu côté serveur par
+    // ecole_maint_lire_gz() comme un .sql.gz ordinaire.
+    (function () {
+      const form = document.getElementById('form-import-bd');
+      if (!form || typeof CompressionStream === 'undefined' || typeof DataTransfer === 'undefined') return;
+      let pret = false;
+      form.addEventListener('submit', async (ev) => {
+        const champ = form.querySelector('input[name="dump"]');
+        const f = champ && champ.files[0];
+        if (pret || !f || !/\.sql$/i.test(f.name)) return;
+        ev.preventDefault();
+        const btn = form.querySelector('button.btn-danger');
+        if (btn) { btn.disabled = true; btn.textContent = 'Compression du fichier…'; }
+        try {
+          const gz = await new Response(f.stream().pipeThrough(new CompressionStream('gzip'))).blob();
+          const dt = new DataTransfer();
+          dt.items.add(new File([gz], f.name + '.gz', { type: 'application/gzip' }));
+          champ.files = dt.files;
+        } catch (e) { /* échec : envoi du .sql tel quel */ }
+        pret = true;
+        if (btn) btn.textContent = 'Import en cours…';
+        HTMLFormElement.prototype.submit.call(form);
+      });
+    })();
+    </script>
   <?php endif; ?>
 </div>
 <?php asso_bas();

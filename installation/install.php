@@ -233,7 +233,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                 $vmax = 0;
                 $motif = $type === 'secondaire' ? '/bd/secondaire/migration_v*.sql' : '/bd/migration_v*.sql';
-                foreach (glob(__DIR__ . $motif) ?: [] as $f) {
+                // install.php est dans installation/ : sans « /.. », aucune migration
+                // trouvée, version 0 enregistrée et tout rejoué (v4 secondaire en échec).
+                foreach (glob(__DIR__ . '/..' . $motif) ?: [] as $f) {
                     if (preg_match('/migration_v(\d+)\.sql$/', $f, $m)) $vmax = max($vmax, (int) $m[1]);
                 }
                 mysqli_query($assoc, "INSERT INTO schema_version_etab (id_etablissement, version) VALUES ($id_ec1, $vmax)");
