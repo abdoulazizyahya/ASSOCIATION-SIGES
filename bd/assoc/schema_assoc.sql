@@ -27,6 +27,8 @@ CREATE TABLE IF NOT EXISTS `etablissement` (
   `code`                 varchar(20)  NOT NULL,                 -- ex. « EC1 » — porté par les URLs publiques ?ec=
   `sous_domaine`         varchar(63)  DEFAULT NULL,             -- ex. « ecole1 » (ecole1.assoc.cm) — NULL en LAN
   `db_name`              varchar(64)  NOT NULL,                 -- nom de la base MySQL de l'école
+  `db_user`              varchar(80)  DEFAULT NULL,             -- utilisateur MySQL propre (base créée au cPanel) — NULL = DB_USER global
+  `db_pass_chiffre`      text         DEFAULT NULL,             -- son mot de passe, AES-256-GCM (connexion_assoc.php::ecole_bd_chiffrer)
   `nom`                  varchar(150) NOT NULL,
   `type_enseignement`    enum('primaire','secondaire') NOT NULL DEFAULT 'primaire', -- figé à la création, détermine le schéma école + le module de pages (pages/ vs secondaire/)
   `sigle`                varchar(50)  DEFAULT NULL,
@@ -292,4 +294,15 @@ CREATE TABLE IF NOT EXISTS `bd_pool` (
   PRIMARY KEY (`db_name`),
   KEY `k_etat` (`etat`),
   CONSTRAINT `fk_pool_etab` FOREIGN KEY (`id_etablissement`) REFERENCES `etablissement` (`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Réglages de l'association, clé / valeur (18/10/2026) : page d'entrée du site
+-- ('page_entree' = accueil | connexion), modifiés depuis association/parametres.php.
+-- Aussi créée au premier enregistrement (assoc_param_set(), noyau/connexion_assoc.php).
+CREATE TABLE IF NOT EXISTS `parametre_assoc` (
+  `cle`     varchar(60) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `valeur`  text COLLATE utf8mb4_unicode_ci,
+  `maj_le`  datetime DEFAULT NULL,
+  `maj_par` varchar(80) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  PRIMARY KEY (`cle`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

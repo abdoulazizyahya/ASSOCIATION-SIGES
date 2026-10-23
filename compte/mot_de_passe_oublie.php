@@ -29,7 +29,7 @@ $erreur = '';
 // Une fois choisie, basculer_base_ecole() pose $_SESSION['ecole'] et
 // connexion.php résout automatiquement la bonne base aux étapes suivantes.
 $ecoles = annuaire_dispo()
-    ? assoc_all("SELECT id, code, nom FROM etablissement WHERE actif=1 ORDER BY nom")
+    ? assoc_all("SELECT id, code, nom, type_enseignement FROM etablissement WHERE actif=1 ORDER BY type_enseignement='secondaire' DESC, nom")
     : [];
 $choix_ecole = count($ecoles) > 1;
 
@@ -201,11 +201,17 @@ $etab = get_etablissement();
         <label class="form-label">Établissement</label>
         <select name="ecole" class="form-select" required>
           <option value="">— Choisir —</option>
-          <?php foreach ($ecoles as $ec): ?>
+          <?php $groupe_ouvert = null; // regroupées : Secondaire puis Primaire (tri SQL)
+          foreach ($ecoles as $ec):
+            $groupe = ($ec['type_enseignement'] ?? '') === 'secondaire' ? 'Secondaire' : 'Primaire';
+            if ($groupe !== $groupe_ouvert): ?>
+            <?= $groupe_ouvert !== null ? '</optgroup>' : '' ?><optgroup label="<?= $groupe ?>">
+            <?php $groupe_ouvert = $groupe; endif; ?>
             <option value="<?= h($ec['code']) ?>" <?= post('ecole') === $ec['code'] ? 'selected' : '' ?>>
               <?= h($ec['nom']) ?>
             </option>
           <?php endforeach; ?>
+          <?= $groupe_ouvert !== null ? '</optgroup>' : '' ?>
         </select>
       </div>
       <?php endif; ?>

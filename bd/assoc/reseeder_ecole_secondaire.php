@@ -20,6 +20,7 @@
 // =====================================================================
 
 require_once __DIR__ . '/../../config/config.php';
+require_once __DIR__ . '/../../noyau/connexion_assoc.php';   // connecter_base_ecole()
 
 if (PHP_SAPI !== 'cli') { header('Content-Type: text/plain; charset=utf-8'); }
 $db = $argv[1] ?? '';
@@ -28,7 +29,7 @@ if (!preg_match('/^[A-Za-z0-9_]+$/', $db)) {
     exit(2);
 }
 
-$l = mysqli_connect(DB_HOST, DB_USER, DB_PASS, $db);
+$l = connecter_base_ecole($db);
 if (!$l) { fwrite(STDERR, "Connexion impossible à $db.\n"); exit(1); }
 mysqli_set_charset($l, 'utf8mb4');
 

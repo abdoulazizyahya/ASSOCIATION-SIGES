@@ -64,22 +64,24 @@ foreach (assoc_all("SELECT id, code, nom, type_enseignement FROM etablissement O
                 if ($appliquer) creer_compte_ecole($l, $type, $c['role'], $login, password_hash($login, PASSWORD_DEFAULT), $c['nom'], $c['prenom']);
             }
 
-            if (!compte_login_existe($l, $type, COMPTE_PROPRIETAIRE_LOGIN)) {
-                echo "    + compte propriétaire\n";
+            foreach (array_keys(comptes_proprietaires()) as $plogin) {
+            if (!compte_login_existe($l, $type, $plogin)) {
+                echo "    + compte propriétaire $plogin\n";
                 if ($appliquer) creer_compte_proprietaire_ecole($l, $type);
             } elseif ($sec) {
-                $u = ecole_one($l, "SELECT id, role, compte_systeme FROM utilisateur WHERE login=?", [COMPTE_PROPRIETAIRE_LOGIN]);
+                $u = ecole_one($l, "SELECT id, role, compte_systeme FROM utilisateur WHERE login=?", [$plogin]);
                 if (!(int) $u['compte_systeme'] || $u['role'] !== 'ADMIN') {
                     echo "    ~ compte propriétaire existant (#{$u['id']}, {$u['role']}) : passé en compte système ADMIN, mot de passe inchangé\n";
                     if ($appliquer) ecole_exec($l, "UPDATE utilisateur SET compte_systeme=1, role='ADMIN', actif=1 WHERE id=?", [$u['id']]);
                 }
             } else {
                 $u = ecole_one($l, "SELECT e.matricule_ens, e.statut_ens FROM user u JOIN enseignant e ON e.matricule_ens=u.matricule_ens
-                                    WHERE u.login_user=?", [COMPTE_PROPRIETAIRE_LOGIN]);
+                                    WHERE u.login_user=?", [$plogin]);
                 if ($u && $u['statut_ens'] !== 'systeme') {
                     echo "    ~ compte propriétaire existant : fiche passée au statut système, mot de passe inchangé\n";
                     if ($appliquer) ecole_exec($l, "UPDATE enseignant SET statut_ens='systeme' WHERE matricule_ens=?", [$u['matricule_ens']]);
                 }
+            }
             }
         });
     } catch (Throwable $t) {

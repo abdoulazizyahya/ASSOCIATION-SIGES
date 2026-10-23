@@ -88,6 +88,8 @@ asso_haut('Supprimer — ' . $e['nom']);
           <td class="text-end">
             <?php if ($imp['pool']): ?>
               <span class="text-info">vidée et remise au pool</span>
+            <?php elseif ($imp['base_cpanel']): ?>
+              <span class="text-danger">VIDÉE</span> · <?= (int) $imp['db_tables'] ?> tables · la base elle-même reste dans le cPanel
             <?php elseif ($imp['db_existe']): ?>
               <span class="text-danger">SUPPRIMÉE</span> · <?= (int) $imp['db_tables'] ?> tables · <?= h((string) $imp['db_mo']) ?> Mo
             <?php else: ?>
@@ -145,7 +147,7 @@ asso_haut('Supprimer — ' . $e['nom']);
           <label class="form-check-label small" for="comprend_base">
             Je comprends que la base <span class="font-monospace"><?= h($e['db_name']) ?></span>
             et toutes ses données scolaires seront
-            <?= $imp['pool'] ? 'effacées (base remise au pool)' : 'définitivement supprimées' ?>.
+            <?= $imp['pool'] ? 'effacées (base remise au pool)' : ($imp['base_cpanel'] ? 'effacées (base vidée)' : 'définitivement supprimées') ?>.
           </label>
         </div>
       </div>

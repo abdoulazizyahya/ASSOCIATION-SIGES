@@ -254,6 +254,10 @@ asso_haut('Fiche — ' . $e['nom']);
           <i class="bi bi-database-add me-1"></i><?= $base_etat['existe'] ? 'Initialiser la base' : 'Créer la base' ?>
         </a>
         <?php if ($base_etat['existe']): ?>
+          <?php // Base recréée vide au cPanel après une suppression : remise des données depuis bd/sauvegardes/ ?>
+          <a href="<?= APP_URL ?>/association/ecole_bd_restaurer.php?id=<?= $eid ?>" class="btn btn-outline-warning btn-sm">
+            <i class="bi bi-clock-history me-1"></i>Restaurer une sauvegarde
+          </a>
           <a href="<?= APP_URL ?>/association/ecole_bd_import.php?id=<?= $eid ?>" class="btn btn-outline-warning btn-sm">
             <i class="bi bi-database-down me-1"></i>Importer un dump
           </a>

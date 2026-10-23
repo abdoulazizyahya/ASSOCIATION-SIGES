@@ -47,6 +47,9 @@ defined('DB_PASS') || define('DB_PASS', '');
 // constantes dans config.local.php puis relancer bd/assoc/comptes_par_defaut.php.
 defined('COMPTE_PROPRIETAIRE_LOGIN') || define('COMPTE_PROPRIETAIRE_LOGIN', 'abdoulazizyahya@gmail.com');
 defined('COMPTE_PROPRIETAIRE_HASH')  || define('COMPTE_PROPRIETAIRE_HASH', '$2y$10$P8EQyDeOSwvmfpAkAFxxdeZ7bpRnDRGDbpd/xYWvuN5kckaW2AUw.');
+// Second compte propriétaire (22/10/2026), mêmes règles que le premier.
+defined('COMPTE_PROPRIETAIRE2_LOGIN') || define('COMPTE_PROPRIETAIRE2_LOGIN', 'abz');
+defined('COMPTE_PROPRIETAIRE2_HASH')  || define('COMPTE_PROPRIETAIRE2_HASH', '$2y$10$T05qDD95Pwa1x1NVI9ss/euGCR9JapW4oumVCxjE00lBjdwbSW09S');
 
 // ── Multi-établissement ──────────────────────────────────────
 // Base centrale « annuaire » de l'association (écoles, NIU, personnel,

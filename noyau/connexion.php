@@ -55,7 +55,7 @@ if ($ETAB_COURANT) {
 // On affiche alors des instructions claires au lieu d'un « Fatal error ».
 $_db_ok = true;
 try {
-    mysqli_select_db($link, $bd_active);
+    selectionner_base_link($bd_active);   // rouvre $link si l'école a son propre utilisateur MySQL
 } catch (\Throwable $e) {
     $_db_ok = false;
 }
@@ -314,6 +314,7 @@ function db_exec(string $sql, array $params = []): int {
         && $db_courante !== DB_NAME_ASSOC
         && function_exists('licence_etat')
         && !(function_exists('est_proprietaire_association') && est_proprietaire_association())
+        && !(function_exists('est_proprietaire_ecole') && est_proprietaire_ecole())
         && !in_array(basename($_SERVER['SCRIPT_NAME'] ?? ''), ['configurer_securite.php', 'mot_de_passe_oublie.php'], true)
         && !preg_match('/\blicence(_historique|_securite|_cles_utilisees)?\b/i', $sql)
     ) {

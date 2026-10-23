@@ -69,6 +69,7 @@ protected $CreationDate;       // document creation date
 protected $PDFVersion;         // PDF version number
 public $tableStartX = null;
 protected $tmpImages = []; // pour stocker les fichiers temporaires PNG
+protected $pngConvertis = []; // PNG source => copie temporaire deja convertie (une conversion par image et par document)
 protected $extgstates = [];
 
 
@@ -875,7 +876,15 @@ function Image($file, $x=null, $y=null, $w=0, $h=0, $type='', $link='')
 {
     // V�rifier si le fichier est PNG
     $ext = strtolower(pathinfo($file, PATHINFO_EXTENSION));
+    // Meme PNG deja converti dans ce document (filigrane, logo repetes sur
+    // chaque page) : on reprend la copie, sinon FPDF recompressait et
+    // reintegrait l'image a CHAQUE page (releve vierge LTM : 44 s, 4,8 Mo).
+    if ($ext === 'png' && isset($this->pngConvertis[$file])) {
+        $file = $this->pngConvertis[$file];
+        $ext = '';
+    }
     if ($ext === 'png') {
+        $source = $file;
         $img = @imagecreatefrompng($file);
         if ($img !== false) {
             // D�sactiver l�entrelacement
@@ -895,6 +904,7 @@ function Image($file, $x=null, $y=null, $w=0, $h=0, $type='', $link='')
             imagedestroy($img);
             $file = $tmpFile;
             $this->tmpImages[] = $tmpFile; // garder pour nettoyage
+            $this->pngConvertis[$source] = $tmpFile;
         }
     }
 

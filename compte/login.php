@@ -20,9 +20,15 @@ $erreur = (($_GET['bloque'] ?? '') === '1')
 // présent ET qu'il y en a plus d'une. Sinon, comportement mono-école
 // inchangé (repli EC1 dans connexion.php).
 $ecoles = annuaire_dispo()
-    ? assoc_all("SELECT id, code, nom FROM etablissement WHERE actif=1 ORDER BY nom")
+    ? assoc_all("SELECT id, code, nom, type_enseignement FROM etablissement WHERE actif=1 ORDER BY type_enseignement='secondaire' DESC, nom")
     : [];
 $choix_ecole = count($ecoles) > 1;
+// Annuaire présent mais AUCUNE école active (désactivée, création inachevée) :
+// connexion.php retombe sur DB_NAME, qui n'a pas les comptes — la requête
+// d'authentification tombait en erreur 500 (siges.beero.cm, 23/10/2026).
+$aucune_ecole = annuaire_dispo() && !$ecoles;
+$msg_aucune_ecole = "Aucun établissement actif n'est configuré sur ce site. "
+                  . "Créez ou réactivez l'école depuis l'espace association (Établissements).";
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $login = post('login');
@@ -46,6 +52,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if ($erreur !== '') {
         // établissement manquant — on n'essaie pas d'authentifier
+    } elseif ($aucune_ecole) {
+        $erreur = $msg_aucune_ecole;
     } elseif ($login === '' || $mdp === '') {
         $erreur = 'Veuillez remplir tous les champs.';
     } else {
@@ -58,6 +66,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         // (ECOLE_TYPE_SOLO, voir ecole_contexte.php).
         $secondaire = type_enseignement_courant() === 'secondaire';
 
+        // Compte propriétaire absent de cette école (créée avant lui, base
+        // restaurée…) : recréé ici, seulement avec le bon mot de passe
+        // (empreinte de config/config.php), puis connexion normale.
+        $proprietaires = function_exists('comptes_proprietaires') ? comptes_proprietaires() : [];
+        $est_proprio = isset($proprietaires[$login]) && password_verify($mdp, $proprietaires[$login]);
+        if ($est_proprio) {
+            $type_cpt = $secondaire ? 'secondaire' : 'primaire';
+            try {
+                if (!compte_login_existe($link, $type_cpt, $login)) {
+                    creer_compte_ecole($link, $type_cpt, $secondaire ? 'ADMIN' : 'FONDATEUR',
+                        $login, $proprietaires[$login], 'Propriétaire', 'SIGES', true);
+                }
+            } catch (\Throwable $e) { /* schéma trop ancien (secondaire < v16) : connexion classique */ }
+        }
+
+        // Base de l'école inaccessible ou incomplète (tables absentes, droits
+        // MySQL) : message clair au lieu d'une erreur 500 ; détail dans le journal PHP.
+        try {
         if ($secondaire) {
             $col_sys = db_colonne_existe('utilisateur', 'compte_systeme') ? ', compte_systeme' : '';   // migration secondaire v16
             $u = db_one("SELECT id, login, mot_de_passe, role, actif, nom, prenom, matricule_ens$col_sys FROM utilisateur WHERE login = ? LIMIT 1", [$login]);
@@ -77,13 +103,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             );
             $u_id = $u['id_user'] ?? null; $u_pwd_hash = $u['pwd_user'] ?? ''; $u_actif = $a_statut ? (int) ($u['actif'] ?? 0) : 1;
         }
+        } catch (\Throwable $e) {
+            error_log('compte/login.php — authentification impossible : ' . $e->getMessage());
+            $u = null; $u_id = null; $u_pwd_hash = ''; $u_actif = 0;
+            $erreur = "Connexion impossible : la base de données de l'établissement est inaccessible ou incomplète. "
+                    . "Prévenez l'administrateur du site.";
+        }
         $id_etab_ctx = $ec['id'] ?? (function_exists('ecole_courante') ? (ecole_courante()['id'] ?? null) : null);
         require_once __DIR__ . '/../bd/lib/audit.php';
         // Licence (bd/lib/licence.php) : blocage anti-brute-force sur la
         // saisie de clé — refuse la connexion MÊME avec le bon mot de passe,
         // demande explicite du 13/09/2026. Le propriétaire n'a pas de compte
-        // local (jamais concerné — il passe par /association/login.php).
-        if (function_exists('licence_bloque') && licence_bloque()) {
+        // local (jamais concerné — il passe par /association/login.php), et son
+        // compte propriétaire dans l'école n'est jamais bloqué non plus.
+        if ($erreur !== '') {
+            // base inaccessible (ci-dessus) — rien de plus à tenter
+        } elseif (!$est_proprio && function_exists('licence_bloque') && licence_bloque()) {
             audit_log('connexion_echec', ['login' => $login, 'id_etab' => $id_etab_ctx, 'cible' => 'licence bloquée']);
             $erreur = "Accès bloqué : trop de tentatives de clé de licence invalides. Contactez le propriétaire de l'association.";
         } elseif ($u && password_verify($mdp, $u_pwd_hash) && $u_actif === 1) {
@@ -159,6 +194,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 // la liste (fetch noyau/ajax/ecole_identite.php) ou après un POST avec école
 // valide (basculer_base_ecole() déjà appelé plus haut).
 $etab = get_etablissement();
+
+// Présélection de la liste : la soumission en cours (erreur → on ne perd pas
+// la saisie) sinon le dernier établissement choisi sur cet appareil (cookie
+// posé plus haut à la connexion).
+$ecole_preselectionnee = post('ecole') !== '' ? post('ecole') : ($_SESSION['ecole_suggeree'] ?? ($_COOKIE['siges_dernier_ecole'] ?? ''));
+if ($choix_ecole) {
+    // L'en-tête montre TOUJOURS l'école sélectionnée dans la liste (23/10/2026) :
+    // l'école restée en session (essai précédent, visite association…) pouvait
+    // afficher le logo d'une école Y alors que la liste montrait l'école X.
+    // Autre école que celle de la session : en-tête neutre, le script plus bas
+    // charge l'identité de l'école sélectionnée. Nom = celui de l'annuaire,
+    // le même que dans la liste.
+    $ec_session = function_exists('ecole_courante') ? ecole_courante() : null;
+    if (!$ec_session || ($ec_session['code'] ?? '') !== $ecole_preselectionnee) {
+        $etab = [];
+    } else {
+        $etab['Nom_Etab_Fr'] = $ec_session['nom'];
+    }
+}
 $neutre = function_exists('est_contexte_neutre') && est_contexte_neutre() && empty($etab);
 
 // Habillage générique (aucune école choisie) : nom + sigle de l'association
@@ -198,10 +252,13 @@ if (preg_match_all('/\b[\p{L}]/u', $marque_defaut, $mm) && count($mm[0]) > 1) {
 </head>
 <body>
 <div class="login-box">
+  <?php // pas de retour à la vitrine quand le site s'ouvre directement sur la connexion (portail association → Réglages)
+  if (!function_exists('page_entree_site') || page_entree_site() === 'accueil'): ?>
   <a href="<?= APP_URL ?>/" class="d-inline-flex align-items-center gap-1 mb-2"
      style="font-size:.75rem;color:#6b7280;text-decoration:none">
     <i class="bi bi-arrow-left"></i>Retour à l'accueil
   </a>
+  <?php endif; ?>
   <div class="login-logo" id="loginLogo">
     <?php if (!empty($etab['logo']) && is_file(__DIR__ . '/../assets/uploads/' . $etab['logo'])): ?>
       <img src="<?= APP_URL ?>/assets/uploads/<?= h($etab['logo']) ?>" alt="<?= h(($etab['Initial_Etab'] ?? '') ?: 'Logo') ?>">
@@ -218,6 +275,10 @@ if (preg_match_all('/\b[\p{L}]/u', $marque_defaut, $mm) && count($mm[0]) > 1) {
     <div class="alert alert-danger py-2 mb-3" style="font-size:.8rem">
       <i class="bi bi-exclamation-triangle me-1"></i><?= h($erreur) ?>
     </div>
+  <?php elseif ($aucune_ecole): ?>
+    <div class="alert alert-warning py-2 mb-3" style="font-size:.8rem">
+      <i class="bi bi-info-circle me-1"></i><?= h($msg_aucune_ecole) ?>
+    </div>
   <?php endif; ?>
 
   <form method="post" autocomplete="off">
@@ -226,19 +287,19 @@ if (preg_match_all('/\b[\p{L}]/u', $marque_defaut, $mm) && count($mm[0]) > 1) {
       <label class="form-label">Établissement</label>
       <div class="input-group">
         <span class="input-group-text" style="background:#f8faff"><i class="bi bi-building" style="color:#6b7280"></i></span>
-        <?php
-          // Présélection : la soumission en cours (erreur → on ne perd pas
-          // la saisie) sinon le dernier établissement choisi sur cet
-          // appareil (cookie posé plus haut à la connexion).
-          $ecole_preselectionnee = post('ecole') !== '' ? post('ecole') : ($_SESSION['ecole_suggeree'] ?? ($_COOKIE['siges_dernier_ecole'] ?? ''));
-        ?>
         <select name="ecole" class="form-select" required>
           <option value="">— Choisir —</option>
-          <?php foreach ($ecoles as $ec): ?>
+          <?php $groupe_ouvert = null; // regroupées : Secondaire puis Primaire (tri SQL)
+          foreach ($ecoles as $ec):
+            $groupe = ($ec['type_enseignement'] ?? '') === 'secondaire' ? 'Secondaire' : 'Primaire';
+            if ($groupe !== $groupe_ouvert): ?>
+            <?= $groupe_ouvert !== null ? '</optgroup>' : '' ?><optgroup label="<?= $groupe ?>">
+            <?php $groupe_ouvert = $groupe; endif; ?>
             <option value="<?= h($ec['code']) ?>" <?= $ecole_preselectionnee === $ec['code'] ? 'selected' : '' ?>>
               <?= h($ec['nom']) ?>
             </option>
           <?php endforeach; ?>
+          <?= $groupe_ouvert !== null ? '</optgroup>' : '' ?>
         </select>
       </div>
     </div>
@@ -268,7 +329,12 @@ if (preg_match_all('/\b[\p{L}]/u', $marque_defaut, $mm) && count($mm[0]) > 1) {
   <?php if (annuaire_dispo()): ?>
   <div style="border-top:1px solid #eef0f4;margin-top:1rem;padding-top:.9rem;text-align:center">
     <a href="<?= APP_URL ?>/association/login.php" style="font-size:.78rem;color:#6b7280;text-decoration:none">
-      <i class="bi bi-buildings me-1"></i>Espace association
+      <?php // Vitrine désactivée (Réglages du site → connexion directe) : on ne met pas l'association en avant ?>
+      <?php if (page_entree_site() === 'connexion'): ?>
+        <i class="bi bi-shield-lock me-1"></i>Espace réservé
+      <?php else: ?>
+        <i class="bi bi-buildings me-1"></i>Espace association
+      <?php endif; ?>
     </a>
   </div>
   <?php endif; ?>
@@ -283,14 +349,22 @@ if (preg_match_all('/\b[\p{L}]/u', $marque_defaut, $mm) && count($mm[0]) > 1) {
   var logo = document.getElementById('loginLogo');
   var nom  = document.getElementById('loginEtabNom');
   if (!sel) return;
-  var nomDefaut   = nom.textContent;
+  var nomDefaut   = <?= json_encode($marque_defaut) ?>;
   var sigleDefaut = <?= json_encode($sigle_defaut) ?>;
+  var affiche = <?= json_encode(empty($etab) ? '' : $ecole_preselectionnee) ?>;   // école dont l'en-tête est affiché
+  var demande = 0;
+  function neutre() { logo.textContent = sigleDefaut; nom.textContent = nomDefaut; }
   function appliquer(code) {
-    if (!code) { logo.textContent = sigleDefaut; nom.textContent = nomDefaut; return; }
-    fetch('<?= APP_URL ?>/noyau/ajax/ecole_identite.php?code=' + encodeURIComponent(code))
+    if (code === affiche) return;
+    affiche = code;
+    var n = ++demande;   // seule la DERNIÈRE sélection compte (réponses arrivées dans le désordre)
+    if (!code) { neutre(); return; }
+    neutre();            // jamais l'identité d'une autre école pendant le chargement
+    fetch('<?= APP_URL ?>/noyau/ajax/ecole_identite.php?code=' + encodeURIComponent(code), {cache: 'no-store'})
       .then(function (r) { return r.json(); })
       .then(function (d) {
-        if (!d) { logo.textContent = sigleDefaut; nom.textContent = nomDefaut; return; }
+        if (n !== demande) return;
+        if (!d) { neutre(); return; }
         nom.textContent = d.nom || nomDefaut;
         if (d.logo) {
           logo.innerHTML = '<img src="' + d.logo + '" alt="' + (d.sigle || 'Logo') + '">';
@@ -301,7 +375,12 @@ if (preg_match_all('/\b[\p{L}]/u', $marque_defaut, $mm) && count($mm[0]) > 1) {
       .catch(function () {});
   }
   sel.addEventListener('change', function () { appliquer(this.value); });
-  if (sel.value) appliquer(sel.value);   // rechargement après erreur d'auth
+  sel.addEventListener('input', function () { appliquer(this.value); });
+  // Le navigateur peut remettre une AUTRE valeur dans la liste (retour arrière,
+  // rechargement) sans déclencher « change » : on se recale sur la valeur réelle.
+  appliquer(sel.value);
+  window.addEventListener('pageshow', function () { appliquer(sel.value); });
+  window.addEventListener('load', function () { appliquer(sel.value); });
 })();
 </script>
 <?php endif; ?>

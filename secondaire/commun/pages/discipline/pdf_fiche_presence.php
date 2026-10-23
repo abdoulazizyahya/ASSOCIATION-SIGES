@@ -76,15 +76,21 @@ $dl   = ($_GET['dl'] ?? '0') === '1';
 
 require_once __DIR__ . '/../../pdf/fpdf.php';
 require_once __DIR__ . '/../../pdf/header_pdf.php';
-require_once __DIR__ . '/../../pdf/qrcode.php';
+require_once __DIR__ . '/../../pdf/pages_par_classe.php';   // pages numérotées par classe, pied réduit
 
 // ── Découpage des colonnes (identique pour chaque page) ─────────────────
 $jours = ['LUNDI' => 9, 'MARDI' => 9, 'MERCREDI' => 5, 'JEUDI' => 9, 'VENDREDI' => 9];
 $nb_sub = array_sum($jours); // 41
 
-function dessiner_entete_fiche(FPDF $pdf, array $etab, array $classe, string $val_annee, float $ml, float $uw, array $jours, float $w_no, float $w_nom, float $w_total, float $w_sub, float $h_hdr1, float $h_hdr2): void {
+// En-tête complet (établissement, titre, effectifs, semaine) : 1re page de
+// la classe seulement ; les pages suivantes ne reprennent que l'en-tête du tableau.
+function dessiner_entete_fiche(FPDF $pdf, array $etab, array $classe, string $val_annee, float $ml, float $uw, array $stats): void {
     pdf_entete($pdf, $etab, $pdf->GetPageWidth(), $ml);
 
+    // Effectifs en haut à droite, à côté du titre (au-dessus de « Classe : »).
+    $y_titre = $pdf->GetY();
+    pdf_tableau_effectifs($pdf, $stats, $ml + $uw - 36, $y_titre);
+    $pdf->SetXY($ml, $y_titre);
     $pdf->SetFont('Arial', 'B', 15);
     $pdf->Cell($uw, 6.5, pdf_u('FICHE DE PRESENCE'), 0, 1, 'C');
     $pdf->SetFont('Arial', 'I', 9);
@@ -99,8 +105,10 @@ function dessiner_entete_fiche(FPDF $pdf, array $etab, array $classe, string $va
     $pdf->SetFont('Arial', 'B', 10);
     $pdf->Cell($uw, 6, pdf_u('SEMAINE DU ' . str_repeat('.', 30) . ' AU ' . str_repeat('.', 30)), 0, 1, 'C');
     $pdf->Ln(0.5);
+}
 
-    // ── En-tête du tableau (2 lignes) ────────────────────────────────────
+// En-tête du tableau (2 lignes : jours puis T1…T9), répété sur chaque page.
+function dessiner_entete_tableau_fiche(FPDF $pdf, float $ml, array $jours, float $w_no, float $w_nom, float $w_total, float $w_sub, float $h_hdr1, float $h_hdr2): void {
     $y_hdr = $pdf->GetY();
     $h_hdr = $h_hdr1 + $h_hdr2;
     $pdf->SetFillColor(179, 224, 255);
@@ -134,8 +142,7 @@ function dessiner_entete_fiche(FPDF $pdf, array $etab, array $classe, string $va
     $pdf->SetXY($ml, $y_hdr + $h_hdr);
 }
 
-$pdf = new FPDF('L', 'mm', 'A4');
-$pdf->AliasNbPages();
+$pdf = new FPDF_PagesParClasse('L', 'mm', 'A4');
 $pdf->SetMargins(8, 8, 8);
 $pdf->SetAutoPageBreak(false);
 $pw = $pdf->GetPageWidth();
@@ -150,35 +157,34 @@ $h_row  = 6;
 
 foreach ($classes_a_generer as $classe) {
     $eleves = db_all(
-        "SELECT e.id, e.nom, e.prenom FROM eleve e
+        "SELECT e.id, e.nom, e.prenom, e.sexe, i.statut AS statut_insc FROM eleve e
          JOIN inscription i ON i.id_eleve=e.id AND i.id_classe=? AND i.id_annee=?
          WHERE e.statut='actif' ORDER BY e.nom, e.prenom",
         [$classe['id'], $id_annee]
     );
 
+    $pdf->nouvelleClasse();
     $pdf->AddPage();
     pdf_filigrane($pdf, $etab, $pw, $ph);
-    dessiner_entete_fiche($pdf, $etab, $classe, $val_annee, $ml, $uw, $jours, $w_no, $w_nom, $w_total, $w_sub, $h_hdr1, $h_hdr2);
+    dessiner_entete_fiche($pdf, $etab, $classe, $val_annee, $ml, $uw, pdf_effectifs_classe($eleves));
+    dessiner_entete_tableau_fiche($pdf, $ml, $jours, $w_no, $w_nom, $w_total, $w_sub, $h_hdr1, $h_hdr2);
 
     $n = 1;
     foreach ($eleves as $el) {
-        // Marge basse agrandie (26mm au lieu de 16) : la dernière page de
-        // chaque classe se termine par un pied de page avec QR de
-        // vérification (16mm) au lieu du simple filet copyright — voir
-        // pdf_pied_copyright_qr() plus bas.
-        if ($pdf->GetY() + $h_row > $ph - 26) {
-            pdf_pied_copyright($pdf, $val_annee, $pw, $ph, $ml);
+        // Marge basse de 10 mm : place du pied de page réduit (pdf_pied_par_classe()).
+        if ($pdf->GetY() + $h_row > $ph - 10) {
+            pdf_pied_par_classe($pdf, $val_annee, $pw, $ph, $ml);
             $pdf->AddPage();
             pdf_filigrane($pdf, $etab, $pw, $ph);
-            dessiner_entete_fiche($pdf, $etab, $classe, $val_annee, $ml, $uw, $jours, $w_no, $w_nom, $w_total, $w_sub, $h_hdr1, $h_hdr2);
+            $pdf->SetY($ml);   // page suivante : en-tête du tableau seulement
+            dessiner_entete_tableau_fiche($pdf, $ml, $jours, $w_no, $w_nom, $w_total, $w_sub, $h_hdr1, $h_hdr2);
         }
         $x = $ml; $y = $pdf->GetY();
         $pdf->SetFont('Arial', '', 7.5);
         $pdf->SetXY($x, $y);
         $pdf->Cell($w_no, $h_row, (string)$n, 1, 0, 'C');
         $x += $w_no;
-        $pdf->SetXY($x, $y);
-        $pdf->Cell($w_nom, $h_row, pdf_u(strtoupper($el['nom']) . ' ' . ($el['prenom'] ?? '')), 1, 0, 'L');
+        pdf_cellule_nom($pdf, $x, $y, $w_nom, $h_row, pdf_u(strtoupper($el['nom']) . ' ' . ($el['prenom'] ?? '')), pdf_est_redoublant($el));
         $x += $w_nom;
         for ($i = 0; $i < $nb_sub; $i++) {
             $pdf->SetXY($x, $y);
@@ -194,19 +200,9 @@ foreach ($classes_a_generer as $classe) {
         $pdf->Cell($uw, 8, pdf_u('Aucun eleve inscrit.'), 1, 1, 'C');
     }
 
-    // ── QR de vérification d'authenticité (même principe que les bulletins/
-    // attestations) : un tampon PNG temporaire, incrusté puis supprimé. ───
-    $qr_tmp = tempnam(sys_get_temp_dir(), 'abzqrfp_') . '.png';
-    try {
-        $verif_url = fiche_presence_verif_url((int)$classe['id'], $id_annee);
-        $qr_gen = new QRCode($verif_url, ['s' => 'qr-h']); // qr-h = correction d'erreur elevee (impression papier)
-        $qr_img = $qr_gen->render_image();
-        imagepng($qr_img, $qr_tmp);
-        imagedestroy($qr_img);
-        pdf_pied_copyright_qr($pdf, $val_annee, $pw, $ph, $ml, $qr_tmp, 16);
-    } finally {
-        if (is_file($qr_tmp)) unlink($qr_tmp);
-    }
+    // Plus de QR de vérification sur cette fiche vierge (22/10/2026). Le
+    // lien public (vh/va) reste valable pour les fiches déjà imprimées.
+    pdf_pied_par_classe($pdf, $val_annee, $pw, $ph, $ml);
 }
 
 $mode   = $dl ? 'D' : 'I';

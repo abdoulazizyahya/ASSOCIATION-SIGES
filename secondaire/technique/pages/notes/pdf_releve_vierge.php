@@ -76,10 +76,9 @@ $dl = ($_GET['dl'] ?? '0') === '1';
 
 require_once __DIR__ . '/../../../commun/pdf/fpdf.php';
 require_once __DIR__ . '/../../../commun/pdf/header_pdf.php';
-require_once __DIR__ . '/../../../commun/pdf/qrcode.php';
+require_once __DIR__ . '/../../../commun/pdf/pages_par_classe.php';   // pages numérotées par classe, pied réduit
 
-$pdf = new FPDF('P', 'mm', 'A4');
-$pdf->AliasNbPages();
+$pdf = new FPDF_PagesParClasse('P', 'mm', 'A4');
 $pdf->SetMargins(10, 10, 10);
 $pdf->SetAutoPageBreak(false);
 $pw = $pdf->GetPageWidth();
@@ -91,7 +90,7 @@ $w_no = 10; $w_nom = 70; $nb_eval = 6;
 $w_eval = ($uw - $w_no - $w_nom) / $nb_eval;
 $h_hdr = 8; $h_row = 6;
 
-function dessiner_entete_releve_vierge(FPDF $pdf, array $etab, array $classe, string $val_annee, float $ml, float $uw, float $pw): void {
+function dessiner_entete_releve_vierge(FPDF $pdf, array $etab, array $classe, string $val_annee, float $ml, float $uw, float $pw, ?array $stats = null): void {
     pdf_entete($pdf, $etab, $pw, $ml);
 
     $badge_w = 85; $badge_h = 15;
@@ -112,6 +111,8 @@ function dessiner_entete_releve_vierge(FPDF $pdf, array $etab, array $classe, st
     $pdf->SetTextColor(0, 0, 0);
     $pdf->SetLineWidth(0.2);
     $pdf->SetDrawColor(0, 0, 0);
+    // Effectifs H / F / T (nouveaux, redoublants) à droite du bandeau.
+    if ($stats) pdf_tableau_effectifs($pdf, $stats, $ml + $uw - 36, $by + ($badge_h - 11.6) / 2);
     $pdf->SetY($by + $badge_h + 2);
 
     $pdf->SetFont('Arial', 'B', 9);
@@ -162,24 +163,23 @@ function dessiner_entete_tableau_rv(FPDF $pdf, float $ml, float $w_no, float $w_
 
 foreach ($classes_a_generer as $classe) {
     $eleves = db_all(
-        "SELECT e.id, e.nom, e.prenom FROM eleve e
+        "SELECT e.id, e.nom, e.prenom, e.sexe, i.statut AS statut_insc FROM eleve e
          JOIN inscription i ON i.id_eleve=e.id AND i.id_classe=? AND i.id_annee=?
          WHERE e.statut='actif' ORDER BY e.nom, e.prenom",
         [$classe['id'], $id_annee]
     );
 
+    $pdf->nouvelleClasse();
     $pdf->AddPage();
     pdf_filigrane($pdf, $etab, $pw, $ph);
-    dessiner_entete_releve_vierge($pdf, $etab, $classe, $val_annee, $ml, $uw, $pw);
+    dessiner_entete_releve_vierge($pdf, $etab, $classe, $val_annee, $ml, $uw, $pw, pdf_effectifs_classe($eleves));
     dessiner_entete_tableau_rv($pdf, $ml, $w_no, $w_nom, $w_eval, $nb_eval, $h_hdr);
 
     $n = 1;
     foreach ($eleves as $el) {
-        // Marge basse agrandie (26mm au lieu de 16) : la dernière page de
-        // chaque classe se termine par un pied de page avec QR de
-        // vérification (16mm) — voir pdf_pied_copyright_qr() plus bas.
-        if ($pdf->GetY() + $h_row > $ph - 26) {
-            pdf_pied_copyright($pdf, $val_annee, $pw, $ph, $ml);
+        // Marge basse de 10 mm : place du pied de page réduit (pdf_pied_par_classe()).
+        if ($pdf->GetY() + $h_row > $ph - 10) {
+            pdf_pied_par_classe($pdf, $val_annee, $pw, $ph, $ml);
             $pdf->AddPage();
             pdf_filigrane($pdf, $etab, $pw, $ph);
             $pdf->SetY($ml);
@@ -189,7 +189,7 @@ foreach ($classes_a_generer as $classe) {
         $x = $ml;
         $pdf->SetFont('Arial', '', 8);
         $pdf->SetXY($x, $y); $pdf->Cell($w_no, $h_row, (string)$n, 1, 0, 'C'); $x += $w_no;
-        $pdf->SetXY($x, $y); $pdf->Cell($w_nom, $h_row, pdf_u(strtoupper($el['nom']) . ' ' . ($el['prenom'] ?? '')), 1, 0, 'L'); $x += $w_nom;
+        pdf_cellule_nom($pdf, $x, $y, $w_nom, $h_row, pdf_u(strtoupper($el['nom']) . ' ' . ($el['prenom'] ?? '')), pdf_est_redoublant($el)); $x += $w_nom;
         for ($i = 0; $i < $nb_eval; $i++) {
             $pdf->SetXY($x, $y);
             $pdf->Cell($w_eval, $h_row, '', 1, 0, 'C');
@@ -203,19 +203,9 @@ foreach ($classes_a_generer as $classe) {
         $pdf->Cell($uw, 8, pdf_u('Aucun eleve inscrit.'), 1, 1, 'C');
     }
 
-    // ── QR de vérification d'authenticité (même principe que les bulletins/
-    // attestations) : un tampon PNG temporaire, incrusté puis supprimé. ───
-    $qr_tmp = tempnam(sys_get_temp_dir(), 'abzqrrv_') . '.png';
-    try {
-        $verif_url = releve_vierge_verif_url((int)$classe['id'], $id_annee);
-        $qr_gen = new QRCode($verif_url, ['s' => 'qr-h']); // qr-h = correction d'erreur elevee (impression papier)
-        $qr_img = $qr_gen->render_image();
-        imagepng($qr_img, $qr_tmp);
-        imagedestroy($qr_img);
-        pdf_pied_copyright_qr($pdf, $val_annee, $pw, $ph, $ml, $qr_tmp, 16);
-    } finally {
-        if (is_file($qr_tmp)) unlink($qr_tmp);
-    }
+    // Plus de QR de vérification sur ce formulaire vierge (22/10/2026). Le
+    // lien public (vh/va) reste valable pour les relevés déjà imprimés.
+    pdf_pied_par_classe($pdf, $val_annee, $pw, $ph, $ml);
 }
 
 $mode   = $dl ? 'D' : 'I';

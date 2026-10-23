@@ -8,7 +8,7 @@ require_once __DIR__ . '/_layout.php';
 exiger_superadmin_association();
 
 $msg = ''; $err = ''; $ok = false; $comptes = [];
-$val = ['code' => '', 'nom' => '', 'nom_en' => '', 'sigle' => '', 'ville' => '', 'sous_domaine' => '', 'type_enseignement' => 'primaire', 'statut' => 'public', 'ordre_enseignement' => 'general'];
+$val = ['code' => '', 'nom' => '', 'nom_en' => '', 'sigle' => '', 'ville' => '', 'sous_domaine' => '', 'type_enseignement' => 'primaire', 'statut' => 'public', 'ordre_enseignement' => 'general', 'db_existante' => '', 'db_user' => ''];
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     csrf_verifier();
@@ -19,13 +19,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!in_array($val['statut'], ['public', 'prive'], true)) $val['statut'] = 'public';
     if ($val['ordre_enseignement'] !== 'technique') $val['ordre_enseignement'] = 'general';
 
-    $r = creer_etablissement($val + ['par' => membre_connecte()['login'] ?? '?']);
+    // Mot de passe MySQL : jamais réaffiché dans le formulaire.
+    $r = creer_etablissement($val + ['db_pass' => (string) ($_POST['db_pass'] ?? ''), 'par' => membre_connecte()['login'] ?? '?']);
     if ($r['ok']) {
         journaliser_action('etablissement_creation', $r['id'], $val['code'] . ' — ' . $val['nom']);
         $ok = true;
         $msg = $r['message'];
         $comptes = $r['comptes'] ?? [];
-        $val = ['code' => '', 'nom' => '', 'nom_en' => '', 'sigle' => '', 'ville' => '', 'sous_domaine' => '', 'type_enseignement' => 'primaire', 'statut' => 'public', 'ordre_enseignement' => 'general'];
+        $val = ['code' => '', 'nom' => '', 'nom_en' => '', 'sigle' => '', 'ville' => '', 'sous_domaine' => '', 'type_enseignement' => 'primaire', 'statut' => 'public', 'ordre_enseignement' => 'general', 'db_existante' => '', 'db_user' => ''];
     } else {
         $err = $r['message'];
     }
@@ -62,10 +63,11 @@ asso_haut('Nouvel établissement');
   <?php $pool_mode = defined('ECOLE_POOL_ACTIF') && ECOLE_POOL_ACTIF; ?>
   <p class="text-muted2 small mb-3">
     <?php if ($pool_mode): ?>
-      Consomme une base vide du <strong>pool</strong> pré-créé (hébergement mutualisé),
-      y installe le schéma de référence à jour, puis inscrit l'école à l'annuaire.
+      Créez d'abord dans le cPanel une base vide et son utilisateur MySQL (tous les privilèges), puis
+      saisissez-les ci-dessous : le système y installe le schéma de référence à jour et inscrit l'école à l'annuaire.
     <?php else: ?>
-      Crée une base de données dédiée <span class="font-monospace"><?= h(DB_PREFIXE_ECOLE) ?>_&lt;nom simplifié&gt;</span>,
+      Crée une base de données dédiée <span class="font-monospace"><?= h(DB_PREFIXE_ECOLE) ?>_&lt;nom simplifié&gt;</span>
+      (ou utilise la base existante indiquée ci-dessous),
       y installe le schéma de référence à jour, puis inscrit l'école à l'annuaire.
     <?php endif; ?>
     Crée aussi automatiquement les comptes par défaut (mot de passe = identifiant, affichés ci-dessus une
@@ -162,6 +164,35 @@ asso_haut('Nouvel établissement');
       <div class="form-text small text-muted2">production uniquement · optionnel</div>
     </div>
     <?php endif; ?>
+
+    <div class="col-12 mt-3">
+      <label class="form-label small fw-semibold mb-0"><i class="bi bi-database me-1"></i>Base de données (créée dans le cPanel)</label>
+      <div class="form-text small text-muted2 mt-0">
+        <?php if ($pool_mode): ?>
+          Base vide, avec son utilisateur rattaché (TOUS LES PRIVILÈGES). Noms complets, préfixe compris.
+        <?php else: ?>
+          Optionnel : laissez vide pour que la base soit créée automatiquement.
+        <?php endif; ?>
+      </div>
+    </div>
+    <div class="col-12">
+      <label class="form-label small">Nom de la base<?= $pool_mode ? ' *' : '' ?></label>
+      <input name="db_existante" class="form-control form-control-sm font-monospace"
+             value="<?= h($val['db_existante']) ?>" maxlength="64" pattern="[A-Za-z0-9_]{1,64}"
+             placeholder="ex. beeroc11073_ecole3" autocomplete="off" <?= $pool_mode ? 'required' : '' ?>>
+    </div>
+    <div class="col-6">
+      <label class="form-label small">Utilisateur MySQL<?= $pool_mode ? ' *' : '' ?></label>
+      <input name="db_user" class="form-control form-control-sm font-monospace"
+             value="<?= h($val['db_user']) ?>" maxlength="80" pattern="[A-Za-z0-9_.@\-]{1,80}"
+             placeholder="ex. beeroc11073_ec3" autocomplete="off" <?= $pool_mode ? 'required' : '' ?>>
+    </div>
+    <div class="col-6">
+      <label class="form-label small">Mot de passe MySQL<?= $pool_mode ? ' *' : '' ?></label>
+      <input type="password" name="db_pass" class="form-control form-control-sm"
+             autocomplete="new-password" <?= $pool_mode ? 'required' : '' ?>>
+      <div class="form-text small text-muted2">stocké chiffré dans l'annuaire</div>
+    </div>
 
     <div class="col-12 mt-3">
       <button class="btn btn-primary btn-sm"><i class="bi bi-plus-lg me-1"></i>Créer l'établissement</button>

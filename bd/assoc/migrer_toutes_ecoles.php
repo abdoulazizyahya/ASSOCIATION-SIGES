@@ -57,7 +57,7 @@ foreach (assoc_all("SELECT id, code, nom, db_name, type_enseignement FROM etabli
     echo "  -> " . implode(', ', array_map(fn($v) => "v$v", $a_faire)) . "\n";
     if ($dry) continue;
 
-    $l = mysqli_connect(DB_HOST, DB_USER, DB_PASS, $e['db_name']);
+    $l = connecter_base_ecole($e['db_name']);
     mysqli_set_charset($l, 'utf8mb4');
     foreach ($a_faire as $v) {
         $sql = file_get_contents($dispo[$v]);

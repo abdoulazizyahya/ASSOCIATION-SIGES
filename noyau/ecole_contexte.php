@@ -67,6 +67,18 @@ function est_fondateur(): bool {
     return ($_SESSION['user']['role'] ?? '') === 'FONDATEUR';
 }
 
+// Compte PROPRIÉTAIRE connecté à une école (comptes_proprietaires() : e-mail
+// + abz, créés dans chaque école en compte système — 23/10/2026) : il est
+// PROPRIÉTAIRE de l'école où il se connecte, pas un simple fondateur. Accès
+// complet comme le propriétaire de l'association : jamais en lecture seule,
+// hors module Privilèges, toutes les rubriques. Son rôle technique (FONDATEUR
+// au primaire, ADMIN au secondaire) reste en base pour les listes de rôles
+// des pages ; ce test passe avant.
+function est_proprietaire_ecole(): bool {
+    ecole_session_demarrer();
+    return !empty($_SESSION['user_id']) && !empty($_SESSION['user']['compte_systeme']);
+}
+
 // Séparation des pouvoirs (11/09/2026) : dans les modules « argent »
 // (finances / dépenses / paie), seul l'agent financier (COMPTABLE) écrit —
 // tous les autres profils (directeur, fondateur, secrétaire, membre
@@ -172,7 +184,7 @@ function fondateur_ecriture_permise(): bool {
 // en sont exclus par défaut ; le FONDATEUR, l'agent financier, la secrétaire,
 // le propriétaire et une visite association les voient.
 function capacite_finances(): bool {
-    if (est_visite_association() || est_proprietaire_association()) return true;
+    if (est_visite_association() || est_proprietaire_association() || est_proprietaire_ecole()) return true;
     if (est_fondateur()) return true;
     // Rôles secondaire distincts du primaire (COMPTABLE/SECRETAIRE) — mêmes
     // rôles déjà autorisés sur le module Paiements secondaire, voir
@@ -193,7 +205,7 @@ function capacite_finances(): bool {
 // (visite association, argent = agent financier, pédagogie = enseignant(e)
 // / secrétaire).
 function est_lecture_seule(): bool {
-    if (est_proprietaire_association()) return false;
+    if (est_proprietaire_association() || est_proprietaire_ecole()) return false;
 
     $c = niveau_central_page_courante();          // 'masque'|'lecture'|'ecriture'|null
     if ($c === 'ecriture')             return false;
@@ -249,6 +261,7 @@ function regles_centrales(): array {
     // entrer_ecole.php) — c'est justement ce module qui masque par défaut
     // Utilisateurs / Paramètres pour lui (bd/assoc/maj_assoc.php).
     if (est_visite_association() && est_visite_association_administrateur()) return $cache = [];
+    if (est_proprietaire_ecole()) return $cache = [];   // compte propriétaire : jamais restreint
     $ec = ecole_courante();
     $id = $ec['id'] ?? null;
     if (!$id) return $cache = [];
@@ -317,7 +330,7 @@ function niveau_central_page_courante(): ?string {
 // blocage réel des écritures reste csrf_verifier() / db_exec().
 function est_ecriture_deleguee(): bool {
     if (est_lecture_seule()) return false;
-    return est_visite_association() || est_fondateur();
+    return est_visite_association() || est_fondateur() || est_proprietaire_ecole();
 }
 
 // Propriétaire de l'association : compte fondateur (membre.proprietaire=1).
@@ -469,7 +482,7 @@ function basculer_base_ecole(array $etab): void {
     ];
     $ETAB_COURANT = $etab;
     if ($link instanceof mysqli) {
-        mysqli_select_db($link, $etab['db_name']);
+        selectionner_base_link($etab['db_name']);   // connexion_assoc.php
     }
 }
 

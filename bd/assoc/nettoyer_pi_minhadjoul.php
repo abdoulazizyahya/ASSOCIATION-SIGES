@@ -52,7 +52,7 @@ const CLASSES_COLLEGE = ['6ème', '5ème', '4ème'];
 function ouvrir(string $code): mysqli {
     $r = assoc_one("SELECT db_name FROM etablissement WHERE code=?", [$code]);
     if (!$r) die("✗ Établissement $code introuvable dans l'annuaire.\n");
-    $l = @mysqli_connect(DB_HOST, DB_USER, DB_PASS, $r['db_name']);
+    $l = connecter_base_ecole($r['db_name']);
     if (!$l) die("✗ Connexion impossible à {$r['db_name']} : " . mysqli_connect_error() . "\n");
     mysqli_set_charset($l, 'utf8mb4');
     mysqli_report(MYSQLI_REPORT_OFF);

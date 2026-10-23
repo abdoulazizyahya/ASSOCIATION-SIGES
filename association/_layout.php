@@ -24,7 +24,9 @@ function _asso_nav_entrees(): array {
         ['Journal',         'journal-text',   'journal.php',         ['journal.php'],                            true,  false],
         ['Registre NIU',    'person-vcard',   'niu/index.php',       ['niu/'],                                   false, false],
         ['Personnel',       'person-badge',   'personnel/liste.php', ['personnel/'],                             false, false],
+        ['Réglages',        'gear',           'parametres.php',      ['parametres.php'],                         true,  false],   // page d'entrée du site (18/10/2026)
         ['Sécurité',        'shield-lock',    'securite.php',        ['securite.php'],                            false, false],
+        ['Accès MySQL',     'person-lock',    'acces_bd.php',        ['acces_bd.php'],                            true,  true],    // diagnostic droits cPanel (21/10/2026)
     ];
 }
 

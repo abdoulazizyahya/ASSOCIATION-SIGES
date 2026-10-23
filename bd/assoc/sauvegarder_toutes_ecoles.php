@@ -49,10 +49,11 @@ if (!annuaire_dispo()) {
 $ok = 0; $ko = 0;
 foreach ($bases as $b) {
     $fichier = $dir . '/' . strtolower($b['code']) . '_' . $b['db_name'] . '.sql' . ($gzip ? '.gz' : '');
+    [$u, $p] = ecole_identifiants_bd($b['db_name']);   // utilisateur MySQL propre à l'école, sinon DB_USER
     $cmd = escapeshellarg($dump)
          . ' --host=' . escapeshellarg(DB_HOST)
-         . ' --user=' . escapeshellarg(DB_USER)
-         . (DB_PASS !== '' ? ' --password=' . escapeshellarg(DB_PASS) : '')
+         . ' --user=' . escapeshellarg($u)
+         . ($p !== '' ? ' --password=' . escapeshellarg($p) : '')
          . ' --single-transaction --quick --routines --events --default-character-set=utf8mb4 '
          . escapeshellarg($b['db_name']);
     $cmd .= $gzip ? ' | gzip' : '';

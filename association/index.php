@@ -9,6 +9,14 @@ exiger_membre_association();
 $ecoles = assoc_all("SELECT * FROM etablissement ORDER BY actif DESC, nom");
 $superadmin = est_superadmin_association();
 
+// Regroupement par type d'enseignement (secondaire puis primaire) pour
+// repérer une école d'un coup d'œil.
+$groupes = ['secondaire' => [], 'primaire' => []];
+foreach ($ecoles as $e) {
+    $groupes[$e['type_enseignement'] === 'secondaire' ? 'secondaire' : 'primaire'][] = $e;
+}
+$libelles_groupe = ['secondaire' => 'Secondaire', 'primaire' => 'Primaire'];
+
 asso_haut('Établissements de l\'association');
 ?>
 <?php if ($superadmin): ?>
@@ -19,8 +27,14 @@ asso_haut('Établissements de l\'association');
 </div>
 <?php endif; ?>
 
+<?php foreach ($groupes as $type => $liste): if (!$liste) continue; ?>
+<h6 class="d-flex align-items-center gap-2 mt-4 mb-2 fw-bold text-uppercase" style="letter-spacing:.04em">
+  <i class="bi bi-<?= $type === 'secondaire' ? 'mortarboard' : 'backpack' ?>"></i>
+  <?= h($libelles_groupe[$type]) ?>
+  <span class="badge badge-soft"><?= count($liste) ?></span>
+</h6>
 <div class="row g-3">
-  <?php foreach ($ecoles as $e): ?>
+  <?php foreach ($liste as $e): ?>
     <div class="col-12 col-md-6 col-xl-4">
       <?php
         $logo_url      = assoc_ecole_logo_url($e['logo'] ?? null);
@@ -91,8 +105,9 @@ asso_haut('Établissements de l\'association');
       </div>
     </div>
   <?php endforeach; ?>
-  <?php if (!$ecoles): ?>
-    <div class="col-12"><div class="asso-card text-muted2">Aucun établissement enregistré.</div></div>
-  <?php endif; ?>
 </div>
+<?php endforeach; ?>
+<?php if (!$ecoles): ?>
+  <div class="asso-card text-muted2">Aucun établissement enregistré.</div>
+<?php endif; ?>
 <?php asso_bas();

@@ -133,7 +133,8 @@ if ($partiel) {
 $classes = db_all(
     "SELECT c.IDClasses, c.DesignationClasses, COALESCE(ef.nb, 0) AS nb
      FROM classe c LEFT JOIN niveau n ON n.LibelleNiveau=c.Niveau
-     LEFT JOIN (SELECT IDClasses, COUNT(*) AS nb FROM inscrire WHERE val_annee=? GROUP BY IDClasses) ef
+     LEFT JOIN (SELECT ix.IDClasses, COUNT(*) AS nb FROM inscrire ix JOIN eleve ex ON ex.id_eleve=ix.id_eleve
+                WHERE ix.val_annee=? AND ex.statut='actif' GROUP BY ix.IDClasses) ef
             ON ef.IDClasses=c.IDClasses
      ORDER BY n.OrdreNiveau, c.DesignationClasses", [$val_annee]);
 // Enseignant restreint : le filtre « Classe » ne propose que ses classes.

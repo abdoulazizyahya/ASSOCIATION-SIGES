@@ -70,13 +70,13 @@ INSERT IGNORE INTO `operateur_paiement` (`id`, `libelle`, `logo`) VALUES
 -- signature ne persiste jamais : la page affiche "Signature mise à jour"
 -- (flash de succès) alors que l'UPDATE touche 0 ligne, échec totalement
 -- silencieux (bug réel constaté le 17/09/2026, audit étape 12). fichier
--- reste NULL (pas encore de signature) sauf pour les 2 déjà fournies par
--- LAM_ABZ de base (chef_etablissement, intendant) — copiées dans
--- assets/uploads/ à l'étape 11.
+-- reste NULL (pas encore de signature) : depuis le 22/10/2026 plus aucun
+-- fichier de LAM_ABZ par défaut, une école neuve imprimait sinon la
+-- signature d'une autre école (assets/uploads/signature_intendant.png).
 INSERT IGNORE INTO `signature_titulaire` (`code`, `libelle`, `fichier`, `role_gestion`) VALUES
 ('censeur', 'Censeur', NULL, 'CENSEUR'),
-('chef_etablissement', 'Chef d\'établissement (Proviseur)', 'signature_chef_etablissement.png', 'PROVISEUR'),
-('intendant', 'Intendant', 'signature_intendant.png', 'INTENDANT'),
+('chef_etablissement', 'Chef d\'établissement (Proviseur)', NULL, 'PROVISEUR'),
+('intendant', 'Intendant', NULL, 'INTENDANT'),
 ('president_apee', 'Président de l\'APEE', NULL, 'INTENDANT'),
 ('surveillant_general', 'Surveillant Général', NULL, 'SG'),
 ('tresorier_apee', 'Trésorier de l\'APEE', NULL, 'INTENDANT');

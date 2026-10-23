@@ -75,7 +75,7 @@ function verif_trouver_ecole(string $type, callable $valide): bool {
     foreach (assoc_all("SELECT * FROM etablissement WHERE actif=1 AND type_enseignement=? ORDER BY id", [$type]) as $e) {
         try {
             $ETAB_COURANT = $e;
-            mysqli_select_db($link, $e['db_name']);
+            selectionner_base_link($e['db_name']);
             if (function_exists('db_cache_vider')) db_cache_vider();
             if ($valide()) return true;
         } catch (\Throwable $ex) { /* base indisponible : école suivante */ }

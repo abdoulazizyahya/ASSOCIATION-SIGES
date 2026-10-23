@@ -56,29 +56,32 @@ if (classes_ids_visibles($val_annee) !== null) {
 $seq_act   = get_sequence_active();
 
 // ── Scolarité ─────────────────────────────────────────────────────
+// Effectifs : élèves ACTIFS uniquement (un élève désactivé n'est plus compté,
+// demande du 22/10/2026 — même règle partout : classes, liste, export).
 $nb_eleves = (int) db_val(
-    "SELECT COUNT(DISTINCT id_eleve) FROM inscrire WHERE val_annee=?", [$val_annee]
+    "SELECT COUNT(DISTINCT i.id_eleve) FROM inscrire i JOIN eleve e ON e.id_eleve=i.id_eleve
+     WHERE i.val_annee=? AND e.statut='actif'", [$val_annee]
 );
 $nb_garcons = (int) db_val(
     "SELECT COUNT(DISTINCT i.id_eleve) FROM inscrire i JOIN eleve e ON e.id_eleve=i.id_eleve
-     WHERE i.val_annee=? AND e.Sexe_elv LIKE 'M%'", [$val_annee]
+     WHERE i.val_annee=? AND e.statut='actif' AND e.Sexe_elv LIKE 'M%'", [$val_annee]
 );
 $nb_filles = (int) db_val(
     "SELECT COUNT(DISTINCT i.id_eleve) FROM inscrire i JOIN eleve e ON e.id_eleve=i.id_eleve
-     WHERE i.val_annee=? AND e.Sexe_elv LIKE 'F%'", [$val_annee]
+     WHERE i.val_annee=? AND e.statut='actif' AND e.Sexe_elv LIKE 'F%'", [$val_annee]
 );
 $nb_classes     = (int) db_val("SELECT COUNT(*) FROM classe");
 $nb_enseignants = (int) db_val("SELECT COUNT(*) FROM enseignant WHERE id_fonction='ENSEIGNANT'");
 
 $par_classe = db_all(
     "SELECT c.IDClasses, c.DesignationClasses, n.OrdreNiveau,
-            COUNT(DISTINCT i.id_eleve) AS effectif,
+            COUNT(DISTINCT e.id_eleve) AS effectif,
             SUM(e.Sexe_elv LIKE 'M%') AS nb_m,
             SUM(e.Sexe_elv LIKE 'F%') AS nb_f
      FROM classe c
      LEFT JOIN niveau n ON n.LibelleNiveau=c.Niveau
      LEFT JOIN inscrire i ON i.IDClasses=c.IDClasses AND i.val_annee=?
-     LEFT JOIN eleve e ON e.id_eleve=i.id_eleve
+     LEFT JOIN eleve e ON e.id_eleve=i.id_eleve AND e.statut='actif'
      GROUP BY c.IDClasses
      ORDER BY n.OrdreNiveau",
     [$val_annee]

@@ -38,8 +38,11 @@ $logo_url = ($logo !== '' && is_file(__DIR__ . '/../../assets/uploads/' . $logo)
     ? APP_URL . '/assets/uploads/' . $logo
     : null;
 
+// Nom = celui de l'annuaire, le MÊME que dans la liste de compte/login.php
+// (23/10/2026) : le nom saisi dans la base de l'école peut différer (base
+// importée d'une autre école…) et faisait croire à un mélange d'écoles.
 echo json_encode([
-    'nom'   => $info['Nom_Etab_Fr'] ?: $e['nom'],
+    'nom'   => $e['nom'],
     'sigle' => $info['Initial_Etab'] ?? '',
     'logo'  => $logo_url,
 ]);

@@ -32,7 +32,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $err = "Non applicable au secondaire — saisissez le NIU existant directement sur la fiche élève.";
         } elseif ($e && $id_eleve) {
             try {
-                $l = mysqli_connect(DB_HOST, DB_USER, DB_PASS, $e['db_name']);
+                $l = connecter_base_ecole($e['db_name']);
                 mysqli_set_charset($l, 'utf8mb4');
                 $el = mysqli_fetch_assoc(mysqli_query($l,
                     "SELECT Nom_elv, Prenom_elv, Date_naiss_elv, Sexe_elv, Lieu_naiss_elv, niu
@@ -259,7 +259,7 @@ function niuGenerer(idEcole, idEleve) {
     $r = assoc_one("SELECT db_name FROM etablissement WHERE id=?", [$e['id']]);
     $n = null;
     try {
-      $l = mysqli_connect(DB_HOST, DB_USER, DB_PASS, $r['db_name']);
+      $l = connecter_base_ecole($r['db_name']);
       mysqli_set_charset($l, 'utf8mb4');
       $n = (int) mysqli_fetch_row(mysqli_query($l,
         "SELECT SUM(niu IS NULL OR niu='') FROM eleve WHERE statut='actif'"))[0];

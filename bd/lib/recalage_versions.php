@@ -163,7 +163,7 @@ function rv_analyser_ecole(array $e): array {
           'reelle' => RV_BASE[$type], 'derniere' => $serie ? (int) array_key_last($serie) : RV_BASE[$type],
           'partielles' => [], 'trous' => [], 'a_appliquer' => [], 'manque' => []];
 
-    $l = @mysqli_connect(DB_HOST, DB_USER, DB_PASS, $e['db_name']);
+    $l = connecter_base_ecole($e['db_name']);
     if (!$l) return $r;
     mysqli_set_charset($l, 'utf8mb4');
     $r['joignable'] = true;

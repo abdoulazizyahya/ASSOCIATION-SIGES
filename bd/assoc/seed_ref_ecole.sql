@@ -36,14 +36,12 @@ INSERT INTO `groupe_competence_niveau` (`code_niveau`, `id_groupe_comp`, `actif`
 
 -- ---- critere_conseil ----
 DELETE FROM `critere_conseil`;
-INSERT INTO `critere_conseil` (`id_classe`, `val_annee`, `moyenne_admission`, `moyenne_exclusion`, `jours_absence_max`, `jours_exclusion_max`, `seuil_tableau_honneur`, `seuil_encouragement`, `seuil_felicitation`) VALUES (1,'2025/2026',10.00,NULL,NULL,NULL,NULL,NULL,NULL),(4,'2025/2026',NULL,NULL,NULL,NULL,12.00,14.00,15.00);
 
 -- ---- critere_conseil_arabe ----
 DELETE FROM `critere_conseil_arabe`;
 
 -- ---- discipline_arabe ----
 DELETE FROM `discipline_arabe`;
-INSERT INTO `discipline_arabe` (`IDClasses`, `id_mat`, `annee_scol`, `orale`, `ecrite`, `pratique`, `total_points`, `actif`) VALUES (3,1,'2025/2026',7,7,6,20,1),(3,2,'2025/2026',7,7,6,20,1),(3,3,'2025/2026',7,7,6,20,1),(3,5,'2025/2026',7,7,6,20,1),(3,6,'2025/2026',7,7,6,20,1),(3,7,'2025/2026',7,7,6,20,1),(4,1,'2025/2026',7,7,6,20,1),(4,2,'2025/2026',7,7,6,20,1),(4,3,'2025/2026',7,7,6,20,1),(4,5,'2025/2026',7,7,6,20,1),(4,6,'2025/2026',7,7,6,20,1),(4,7,'2025/2026',7,7,6,20,1);
 
 -- ---- groupe_matiere_arabe ----
 DELETE FROM `groupe_matiere_arabe`;

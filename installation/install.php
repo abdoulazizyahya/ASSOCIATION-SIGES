@@ -76,6 +76,11 @@ $val = [
     'nom_ecole'         => '',
     'ville'             => '',
     'login'             => 'admin',
+    // Hébergement mutualisé (cPanel, Camoo…) : bases créées d'avance au cPanel
+    // (l'utilisateur MySQL n'a pas le droit de faire CREATE DATABASE).
+    'bases_cpanel'      => false,
+    'db_assoc_cp'       => '',
+    'db_ec1_cp'         => '',
 ];
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -95,6 +100,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $val['ordre_enseignement'] = ($_POST['ordre_enseignement'] ?? '') === 'technique' ? 'technique' : 'general';
     $val['login'] = strtolower($val['login']);
     $reseau = $val['mode'] === 'reseau';
+    $val['bases_cpanel'] = !empty($_POST['bases_cpanel']);
+    $val['db_assoc_cp']  = trim((string) ($_POST['db_assoc_cp'] ?? ''));
+    $val['db_ec1_cp']    = trim((string) ($_POST['db_ec1_cp'] ?? ''));
+    $cpanel = $val['bases_cpanel'];
+    if ($cpanel) {
+        $noms_cp = $reseau ? ['annuaire' => $val['db_assoc_cp'], 'école' => $val['db_ec1_cp']] : ['école' => $val['db_ec1_cp']];
+        foreach ($noms_cp as $quoi => $n) {
+            if (!preg_match('/^[A-Za-z0-9_]{1,64}$/', $n)) $err[] = "Nom de la base $quoi (créée au cPanel) : obligatoire, lettres, chiffres et « _ » uniquement.";
+        }
+        if ($reseau && $val['db_assoc_cp'] !== '' && $val['db_assoc_cp'] === $val['db_ec1_cp']) {
+            $err[] = "L'annuaire et l'école n°1 doivent être deux bases différentes.";
+        }
+    }
 
     if ($reseau && $val['nom_association'] === '') $err[] = "Le nom de l'association est obligatoire.";
     if ($val['nom_ecole'] === '') $err[] = $reseau ? "Le nom du premier établissement est obligatoire." : "Le nom de l'école est obligatoire.";
@@ -129,8 +147,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } else {
         $db_ec1 = $slug;
     }
+    if ($cpanel) {
+        if ($reseau) $db_assoc = $val['db_assoc_cp'];
+        $db_ec1 = $val['db_ec1_cp'];
+    }
 
-    if (!$err && $srv) {
+    if (!$err && $srv && $cpanel) {
+        // Bases du cPanel : elles doivent exister, être accessibles à DB_USER et être vides.
+        $cibles = $reseau ? [$db_assoc => 'annuaire', $db_ec1 => 'école'] : [$db_ec1 => 'école'];
+        foreach ($cibles as $d => $quoi) {
+            if (($m = tester_identifiants_bd($d, DB_USER, DB_PASS)) !== null) { $err[] = "Base $quoi : $m"; continue; }
+            $q = mysqli_real_escape_string($srv, $d);
+            $nb = (int) mysqli_fetch_row(mysqli_query($srv,
+                "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='$q'"))[0];
+            if ($nb > 0) $err[] = "La base $quoi « $d » n'est pas vide ($nb tables) — indiquez une base neuve.";
+        }
+    } elseif (!$err && $srv) {
         $cibles = $reseau ? [$db_assoc => 'annuaire', $db_ec1 => 'école'] : [$db_ec1 => 'école'];
         foreach ($cibles as $d => $quoi) {
             $q = mysqli_real_escape_string($srv, $d);
@@ -153,13 +185,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $sql = @file_get_contents(__DIR__ . '/../bd/assoc/schema_assoc.sql');
                 if ($sql === false) throw new RuntimeException("bd/assoc/schema_assoc.sql introuvable.");
                 $sql = str_replace('{{DB_NAME_ASSOC}}', $db_assoc, $sql);
-                if (mysqli_multi_query($srv, $sql)) { do { if ($r = mysqli_store_result($srv)) mysqli_free_result($r); } while (mysqli_more_results($srv) && mysqli_next_result($srv)); }
-                if (mysqli_errno($srv)) throw new RuntimeException("Création de l'annuaire : " . mysqli_error($srv));
+                $l_annuaire = $srv;
+                if ($cpanel) {
+                    // Base déjà créée : on retire CREATE DATABASE / USE et on joue le schéma dedans.
+                    $sql = preg_replace('/^\s*CREATE DATABASE[^;]*;|^\s*USE\s[^;]*;/mi', '', $sql);
+                    $l_annuaire = mysqli_connect(DB_HOST, DB_USER, DB_PASS, $db_assoc);
+                    mysqli_set_charset($l_annuaire, 'utf8mb4');
+                }
+                if (mysqli_multi_query($l_annuaire, $sql)) { do { if ($r = mysqli_store_result($l_annuaire)) mysqli_free_result($r); } while (mysqli_more_results($l_annuaire) && mysqli_next_result($l_annuaire)); }
+                if (mysqli_errno($l_annuaire)) throw new RuntimeException("Création de l'annuaire : " . mysqli_error($l_annuaire));
+                if ($l_annuaire !== $srv) mysqli_close($l_annuaire);
             }
 
             // 2. Base de l'école : schéma (primaire ou secondaire) + données de
             //    référence + classes + année + barème (charger_schema_ecole).
-            mysqli_query($srv, "CREATE DATABASE `$db_ec1` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci");
+            if (!$cpanel) mysqli_query($srv, "CREATE DATABASE `$db_ec1` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci");
             $le = mysqli_connect(DB_HOST, DB_USER, DB_PASS, $db_ec1);
             mysqli_set_charset($le, 'utf8mb4');
             charger_schema_ecole($le, [
@@ -222,7 +262,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     . "\n"
                     . "// Double authentification (TOTP) NON imposée aux superadministrateurs :\n"
                     . "// chacun peut l'activer depuis « Sécurité ». Mettre true pour la rendre obligatoire.\n"
-                    . "define('ASSOC_2FA_SUPERADMIN_OBLIGATOIRE', false);\n";
+                    . "define('ASSOC_2FA_SUPERADMIN_OBLIGATOIRE', false);\n"
+                    . ($cpanel
+                        ? "\n// Bases créées au cPanel : « Nouvel établissement » demande la base, l'utilisateur et le mot de passe.\n"
+                          . "define('ECOLE_POOL_ACTIF', true);\n"
+                        : '');
             } else {
                 $conf = "<?php\n"
                     . "// Généré par installation/install.php le " . date('Y-m-d H:i') . " — installation ÉCOLE UNIQUE (sans annuaire association), spécifique à ce serveur, NE PAS versionner.\n"
@@ -236,8 +280,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             // utilisateur, autre hôte) : déclarés AVANT l'installation dans
             // un config.local.php minimal — on les reporte, sinon la
             // réécriture ci-dessus les perdrait et plus rien ne se connecterait.
+            //  Toute autre constante de ce fichier minimal (LICENCE_SECRET,
+            //  APP_HOTE, BULLETIN_VERIF_BASE_URL…) est reprise telle quelle :
+            //  perdre LICENCE_SECRET invaliderait la licence d'essai posée plus haut.
+            $deja = static function (string $k) use (&$conf): bool {
+                return (bool) preg_match("/define\\(\\s*'" . preg_quote($k, '/') . "'/", $conf);
+            };
+            $ancien = CONFIG_LOCAL_FICHIER !== '' ? (string) @file_get_contents(CONFIG_LOCAL_FICHIER) : '';
+            if (preg_match_all("/^[ \\t]*define\\(\\s*'([A-Z0-9_]+)'.*\\);[ \\t]*$/m", $ancien, $lignes, PREG_SET_ORDER)) {
+                $repris = '';
+                foreach ($lignes as [$ligne, $k]) {
+                    if (!$deja($k)) $repris .= trim($ligne) . "\n";
+                }
+                if ($repris !== '') $conf .= "\n// Repris de la configuration précédente :\n" . $repris;
+            }
             foreach (['DB_HOST' => '127.0.0.1', 'DB_USER' => 'root', 'DB_PASS' => ''] as $k => $defaut) {
-                if (constant($k) !== $defaut) {
+                if (constant($k) !== $defaut && !$deja($k)) {
                     $conf .= "define(" . var_export($k, true) . ", " . str_repeat(' ', 16 - strlen($k)) . var_export(constant($k), true) . ");\n";
                 }
             }
@@ -250,7 +308,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } catch (\Throwable $e) {
             $err[] = $e->getMessage();
             // Nettoyage best-effort (sauf si config.local.php a été écrit).
-            if (!$conf_manuel) {
+            if (!$conf_manuel && $cpanel) {
+                // Bases du cPanel : on les vide (pas de droit DROP DATABASE), elles restent réutilisables.
+                foreach (array_filter([$db_ec1, $db_assoc]) as $d) {
+                    $lv = @mysqli_connect(DB_HOST, DB_USER, DB_PASS, $d);
+                    if (!$lv) continue;
+                    @mysqli_query($lv, "SET FOREIGN_KEY_CHECKS=0");
+                    $rv = @mysqli_query($lv, "SELECT table_name FROM information_schema.tables WHERE table_schema = DATABASE()");
+                    while ($rv && ($t = mysqli_fetch_row($rv))) @mysqli_query($lv, "DROP TABLE IF EXISTS `" . str_replace('`', '', $t[0]) . "`");
+                    mysqli_close($lv);
+                }
+            } elseif (!$conf_manuel) {
                 @mysqli_query($srv, "DROP DATABASE IF EXISTS `$db_ec1`");
                 if ($db_assoc) @mysqli_query($srv, "DROP DATABASE IF EXISTS `$db_assoc`");
             }
@@ -426,6 +494,28 @@ $exemple_slug = install_slug(($val['mode'] === 'reseau' ? $val['nom_association'
         </div>
       </div>
 
+      <label style="display:flex;align-items:center;gap:.5rem;font-weight:600">
+        <input type="checkbox" name="bases_cpanel" id="bases_cpanel" value="1" style="width:auto" <?= $val['bases_cpanel'] ? 'checked' : '' ?>>
+        Hébergement mutualisé (cPanel) : les bases sont déjà créées
+      </label>
+      <div id="bloc_cpanel" style="<?= $val['bases_cpanel'] ? '' : 'display:none' ?>">
+        <div class="hint">Créez d'abord dans le cPanel les bases vides et un utilisateur MySQL rattaché à chacune avec TOUS LES PRIVILÈGES,
+          puis un <span class="mono">config/config.local.php</span> minimal avec <span class="mono">DB_HOST</span>, <span class="mono">DB_USER</span>,
+          <span class="mono">DB_PASS</span> (et <span class="mono">LICENCE_SECRET</span>). Saisissez les noms complets, préfixe compris.</div>
+        <div class="row">
+          <div id="bloc_cp_assoc">
+            <label for="db_assoc_cp">Base de l'annuaire</label>
+            <input type="text" id="db_assoc_cp" name="db_assoc_cp" maxlength="64" class="mono"
+                   value="<?= htmlspecialchars($val['db_assoc_cp']) ?>" placeholder="ex. beeroc11073_a2assoc">
+          </div>
+          <div>
+            <label for="db_ec1_cp">Base de l'école n°1</label>
+            <input type="text" id="db_ec1_cp" name="db_ec1_cp" maxlength="64" class="mono"
+                   value="<?= htmlspecialchars($val['db_ec1_cp']) ?>" placeholder="ex. beeroc11073_a2ec1">
+          </div>
+        </div>
+      </div>
+
       <label for="login">Identifiant du compte Directeur <span style="color:#b91c1c">*</span></label>
       <input type="text" id="login" name="login" required maxlength="30" value="<?= htmlspecialchars($val['login']) ?>">
       <div class="hint" id="hint_login">Sert aussi de compte DIRECTEUR de l'école. Mot de passe = cet identifiant (à changer depuis Sécurité). Le compte FINANCIER (et FONDATEUR si l'école est privée) est créé automatiquement, mêmes conditions.</div>
@@ -460,7 +550,13 @@ $exemple_slug = install_slug(($val['mode'] === 'reseau' ? $val['nom_association'
             ? (slug(nAssoc.value) || 'association') + '_assoc, ' + (slug(nAssoc.value) || 'association') + '_<école>'
             : (slug(nEcole.value) || 'ecole');
           blocStatut.style.display = typeSecondaire.checked ? '' : 'none';
+          var cp = document.getElementById('bases_cpanel').checked;
+          document.getElementById('bloc_cpanel').style.display = cp ? '' : 'none';
+          document.getElementById('bloc_cp_assoc').style.display = reseau ? '' : 'none';
+          document.getElementById('db_assoc_cp').required = cp && reseau;
+          document.getElementById('db_ec1_cp').required = cp;
         }
+        document.getElementById('bases_cpanel').addEventListener('change', refresh);
         document.querySelectorAll('input[name="mode"]').forEach(function (r) { r.addEventListener('change', refresh); });
         document.querySelectorAll('input[name="type_enseignement"]').forEach(function (r) { r.addEventListener('change', refresh); });
         nAssoc.addEventListener('input', refresh);

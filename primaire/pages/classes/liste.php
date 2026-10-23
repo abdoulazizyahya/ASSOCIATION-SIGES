@@ -111,16 +111,18 @@ $niveaux = db_all(
 // ══════════════════════════════════════════════════════════════
 //  ONGLET 1 — Classes (inchangé)
 // ══════════════════════════════════════════════════════════════
+// nb_eleves / nb_m / nb_f : élèves actifs seulement (22/10/2026) ;
+// nb_inscrits_total compte toutes les inscriptions (garde de suppression).
 $classes = db_all(
     "SELECT c.IDClasses, c.DesignationClasses, c.Niveau, n.Section, n.OrdreNiveau,
-            COUNT(DISTINCT i.id_eleve) AS nb_eleves,
+            COUNT(DISTINCT e.id_eleve) AS nb_eleves,
             SUM(e.Sexe_elv LIKE 'M%') AS nb_m,
             SUM(e.Sexe_elv LIKE 'F%') AS nb_f,
             (SELECT COUNT(*) FROM inscrire ix WHERE ix.IDClasses = c.IDClasses) AS nb_inscrits_total
      FROM classe c
      LEFT JOIN niveau n ON n.LibelleNiveau = c.Niveau
      LEFT JOIN inscrire i ON i.IDClasses = c.IDClasses AND i.val_annee = ?
-     LEFT JOIN eleve e ON e.id_eleve = i.id_eleve
+     LEFT JOIN eleve e ON e.id_eleve = i.id_eleve AND e.statut = 'actif'
      GROUP BY c.IDClasses
      ORDER BY n.OrdreNiveau, c.DesignationClasses",
     [$val_annee]

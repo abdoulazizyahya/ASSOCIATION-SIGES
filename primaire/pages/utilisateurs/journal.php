@@ -34,7 +34,7 @@ $crit = [
     'depuis'    => preg_match('/^\d{4}-\d{2}-\d{2}$/', $_GET['depuis'] ?? '') ? $_GET['depuis'] : null,
     'jusqua'    => preg_match('/^\d{4}-\d{2}-\d{2}$/', $_GET['jusqua'] ?? '') ? $_GET['jusqua'] : null,
 ];
-if (!voit_tous_les_comptes() && defined('COMPTE_PROPRIETAIRE_LOGIN')) $crit['exclure_login'] = COMPTE_PROPRIETAIRE_LOGIN;   // activité du compte propriétaire masquée
+if (!voit_tous_les_comptes() && comptes_proprietaires()) $crit['exclure_login'] = array_keys(comptes_proprietaires());   // activité du compte propriétaire masquée
 $page = max(1, (int) ($_GET['page'] ?? 1));
 $j    = $dispo ? audit_journal($crit, $page, 60, $id_etab)
               : ['lignes' => [], 'total' => 0, 'page' => 1, 'pages' => 1];

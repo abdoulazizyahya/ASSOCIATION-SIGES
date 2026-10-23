@@ -52,8 +52,7 @@ function ecole_maint_garde_nom(string $db): void {
 
 // État d'une base sur le serveur : ['existe'=>bool, 'tables'=>int, 'mo'=>float].
 function ecole_base_etat(string $db): array {
-    $srv = mysqli_connect(DB_HOST, DB_USER, DB_PASS);
-    mysqli_set_charset($srv, 'utf8mb4');
+    $srv = connecter_serveur_ecole($db);   // utilisateur MySQL de l'école (connexion_assoc.php)
     $q = mysqli_escape_string($srv, $db);
     $existe = (int) mysqli_fetch_row(mysqli_query($srv,
         "SELECT COUNT(*) FROM information_schema.schemata WHERE schema_name='$q'"))[0] > 0;
@@ -77,9 +76,7 @@ function ecole_maint_garde_base(string $db): void {
 }
 
 function ecole_maint_lien(string $db): mysqli {
-    $l = mysqli_connect(DB_HOST, DB_USER, DB_PASS, $db);
-    mysqli_set_charset($l, 'utf8mb4');
-    return $l;
+    return connecter_base_ecole($db);
 }
 
 // Répertoire des sauvegardes (créé si absent).

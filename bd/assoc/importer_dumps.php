@@ -156,7 +156,7 @@ foreach ($fichiers as $f) {
         continue;
     }
 
-    $link = @mysqli_connect(DB_HOST, DB_USER, DB_PASS, $db);
+    $link = connecter_base_ecole($db);
     if (!$link) {
         echo "  ✗ connexion à « $db » impossible : " . mysqli_connect_error() . "\n";
         echo "     → crée cette base dans le panneau de l'hébergeur et rattache "

@@ -290,6 +290,7 @@ function menu_acces_autorise(string $groupe, string $url): bool {
     // module comme n'importe quel rôle (Utilisateurs/Paramètres masqués par
     // défaut, voir assoc_seeder_masque_visite()) — demande du 23/09/2026.
     if (function_exists('est_visite_association_administrateur') && est_visite_association_administrateur()) return true;
+    if (function_exists('est_proprietaire_ecole') && est_proprietaire_ecole()) return true;   // compte propriétaire : tout le menu
     // Règle « Privilèges » centrale : 'masque' cache l'entrée pour ce
     // rôle/compte (y compris le fondateur). 'lecture'/'ecriture' = octroi,
     // géré côté header.php (révèle une entrée hors périmètre de rôle).
@@ -1024,7 +1025,8 @@ function exiger_acces_eleve_secondaire(int $id_eleve): void {
 function exiger_acces_bulletin_secondaire(int $id_eleve): void {
     $role = role_connecte();
     if (in_array($role, ['ADMIN', 'PROVISEUR', 'FONDATEUR', 'CENSEUR', 'MEMBRE_ASSOCIATION'], true)
-        || (function_exists('est_visite_association') && est_visite_association())) return;
+        || (function_exists('est_visite_association') && est_visite_association())
+        || (function_exists('est_proprietaire_ecole') && est_proprietaire_ecole())) return;
     if ($role === 'ENSEIGNANT' && in_array(sec_classe_eleve($id_eleve), sec_classes_ids_visibles(true) ?? [], true)) return;
     sec_refuser_acces('Accès refusé : seuls l\'administration et le professeur principal de la classe peuvent consulter ce bulletin.');
 }
@@ -1045,6 +1047,8 @@ function normaliser_reponse(string $r): string {
 
 function exiger_role(array $roles): void {
     exiger_connexion();
+    // Compte propriétaire de l'école : toutes les pages (23/10/2026).
+    if (function_exists('est_proprietaire_ecole') && est_proprietaire_ecole()) return;
     // Membre association en visite.
     if (function_exists('est_visite_association') && est_visite_association()) {
         // Administrateur (superadmin/propriétaire) : lecture accordée sur
@@ -1100,6 +1104,7 @@ function exiger_role(array $roles): void {
 function exiger_acces_pedagogie(): void {
     exiger_connexion();
     if (function_exists('est_visite_association') && est_visite_association()) return;
+    if (function_exists('est_proprietaire_ecole') && est_proprietaire_ecole()) return;
     if (function_exists('niveau_central_page_courante')
         && in_array(niveau_central_page_courante(), ['lecture', 'ecriture'], true)) return;
     if (function_exists('est_fondateur') && est_fondateur()) return;

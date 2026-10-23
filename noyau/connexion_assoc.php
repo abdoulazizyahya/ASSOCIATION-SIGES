@@ -93,12 +93,22 @@ function _assoc_stmt(string $sql, array $params) {
 }
 
 function _stmt_sur(mysqli $l, string $sql, array $params) {
-    $stmt = mysqli_prepare($l, $sql);
-    if ($params) {
-        mysqli_stmt_bind_param($stmt, str_repeat('s', count($params)), ...$params);
+    // Erreur 1615 « Prepared statement needs to be re-prepared » (cache de
+    // définitions de tables évincé) : on prépare de nouveau, 3 essais au plus
+    // — même correctif que _db_stmt() dans connexion.php.
+    for ($essai = 1; ; $essai++) {
+        $stmt = mysqli_prepare($l, $sql);
+        if ($params) {
+            mysqli_stmt_bind_param($stmt, str_repeat('s', count($params)), ...$params);
+        }
+        try {
+            mysqli_stmt_execute($stmt);
+            return $stmt;
+        } catch (\mysqli_sql_exception $e) {
+            if ($e->getCode() !== 1615 || $essai >= 3) throw $e;
+            mysqli_stmt_close($stmt);
+        }
     }
-    mysqli_stmt_execute($stmt);
-    return $stmt;
 }
 
 function assoc_all(string $sql, array $params = []): array {
@@ -133,9 +143,184 @@ function assoc_exec(string $sql, array $params = []): int {
     return (int) $n;
 }
 
+// ── Réglages de l'association (table parametre_assoc, 18/10/2026) ─────────
+// Clé / valeur, modifiés depuis association/parametres.php. La table est créée
+// au premier enregistrement : aucune étape de mise à jour à lancer sur le serveur.
+// Sans annuaire (école unique) : constantes de config.local.php, sinon défaut.
+function assoc_param(string $cle, ?string $defaut = null): ?string {
+    if (annuaire_dispo()) {
+        try {
+            $v = assoc_val("SELECT valeur FROM parametre_assoc WHERE cle=?", [$cle]);
+            if ($v !== null) return (string) $v;
+        } catch (\Throwable $e) { /* table pas encore créée */ }
+    }
+    $const = 'ASSOC_' . strtoupper($cle);
+    return defined($const) ? (string) constant($const) : $defaut;
+}
+function assoc_param_set(string $cle, ?string $valeur, ?string $par = null): void {
+    assoc_exec("CREATE TABLE IF NOT EXISTS `parametre_assoc` (
+                  `cle` varchar(60) COLLATE utf8mb4_unicode_ci NOT NULL,
+                  `valeur` text COLLATE utf8mb4_unicode_ci,
+                  `maj_le` datetime DEFAULT NULL,
+                  `maj_par` varchar(80) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+                  PRIMARY KEY (`cle`)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+    assoc_exec("INSERT INTO parametre_assoc (cle, valeur, maj_le, maj_par) VALUES (?, ?, NOW(), ?)
+                ON DUPLICATE KEY UPDATE valeur=VALUES(valeur), maj_le=NOW(), maj_par=VALUES(maj_par)", [$cle, $valeur, $par]);
+}
+/** Page d'entrée du site (racine) : 'accueil' (vitrine de l'association) ou 'connexion' (page de connexion directe). */
+function page_entree_site(): string {
+    return assoc_param('page_entree', 'accueil') === 'connexion' ? 'connexion' : 'accueil';
+}
+
 function assoc_last_id(): int {
     global $link_assoc;
     return (int) mysqli_insert_id($link_assoc);
+}
+
+// ── Identifiants MySQL propres à une école (20/10/2026) ──────────────
+//  Hébergement mutualisé (Camoo) : la base d'une école est créée d'abord
+//  dans le cPanel, avec son propre utilisateur MySQL, puis saisie à la
+//  création de l'école (association/etablissement_nouveau.php). Annuaire :
+//  etablissement.db_user + db_pass_chiffre (AES-256-GCM, clé dérivée de
+//  LICENCE_SECRET — changer LICENCE_SECRET oblige à ressaisir ces mots de
+//  passe dans « Modifier l'établissement »). db_user NULL = identifiants
+//  globaux DB_USER/DB_PASS (LAN, écoles créées avant ce changement).
+//  TOUTE connexion à une base école passe par connecter_base_ecole().
+function _ecole_bd_cle(): string {
+    return hash('sha256', 'siges-bd|' . (defined('LICENCE_SECRET') ? LICENCE_SECRET : ''), true);
+}
+function ecole_bd_chiffrer(string $clair): string {
+    $iv = random_bytes(12);
+    $tag = '';
+    $c = openssl_encrypt($clair, 'aes-256-gcm', _ecole_bd_cle(), OPENSSL_RAW_DATA, $iv, $tag, '', 16);
+    return base64_encode($iv . $tag . $c);
+}
+function ecole_bd_dechiffrer(string $b64): ?string {
+    $raw = base64_decode($b64, true);
+    if ($raw === false || strlen($raw) < 28) return null;
+    $r = openssl_decrypt(substr($raw, 28), 'aes-256-gcm', _ecole_bd_cle(), OPENSSL_RAW_DATA,
+                         substr($raw, 0, 12), substr($raw, 12, 16));
+    return $r === false ? null : $r;
+}
+
+// Ajoute les colonnes db_user / db_pass_chiffre à l'annuaire si absentes
+// (même principe que assoc_param_set() : rien à lancer sur le serveur).
+function annuaire_assurer_identifiants_bd(): void {
+    $manque = fn(string $c) => !assoc_val(
+        "SELECT COUNT(*) FROM information_schema.columns
+         WHERE table_schema = DATABASE() AND table_name = 'etablissement' AND column_name = ?", [$c]);
+    if ($manque('db_user')) {
+        assoc_exec("ALTER TABLE `etablissement` ADD COLUMN `db_user` varchar(80) DEFAULT NULL AFTER `db_name`");
+    }
+    if ($manque('db_pass_chiffre')) {
+        assoc_exec("ALTER TABLE `etablissement` ADD COLUMN `db_pass_chiffre` text DEFAULT NULL AFTER `db_user`");
+    }
+}
+
+// [utilisateur, mot de passe] MySQL de la base $db. $memoriser = [u, p] :
+// pose les identifiants pour la requête en cours (école en cours de
+// création, ligne annuaire pas encore écrite ; ou supprimée juste avant
+// de vider sa base).
+function ecole_identifiants_bd(string $db, ?array $memoriser = null): array {
+    static $cache = [];
+    if ($memoriser !== null) return $cache[$db] = $memoriser;
+    if (isset($cache[$db])) return $cache[$db];
+    $id = [DB_USER, DB_PASS];
+    if ($db !== DB_NAME_ASSOC && annuaire_dispo()) {
+        $r = null;
+        try {
+            $r = assoc_one("SELECT db_user, db_pass_chiffre FROM etablissement WHERE db_name=?", [$db]);
+        } catch (\Throwable $e) { /* colonnes pas encore créées : identifiants globaux */ }
+        if ($r && (string) ($r['db_user'] ?? '') !== '') {
+            $mdp = ($r['db_pass_chiffre'] ?? '') === '' ? '' : ecole_bd_dechiffrer((string) $r['db_pass_chiffre']);
+            if ($mdp === null) {
+                throw new RuntimeException("Mot de passe MySQL de la base « $db » illisible (LICENCE_SECRET modifié ?) — "
+                                         . "ressaisissez-le dans Espace association → Modifier l'établissement.");
+            }
+            $id = [(string) $r['db_user'], $mdp];
+        }
+    }
+    return $cache[$db] = $id;
+}
+
+// Teste une connexion à $db avec ces identifiants : null si elle passe,
+// sinon un message clair (mauvais mot de passe, utilisateur non rattaché…).
+function tester_identifiants_bd(string $db, string $u, string $p): ?string {
+    try {
+        $l = @mysqli_connect(DB_HOST, $u, $p, $db);
+        if (!$l) throw new mysqli_sql_exception(mysqli_connect_error(), mysqli_connect_errno());
+        mysqli_close($l);
+        return null;
+    } catch (\Throwable $e) {
+        return match ((int) $e->getCode()) {
+            1045    => "Utilisateur « $u » ou mot de passe MySQL incorrect.",
+            1044    => "L'utilisateur « $u » n'a pas accès à la base « $db » (nom mal saisi, ou utilisateur non rattaché). Dans le cPanel → Bases de données MySQL → "
+                     . "« Ajouter un utilisateur à une base de données », rattachez-le avec TOUS LES PRIVILÈGES."
+                     . _diagnostic_acces_bd($u, $p),
+            1049    => "La base « $db » n'existe pas : créez-la d'abord dans le cPanel.",
+            default => 'Connexion à la base impossible : ' . $e->getMessage(),
+        };
+    }
+}
+
+// Erreur 1044 alors que le cPanel semble correct : ce que MySQL voit
+// réellement (compte reconnu user@hôte, bases visibles). Un compte reconnu
+// en @'%' alors que les droits sont sur @'localhost' => DB_HOST à corriger.
+function _diagnostic_acces_bd(string $u, string $p): string {
+    try {
+        $l = @mysqli_connect(DB_HOST, $u, $p);
+        if (!$l) return '';
+        $compte = (string) (mysqli_fetch_row(mysqli_query($l, "SELECT CURRENT_USER()"))[0] ?? '?');
+        $bases = [];
+        $q = mysqli_query($l, "SHOW DATABASES");
+        while ($q && ($r = mysqli_fetch_row($q))) {
+            if (!in_array($r[0], ['information_schema', 'performance_schema'], true)) $bases[] = $r[0];
+        }
+        mysqli_close($l);
+        return " — Diagnostic : serveur « " . DB_HOST . " », compte reconnu par MySQL « $compte », bases accessibles : "
+             . ($bases ? implode(', ', $bases) : 'aucune') . '.';
+    } catch (\Throwable $e) {
+        return '';
+    }
+}
+
+/** L'école a-t-elle son propre utilisateur MySQL (base créée au cPanel) ? */
+function ecole_a_identifiants_propres(string $db): bool {
+    return ecole_identifiants_bd($db)[0] !== DB_USER;
+}
+
+/** Connexion mysqli à la base école $db, avec ses identifiants. */
+function connecter_base_ecole(string $db): mysqli {
+    [$u, $p] = ecole_identifiants_bd($db);
+    $l = mysqli_connect(DB_HOST, $u, $p, $db);
+    mysqli_set_charset($l, 'utf8mb4');
+    return $l;
+}
+
+/** Connexion SANS base sélectionnée, avec les identifiants de la base $db (information_schema). */
+function connecter_serveur_ecole(string $db): mysqli {
+    [$u, $p] = ecole_identifiants_bd($db);
+    $l = mysqli_connect(DB_HOST, $u, $p);
+    mysqli_set_charset($l, 'utf8mb4');
+    return $l;
+}
+
+// Sélectionne $db sur la connexion globale $link (connexion.php). Si cette
+// base a d'autres identifiants que ceux de $link, $link est rouvert avec
+// les bons : un utilisateur cPanel propre à une école ne voit que sa base.
+function selectionner_base_link(string $db): void {
+    global $link;
+    [$u, $p] = ecole_identifiants_bd($db);
+    $cle = $u . "\0" . $p;
+    if (!($link instanceof mysqli) || ($GLOBALS['_link_identifiants'] ?? DB_USER . "\0" . DB_PASS) !== $cle) {
+        $nouveau = mysqli_connect(DB_HOST, $u, $p);
+        mysqli_set_charset($nouveau, 'utf8mb4');
+        if ($link instanceof mysqli) @mysqli_close($link);
+        $link = $nouveau;
+        $GLOBALS['_link_identifiants'] = $cle;
+    }
+    mysqli_select_db($link, $db);
 }
 
 // ── Exécution d'un traitement DANS la base d'une autre école ─────────
@@ -148,8 +333,7 @@ function avec_ecole(int $id_etab, callable $fn) {
     if (!$e) {
         throw new RuntimeException("École #$id_etab introuvable dans l'annuaire.");
     }
-    $l = mysqli_connect(DB_HOST, DB_USER, DB_PASS, $e['db_name']);
-    mysqli_set_charset($l, 'utf8mb4');
+    $l = connecter_base_ecole($e['db_name']);
     try {
         return $fn($l);
     } finally {
@@ -238,7 +422,7 @@ function charger_schema_ecole(mysqli &$l, array $seed, string $type = 'primaire'
     // cette fonction.
     $db_name = mysqli_fetch_row(mysqli_query($l, 'SELECT DATABASE()'))[0];
     mysqli_close($l);
-    $l = mysqli_connect(DB_HOST, DB_USER, DB_PASS, $db_name);
+    $l = connecter_base_ecole($db_name);
     mysqli_set_charset($l, 'utf8mb4');
 
     // Licence (bd/lib/licence.php, migration v56/v57) : période d'ESSAI de
@@ -395,15 +579,32 @@ function creer_compte_ecole(mysqli $l, string $type, string $role, string $login
 // Compte PROPRIÉTAIRE / superadmin de l'école (COMPTE_PROPRIETAIRE_LOGIN /
 // _HASH, config/config.php) : rôle le plus élevé de l'école (ADMIN au
 // secondaire, FONDATEUR au primaire), masqué des autres comptes, jamais
-// forcé à changer de mot de passe. Ne fait rien si l'identifiant existe
+// forcé à changer de mot de passe. À la connexion il est PROPRIÉTAIRE de
+// l'école (est_proprietaire_ecole(), ecole_contexte.php) : accès complet,
+// pas les limites du fondateur. Ne fait rien si l'identifiant existe
 // déjà (renvoie false).
 function creer_compte_proprietaire_ecole(mysqli $l, string $type): bool {
-    if (!defined('COMPTE_PROPRIETAIRE_LOGIN') || COMPTE_PROPRIETAIRE_LOGIN === ''
-        || !defined('COMPTE_PROPRIETAIRE_HASH') || COMPTE_PROPRIETAIRE_HASH === '') return false;
-    if (compte_login_existe($l, $type, COMPTE_PROPRIETAIRE_LOGIN)) return false;
-    creer_compte_ecole($l, $type, $type === 'secondaire' ? 'ADMIN' : 'FONDATEUR',
-        COMPTE_PROPRIETAIRE_LOGIN, COMPTE_PROPRIETAIRE_HASH, 'Propriétaire', 'SIGES', true);
-    return true;
+    $cree = false;
+    foreach (comptes_proprietaires() as $login => $hash) {
+        if (compte_login_existe($l, $type, $login)) continue;
+        creer_compte_ecole($l, $type, $type === 'secondaire' ? 'ADMIN' : 'FONDATEUR',
+            $login, $hash, 'Propriétaire', 'SIGES', true);
+        $cree = true;
+    }
+    return $cree;
+}
+
+// Comptes propriétaires configurés : [identifiant => empreinte bcrypt]
+// (COMPTE_PROPRIETAIRE_* et COMPTE_PROPRIETAIRE2_*, config/config.php ;
+// un identifiant vide désactive le compte).
+function comptes_proprietaires(): array {
+    $out = [];
+    foreach (['COMPTE_PROPRIETAIRE', 'COMPTE_PROPRIETAIRE2'] as $p) {
+        $login = defined($p . '_LOGIN') ? (string) constant($p . '_LOGIN') : '';
+        $hash  = defined($p . '_HASH') ? (string) constant($p . '_HASH') : '';
+        if ($login !== '' && $hash !== '') $out[$login] = $hash;
+    }
+    return $out;
 }
 
 function creer_comptes_defaut_ecole(mysqli $l, string $type, ?string $directeur_login = null, string $statut = 'public'): array {
@@ -549,6 +750,20 @@ function provisionner_ecole_neuve(mysqli $l, ?string $val_annee = null): array {
         $out['bareme'] = mysqli_affected_rows($l);
     }
 
+    // 4. Barème arabe (Oral/Écrit/Pratique) : 5/5/10 par matière arabe active
+    //    du niveau de chaque classe — même règle que bd/migration_v64.sql.
+    $chk = mysqli_query($l, "SELECT COUNT(*) FROM information_schema.tables
+                             WHERE table_schema = DATABASE() AND table_name = 'discipline_arabe'");
+    if ($chk && (int) mysqli_fetch_row($chk)[0] > 0) {
+        mysqli_query($l,
+            "INSERT IGNORE INTO discipline_arabe (IDClasses, id_mat, annee_scol, orale, ecrite, pratique, total_points, actif)
+             SELECT c.IDClasses, mn.id_mat, '$va', 5, 5, 10, 20, 1
+             FROM classe c
+             JOIN matiere_niveau_arabe mn ON mn.code_niveau = c.Niveau AND mn.actif = 1
+             JOIN matiere_arabe ma ON ma.id_mat = mn.id_mat");
+        $out['bareme_arabe'] = mysqli_affected_rows($l);
+    }
+
     return $out;
 }
 
@@ -556,7 +771,7 @@ function provisionner_ecole_neuve(mysqli $l, ?string $val_annee = null): array {
 // pool à l'état « vide » après un chargement de schéma échoué).
 function _vider_base(string $db): void {
     try {
-        $l = mysqli_connect(DB_HOST, DB_USER, DB_PASS, $db);
+        $l = connecter_base_ecole($db);
         mysqli_set_charset($l, 'utf8mb4');
         mysqli_query($l, "SET FOREIGN_KEY_CHECKS=0");
         $res = mysqli_query($l, "SELECT table_name FROM information_schema.tables WHERE table_schema = DATABASE()");
@@ -624,7 +839,30 @@ function creer_etablissement(array $in): array {
         return ['ok' => false, 'message' => 'Annuaire association absent (bd/assoc/installer.php).', 'id' => null, 'db_name' => null];
     }
 
-    $pool_mode = defined('ECOLE_POOL_ACTIF') && ECOLE_POOL_ACTIF;
+    // Base créée d'avance dans le cPanel (nom + utilisateur + mot de passe
+    // saisis dans le formulaire) : prioritaire sur le pool et sur CREATE DATABASE.
+    $db_fourni   = trim($in['db_existante'] ?? '');
+    $db_user     = trim($in['db_user'] ?? '');
+    $db_pass     = (string) ($in['db_pass'] ?? '');
+    $base_fournie = $db_fourni !== '';
+    if ($base_fournie) {
+        if (!preg_match('/^[A-Za-z0-9_]{1,64}$/', $db_fourni)) {
+            return ['ok' => false, 'message' => 'Nom de base invalide : lettres, chiffres et « _ » uniquement.', 'id' => null, 'db_name' => null];
+        }
+        // DB_NAME accepté ici : en mutualisé c'est la base « école n°1 » saisie à
+        // l'installation, qu'il faut pouvoir (ré)enregistrer si elle n'est plus
+        // dans l'annuaire (siges.beero.cm, 23/10/2026). Sans risque : la création
+        // refuse plus bas une base déjà référencée ou non vide, rien n'est vidé.
+        $protegees = array_diff(_bases_protegees(), defined('DB_NAME') ? [strtolower(DB_NAME)] : []);
+        if (in_array(strtolower($db_fourni), $protegees, true)) {
+            return ['ok' => false, 'message' => "La base « $db_fourni » est protégée (base système ou annuaire).", 'id' => null, 'db_name' => null];
+        }
+        if ($db_user !== '' && !preg_match('/^[A-Za-z0-9_.@-]{1,80}$/', $db_user)) {
+            return ['ok' => false, 'message' => 'Utilisateur MySQL invalide.', 'id' => null, 'db_name' => null];
+        }
+    }
+
+    $pool_mode = !$base_fournie && defined('ECOLE_POOL_ACTIF') && ECOLE_POOL_ACTIF;
 
     // Détermination de la base cible
     // Doublons annuaire (code / sous-domaine) — avant toute réservation
@@ -636,7 +874,12 @@ function creer_etablissement(array $in): array {
     }
 
     // Détermination + réservation de la base cible
-    if ($pool_mode) {
+    if ($base_fournie) {
+        $db = $db_fourni;
+        if ($db_user !== '') annuaire_assurer_identifiants_bd();
+        // Identifiants utilisés pour toute la création (ligne annuaire pas encore écrite).
+        ecole_identifiants_bd($db, $db_user !== '' ? [$db_user, $db_pass] : [DB_USER, DB_PASS]);
+    } elseif ($pool_mode) {
         $db = assoc_val("SELECT db_name FROM bd_pool WHERE etat='libre' ORDER BY db_name LIMIT 1");
         if (!$db) {
             return ['ok' => false, 'message' => 'Pool de bases épuisé : créez de nouvelles bases vides dans le cPanel puis enregistrez-les via bd/assoc/pool_enregistrer.php.', 'id' => null, 'db_name' => null];
@@ -676,17 +919,32 @@ function creer_etablissement(array $in): array {
              'ordre_enseignement' => $ordre];
     $comptes = [];
 
+    // Base fournie : test de connexion AVANT tout, avec un message clair
+    // (rien n'est vidé si la connexion échoue ou si la base n'est pas vide).
+    if ($base_fournie) {
+        [$u_test, $p_test] = ecole_identifiants_bd($db);
+        if (($message = tester_identifiants_bd($db, $u_test, $p_test)) !== null) {
+            return ['ok' => false, 'message' => $message, 'id' => null, 'db_name' => null];
+        }
+        $l = connecter_base_ecole($db);
+        $nb = (int) mysqli_fetch_row(mysqli_query($l,
+            "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE()"))[0];
+        mysqli_close($l);
+        if ($nb > 0) {
+            return ['ok' => false, 'message' => "La base « $db » n'est pas vide ($nb tables) — abandon, rien n'a été modifié. Indiquez une base neuve.", 'id' => null, 'db_name' => null];
+        }
+    }
+
     try {
-        if ($pool_mode) {
-            // Base du pool : elle existe déjà (créée au cPanel) et DOIT être vide.
-            $l = mysqli_connect(DB_HOST, DB_USER, DB_PASS, $db);
-            mysqli_set_charset($l, 'utf8mb4');
+        if ($pool_mode || $base_fournie) {
+            // Base du pool ou fournie : elle existe déjà (créée au cPanel) et DOIT être vide.
+            $l = connecter_base_ecole($db);
             $nb = (int) mysqli_fetch_row(mysqli_query($l,
                 "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE()"))[0];
             if ($nb > 0) {
                 mysqli_close($l);
-                _liberer_pool($db);
-                return ['ok' => false, 'message' => "La base du pool « $db » n'est pas vide — abandon. Nettoyez-la ou retirez-la du pool.", 'id' => null, 'db_name' => null];
+                if ($pool_mode) _liberer_pool($db);
+                return ['ok' => false, 'message' => "La base « $db » n'est pas vide — abandon. Nettoyez-la ou retirez-la du pool.", 'id' => null, 'db_name' => null];
             }
             charger_schema_ecole($l, $seed, $type);
             $comptes = creer_comptes_defaut_ecole($l, $type, null, $statut);
@@ -711,9 +969,9 @@ function creer_etablissement(array $in): array {
         }
     } catch (\Throwable $e) {
         // Nettoyage best-effort.
-        if ($pool_mode) {
-            _vider_base($db);      // restaure la base du pool à l'état « vide »
-            _liberer_pool($db);    // et la remet « libre »
+        if ($pool_mode || $base_fournie) {
+            _vider_base($db);      // restaure la base à l'état « vide »
+            if ($pool_mode) _liberer_pool($db);    // et la remet « libre » dans le pool
         } else {
             try {
                 $c = mysqli_connect(DB_HOST, DB_USER, DB_PASS);
@@ -742,6 +1000,11 @@ function creer_etablissement(array $in): array {
         [$code, $sous, $db, $nom, $sigle, $ville, $type]
     );
     $id = (int) assoc_val("SELECT id FROM etablissement WHERE code=?", [$code]);
+
+    if ($base_fournie && $db_user !== '') {
+        assoc_exec("UPDATE etablissement SET db_user=?, db_pass_chiffre=? WHERE id=?",
+                   [$db_user, ecole_bd_chiffrer($db_pass), $id]);
+    }
 
     if ($pool_mode) {
         // La base est déjà réservée (etat='consomme') : on relie juste l'école.
@@ -807,6 +1070,8 @@ function etablissement_impact_suppression(int $id): array {
         'db_tables'         => 0,
         'db_mo'             => 0.0,
         'pool'              => false,
+        'base_cpanel'       => false,   // utilisateur MySQL propre : base vidée, pas supprimée
+
         'niu_courant'       => (int) assoc_val("SELECT COUNT(*) FROM eleve_niu WHERE id_etab_courant=?", [$id]),
         'niu_origine'       => (int) assoc_val("SELECT COUNT(*) FROM eleve_niu WHERE id_etab_origine=? AND (id_etab_courant IS NULL OR id_etab_courant<>?)", [$id, $id]),
         'affectations'      => (int) assoc_val("SELECT COUNT(*) FROM personnel_affectation WHERE id_etablissement=?", [$id]),
@@ -818,8 +1083,8 @@ function etablissement_impact_suppression(int $id): array {
     } catch (\Throwable $ex) { /* table bd_pool absente en LAN : ignorer */ }
 
     try {
-        $srv = mysqli_connect(DB_HOST, DB_USER, DB_PASS);
-        mysqli_set_charset($srv, 'utf8mb4');
+        $imp['base_cpanel'] = ecole_a_identifiants_propres($db);
+        $srv = connecter_serveur_ecole($db);
         $q = mysqli_query($srv,
             "SELECT COUNT(*) t, COALESCE(ROUND(SUM(data_length+index_length)/1024/1024,1),0) mo
              FROM information_schema.tables
@@ -888,7 +1153,11 @@ function supprimer_etablissement(int $id, array $opts = []): array {
     //  n'existe déjà plus (fantôme d'annuaire), rien à sauvegarder.
     require_once __DIR__ . '/../bd/lib/ecole_maintenance.php';
     $backup_securite = null;
-    if (ecole_base_etat($db)['existe']) {
+    // Base injoignable (utilisateur cPanel supprimé, mot de passe changé…) :
+    // rien à sauvegarder ni à vider d'ici — elle reste intacte au cPanel.
+    try { $db_existe = ecole_base_etat($db)['existe']; }
+    catch (\Throwable $ex) { $db_existe = false; }
+    if ($db_existe) {
         try {
             $dir = __DIR__ . '/../bd/sauvegardes';
             if (!is_dir($dir)) @mkdir($dir, 0775, true);
@@ -907,13 +1176,23 @@ function supprimer_etablissement(int $id, array $opts = []): array {
     $pool = false;
     try { $pool = (bool) assoc_val("SELECT COUNT(*) FROM bd_pool WHERE db_name=?", [$db]); }
     catch (\Throwable $ex) { /* pas de pool en LAN */ }
+    // Base créée au cPanel avec son propre utilisateur : celui-ci n'a pas le
+    // droit DROP DATABASE -> on la vide. Identifiants mis en cache ICI, avant
+    // que la ligne annuaire qui les porte soit supprimée (étape 4).
+    $base_cpanel = false;
+    try { $base_cpanel = ecole_a_identifiants_propres($db); }
+    catch (\Throwable $ex) { /* mot de passe illisible : DROP tenté */ }
 
     try {
         // 1. NIU : les élèves désormais dans une autre école gardent leur NIU
         //    (on détache juste l'origine) ; ceux rattachés ici sont supprimés.
         assoc_exec("UPDATE eleve_niu SET id_etab_origine=NULL
                     WHERE id_etab_origine=? AND (id_etab_courant IS NULL OR id_etab_courant<>?)", [$id, $id]);
-        assoc_exec("DELETE FROM eleve_niu WHERE id_etab_courant=? OR id_etab_origine=?", [$id, $id]);
+        // Non préparée : sous MySQL 9.1, un DELETE préparé sur eleve_niu (FK
+        // ON DELETE CASCADE de eleve_niu_mouvement) échoue TOUJOURS en 1615,
+        // relance comprise (constaté le 21/10/2026). $id est un entier.
+        global $link_assoc;
+        mysqli_query($link_assoc, "DELETE FROM eleve_niu WHERE id_etab_courant=" . (int) $id . " OR id_etab_origine=" . (int) $id);
 
         // 2. Affectations de personnel (le personnel central lui-même est conservé).
         assoc_exec("DELETE FROM personnel_affectation WHERE id_etablissement=?", [$id]);
@@ -930,9 +1209,9 @@ function supprimer_etablissement(int $id, array $opts = []): array {
         assoc_exec("DELETE FROM etablissement WHERE id=?", [$id]);
 
         // 5. Base MySQL de l'école.
-        if ($pool) {
+        if ($pool || $base_cpanel) {
             _vider_base($db);
-            _liberer_pool($db);
+            if ($pool) _liberer_pool($db);
         } else {
             $srv = mysqli_connect(DB_HOST, DB_USER, DB_PASS);
             mysqli_set_charset($srv, 'utf8mb4');
@@ -961,7 +1240,9 @@ function supprimer_etablissement(int $id, array $opts = []): array {
         'db_name' => $db,
         'backup'  => $backup_securite,
         'message' => "Établissement « {$e['nom']} » supprimé. "
-                   . ($pool ? "Base « $db » vidée et remise au pool." : "Base « $db » supprimée.")
+                   . ($pool ? "Base « $db » vidée et remise au pool."
+                      : ($base_cpanel ? "Base « $db » vidée (supprimez-la, ainsi que son utilisateur, dans le cPanel si elle ne sert plus)."
+                                      : "Base « $db » supprimée."))
                    . ($backup_securite ? " Sauvegarde de sécurité : " . basename($backup_securite) . "." : ""),
     ];
 }
@@ -1275,7 +1556,11 @@ function audit_journal(array $f, int $page = 1, int $par_page = 50, ?int $id_eta
         $w[] = "(j.acteur_login LIKE ? OR j.acteur_nom LIKE ?)";
         $p[] = '%' . $f['acteur'] . '%'; $p[] = '%' . $f['acteur'] . '%';
     }
-    if (!empty($f['exclure_login'])) { $w[] = "COALESCE(j.acteur_login, '') <> ?"; $p[] = $f['exclure_login']; }   // compte propriétaire masqué aux écoles
+    if (!empty($f['exclure_login'])) {   // un identifiant ou une liste
+        $ex = (array) $f['exclure_login'];
+        $w[] = "COALESCE(j.acteur_login, '') NOT IN (" . implode(',', array_fill(0, count($ex), '?')) . ")";
+        array_push($p, ...array_values($ex));
+    }   // compte propriétaire masqué aux écoles
     if (!empty($f['type']))      { $w[] = "j.acteur_type = ?"; $p[] = $f['type']; }
     if (!empty($f['role']))      { $w[] = "j.role = ?";        $p[] = $f['role']; }
     if (!empty($f['evenement'])) { $w[] = "j.evenement = ?";   $p[] = $f['evenement']; }
@@ -1521,12 +1806,16 @@ function assoc_cockpit(): array {
              WHERE id_etablissement=? AND actif=1 AND fonction IN ('DIRECTEUR','FONDATEUR')", [$e['id']]);
 
         if ($srv) {
+            $s = null;
             try {
-                $q = mysqli_query($srv, "SELECT COALESCE(ROUND(SUM(data_length+index_length)/1024/1024,1),0) AS mo
+                // Base à utilisateur MySQL propre : invisible pour DB_USER dans information_schema.
+                $s = ecole_a_identifiants_propres($e['db_name']) ? connecter_serveur_ecole($e['db_name']) : $srv;
+                $q = mysqli_query($s, "SELECT COALESCE(ROUND(SUM(data_length+index_length)/1024/1024,1),0) AS mo
                                           FROM information_schema.tables
-                                          WHERE table_schema='" . mysqli_real_escape_string($srv, $e['db_name']) . "'");
+                                          WHERE table_schema='" . mysqli_real_escape_string($s, $e['db_name']) . "'");
                 if ($q && ($r = mysqli_fetch_assoc($q))) $row['db_mo'] = (float) $r['mo'];
             } catch (\Throwable $ex) { /* ignore */ }
+            if ($s && $s !== $srv) mysqli_close($s);
         }
 
         try {
@@ -1854,7 +2143,7 @@ function assoc_migrer_ecole(int $id, bool $backup = true): array {
         }
     }
 
-    $l = mysqli_connect(DB_HOST, DB_USER, DB_PASS, $e['db_name']);
+    $l = connecter_base_ecole($e['db_name']);
     mysqli_set_charset($l, 'utf8mb4');
     $ok = []; $echec = null;
     foreach ($a_faire as $v) {
@@ -2345,7 +2634,7 @@ function assoc_niu_generer_manquants(?int $id_etab, string $par): array {
         $ligne = ['code' => $e['code'], 'nom' => $e['nom'], 'crees' => 0, 'deja' => 0, 'total' => 0, 'erreur' => null];
 
         try {
-            $l = mysqli_connect(DB_HOST, DB_USER, DB_PASS, $e['db_name']);
+            $l = connecter_base_ecole($e['db_name']);
             mysqli_set_charset($l, 'utf8mb4');
         } catch (\Throwable $ex) {
             $ligne['erreur'] = 'base injoignable';
@@ -2416,7 +2705,7 @@ function assoc_eleves_systeme(array $f, int $page = 1, int $par_page = 40): arra
     foreach ($ecoles as $e) {
         $secondaire = ($e['type_enseignement'] ?? 'primaire') === 'secondaire';
         try {
-            $l = mysqli_connect(DB_HOST, DB_USER, DB_PASS, $e['db_name']);
+            $l = connecter_base_ecole($e['db_name']);
             mysqli_set_charset($l, 'utf8mb4');
 
             // Schéma DISTINCT selon le type d'école (Nom_elv/Mat_elv/id_eleve
@@ -2548,7 +2837,7 @@ function assoc_comptes_systeme(array $f, int $page = 1, int $par_page = 40): arr
         if (($e['type_enseignement'] ?? 'primaire') === 'secondaire') continue;
 
         try {
-            $l = mysqli_connect(DB_HOST, DB_USER, DB_PASS, $e['db_name']);
+            $l = connecter_base_ecole($e['db_name']);
             mysqli_set_charset($l, 'utf8mb4');
         } catch (\Throwable $ex) { continue; }
 
@@ -2615,7 +2904,7 @@ function assoc_comptes_systeme(array $f, int $page = 1, int $par_page = 40): arr
         // filtré sur une école : refaire un balayage léger des logins réseau
         foreach (assoc_all("SELECT db_name, code FROM etablissement WHERE actif=1") as $e) {
             try {
-                $l = mysqli_connect(DB_HOST, DB_USER, DB_PASS, $e['db_name']);
+                $l = connecter_base_ecole($e['db_name']);
                 $rr = mysqli_query($l, "SELECT login_user FROM user");
                 while ($rr && ($x = mysqli_fetch_row($rr))) {
                     $doublons[mb_strtolower($x[0])][] = $e['code'];

@@ -38,7 +38,7 @@ foreach (assoc_all("SELECT id, code, db_name FROM etablissement WHERE actif=1 OR
     $prefix = 'etab/' . $code . '/';
     echo strtoupper($e['code']) . " ({$e['db_name']})\n";
 
-    $l = mysqli_connect(DB_HOST, DB_USER, DB_PASS, $e['db_name']);
+    $l = connecter_base_ecole($e['db_name']);
     mysqli_set_charset($l, 'utf8mb4');
 
     // 1. logo + signature (table etablissement)

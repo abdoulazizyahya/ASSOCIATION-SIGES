@@ -26,8 +26,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $actif   = isset($_POST['actif']) ? 1 : 0;
     $niu_sig = strtoupper(preg_replace('/[^A-Za-z0-9]/', '', $_POST['niu_sigle'] ?? '')) ?: null;
     if ($niu_sig !== null) $niu_sig = substr($niu_sig, 0, 3);
+    // Utilisateur MySQL de la base (créé au cPanel) : vide = identifiants
+    // globaux ; mot de passe vide = inchangé. Testé avant enregistrement.
+    $db_user  = trim($_POST['db_user'] ?? '');
+    $db_pass  = (string) ($_POST['db_pass'] ?? '');
+    $maj_bd   = $db_user !== (string) ($e['db_user'] ?? '') || $db_pass !== '';
+    if ($maj_bd && $db_user !== '' && $db_pass === '' && (string) ($e['db_user'] ?? '') === '') {
+        $err_bd = "Saisissez le mot de passe MySQL de l'utilisateur « $db_user ».";
+    } elseif ($maj_bd && $db_user !== '' && !preg_match('/^[A-Za-z0-9_.@-]{1,80}$/', $db_user)) {
+        $err_bd = "Utilisateur MySQL invalide.";
+    } elseif ($maj_bd) {
+        try {
+            $p_test = $db_user === '' ? DB_PASS
+                    : ($db_pass !== '' ? $db_pass : ecole_identifiants_bd($e['db_name'])[1]);
+            $err_bd = tester_identifiants_bd($e['db_name'], $db_user ?: DB_USER, $p_test);
+        } catch (\Throwable $ex) {
+            $err_bd = "Ancien mot de passe illisible : saisissez le mot de passe MySQL.";
+        }
+    } else {
+        $err_bd = null;
+    }
 
-    if ($nom === '') {
+    if ($err_bd !== null) {
+        $err = $err_bd;
+    } elseif ($nom === '') {
         $err = "Le nom est obligatoire.";
     } elseif ($sous !== null && !preg_match('/^[a-z0-9-]{2,63}$/', $sous)) {
         $err = "Sous-domaine invalide : lettres minuscules, chiffres et tirets (2 à 63).";
@@ -45,6 +67,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (function_exists('assoc_niu_config_dispo') && assoc_niu_config_dispo()) {
             $cols .= ", niu_sigle=?";
             $vals[] = $niu_sig;
+        }
+        if ($maj_bd) {
+            annuaire_assurer_identifiants_bd();
+            $cols .= ", db_user=?, db_pass_chiffre=?";
+            $vals[] = $db_user ?: null;
+            $vals[] = $db_user === '' ? null
+                    : ($db_pass !== '' ? ecole_bd_chiffrer($db_pass) : $e['db_pass_chiffre']);
         }
         $vals[] = $id;
         assoc_exec("UPDATE etablissement SET $cols WHERE id=?", $vals);
@@ -112,6 +141,18 @@ asso_haut('Modifier — ' . $e['nom']);
         <span class="text-muted2">(laisser vide en LAN — détection automatique)</span></label>
       <input type="text" name="verif_base_url" class="form-control form-control-sm" value="<?= h($e['verif_base_url'] ?? '') ?>"
              placeholder="https://promeducam.beero.cm">
+    </div>
+    <div class="col-6">
+      <label class="form-label small">Utilisateur MySQL de la base</label>
+      <input type="text" name="db_user" class="form-control form-control-sm font-monospace" maxlength="80"
+             value="<?= h($e['db_user'] ?? '') ?>" placeholder="<?= h(DB_USER) ?> (global)" autocomplete="off">
+      <div class="form-text small text-muted2">Celui créé dans le cPanel · vide = utilisateur global</div>
+    </div>
+    <div class="col-6">
+      <label class="form-label small">Mot de passe MySQL</label>
+      <input type="password" name="db_pass" class="form-control form-control-sm" autocomplete="new-password"
+             placeholder="<?= ($e['db_user'] ?? '') !== '' ? 'inchangé' : '' ?>">
+      <div class="form-text small text-muted2">Laisser vide pour ne pas le changer · testé avant enregistrement</div>
     </div>
     <div class="col-12">
       <div class="form-check">

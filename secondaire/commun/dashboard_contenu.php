@@ -40,21 +40,25 @@ $id_annee = (int) ($annee['id'] ?? 0);
 $val_annee = $annee['val_annee'] ?? '';
 
 // ── Scolarité ─────────────────────────────────────────────────────────
-$nb_eleves  = $id_annee ? (int) db_val("SELECT COUNT(DISTINCT id_eleve) FROM inscription WHERE id_annee=?", [$id_annee]) : 0;
+// Effectifs : élèves ACTIFS uniquement (demande du 22/10/2026), comme la page Classes.
+$nb_eleves  = $id_annee ? (int) db_val(
+    "SELECT COUNT(DISTINCT i.id_eleve) FROM inscription i JOIN eleve e ON e.id=i.id_eleve
+     WHERE i.id_annee=? AND e.statut='actif'", [$id_annee]
+) : 0;
 $nb_garcons = $id_annee ? (int) db_val(
     "SELECT COUNT(DISTINCT i.id_eleve) FROM inscription i JOIN eleve e ON e.id=i.id_eleve
-     WHERE i.id_annee=? AND e.sexe='M'", [$id_annee]
+     WHERE i.id_annee=? AND e.statut='actif' AND e.sexe='M'", [$id_annee]
 ) : 0;
 $nb_filles = $id_annee ? (int) db_val(
     "SELECT COUNT(DISTINCT i.id_eleve) FROM inscription i JOIN eleve e ON e.id=i.id_eleve
-     WHERE i.id_annee=? AND e.sexe='F'", [$id_annee]
+     WHERE i.id_annee=? AND e.statut='actif' AND e.sexe='F'", [$id_annee]
 ) : 0;
 $nb_classes     = (int) db_val("SELECT COUNT(*) FROM classe WHERE archivee=0");
 $nb_enseignants = (int) db_val("SELECT COUNT(*) FROM enseignant");
 
 $par_classe = $id_annee ? db_all(
     "SELECT c.id, c.designation, c.code_niveau, n.ordre_niveau,
-            COUNT(DISTINCT i.id_eleve) AS effectif,
+            COUNT(DISTINCT e.id) AS effectif,
             SUM(e.sexe='M') AS nb_m, SUM(e.sexe='F') AS nb_f
      FROM classe c
      LEFT JOIN niveau n ON n.code_niveau=c.code_niveau

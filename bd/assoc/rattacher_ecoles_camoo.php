@@ -78,7 +78,7 @@ foreach ($ECOLES as $e) {
     }
 
     // La base doit déjà exister et être peuplée (pas vide, pas absente).
-    $l = @mysqli_connect(DB_HOST, DB_USER, DB_PASS, $e['db_name']);
+    $l = connecter_base_ecole($e['db_name']);
     if (!$l) {
         echo "  ✗ connexion impossible : " . mysqli_connect_error() . " — vérifie que la base existe et que "
            . DB_USER . " y a accès.\n";

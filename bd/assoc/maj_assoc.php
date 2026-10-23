@@ -286,6 +286,18 @@ if (table_existe('acces_regle') && table_existe('etablissement')
     if ($nb) $fait[] = "règles Privilèges par défaut (MEMBRE_ASSOCIATION) posées pour $nb école(s)";
 }
 
+// Identifiants MySQL propres à chaque école (base créée au cPanel, 20/10/2026)
+if (!col_existe('etablissement', 'db_user') || !col_existe('etablissement', 'db_pass_chiffre')) {
+    annuaire_assurer_identifiants_bd();
+    $fait[] = "etablissement.db_user / db_pass_chiffre ajoutées";
+}
+
+// Réglages de l'association (page d'entrée du site, 18/10/2026)
+if (!table_existe('parametre_assoc')) {
+    assoc_param_set('page_entree', 'accueil', 'maj_assoc');   // crée la table, valeur par défaut
+    $fait[] = "table parametre_assoc créée (page d'entrée : accueil)";
+}
+
 if ($fait) {
     foreach ($fait as $f) echo "  OK  $f\n";
 } else {

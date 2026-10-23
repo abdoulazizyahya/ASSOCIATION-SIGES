@@ -1,8 +1,11 @@
 <?php
 // ─────────────────────────────────────────────────────────────────────
 //  index.php — point d'entrée.
-//  • bare "/" et visiteur non connecté  → page d'accueil publique (accueil.php)
+//  • bare "/" et visiteur non connecté  → page d'accueil publique (accueil.php),
+//    OU directement la page de connexion si l'association l'a choisi
+//    (portail association → Réglages, page_entree_site(), 18/10/2026)
 //  • "/?login" (bouton « Se connecter ») → compte/login.php
+//  • "/?accueil"                         → vitrine, quel que soit le réglage
 //  • visiteur déjà connecté              → noyau/dashboard.php
 //
 //  On sert la vitrine ICI (et non via « DirectoryIndex accueil.php » dans
@@ -12,9 +15,11 @@
 // ─────────────────────────────────────────────────────────────────────
 require_once __DIR__ . '/config/config.php';
 require_once __DIR__ . '/noyau/fonctions.php';
+require_once __DIR__ . '/noyau/connexion_assoc.php';   // assoc_param() : réglage de la page d'entrée
 session_init();
 
-$aller_login = isset($_GET['login']) || isset($_GET['connexion']) || isset($_GET['app']);
+$aller_login = isset($_GET['login']) || isset($_GET['connexion']) || isset($_GET['app'])
+    || (!isset($_GET['accueil']) && page_entree_site() === 'connexion');
 
 if (est_connecte()) {
     header('Location: ' . APP_URL . '/noyau/dashboard.php');

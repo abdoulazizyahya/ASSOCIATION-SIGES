@@ -91,7 +91,7 @@ exit($ko === 0 ? 0 : 1);
 
 // ── Dump logique d'une base, écrit au fil de l'eau ─────────────────
 function dump_base_vers_fichier(string $db, string $fichier, bool $gzip): void {
-    $l = mysqli_connect(DB_HOST, DB_USER, DB_PASS, $db);
+    $l = connecter_base_ecole($db);
     mysqli_set_charset($l, 'utf8mb4');
 
     $fh = $gzip ? gzopen($fichier, 'wb6') : fopen($fichier, 'wb');

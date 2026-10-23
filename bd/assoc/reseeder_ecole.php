@@ -69,7 +69,7 @@ $echecs = 0;
 foreach ($ecoles as $e) {
     echo "=== {$e['code']} — {$e['nom']} ({$e['db_name']}) ===\n";
     try {
-        $l = mysqli_connect(DB_HOST, DB_USER, DB_PASS, $e['db_name']);
+        $l = connecter_base_ecole($e['db_name']);
         mysqli_set_charset($l, 'utf8mb4');
     } catch (\Throwable $ex) {
         echo "  base injoignable — ignorée\n"; $echecs++; continue;

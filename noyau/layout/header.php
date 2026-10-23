@@ -30,10 +30,13 @@ if ($role !== 'ENSEIGNANT' && agent_est_aussi_enseignant()) {
 // quel que soit leur liste de rôles ; les écritures restent bloquées
 // (est_lecture_seule() : csrf_verifier / db_exec).
 $visite_asso   = function_exists('est_visite_association') && est_visite_association();
-$est_fondateur = function_exists('est_fondateur') && est_fondateur();
+// Compte propriétaire (abz…) : propriétaire de l'école, pas fondateur — tout
+// le menu, en écriture, sans bandeau « Espace fondateur » (23/10/2026).
+$est_proprio_ecole = function_exists('est_proprietaire_ecole') && est_proprietaire_ecole();
+$est_fondateur = !$est_proprio_ecole && function_exists('est_fondateur') && est_fondateur();
 // FONDATEUR : voit tout le menu de son école (comme une visite association),
 // en lecture seule — sa seule action est la page « Directeur ».
-$menu_voit_tout = $visite_asso || $est_fondateur;
+$menu_voit_tout = $visite_asso || $est_fondateur || $est_proprio_ecole;
 $lecture_seule = function_exists('est_lecture_seule') && est_lecture_seule();
 
 // Bandeau « schéma en retard » (propriétaire uniquement) — demande
@@ -57,7 +60,8 @@ $licence_expiree   = $licence_etat_info['etat'] === 'expiree';
 // et le propriétaire (jamais bridé, comme pour $lecture_seule).
 $licence_sur_sa_page = str_ends_with(page_courante_relative(), 'primaire/pages/parametres/licence.php');
 $licence_bloque_ecriture = $licence_expiree && !$licence_sur_sa_page
-    && !(function_exists('est_proprietaire_association') && est_proprietaire_association());
+    && !(function_exists('est_proprietaire_association') && est_proprietaire_association())
+    && !$est_proprio_ecole;
 
 // Bandeau « questions de sécurité » — facultatif (demande explicite du
 // 24/09/2026, primaire ET secondaire) : proposé tant que le compte ne les a
@@ -468,7 +472,7 @@ function lien_actif(string $url): string {
           <ul class="dropdown-menu dropdown-menu-end">
             <li>
               <span class="dropdown-item-text text-muted" style="font-size:.75rem">
-                <?= h(libelle_role($user['role'] ?? '')) ?>
+                <?= h($est_proprio_ecole ? 'Propriétaire' : libelle_role($user['role'] ?? '')) ?>
               </span>
             </li>
             <li><hr class="dropdown-divider my-1"></li>
