@@ -298,6 +298,8 @@ require_once __DIR__ . '/../../../../noyau/layout/header.php';
 
 <?= flash_html() ?>
 
+<?php // Vérification avant impression : élèves sans note, enseignant parti (25/10/2026)
+if ($vue === 'trim' && $id_classe) echo sec_controle_notes_html((int) $id_classe, (int) $id_trim, 'comp'); ?>
 <!-- ── Filtres ── -->
 <div class="card mb-3" style="border-color:#c7d8f0">
   <div class="card-body py-2">

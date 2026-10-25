@@ -62,11 +62,7 @@ foreach (assoc_all("SELECT id, code, nom, db_name, type_enseignement FROM etabli
     foreach ($a_faire as $v) {
         $sql = file_get_contents($dispo[$v]);
         try {
-            if (mysqli_multi_query($l, $sql)) {
-                do { if ($r = mysqli_store_result($l)) mysqli_free_result($r); } while (mysqli_more_results($l) && mysqli_next_result($l));
-            }
-            // erreur eventuelle du dernier statement
-            if (mysqli_errno($l)) throw new RuntimeException(mysqli_error($l));
+            migration_executer($l, $sql);   // « déjà présent » sauté (noyau/connexion_assoc.php)
             assoc_exec("UPDATE schema_version_etab SET version=? WHERE id_etablissement=?", [$v, $e['id']]);
             // Licence (migration v56) : période d'ESSAI de 60 jours pour une
             // école EXISTANTE qui vient de recevoir les tables de licence —

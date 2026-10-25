@@ -271,6 +271,7 @@ $fmt_f   = fn(float $v): string => number_format($v, 0, ',', ' ') . ' F';
 
 $titre_page = 'Tableau de bord';
 require_once __DIR__ . '/../../noyau/layout/header.php';
+echo avis_remplacements_html();   // enseignant remplaçant : prévenu à la connexion (25/10/2026)
 ?>
 <style>
 /* ── Copié à l'identique de noyau/dashboard.php (primaire) — ne pas laisser

@@ -179,6 +179,41 @@ function edt_param(int $a, string $cle, $defaut = null) {
     $v = db_val("SELECT valeur FROM edt_parametre WHERE id_annee=? AND cle=?", [$a, $cle]);
     return $v === null ? $defaut : $v;
 }
+// ── Annuler la dernière action de la saisie (25/10/2026) ───────────────
+//  Avant chaque modification, les séances des jours touchés sont photographiées
+//  (+ dernier n° de service) ; « Annuler » remet ces jours exactement comme avant
+//  et retire les cours créés par l'action. Pile des 10 dernières actions, par année.
+const EDT_ANNULER_MAX = 10;
+function edt_annuler_pile(int $a): array { return json_decode((string) edt_param($a, 'annuler', ''), true) ?: []; }
+function edt_annuler_capturer(int $a, array $jours, string $lib): array {
+    $jours = array_values(array_unique(array_map('intval', $jours)));
+    return ['lib' => $lib, 'quand' => date('H:i'), 'jours' => $jours,
+            'seances' => $jours ? db_all("SELECT * FROM edt_seance WHERE id_annee=? AND jour IN (" . implode(',', $jours) . ")", [$a]) : [],
+            'max_service' => (int) db_val("SELECT COALESCE(MAX(id),0) FROM edt_service")];
+}
+function edt_annuler_empiler(int $a, array $snap): void {
+    $p = edt_annuler_pile($a);
+    $p[] = $snap;
+    edt_param_set($a, 'annuler', json_encode(array_slice($p, -EDT_ANNULER_MAX), JSON_UNESCAPED_UNICODE));
+}
+/** Annule la dernière action. Retour : libellé de l'action annulée, ou null. */
+function edt_annuler_derniere(int $a): ?string {
+    $p = edt_annuler_pile($a);
+    $snap = array_pop($p);
+    if (!$snap) return null;
+    if ($snap['jours']) {
+        db_exec("DELETE FROM edt_seance WHERE id_annee=? AND jour IN (" . implode(',', array_map('intval', $snap['jours'])) . ")", [$a]);
+        foreach ($snap['seances'] as $s) {
+            unset($s['maj_le']);
+            $cols = array_keys($s);
+            db_exec("INSERT INTO edt_seance (`" . implode('`,`', $cols) . "`) VALUES (" . implode(',', array_fill(0, count($cols), '?')) . ")", array_values($s));
+        }
+    }
+    // cours (services) créés par l'action et redevenus sans séance
+    db_exec("DELETE s FROM edt_service s WHERE s.id_annee=? AND s.id>? AND NOT EXISTS (SELECT 1 FROM edt_seance q WHERE q.id_service=s.id)", [$a, (int) $snap['max_service']]);
+    edt_param_set($a, 'annuler', json_encode($p, JSON_UNESCAPED_UNICODE));
+    return $snap['lib'];
+}
 function edt_param_set(int $a, string $cle, ?string $valeur): void {
     db_exec("INSERT INTO edt_parametre (id_annee, cle, valeur) VALUES (?,?,?) ON DUPLICATE KEY UPDATE valeur=VALUES(valeur)", [$a, $cle, $valeur]);
 }
@@ -509,6 +544,27 @@ final class EdtModele {
         return $out;
     }
 
+    /** Classes (désignations) qui suivent le même cours commun que ce bloc, au même moment, elle comprise. */
+    public function classesCommunes(array $b): array {
+        if (empty($b['code_commun'])) return [$this->classes[$b['id_classe']]['designation'] ?? '?'];
+        $cr0 = (int) ($b['creneaux'][0] ?? $b['id_creneau']);
+        $out = [];
+        foreach ($this->seances as $s)
+            if ($s['code_commun'] === $b['code_commun'] && $s['jour'] === (int) $b['jour'] && $s['id_creneau'] === $cr0)
+                $out[$s['id_classe']] = $this->classes[$s['id_classe']]['designation'] ?? '?';
+        return array_values($out);
+    }
+    /** Vue enseignant : un cours commun n'apparaît qu'une fois (un bloc par classe sinon, superposés). */
+    public function blocsSansDoublonCommun(array $blocs): array {
+        $vu = [];
+        return array_values(array_filter($blocs, function ($b) use (&$vu) {
+            if (empty($b['code_commun'])) return true;
+            $k = $b['code_commun'] . '|' . $b['jour'] . '|' . implode(',', $b['creneaux']);
+            if (isset($vu[$k])) return false;
+            return $vu[$k] = true;
+        }));
+    }
+
     /** Blocs (séances contiguës identiques) de toutes les séances, ou filtrés. */
     public function blocs(?callable $filtre = null): array {
         $rows = array_values(array_filter($this->seances, $filtre ?? fn() => true));
@@ -836,6 +892,7 @@ function edt_grille_html(int $a, string $vue, int $id, array $opt = []): string 
         default => fn($s) => $s['id_salle'] === $id,
     };
     $blocs = $mod->blocs($filtre);
+    if ($vue === 'enseignant') $blocs = $mod->blocsSansDoublonCommun($blocs);
     // Un bloc ne traverse pas une pause à l'affichage : il est coupé en segments.
     $segments = []; $couvert = [];
     foreach ($blocs as $b) {
@@ -889,11 +946,12 @@ function edt_grille_html(int $a, string $vue, int $id, array $opt = []): string 
                     $titre = h($mod->mat[$b['id_mat']] ?? '?');
                     $sous = match ($vue) {
                         'classe' => h(edt_nom_court($mod->ens[$b['matricule_ens']] ?? '')),
-                        'enseignant' => h($mod->classes[$b['id_classe']]['designation'] ?? '?'),
+                        'enseignant' => h(implode(' + ', $mod->classesCommunes($b))),
                         default => h(($mod->classes[$b['id_classe']]['designation'] ?? '?') . ' · ' . edt_nom_court($mod->ens[$b['matricule_ens']] ?? '')),
                     };
                     $extra = ($b['id_salle'] && $vue !== 'salle' ? '<div class="edt-salle"><i class="bi bi-geo-alt"></i> ' . h($mod->salles[$b['id_salle']] ?? '') . '</div>' : '')
-                           . ($b['code_commun'] ? '<div class="edt-commun" title="Cours commun"><i class="bi bi-people"></i> commun</div>' : '')
+                           . ($b['code_commun'] ? '<div class="edt-commun" title="Cours commun"><i class="bi bi-people"></i> '
+                               . ($vue === 'classe' && count($cc = array_diff($mod->classesCommunes($b), [$mod->classes[$b['id_classe']]['designation'] ?? ''])) ? 'avec ' . h(implode(', ', $cc)) : 'commun') . '</div>' : '')
                            . ($b['sous_groupe'] !== '' ? '<div class="edt-salle">Gr. ' . h($b['sous_groupe']) . '</div>' : '');
                     $h .= '<div class="edt-bloc' . ($b['verrou'] ? ' edt-verrou' : '') . '" style="background:' . edt_couleur($b['id_mat']) . '"'
                         . ($editable ? ' data-ids="' . h(implode(',', $it['ids'])) . '" data-ens="' . (int) $b['matricule_ens'] . '" data-commun="' . ($b['code_commun'] ? 1 : 0)

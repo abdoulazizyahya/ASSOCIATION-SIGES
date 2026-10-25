@@ -93,10 +93,30 @@ if ($id_mat > 0 && !$acces_public && count($classes_a_generer) === 1) {
     if ($mode_rv === 'rempli') {
         $seqs_rv = db_all("SELECT s.id, s.libelle FROM sequence s JOIN trimestre t ON t.id=s.id_trim
                            WHERE t.id_annee=? ORDER BY t.ordre, s.ordre", [$id_annee]);
-        foreach (db_all("SELECT n.id_eleve, n.id_seq, n.valeur FROM note n
+        $cle_rv = 'id_seq';
+        // Secondaire GÉNÉRAL (25/10/2026) : notes saisies par COMPÉTENCE et par trimestre
+        // (onglet « Saisie par classe ») — une colonne par compétence « T1-C1 », avec
+        // une légende sous le tableau. Choisi quand ces notes sont plus nombreuses que
+        // celles par séquence.
+        $comps = db_all("SELECT cp.id, cp.libelle, t.ordre t_ordre FROM competence cp JOIN trimestre t ON t.id=cp.id_trim
+                          WHERE cp.id_matiere=? AND cp.code_niveau=? AND t.id_annee=? ORDER BY t.ordre, cp.ordre, cp.id",
+                         [$id_mat, (string) ($classes_a_generer[0]['code_niveau'] ?? ''), $id_annee]);
+        if ($comps) {
+            $n_cl = "FROM note n JOIN inscription i ON i.id_eleve=n.id_eleve AND i.id_classe=? AND i.id_annee=? WHERE n.id_matiere=? AND n.valeur IS NOT NULL";
+            $nb_comp = (int) db_val("SELECT COUNT(*) $n_cl AND n.id_competence IS NOT NULL", [$cl, $id_annee, $id_mat]);
+            $nb_seq  = (int) db_val("SELECT COUNT(*) $n_cl AND n.id_seq IS NOT NULL", [$cl, $id_annee, $id_mat]);
+            if ($nb_comp >= $nb_seq && ($nb_comp > 0 || !$seqs_rv)) {
+                $cle_rv = 'id_competence'; $seqs_rv = []; $k = [];
+                foreach ($comps as $c) {
+                    $k[$c['t_ordre']] = ($k[$c['t_ordre']] ?? 0) + 1;
+                    $seqs_rv[] = ['id' => $c['id'], 'libelle' => 'T' . $c['t_ordre'] . '-C' . $k[$c['t_ordre']], 'legende' => $c['libelle']];
+                }
+            }
+        }
+        foreach (db_all("SELECT n.id_eleve, n.$cle_rv cle, n.valeur FROM note n
                          JOIN inscription i ON i.id_eleve=n.id_eleve AND i.id_classe=? AND i.id_annee=?
-                         WHERE n.id_matiere=? AND n.valeur IS NOT NULL", [$cl, $id_annee, $id_mat]) as $n) {
-            $notes_rv[(int) $n['id_eleve']][(int) $n['id_seq']] = (float) $n['valeur'];
+                         WHERE n.id_matiere=? AND n.valeur IS NOT NULL AND n.$cle_rv IS NOT NULL", [$cl, $id_annee, $id_mat]) as $n) {
+            $notes_rv[(int) $n['id_eleve']][(int) $n['cle']] = (float) $n['valeur'];
         }
     }
 }
@@ -234,6 +254,14 @@ foreach ($classes_a_generer as $classe) {
     if (empty($eleves)) {
         $pdf->SetX($ml);
         $pdf->Cell($uw, 8, pdf_u('Aucun eleve inscrit.'), 1, 1, 'C');
+    }
+    // Légende des compétences (mode rempli, secondaire général)
+    if ($mode_rv === 'rempli' && isset($seqs_rv[0]['legende'])) {
+        $pdf->Ln(2); $pdf->SetFont('Arial', '', 7);
+        foreach ($seqs_rv as $sq) {
+            if ($pdf->GetY() + 4 > $ph - 10) { pdf_pied_par_classe($pdf, $val_annee, $pw, $ph, $ml); $pdf->AddPage(); pdf_filigrane($pdf, $etab, $pw, $ph); $pdf->SetY($ml); $pdf->SetFont('Arial', '', 7); }
+            $pdf->SetX($ml); $pdf->Cell($uw, 4, pdf_u($sq['libelle'] . ' : ' . $sq['legende']), 0, 1, 'L');
+        }
     }
 
     // Plus de QR de vérification sur ce formulaire vierge (22/10/2026). Le

@@ -60,6 +60,7 @@ foreach ($mod->regles as $r) if ($r['type'] === 'creneaux_interdits' && $r['cibl
 foreach ($cibles as $cid) {
     $filtre = $vue === 'classe' ? fn($s) => $s['id_classe'] === $cid : fn($s) => $s['matricule_ens'] === $cid;
     $blocs = $mod->blocs($filtre);
+    if ($vue === 'enseignant') $blocs = $mod->blocsSansDoublonCommun($blocs);   // cours commun : un seul bloc, toutes ses classes
     if ($tous && !$blocs && $vue === 'classe') continue;
     $pdf->AddPage();
     pdf_filigrane($pdf, $etab, $pw, $ph);
@@ -193,7 +194,8 @@ foreach ($cibles as $cid) {
             if ($couleur) { [$r, $g, $bl] = $hex(edt_couleur($b['id_mat'])); $pdf->SetFillColor($r, $g, $bl); $pdf->Rect($xA + 0.3, $yy + 0.3, $w - 0.6, $hL - 0.6, 'F'); }
             $pdf->Rect($xA, $yy, $w, $hL);
             $mat = $mod->mat[$b['id_mat']] ?? '?';
-            $sous = $vue === 'classe' ? edt_nom_court($mod->ens[$b['matricule_ens']] ?? '') : ($mod->classes[$b['id_classe']]['designation'] ?? '');
+            $sous = $vue === 'classe' ? edt_nom_court($mod->ens[$b['matricule_ens']] ?? '') : implode(' + ', $mod->classesCommunes($b));
+            if ($vue === 'classe' && $b['code_commun'] && ($cc = array_diff($mod->classesCommunes($b), [$mod->classes[$b['id_classe']]['designation'] ?? '']))) $sous .= ' · avec ' . implode(', ', $cc);
             if ($b['id_salle']) $sous .= ' · ' . ($mod->salles[$b['id_salle']] ?? '');
             $yT = pdf_texte_ajuste($pdf, $xA, $yy + 1, $w, $mat, 8.5, 5.5, 2, 'B');
             pdf_texte_ajuste($pdf, $xA, max($yT, $yy + $hL / 2), $w, $sous, 7.5, 5, 1, '');

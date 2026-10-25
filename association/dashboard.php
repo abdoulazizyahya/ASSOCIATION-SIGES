@@ -7,6 +7,15 @@ require_once __DIR__ . '/../noyau/connexion.php';
 require_once __DIR__ . '/../noyau/fonctions.php';
 require_once __DIR__ . '/_layout.php';
 exiger_superadmin_association();
+require_once __DIR__ . '/../bd/lib/sauvegarde_auto.php';
+
+// Sauvegarde complète à la demande (même contenu que la sauvegarde hebdomadaire automatique)
+$rapport_sauv = null;
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'sauvegarder_tout') {
+    csrf_verifier();
+    $rapport_sauv = sauvegarde_auto_executer();
+    journaliser_action('sauvegarde_auto', null, 'manuelle : ' . (preg_match('/=== (\d+ OK, \d+ KO)/', $rapport_sauv, $m) ? $m[1] : 'voir rapport'));
+}
 
 $c   = assoc_cockpit();
 $tot = $c['total'];
@@ -49,6 +58,17 @@ asso_haut('Tableau de bord');
 <?php else: ?>
   <div class="alert alert-success py-2 small"><i class="bi bi-check-circle me-1"></i>Toutes les écoles actives sont opérationnelles.</div>
 <?php endif; ?>
+
+<?php $der_sauv = sauvegarde_auto_derniere(); $sauv_due = sauvegarde_auto_due(); ?>
+<div class="asso-card mb-3 d-flex flex-wrap align-items-center gap-2 py-2">
+  <i class="bi bi-database-check fs-5 <?= $sauv_due ? 'text-warning' : 'text-success' ?>"></i>
+  <div class="small"><strong>Sauvegarde complète</strong> (annuaire + toutes les écoles) :
+    <?= $der_sauv ? 'dernière le ' . date('d/m/Y à H:i', $der_sauv) . ' (' . _il_y_a($der_sauv) . ')' : 'aucune pour l\'instant' ?>.
+    <span class="text-muted2">Automatique chaque semaine, lancée en arrière-plan à l'ouverture de ce tableau de bord ; 14 dernières conservées.</span></div>
+  <form method="post" class="ms-auto m-0"><?= csrf_champ() ?><input type="hidden" name="action" value="sauvegarder_tout">
+    <button class="btn btn-sm btn-outline-primary" onclick="this.disabled=true;this.form.submit();this.innerHTML='Sauvegarde en cours…'"><i class="bi bi-save me-1"></i>Sauvegarder maintenant</button></form>
+</div>
+<?php if ($rapport_sauv !== null): ?><pre class="asso-card small mb-3" style="white-space:pre-wrap"><?= h($rapport_sauv) ?></pre><?php endif; ?>
 
 <div class="asso-card p-0">
   <div class="table-responsive">
@@ -122,3 +142,4 @@ asso_haut('Tableau de bord');
   Sauvegardes : <span class="font-monospace">php bd/assoc/sauvegarder_toutes_ecoles.php --gzip</span>
 </div>
 <?php asso_bas();
+if ($rapport_sauv === null) sauvegarde_auto_planifier();   // hebdomadaire, après l'envoi de la page

@@ -2080,6 +2080,88 @@ function prim_titulaire_trimestre(int $id_classe, string $va, int $id_trim, stri
 }
 
 /** Historique d'une année : ['fr'|'ar' => [IDClasses => [trim_debut => [noms]]]] pour les classes à ≥ 2 périodes. */
+/**
+ * Tableau de bord de l'enseignant (25/10/2026) : « Vous remplacez M. X en 2nde F3
+ * (Mathématiques) à partir du 2e trimestre ». Remplacements des 45 derniers jours,
+ * primaire (enseignat_classe_periode) et secondaire (dispenser_periode). HTML ou ''.
+ */
+function avis_remplacements_html(): string {
+    $mat = function_exists('matricule_ens_courant') ? (int) matricule_ens_courant() : 0;
+    if (!$mat) return '';
+    $va = (string) (get_annee_active()['val_annee'] ?? '');
+    $sec = function_exists('type_enseignement_courant') && type_enseignement_courant() === 'secondaire';
+    try {
+        if ($sec) {
+            if (!sec_periodes_dispo()) return '';
+            $rows = db_all("SELECT p.trim_debut, c.designation classe, TRIM(m.libelle) matiere,
+                                   (SELECT TRIM(CONCAT(e.nom_ens,' ',COALESCE(e.prenom_ens,''))) FROM dispenser_periode q JOIN enseignant e ON e.matricule_ens=q.matricule_ens
+                                     WHERE q.IDClasses=p.IDClasses AND q.id_mat=p.id_mat AND q.val_annee=p.val_annee AND q.trim_debut<p.trim_debut
+                                     ORDER BY q.trim_debut DESC LIMIT 1) ancien
+                            FROM dispenser_periode p JOIN classe c ON c.id=p.IDClasses JOIN matiere m ON m.id=p.id_mat
+                            WHERE p.matricule_ens=? AND p.val_annee=? AND p.trim_debut>1 AND p.cree_le >= NOW() - INTERVAL 45 DAY", [$mat, $va]);
+        } else {
+            if (!prim_periodes_dispo()) return '';
+            $rows = db_all("SELECT p.trim_debut, c.DesignationClasses classe, IF(p.piste='ar','cours arabes','cours français') matiere,
+                                   (SELECT TRIM(CONCAT(e.nom_ens,' ',COALESCE(e.prenom_ens,''))) FROM enseignat_classe_periode q JOIN enseignant e ON e.matricule_ens=q.matricule_ens
+                                     WHERE q.piste=p.piste AND q.IDClasses=p.IDClasses AND q.val_annee=p.val_annee AND q.trim_debut<p.trim_debut AND q.matricule_ens<>p.matricule_ens
+                                     ORDER BY q.trim_debut DESC LIMIT 1) ancien
+                            FROM enseignat_classe_periode p JOIN classe c ON c.IDClasses=p.IDClasses
+                            WHERE p.matricule_ens=? AND p.val_annee=? AND p.trim_debut>1 AND p.cree_le >= NOW() - INTERVAL 45 DAY", [$mat, $va]);
+        }
+    } catch (\Throwable $e) { return ''; }
+    $rows = array_filter($rows, fn($r) => $r['ancien']);
+    if (!$rows) return '';
+    $ordinal = fn(int $t) => $t === 1 ? '1er' : $t . 'e';
+    $li = array_map(fn($r) => '<li>Vous remplacez <b>' . h($r['ancien']) . '</b> en <b>' . h($r['classe']) . '</b> (' . h($r['matiere']) . ') à partir du '
+                              . $ordinal((int) $r['trim_debut']) . ' trimestre : les notes et le bulletin de ce trimestre sont désormais à votre nom.</li>', $rows);
+    return '<div class="alert alert-info d-flex gap-2 py-2 small"><i class="bi bi-arrow-left-right fs-5"></i><div><b>Nouvelle affectation</b><ul class="mb-0 ps-3">'
+         . implode('', $li) . '</ul></div></div>';
+}
+
+/**
+ * Vérification avant les bulletins (secondaire, 25/10/2026) : pour une classe et un
+ * trimestre, matières où des élèves n'ont aucune note, avec l'enseignant du
+ * trimestre (signalé s'il est parti). $mode : 'seq' (technique, notes par
+ * séquence) ou 'comp' (général, notes par compétence). HTML ou ''.
+ */
+function sec_controle_notes_html(int $id_classe, int $id_trim, string $mode): string {
+    if (!$id_classe || !$id_trim) return '';
+    try {
+        $t = db_one("SELECT t.id_annee, t.ordre, t.libelle, a.libelle annee FROM trimestre t JOIN annee_scolaire a ON a.id=t.id_annee WHERE t.id=?", [$id_trim]);
+        if (!$t) return '';
+        $cl = db_one("SELECT code_niveau FROM classe WHERE id=?", [$id_classe]);
+        $nb = (int) db_val("SELECT COUNT(*) FROM inscription WHERE id_classe=? AND id_annee=?", [$id_classe, $t['id_annee']]);
+        if (!$nb) return '';
+        $filtre = $mode === 'comp'
+            ? "n.id_competence IN (SELECT cp.id FROM competence cp WHERE cp.id_trim=? AND cp.id_matiere=d.id_mat AND cp.code_niveau=?)"
+            : "n.id_seq IN (SELECT s.id FROM sequence s WHERE s.id_trim=?)";
+        $pf = $mode === 'comp' ? [$id_trim, (string) ($cl['code_niveau'] ?? '')] : [$id_trim];
+        $ens = sec_sql_enseignant_trimestre((string) $t['annee'], (int) $t['ordre']);
+        $rows = db_all("SELECT TRIM(m.libelle) matiere,
+                               (SELECT COUNT(DISTINCT n.id_eleve) FROM note n JOIN inscription i ON i.id_eleve=n.id_eleve AND i.id_classe=d.IDClasses AND i.id_annee=?
+                                 WHERE n.id_matiere=d.id_mat AND n.valeur IS NOT NULL AND $filtre) notes,
+                               e.nom_ens, e.prenom_ens, " . (db_colonne_existe('enseignant', 'statut_ens') ? 'e.statut_ens' : "'actif'") . " statut
+                        FROM discipline d JOIN matiere m ON m.id=d.id_mat
+                        LEFT JOIN dispenser disp ON disp.IDClasses=d.IDClasses AND disp.id_mat=d.id_mat AND disp.val_annee=?
+                        LEFT JOIN enseignant e ON e.matricule_ens=$ens
+                        WHERE d.IDClasses=? ORDER BY d.ordre, m.libelle",
+                       array_merge([$t['id_annee']], $pf, [(string) $t['annee'], $id_classe]));
+    } catch (\Throwable $e) { return ''; }
+    $manque = array_filter($rows, fn($r) => (int) $r['notes'] < $nb);
+    if (!$manque) return '<div class="alert alert-success py-2 small"><i class="bi bi-check2-circle me-1"></i>Avant impression : toutes les matières ont des notes pour les ' . $nb . ' élèves (' . h($t['libelle']) . ').</div>';
+    $li = '';
+    foreach ($manque as $r) {
+        $nom = trim(($r['nom_ens'] ?? '') . ' ' . ($r['prenom_ens'] ?? ''));
+        $li .= '<tr><td>' . h($r['matiere']) . '</td><td class="text-end">' . (int) $r['notes'] . ' / ' . $nb . '</td><td>'
+             . ($nom !== '' ? h($nom) . (($r['statut'] ?? 'actif') !== 'actif' ? ' <span class="badge bg-secondary">' . h(SEC_SITUATIONS[$r['statut']] ?? $r['statut']) . '</span>' : '') : '<span class="text-danger">aucun enseignant</span>')
+             . '</td></tr>';
+    }
+    return '<details class="alert alert-warning py-2 small mb-3"' . (count($manque) <= 3 ? ' open' : '') . '><summary><i class="bi bi-exclamation-triangle me-1"></i><b>Avant impression : '
+         . count($manque) . ' matière(s) sans note pour une partie des élèves</b> (' . h($t['libelle']) . ', ' . $nb . ' élèves)</summary>'
+         . '<table class="table table-sm mb-0 mt-2" style="background:transparent"><thead><tr><th>Matière</th><th class="text-end">Élèves notés</th><th>Enseignant du trimestre</th></tr></thead><tbody>'
+         . $li . '</tbody></table><div class="mt-1 text-muted">Une matière optionnelle (langue vivante, série) peut ne concerner qu\'une partie de la classe.</div></details>';
+}
+
 function prim_historique_affectations(string $va): array {
     if (!prim_periodes_dispo()) return [];
     $h = [];

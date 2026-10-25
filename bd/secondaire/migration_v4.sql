@@ -12,13 +12,16 @@
 --  colonne DEFAULT 'public' pour toute AUTRE base sur laquelle cette
 --  migration tournerait (comportement inchangé tant que personne n'y touche).
 --
---  Convention : SQL pur, autosuffisant. Pas idempotent au sens strict (ADD
---  COLUMN simple — MySQL 9.1 de ce serveur ne supporte pas IF NOT EXISTS sur
---  ADD COLUMN, testé le 22/09/2026) : ne doit tourner qu'une fois par école,
---  ce que garantit déjà schema_version_etab (assoc_migrer_ecole()).
+--  Convention : SQL pur, autosuffisant, idempotent (motif PREPARE : MySQL 9.1
+--  n'accepte pas IF NOT EXISTS sur ADD COLUMN).
 -- =====================================================================
 
-ALTER TABLE `etablissement`
-  ADD COLUMN `statut` enum('public','prive') NOT NULL DEFAULT 'public' AFTER `chef_etablissement_en`;
-
-UPDATE `etablissement` SET `statut` = 'prive' WHERE `id` = 1;
+--  25/10/2026 : rendue idempotente. Rejouée sur une base qui a déjà la colonne
+--  (école créée depuis le schéma de référence, version enregistrée restée à 0 :
+--  « Duplicate column statut » sur siges), elle ne fait plus rien — et surtout ne
+--  repasse pas une école publique en « privé ».
+SET @a := (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'etablissement' AND COLUMN_NAME = 'statut');
+SET @s := IF(@a = 0, 'ALTER TABLE `etablissement` ADD COLUMN `statut` enum(''public'',''prive'') NOT NULL DEFAULT ''public'' AFTER `chef_etablissement_en`', 'SELECT 1');
+PREPARE st FROM @s; EXECUTE st; DEALLOCATE PREPARE st;
+SET @s := IF(@a = 0, 'UPDATE `etablissement` SET `statut` = ''prive'' WHERE `id` = 1', 'SELECT 1');
+PREPARE st FROM @s; EXECUTE st; DEALLOCATE PREPARE st;

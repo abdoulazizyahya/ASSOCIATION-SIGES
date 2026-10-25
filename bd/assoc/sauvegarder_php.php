@@ -27,10 +27,11 @@ require_once __DIR__ . '/../../noyau/connexion_assoc.php';
 const RETENTION = 14;
 
 $est_cli = (PHP_SAPI === 'cli');
-if (!$est_cli) header('Content-Type: text/plain; charset=utf-8');
+$interne = defined('SAUVEGARDE_AUTO_INTERNE');   // lancé par bd/lib/sauvegarde_auto.php (tableau de bord association)
+if (!$est_cli && !$interne) header('Content-Type: text/plain; charset=utf-8');
 
 // ── Contrôle d'accès en HTTP ────────────────────────────────────────
-if (!$est_cli) {
+if (!$est_cli && !$interne) {
     $token = (string) ($_GET['token'] ?? $_POST['token'] ?? '');
     if (!defined('BACKUP_TOKEN') || BACKUP_TOKEN === '' || !hash_equals(BACKUP_TOKEN, $token)) {
         http_response_code(403);
@@ -39,7 +40,7 @@ if (!$est_cli) {
 }
 
 $args  = array_slice($argv ?? [], 1);
-$gzip  = in_array('--gzip', $args, true) || !empty($_GET['gzip']);
+$gzip  = in_array('--gzip', $args, true) || !empty($_GET['gzip']) || $interne;
 $cible = null;
 foreach ($args as $a) { if ($a !== '--gzip' && strpos($a, 'token=') !== 0) { $cible = $a; break; } }
 $cible ??= __DIR__ . '/../sauvegardes';
@@ -48,7 +49,7 @@ if ($gzip && !function_exists('gzopen')) { $gzip = false; }
 
 $horo = date('Ymd_His');
 $dir  = rtrim($cible, '/\\') . '/' . $horo;
-if (!is_dir($dir) && !@mkdir($dir, 0775, true)) { die("Impossible de créer $dir\n"); }
+if (!is_dir($dir) && !@mkdir($dir, 0775, true)) { if ($interne) { echo "Impossible de créer $dir\n"; return; } die("Impossible de créer $dir\n"); }
 
 echo "=== Sauvegarde PHP $horo ===\n";
 
@@ -86,6 +87,7 @@ foreach (array_slice($dossiers, RETENTION) as $vieux) {
 }
 
 echo "=== $ok OK, $ko KO — $dir ===\n";
+if ($interne) return;
 exit($ko === 0 ? 0 : 1);
 
 

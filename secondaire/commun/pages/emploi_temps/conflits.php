@@ -10,6 +10,20 @@ require_once __DIR__ . '/_edt_lib.php';
 exiger_role(EDT_ROLES_GESTION);
 
 $a = edt_annee_id();
+// « Rendre commun » (suggestions ci-dessous, 25/10/2026) : même code sur les services
+// choisis et leurs séances ; le générateur et la saisie les placent alors ensemble.
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'rendre_commun' && edt_peut_ecrire()) {
+    csrf_verifier();
+    $sids = array_values(array_filter(array_map('intval', (array) ($_POST['services'] ?? []))));
+    if (count($sids) >= 2) {
+        $code = 'C' . substr(md5(implode(',', $sids) . microtime()), 0, 8);
+        $in = implode(',', $sids);
+        db_exec("UPDATE edt_service SET code_commun=? WHERE id_annee=? AND id IN ($in)", [$code, $a]);
+        db_exec("UPDATE edt_seance SET code_commun=? WHERE id_annee=? AND id_service IN ($in)", [$code, $a]);
+        flash_set('succes', count($sids) . " classes suivront désormais ce cours ensemble (code $code). Les heures déjà placées séparément restent à regrouper (Construction ou Générer).");
+    }
+    rediriger('secondaire/commun/pages/emploi_temps/conflits.php#communs');
+}
 $mod = new EdtModele($a);
 $ctl = edt_controle($a, $mod);
 
@@ -29,6 +43,15 @@ $seancesSansEns = (int) db_val("SELECT COUNT(*) FROM edt_seance WHERE id_annee=?
 // Matières du programme sans service
 $progSansService = db_all("SELECT c.designation classe, c.id id_classe, TRIM(m.libelle) matiere FROM " . edt_t('discipline') . " d JOIN " . edt_t('classe') . " c ON c.id=d.IDClasses AND c.archivee=0 JOIN " . edt_t('matiere') . " m ON m.id=d.id_mat
                            WHERE NOT EXISTS (SELECT 1 FROM edt_service s WHERE s.id_annee=? AND s.id_classe=d.IDClasses AND s.id_mat=d.id_mat) ORDER BY c.ordre, m.libelle", [$a]);
+// Cours communs possibles : même enseignant, même matière, classes du même niveau, aucun code commun
+$communsPossibles = [];
+foreach (db_all("SELECT s.id, s.id_classe, s.id_mat, s.matricule_ens, s.heures, c.designation classe, c.code_niveau, TRIM(m.libelle) matiere,
+                        TRIM(CONCAT(e.nom_ens,' ',IFNULL(e.prenom_ens,''))) enseignant
+                 FROM edt_service s JOIN " . edt_t('classe') . " c ON c.id=s.id_classe AND c.archivee=0 JOIN " . edt_t('matiere') . " m ON m.id=s.id_mat
+                 JOIN enseignant e ON e.matricule_ens=s.matricule_ens
+                 WHERE s.id_annee=? AND s.code_commun IS NULL AND s.heures>0 ORDER BY e.nom_ens, m.libelle, c.ordre", [$a]) as $s)
+    $communsPossibles[$s['matricule_ens'] . '|' . $s['id_mat'] . '|' . $s['code_niveau']][] = $s;
+$communsPossibles = array_values(array_filter($communsPossibles, fn($g) => count($g) > 1));
 // Heures dues
 $charges = edt_charges_enseignants($a);
 $dues = db_all("SELECT d.*, TRIM(CONCAT(e.nom_ens,' ',IFNULL(e.prenom_ens,''))) nom FROM edt_enseignant d JOIN enseignant e ON e.matricule_ens=d.matricule_ens WHERE d.id_annee=? AND d.heures_dues IS NOT NULL ORDER BY e.nom_ens", [$a]);
@@ -127,6 +150,23 @@ foreach ($progSansService as $r) $parClasse[$r['classe']][] = $r['matiere'];
 echo '<div class="table-responsive"><table class="table table-sm mb-0"><tbody>';
 foreach ($parClasse as $cl => $ms) echo '<tr><td style="width:160px"><b>' . h($cl) . '</b></td><td class="small">' . h(implode(', ', $ms)) . '</td></tr>';
 if (!$parClasse) echo '<tr><td class="text-success p-3"><i class="bi bi-check-circle"></i> Toutes les matières ont un service.</td></tr>';
+echo '</tbody></table></div></div>';
+
+echo '<span id="communs"></span>';
+$section('Cours communs possibles', '#0891b2', 'people', count($communsPossibles), 'Un même enseignant fait la même matière dans plusieurs classes du même niveau. Si ces élèves suivent ce cours ensemble, cochez les classes et cliquez « Rendre commun » : une seule séance pour toutes, comptée une fois dans sa charge.');
+echo '<div class="table-responsive"><table class="table table-sm mb-0 align-middle"><tbody>';
+foreach ($communsPossibles as $g) {
+    echo '<tr><td style="width:30%"><b>' . h($g[0]['enseignant']) . '</b><br><span class="small text-muted">' . h($g[0]['matiere']) . '</span></td><td>';
+    if (edt_peut_ecrire()) {
+        echo '<form method="post" class="d-flex flex-wrap align-items-center gap-2 m-0">' . csrf_champ() . '<input type="hidden" name="action" value="rendre_commun">';
+        foreach ($g as $s) echo '<label class="small"><input type="checkbox" class="form-check-input me-1" name="services[]" value="' . (int) $s['id'] . '" checked>' . h($s['classe']) . ' <span class="text-muted">(' . rtrim(rtrim((string) $s['heures'], '0'), '.') . ' h)</span></label>';
+        echo '<button class="btn btn-sm btn-outline-info ms-auto"><i class="bi bi-people"></i> Rendre commun</button></form>';
+    } else {
+        echo h(implode(', ', array_column($g, 'classe')));
+    }
+    echo '</td></tr>';
+}
+if (!$communsPossibles) echo '<tr><td class="text-muted p-3">Aucune suggestion.</td></tr>';
 echo '</tbody></table></div></div>';
 
 $section('Heures dues des enseignants', '#0f766e', 'hourglass-split', count($dues), 'Heures attribuées (services) comparées aux heures dues renseignées dans Préparation → Heures dues.');

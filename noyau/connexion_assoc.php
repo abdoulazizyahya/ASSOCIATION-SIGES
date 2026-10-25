@@ -2072,6 +2072,57 @@ function assoc_migrations_disponibles(string $type = 'primaire'): array {
  * déjà existante ») : c'est ce qui avait remis toutes les écoles primaires
  * à v1 le 25/09/2026 (recalées par bd/assoc/recaler_versions.php).
  */
+/**
+ * Découpe un script SQL en instructions (les « ; » dans une chaîne, un
+ * identifiant `…` ou un commentaire ne coupent pas). Pas de DELIMITER dans
+ * nos migrations (ni procédure ni trigger).
+ */
+function migration_instructions(string $sql): array {
+    $out = []; $cur = ''; $n = strlen($sql); $q = null;
+    for ($i = 0; $i < $n; $i++) {
+        $ch = $sql[$i];
+        if ($q !== null) {
+            $cur .= $ch;
+            if ($ch === '\\' && $q !== '`' && $i + 1 < $n) { $cur .= $sql[++$i]; continue; }
+            if ($ch === $q) { if ($i + 1 < $n && $sql[$i + 1] === $q) { $cur .= $sql[++$i]; continue; } $q = null; }
+            continue;
+        }
+        if ($ch === "'" || $ch === '"' || $ch === '`') { $q = $ch; $cur .= $ch; continue; }
+        if ($ch === '-' && substr($sql, $i, 2) === '--' && ($i + 2 >= $n || ctype_space($sql[$i + 2]))) { $e = strpos($sql, "\n", $i); $i = $e === false ? $n : $e; $cur .= "\n"; continue; }
+        if ($ch === '#') { $e = strpos($sql, "\n", $i); $i = $e === false ? $n : $e; $cur .= "\n"; continue; }
+        if ($ch === '/' && substr($sql, $i, 2) === '/*') { $e = strpos($sql, '*/', $i + 2); $i = $e === false ? $n : $e + 1; $cur .= ' '; continue; }
+        if ($ch === ';') { if (trim($cur) !== '') $out[] = trim($cur); $cur = ''; continue; }
+        $cur .= $ch;
+    }
+    if (trim($cur) !== '') $out[] = trim($cur);
+    return $out;
+}
+
+/**
+ * Exécute une migration instruction par instruction. Une instruction dont
+ * l'effet est DÉJÀ présent (colonne, index, table ou clé étrangère qui
+ * existe déjà, élément à supprimer déjà absent) est sautée au lieu d'arrêter
+ * tout : c'est le cas d'une base créée depuis un schéma récent mais dont la
+ * version enregistrée est restée basse (siges, EC1 : « Duplicate column
+ * statut » sur v4, 25/10/2026). Toute autre erreur arrête la migration.
+ * Retour : nombre d'instructions sautées.
+ */
+const MIGRATION_ERREURS_DEJA_FAIT = [1050, 1060, 1061, 1068, 1091, 1826, 1022];
+function migration_executer(mysqli $l, string $sql): int {
+    $sautees = 0;
+    foreach (migration_instructions($sql) as $ins) {
+        try {
+            $ok = mysqli_query($l, $ins);
+            if ($ok === false) throw new mysqli_sql_exception(mysqli_error($l), mysqli_errno($l));
+            if ($ok instanceof mysqli_result) mysqli_free_result($ok);
+        } catch (mysqli_sql_exception $ex) {
+            if (in_array((int) $ex->getCode(), MIGRATION_ERREURS_DEJA_FAIT, true)) { $sautees++; continue; }
+            throw new RuntimeException($ex->getMessage(), (int) $ex->getCode());
+        }
+    }
+    return $sautees;
+}
+
 function assoc_version_depart(string $type, int $version): int {
     return max($version, $type === 'secondaire' ? 0 : 50);
 }
@@ -2131,6 +2182,17 @@ function assoc_migrer_ecole(int $id, bool $backup = true): array {
     $dispo = assoc_migrations_disponibles($type_ecole);
     $ver   = (int) (assoc_val("SELECT version FROM schema_version_etab WHERE id_etablissement=?", [$id]) ?? 0);
     $ver   = assoc_version_depart($type_ecole, $ver);   // jamais sous le schéma de référence
+    // Version enregistrée plus basse que l'état réel de la base (école installée avec
+    // une version 0, base importée…) : on la recale d'abord vers le haut, pour ne pas
+    // rejouer des migrations déjà présentes — et leurs UPDATE de données (25/10/2026).
+    try {
+        require_once __DIR__ . '/../bd/lib/recalage_versions.php';
+        $rv = rv_analyser_ecole($e + ['version' => $ver]);
+        if ($rv['joignable'] && $rv['reelle'] > $ver) {
+            assoc_exec("INSERT INTO schema_version_etab (id_etablissement, version) VALUES (?, ?) ON DUPLICATE KEY UPDATE version=GREATEST(version, VALUES(version))", [$id, $rv['reelle']]);
+            $ver = $rv['reelle'];
+        }
+    } catch (\Throwable $ex) { /* analyse impossible : on migre depuis la version enregistrée */ }
     $a_faire = array_values(array_filter(array_keys($dispo), fn($v) => $v > $ver));
     if (!$a_faire) return ['ok' => true, 'message' => "Déjà à jour (v$ver).", 'appliquees' => [], 'backup' => null];
 
@@ -2149,10 +2211,7 @@ function assoc_migrer_ecole(int $id, bool $backup = true): array {
     foreach ($a_faire as $v) {
         $sql = file_get_contents($dispo[$v]);
         try {
-            if (mysqli_multi_query($l, $sql)) {
-                do { if ($r = mysqli_store_result($l)) mysqli_free_result($r); } while (mysqli_more_results($l) && mysqli_next_result($l));
-            }
-            if (mysqli_errno($l)) throw new RuntimeException(mysqli_error($l));
+            migration_executer($l, $sql);   // « déjà présent » sauté, toute autre erreur arrête
             assoc_exec(
                 "INSERT INTO schema_version_etab (id_etablissement, version) VALUES (?, ?)
                  ON DUPLICATE KEY UPDATE version=GREATEST(version, VALUES(version))",

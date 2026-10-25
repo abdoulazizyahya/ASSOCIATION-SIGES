@@ -11,7 +11,7 @@ exiger_role(EDT_ROLES_GESTION);
 
 $a = edt_annee_id();
 $act = $_REQUEST['action'] ?? '';
-$json = function (array $d): void { header('Content-Type: application/json; charset=utf-8'); echo json_encode($d, JSON_UNESCAPED_UNICODE); exit; };
+$json = function (array $d): void { $GLOBALS['edt_reponse'] = $d; header('Content-Type: application/json; charset=utf-8'); echo json_encode($d, JSON_UNESCAPED_UNICODE); exit; };
 
 if ($act === 'grille') {
     header('Content-Type: text/html; charset=utf-8');
@@ -95,6 +95,14 @@ if ($act === 'dispo') {
 if ($_SERVER['REQUEST_METHOD'] !== 'POST' || !edt_peut_ecrire()) $json(['ok' => false, 'msg' => 'Action non autorisée.']);
 csrf_verifier();
 $mod = new EdtModele($a);
+// Annuler : une action réussie empile la photo des jours touchés (edt_annuler_* dans _edt_lib.php)
+register_shutdown_function(function () use ($a) {
+    if (!empty($GLOBALS['edt_snap']) && !empty($GLOBALS['edt_reponse']['ok'])) edt_annuler_empiler($a, $GLOBALS['edt_snap']);
+});
+if ($act === 'annuler') {
+    $lib = edt_annuler_derniere($a);
+    $json($lib === null ? ['ok' => false, 'msg' => 'Rien à annuler.'] : ['ok' => true, 'msg' => "Annulé : $lib"]);
+}
 $ids = array_values(array_filter(array_map('intval', explode(',', (string) ($_POST['ids'] ?? '')))));
 $forcer = ($_POST['forcer'] ?? '') === '1';
 
@@ -122,6 +130,7 @@ if ($act === 'placer') {
     $j = (int) ($_POST['jour'] ?? 0); $cr = (int) ($_POST['cr'] ?? 0);
     if (!$cours || !in_array($j, $mod->jours, true) || !isset($mod->cours[$cr])) $json(['ok' => false, 'msg' => 'Données incomplètes.']);
     $crs = [$cr];
+    $GLOBALS['edt_snap'] = edt_annuler_capturer($a, [$j], 'placement ' . ($mod->mat[$cours['id_mat']] ?? '') . ' ' . (EDT_JOURS[$j] ?? '') . ' ' . ($mod->cours[$cr]['libelle'] ?? ''));
     $sg = trim((string) ($_POST['sous_groupe'] ?? ''));
     $c0 = (int) array_key_first($cours['classes']);
     // Nouveau cours (matière + enseignant choisis dans la page) : rattaché au service existant s'il y en a un
@@ -163,6 +172,9 @@ if (!$ids) $json(['ok' => false, 'msg' => 'Aucune séance.']);
 $seances = db_all("SELECT * FROM edt_seance WHERE id_annee=? AND id IN (" . implode(',', $ids) . ")", [$a]);
 if (!$seances) $json(['ok' => false, 'msg' => 'Séance introuvable.']);
 $s0 = $seances[0];
+$GLOBALS['edt_snap'] = edt_annuler_capturer($a, array_merge(array_column($seances, 'jour'), $act === 'deplacer' ? [(int) ($_POST['jour'] ?? 0)] : []),
+    (['supprimer' => 'suppression', 'deplacer' => 'déplacement', 'enseignant' => 'changement d\'enseignant', 'salle' => 'changement de salle', 'verrou' => 'verrou', 'decommun' => 'retrait du cours commun'][$act] ?? $act)
+    . ' ' . ($mod->mat[(int) $s0['id_mat']] ?? '') . ' ' . (EDT_JOURS[(int) $s0['jour']] ?? ''));
 
 if ($act === 'supprimer') {
     $n = db_exec("DELETE FROM edt_seance WHERE id_annee=? AND id IN (" . implode(',', $ids) . ")", [$a]);
