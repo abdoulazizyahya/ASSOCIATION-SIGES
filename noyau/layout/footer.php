@@ -34,18 +34,22 @@
       <?php if (signature_etablissement_chemin()): ?>
       <div id="bandeauSignatureApercu" class="d-none px-3 py-2 d-flex align-items-center gap-2 flex-wrap"
            style="background:#fff8e6;border-bottom:1px solid #f0dca0">
-        <div class="form-check form-switch mb-0">
-          <input class="form-check-input" type="checkbox" role="switch" id="chkSignatureApercu" style="width:2.4em;height:1.3em">
-          <label class="form-check-label fw-semibold" for="chkSignatureApercu" style="font-size:.85rem;color:#7a5b00">
-            <i class="bi bi-vector-pen me-1"></i>Signature numérique du Directeur
-          </label>
+        <?php // Documents soumis à la décision du propriétaire (SIGNATURE_CATEGORIES, fonctions.php) :
+              // état affiché, pas de case. Les autres (documents du personnel) gardent la case. ?>
+        <span id="etatSigPolitique" class="d-none fw-semibold" style="font-size:.85rem;color:#7a5b00"></span>
+        <div id="choixSigLibre" class="d-flex align-items-center gap-2">
+          <div class="form-check form-switch mb-0">
+            <input class="form-check-input" type="checkbox" role="switch" id="chkSignatureApercu" style="width:2.4em;height:1.3em">
+            <label class="form-check-label fw-semibold" for="chkSignatureApercu" style="font-size:.85rem;color:#7a5b00">
+              <i class="bi bi-vector-pen me-1"></i>Signature numérique du Directeur
+            </label>
+          </div>
+          <span class="text-muted" style="font-size:.72rem">— jamais appliquée sans cocher cette case</span>
         </div>
-        <span class="text-muted" style="font-size:.72rem">— jamais appliquée sans cocher cette case</span>
-        <?php if (role_connecte() === 'DIRECTEUR'): ?>
+        <?php // Ajuster la position : ouvert à la personne qui imprime (24/10/2026). ?>
         <button type="button" id="btnPositionApercu" class="btn btn-sm btn-abz-outline ms-auto d-none" onclick="ouvrirPositionSignature()">
-          <i class="bi bi-gear me-1"></i>Positionner
+          <i class="bi bi-gear me-1"></i>Ajuster la position
         </button>
-        <?php endif; ?>
       </div>
       <?php endif; ?>
       <div class="modal-body p-0" style="flex:1 1 auto;overflow:hidden">
@@ -159,6 +163,18 @@
 // dynamiquement selon la case à cocher. $typeDocument identifie le document
 // pour le positionnement de signature (ex. 'liste_eleves', 'carte_3') —
 // requis seulement si ce document porte une signature.
+// Signature numérique décidée par le propriétaire, par catégorie de document
+// (noyau/fonctions.php : SIGNATURE_CATEGORIES, signature_politique()).
+const SIG_CATEGORIES = <?= json_encode(array_map(fn($c) => $c[2], SIGNATURE_CATEGORIES)) ?>;
+const SIG_POLITIQUE  = <?= json_encode(signature_politique()) ?>;
+function sigCategorie(url) {
+  let chemin = url;
+  try { chemin = new URL(url, window.location.href).pathname; } catch (e) {}
+  for (const [cat, motifs] of Object.entries(SIG_CATEGORIES)) {
+    if (motifs.some(m => chemin.includes(m))) return cat;
+  }
+  return null;
+}
 let apercuBaseUrl = '';
 let apercuTypeDocument = null;
 let apercuOrientation = 'portrait';
@@ -177,8 +193,19 @@ function afficherApercu(url, titre, typeDocument = null, orientation = 'portrait
   const bandeau = document.getElementById('bandeauSignatureApercu');
   const btnPos = document.getElementById('btnPositionApercu');
   if (chk) chk.checked = false;
+  // Décision du propriétaire pour ce type de document (null = choix libre, ex. personnel)
+  const cat = sigCategorie(url);
+  const etat = document.getElementById('etatSigPolitique');
+  const libre = document.getElementById('choixSigLibre');
+  if (etat && libre) {
+    etat.classList.toggle('d-none', cat === null);
+    libre.classList.toggle('d-none', cat !== null);
+    if (cat !== null) etat.innerHTML = '<i class="bi bi-vector-pen me-1"></i>' + (SIG_POLITIQUE[cat]
+      ? 'Signature numérique apposée sur ce document (décision du propriétaire)'
+      : 'Pas de signature numérique sur ce document (décision du propriétaire)');
+  }
   if (bandeau) bandeau.classList.toggle('d-none', !typeDocument);
-  if (btnPos) btnPos.classList.toggle('d-none', !typeDocument);
+  if (btnPos) btnPos.classList.toggle('d-none', !typeDocument || (cat !== null && !SIG_POLITIQUE[cat]));
   appliquerApercu();
   document.getElementById('titreApercu').innerHTML = '<i class="bi bi-eye me-1"></i>' + (titre || 'Aperçu');
   const dialog = document.getElementById('dialogApercu');
@@ -220,6 +247,7 @@ function urlSansSignature(url) {
   try {
     const u = new URL(url, window.location.href);
     u.searchParams.delete('signature');
+    u.searchParams.set('signature_pos', '1');   // document sans signature, pour la placer (fonctions.php)
     return u.toString();
   } catch (e) { return url; }
 }

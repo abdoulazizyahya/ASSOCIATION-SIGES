@@ -442,11 +442,7 @@ function dessiner_bulletin_trimestriel_arabe(
     }
 
     // ── Titulaire (hors grille) ──
-    $enseignant = db_one(
-        "SELECT e.civilite_ens, e.nom_ens, e.prenom_ens FROM enseignant e, enseignat_classe_arabe d
-         WHERE e.matricule_ens=d.matricule_ens AND d.IDClasses=? AND d.val_annee=?",
-        [$id_classe, $val_annee]
-    );
+    $enseignant = prim_titulaire_trimestre((int) $id_classe, $val_annee, (int) $id_trim, 'ar');   // titulaire DE CE TRIMESTRE (remplacements, v65)
     $pdf->SetFont('helvetica', '', 7);
     $pdf->Text(5 + $OX, 71.5 + $OY, pdf_u_ar(' TITULAIRE :  ' . trim(($enseignant['civilite_ens'] ?? '') . ' ' . ($enseignant['nom_ens'] ?? '') . ' ' . ($enseignant['prenom_ens'] ?? ''))));
     $pdf->SetFont('amirib', '', 11);

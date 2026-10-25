@@ -94,7 +94,7 @@ if ($id_classe && $periode_choisie) {
 
 $fmt = fn(?float $v): string => $v === null ? '—' : rtrim(rtrim(number_format($v, 2, '.', ''), '0'), '.');
 $chemin_sig = signature_etablissement_chemin();
-$peut_configurer_sig = role_connecte() === 'DIRECTEUR';
+$peut_configurer_sig = signature_politique()['bulletin'];   // signature décidée par le propriétaire ; la personne qui imprime ajuste la position (24/10/2026)
 
 // $id_classe : nécessaire pour choisir le bon fichier PDF — primaire/pdf/
 // bulletin_{trimestriel,annuel}_anglais.php (demande du 26/08/2026) pour

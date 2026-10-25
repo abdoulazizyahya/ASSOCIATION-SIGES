@@ -44,7 +44,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 $mat = (int) ($_GET['mat'] ?? 0);
-$enseignants = db_all("SELECT matricule_ens, nom_ens, prenom_ens FROM enseignant ORDER BY nom_ens");
+$enseignants = db_all("SELECT matricule_ens, nom_ens, prenom_ens FROM enseignant e WHERE " . sec_sql_ens_en_service('e') . " ORDER BY nom_ens");   // ni muté ni parti (v22)
 $ens = $mat ? db_one("SELECT matricule_ens, nom_ens, prenom_ens FROM enseignant WHERE matricule_ens=?", [$mat]) : null;
 
 $historique = $mat ? db_all("SELECT * FROM avance_salaire WHERE matricule_ens=? ORDER BY date_avance DESC, id DESC", [$mat]) : [];

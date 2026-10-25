@@ -282,11 +282,7 @@ function dessiner_bulletin_trimestriel(
     static $titulaire_cache = [];
     $cle_titulaire = $id_classe . '|' . $val_annee;
     if (!array_key_exists($cle_titulaire, $titulaire_cache)) {
-        $titulaire_cache[$cle_titulaire] = db_one(
-            "SELECT e.civilite_ens, e.nom_ens, e.prenom_ens FROM enseignant e, enseignat_classe d
-             WHERE e.matricule_ens=d.matricule_ens AND d.IDClasses=? AND d.val_annee=?",
-            [$id_classe, $val_annee]
-        );
+        $titulaire_cache[$cle_titulaire] = prim_titulaire_trimestre((int) $id_classe, $val_annee, (int) $id_trim, 'fr');   // titulaire DE CE TRIMESTRE (remplacements, v65)
     }
     $enseignant = $titulaire_cache[$cle_titulaire];
     $pdf->SetFont('Arial', 'B', 9);

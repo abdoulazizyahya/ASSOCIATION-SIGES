@@ -277,7 +277,7 @@ function edt_enseignants(): array {
         return db_all("SELECT e.matricule_ens, TRIM(CONCAT(e.nom_ens,' ',IFNULL(e.prenom_ens,''))) AS nom, e.tel_ens, e.id_grade, NULL AS matiere_enseignee
                        FROM enseignant e WHERE COALESCE(e.statut_ens, 'actif') = 'actif' ORDER BY e.nom_ens, e.prenom_ens");
     return db_all("SELECT e.matricule_ens, TRIM(CONCAT(e.nom_ens,' ',IFNULL(e.prenom_ens,''))) AS nom, e.tel_ens, e.id_grade, e.matiere_enseignee
-                   FROM enseignant e ORDER BY e.nom_ens, e.prenom_ens");
+                   FROM enseignant e WHERE " . sec_sql_ens_en_service('e') . " ORDER BY e.nom_ens, e.prenom_ens");   // ni muté ni parti (v22)
 }
 function edt_salles(bool $actives = true): array {
     return db_all("SELECT * FROM edt_salle " . ($actives ? "WHERE actif=1 " : '') . "ORDER BY nom");
@@ -420,6 +420,7 @@ final class EdtModele {
                 if (isset($ign[(string) $id])) continue;
                 $o = $this->seances[$id];
                 if ($sg !== '' && $o['sous_groupe'] !== '' && $o['sous_groupe'] !== $sg) continue;   // demi-groupes
+                if ($cc !== null && $o['code_commun'] === $cc && $o['id_mat'] === $m) continue;     // déjà là : même cours commun
                 $out[] = ['niveau' => 'conflit', 'type' => 'classe', 'msg' => "Classe déjà occupée $lib (" . ($this->mat[$o['id_mat']] ?? '?') . ')'];
             }
             if ($e) foreach ($this->idsEns($e, $j, $cr) as $id) {
@@ -427,7 +428,10 @@ final class EdtModele {
                 $o = $this->seances[$id];
                 if ($cc !== null && $o['code_commun'] === $cc) continue;                            // cours commun
                 if ($o['id_classe'] === $c && $sg !== '' && $o['sous_groupe'] !== $sg) { /* même classe autre groupe : il ne peut pas être aux deux */ }
-                $out[] = ['niveau' => 'conflit', 'type' => 'enseignant', 'msg' => ($this->ens[$e] ?? 'Enseignant') . " déjà en " . ($this->classes[$o['id_classe']]['designation'] ?? '?') . " $lib (" . ($this->mat[$o['id_mat']] ?? '?') . ')'];
+                // même matière, classe du même niveau : peut-être un cours commun (proposé à la saisie)
+                $meme = $o['id_mat'] === $m && $o['id_classe'] !== $c && ($this->classes[$o['id_classe']]['code_niveau'] ?? null) === ($this->classes[$c]['code_niveau'] ?? '');
+                $out[] = ['niveau' => 'conflit', 'type' => 'enseignant', 'msg' => ($this->ens[$e] ?? 'Enseignant') . " déjà en " . ($this->classes[$o['id_classe']]['designation'] ?? '?') . " $lib (" . ($this->mat[$o['id_mat']] ?? '?') . ')',
+                          'commun_possible' => $meme, 'id_seance' => $id, 'classe_autre' => $o['id_classe']];
             }
             if ($sa) foreach ($this->occS[$sa][$j][$cr] ?? [] as $id) {
                 if (isset($ign[(string) $id])) continue;
@@ -596,8 +600,14 @@ function edt_synchroniser_dispenser(int $a): int {
             }
             continue;
         }
-        $n += db_exec("INSERT INTO dispenser (matricule_ens, IDClasses, id_mat, val_annee) VALUES (?,?,?,?)
-                       ON DUPLICATE KEY UPDATE matricule_ens=VALUES(matricule_ens)", [$r['matricule_ens'], $r['id_classe'], $r['id_mat'], $annee['libelle']]) > 0 ? 1 : 0;
+        // Historique des affectations (v22) : nouvelle affectation = depuis le T1 ;
+        // changement d'enseignant = à partir du trimestre en cours (bulletins passés intacts).
+        $actuel = db_val("SELECT matricule_ens FROM dispenser WHERE IDClasses=? AND id_mat=? AND val_annee=?",
+                         [$r['id_classe'], $r['id_mat'], $annee['libelle']]);
+        if ($actuel !== null && (int) $actuel === (int) $r['matricule_ens']) continue;
+        sec_affecter_enseignant((int) $r['id_classe'], (int) $r['id_mat'], $annee['libelle'], (int) $r['matricule_ens'],
+                                $actuel === null ? 1 : sec_ordre_trimestre_courant());
+        $n++;
     }
     return $n;
 }
@@ -874,7 +884,8 @@ function edt_grille_html(int $a, string $vue, int $id, array $opt = []): string 
                            . ($b['code_commun'] ? '<div class="edt-commun" title="Cours commun"><i class="bi bi-people"></i> commun</div>' : '')
                            . ($b['sous_groupe'] !== '' ? '<div class="edt-salle">Gr. ' . h($b['sous_groupe']) . '</div>' : '');
                     $h .= '<div class="edt-bloc' . ($b['verrou'] ? ' edt-verrou' : '') . '" style="background:' . edt_couleur($b['id_mat']) . '"'
-                        . ($editable ? ' data-ids="' . h(implode(',', $it['ids'])) . '" role="button"' : '') . '>'
+                        . ($editable ? ' data-ids="' . h(implode(',', $it['ids'])) . '" data-ens="' . (int) $b['matricule_ens'] . '" data-commun="' . ($b['code_commun'] ? 1 : 0)
+                            . '" data-verrou="' . ($b['verrou'] ? 1 : 0) . '" data-salle="' . (int) $b['id_salle'] . '" role="button" title="Clic (ou clic droit) : options du cours"' : '') . '>'
                         . ($b['verrou'] ? '<i class="bi bi-lock-fill edt-cadenas" title="Verrouillé"></i>' : '')
                         . '<div class="edt-mat">' . $titre . '</div><div class="edt-sous">' . $sous . '</div>' . $extra . '</div>';
                 }
@@ -923,6 +934,7 @@ function edt_css(): string {
 .edt-dispo-ok{background:#dcfce7!important}
 .edt-dispo-souhaitee{background:#fef3c7!important}
 .edt-dispo-conflit{background:#fee2e2!important}
+.edt-dispo-commun{background:#dbeafe!important;outline:2px dashed #2563eb;outline-offset:-3px}
 .edt-kpi{border-left:4px solid #1f3a5f}
 .edt-conflit{background:#fee2e2;outline:2px solid #dc2626;outline-offset:-2px}
 @media print{.no-print{display:none!important}}

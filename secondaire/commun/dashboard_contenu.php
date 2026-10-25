@@ -54,7 +54,7 @@ $nb_filles = $id_annee ? (int) db_val(
      WHERE i.id_annee=? AND e.statut='actif' AND e.sexe='F'", [$id_annee]
 ) : 0;
 $nb_classes     = (int) db_val("SELECT COUNT(*) FROM classe WHERE archivee=0");
-$nb_enseignants = (int) db_val("SELECT COUNT(*) FROM enseignant");
+$nb_enseignants = (int) db_val("SELECT COUNT(*) FROM enseignant e WHERE " . sec_sql_ens_en_service('e'));   // en service seulement (v22)
 
 $par_classe = $id_annee ? db_all(
     "SELECT c.id, c.designation, c.code_niveau, n.ordre_niveau,

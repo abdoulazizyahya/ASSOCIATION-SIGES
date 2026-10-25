@@ -17,9 +17,11 @@ if ($q !== '') {
     $where[] = "(nom_ens LIKE ? OR prenom_ens LIKE ? OR mat_ens LIKE ? OR tel_ens LIKE ? OR u.login_user LIKE ?)";
     array_push($params, ...array_fill(0, 5, "%$q%"));
 }
-if ($statut !== 'tous') {
-    $where[] = "COALESCE(statut_ens,'actif') = ?";
-    $params[] = $statut;
+if ($statut === 'actif') {
+    $where[] = "COALESCE(statut_ens,'actif') = 'actif'";
+} elseif ($statut === 'inactif') {
+    // Inactifs ET anciens (mutés, partis, retraités — migration v65)
+    $where[] = "COALESCE(statut_ens,'actif') NOT IN ('actif', 'systeme')";
 }
 
 // Tri par colonne et pagination (17/10/2026, comme au secondaire) ; compte de connexion
@@ -79,10 +81,20 @@ $affectes_fr = [];
 $affectes_ar = [];
 if ($onglet === 'affectation') {
     $val_annee_aff = get_annee_active()['val_annee'] ?? '';
+    // Membres actifs + ceux qui ne le sont plus mais restent affectés cette année
+    // (signalés, à décocher pour désigner le remplaçant) — sinon l'enregistrement
+    // les retirait sans qu'on les voie (24/10/2026).
     $enseignants_aff = db_all(
-        "SELECT matricule_ens, nom_ens, prenom_ens, id_fonction FROM enseignant
-         WHERE COALESCE(statut_ens,'actif')='actif' ORDER BY nom_ens, prenom_ens"
+        "SELECT matricule_ens, nom_ens, prenom_ens, id_fonction, COALESCE(statut_ens,'actif') AS statut_ens FROM enseignant e
+         WHERE COALESCE(statut_ens,'actif')='actif'
+            OR (COALESCE(statut_ens,'actif')<>'systeme' AND (
+                   EXISTS (SELECT 1 FROM enseignat_classe c WHERE c.matricule_ens=e.matricule_ens AND c.val_annee=?)
+                OR EXISTS (SELECT 1 FROM enseignat_classe_arabe c WHERE c.matricule_ens=e.matricule_ens AND c.val_annee=?)))
+         ORDER BY nom_ens, prenom_ens", [$val_annee_aff, $val_annee_aff]
     );
+    $trims_aff  = $val_annee_aff !== '' ? db_all("SELECT id_trim, libelle_trim FROM trimestre WHERE id_annee=? ORDER BY id_trim", [$val_annee_aff]) : [];
+    $ordre_aff  = prim_ordre_trimestre_courant();
+    $histo_aff  = $val_annee_aff !== '' ? prim_historique_affectations($val_annee_aff) : [];
     if ($val_annee_aff !== '') {
         $classes_aff = db_all(
             "SELECT c.IDClasses, c.DesignationClasses, n.OrdreNiveau
@@ -165,7 +177,7 @@ if (!$es_partiel) {
       <div class="col-md-3">
         <select name="statut" class="form-select form-select-sm" data-ajax-nav-auto>
           <option value="actif" <?= $statut === 'actif' ? 'selected' : '' ?>>Actifs seulement</option>
-          <option value="inactif" <?= $statut === 'inactif' ? 'selected' : '' ?>>Inactifs seulement</option>
+          <option value="inactif" <?= $statut === 'inactif' ? 'selected' : '' ?>>Inactifs et anciens (mutés, partis…)</option>
           <option value="tous" <?= $statut === 'tous' ? 'selected' : '' ?>>Tous</option>
         </select>
       </div>
@@ -226,8 +238,9 @@ if (!$es_partiel) {
             <?php endif; ?>
             <td>
               <span class="badge" style="background:<?= $actif ? '#dcfce7' : '#fee2e2' ?>;color:<?= $actif ? '#166534' : '#991b1b' ?>;font-size:.7rem">
-                <?= $actif ? 'Actif' : 'Inactif' ?>
+                <?= h(PRIM_SITUATIONS[$e['statut_ens'] ?? 'actif'] ?? 'Inactif') ?>
               </span>
+              <?php if (!$actif && !empty($e['date_depart'])): ?><div class="text-muted" style="font-size:.68rem">le <?= h(date_fr($e['date_depart'])) ?></div><?php endif; ?>
             </td>
             <td class="text-end">
               <a href="<?= APP_URL ?>/primaire/pages/enseignants/voir.php?mat=<?= (int) $e['matricule_ens'] ?>"
@@ -312,6 +325,9 @@ if (!$es_partiel) {
                 <tr>
                   <td>
                     <?= h(mb_strtoupper($e['nom_ens'])) ?> <?= h($e['prenom_ens'] ?? '') ?>
+                    <?php if ($e['statut_ens'] !== 'actif'): ?>
+                      <span class="badge bg-danger" style="font-size:.6rem"><?= h(PRIM_SITUATIONS[$e['statut_ens']] ?? 'Inactif') ?> — à remplacer</span>
+                    <?php endif; ?>
                     <div class="text-muted" style="font-size:.72rem"><?= h(libelle_role($e['id_fonction'] ?? '')) ?></div>
                   </td>
                   <?php foreach ($classes_aff as $c): $idc = (int) $c['IDClasses']; ?>
@@ -329,8 +345,29 @@ if (!$es_partiel) {
     <?php };
     $grille_affectation('affect_fr', $affectes_fr, 'Piste française (compétences)', 'translate');
     $grille_affectation('affect_ar', $affectes_ar, 'Piste arabe', 'translate');
+    $noms_classes = array_column($classes_aff, 'DesignationClasses', 'IDClasses');
     ?>
-    <div class="mt-2">
+    <?php if ($histo_aff): ?>
+    <div class="card mb-2"><div class="card-body py-2" style="font-size:.76rem">
+      <div class="fw-semibold mb-1"><i class="bi bi-clock-history me-1"></i>Changements de titulaire en cours d'année</div>
+      <?php foreach ($histo_aff as $piste => $classes_h): foreach ($classes_h as $idc => $periodes): ?>
+        <div><span class="badge-code"><?= $piste === 'ar' ? 'Arabe' : 'Français' ?></span> <?= h($noms_classes[$idc] ?? "Classe $idc") ?> :
+          <?= implode(' · ', array_map(fn($t, $noms) => 'T' . $t . ' : ' . h(implode(', ', $noms)), array_keys($periodes), $periodes)) ?></div>
+      <?php endforeach; endforeach; ?>
+    </div></div>
+    <?php endif; ?>
+    <div class="mt-2 d-flex flex-wrap align-items-center gap-2">
+      <?php if (prim_periodes_dispo() && $trims_aff): ?>
+      <label for="trim-debut-aff" style="font-size:.8rem"
+             title="Remplacement en cours d'année : les bulletins des trimestres précédents gardent l'ancien titulaire. 1er trimestre = correction d'une erreur d'affectation.">
+        <i class="bi bi-arrow-left-right me-1 text-primary"></i>Changements valables à partir du
+      </label>
+      <select name="trim_debut" id="trim-debut-aff" class="form-select form-select-sm" style="width:auto">
+        <?php foreach ($trims_aff as $i => $t): ?>
+          <option value="<?= $i + 1 ?>" <?= $i + 1 === $ordre_aff ? 'selected' : '' ?>><?= h($t['libelle_trim']) ?></option>
+        <?php endforeach; ?>
+      </select>
+      <?php endif; ?>
       <button type="submit" class="btn btn-primary btn-sm"><i class="bi bi-check-lg me-1"></i>Enregistrer l'affectation</button>
     </div>
   </form>

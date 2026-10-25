@@ -37,12 +37,19 @@ $seq_active = db_one(
 if ($is_admin) {
     $classes = db_all("SELECT c.* FROM classe c JOIN inscription i ON i.id_classe=c.id AND i.id_annee=? WHERE c.archivee=0 GROUP BY c.id ORDER BY c.ordre,c.designation", [$id_annee]);
 } elseif ($is_ens && $mat_ens) {
-    $classes = db_all(
-        "SELECT DISTINCT c.* FROM classe c
-         JOIN dispenser d ON d.IDClasses=c.id AND d.matricule_ens=? AND d.val_annee=?
-         WHERE c.archivee=0 ORDER BY c.ordre,c.designation",
-        [$mat_ens, $val_annee]
-    );
+    // Relevés, fiche statistique, tableau d'honneur : réservés au professeur
+    // principal de la classe (24/10/2026) — Censeur, Proviseur, Admin voient
+    // toutes les classes ($is_admin ci-dessus). Les documents eux-mêmes
+    // (pdf_releve.php, pdf_stat_classe.php, pdf_certificat.php…) l'exigeaient déjà.
+    $classes = sec_classes_pp();
+    if (!$classes) {
+        $titre_page = 'Documents de classe';
+        require_once __DIR__ . '/../../../../noyau/layout/header.php';
+        echo '<div class="alert alert-warning mt-3 mx-3"><i class="bi bi-lock me-2"></i>Ces documents (relevés de notes, fiche statistique, tableau d\'honneur) '
+           . 'sont réservés au professeur principal de la classe, au Censeur et au Proviseur.</div>';
+        require_once __DIR__ . '/../../../../noyau/layout/footer.php';
+        exit;
+    }
 } else {
     $classes = [];
 }

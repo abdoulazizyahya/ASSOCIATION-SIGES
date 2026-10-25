@@ -50,7 +50,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if ($action === 'generer_manquants' && !$verrouillee) {
         $deja = array_column(db_all("SELECT matricule_ens FROM bulletin_paie WHERE id_periode=?", [$id_periode]), 'matricule_ens');
-        $actifs = db_all("SELECT matricule_ens FROM enseignant");
+        // Muté / parti / retraité (v22) : payé jusqu'au mois de son départ inclus.
+        [$cond_paie, $par_paie] = sec_sql_ens_paye_mois((int) $periode['annee'], (int) $periode['mois']);
+        $actifs = db_all("SELECT matricule_ens FROM enseignant e WHERE $cond_paie", $par_paie);
         $nb = 0;
         foreach ($actifs as $e) {
             if (in_array((int) $e['matricule_ens'], array_map('intval', $deja), true)) continue;
@@ -132,7 +134,8 @@ $bulletins = db_all(
 );
 $mats_avec_bulletin = array_map('intval', array_column($bulletins, 'matricule_ens'));
 
-$sans_bulletin = db_all("SELECT matricule_ens, nom_ens, prenom_ens, id_grade FROM enseignant ORDER BY nom_ens");
+[$cond_paie, $par_paie] = sec_sql_ens_paye_mois((int) $periode['annee'], (int) $periode['mois']);
+$sans_bulletin = db_all("SELECT matricule_ens, nom_ens, prenom_ens, id_grade FROM enseignant e WHERE $cond_paie ORDER BY nom_ens", $par_paie);
 $sans_bulletin = array_filter($sans_bulletin, fn($e) => !in_array((int) $e['matricule_ens'], $mats_avec_bulletin, true));
 
 foreach ($sans_bulletin as &$e) {

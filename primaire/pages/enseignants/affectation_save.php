@@ -30,22 +30,17 @@ $parser = function (array $brut): array {
     return $out;
 };
 
-$pistes = [
-    'enseignat_classe'       => $parser($_POST['affect_fr'] ?? []),
-    'enseignat_classe_arabe' => $parser($_POST['affect_ar'] ?? []),
+$coches = [
+    'fr' => $parser($_POST['affect_fr'] ?? []),
+    'ar' => $parser($_POST['affect_ar'] ?? []),
 ];
 
-$total = 0;
-foreach ($pistes as $table => $lignes) {
-    db_exec("DELETE FROM $table WHERE val_annee=?", [$val_annee]);
-    foreach ($lignes as [$mat, $idc]) {
-        db_exec(
-            "INSERT IGNORE INTO $table (matricule_ens, IDClasses, val_annee) VALUES (?,?,?)",
-            [$mat, $idc, $val_annee]
-        );
-        $total++;
-    }
-}
+// Titulaires par trimestre (migration v65, 24/10/2026) : seule une classe dont les
+// titulaires changent reçoit une nouvelle période, « à partir du » trimestre choisi
+// (1er trimestre = correction) ; les bulletins des trimestres passés gardent
+// l'ancien titulaire. Voir prim_enregistrer_affectations() (fonctions.php).
+$trim_debut = (int) post('trim_debut') ?: prim_ordre_trimestre_courant();
+$total = prim_enregistrer_affectations($val_annee, $coches, $trim_debut);
 
 flash_set('succes', $total . ' affectation(s) enregistrée(s) pour ' . $val_annee . ' (français + arabe).');
 rediriger('primaire/pages/enseignants/liste.php?onglet=affectation');

@@ -23,6 +23,7 @@ function _asso_nav_entrees(): array {
         ],
         'Gestion des écoles' => [
             ['Licences',        'key',           'licences.php',        ['licences.php'],                            true,  true],    // toutes les écoles (23/10/2026)
+            ['Signature des documents', 'vector-pen', 'signatures_documents.php', ['signatures_documents.php'],     true,  true],    // décision du propriétaire (24/10/2026)
             ['Migrations',      'database-gear', 'migrations.php',      ['migrations.php', 'versions.php'],          true,  true],
             ['Registre NIU',    'person-vcard',  'niu/index.php',       ['niu/'],                                    false, false],
             ['Personnel',       'person-badge',  'personnel/liste.php', ['personnel/'],                              false, false],

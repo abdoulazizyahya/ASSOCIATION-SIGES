@@ -529,6 +529,10 @@ a:hover { color: var(--gold); }
    ce qui rendait le texte blanc hérité de .modal-header illisible). */
 .chk-signature { background: var(--primary); border-radius: 20px; padding: 3px 10px 3px 8px; }
 .chk-signature .form-check-label { color: #fff; }
+/* 24/10/2026 : la signature des documents est décidée par le propriétaire
+   (association → Signature des documents) — plus de case à l'impression,
+   sauf documents du personnel (.sig-libre). */
+.chk-signature:not(.sig-libre) { display: none !important; }
 
 /* ── Modales ──────────────────────────────────────── */
 .modal-content { border-radius: var(--radius); border: none; box-shadow: var(--card-shadow-lg); }

@@ -596,6 +596,8 @@ CREATE TABLE `enseignant` (
   `nom_banque` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `compte_bancaire` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `lieu_origine_libre` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `date_depart` date DEFAULT NULL,
+  `motif_depart` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   PRIMARY KEY (`matricule_ens`),
   KEY `id_grade` (`id_grade`,`id_fonction`),
   KEY `id_fonction` (`id_fonction`),
@@ -627,6 +629,19 @@ CREATE TABLE `enseignat_classe_arabe` (
   KEY `val_annee` (`val_annee`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
+DROP TABLE IF EXISTS `enseignat_classe_periode`;
+CREATE TABLE `enseignat_classe_periode` (
+  `id` int unsigned NOT NULL AUTO_INCREMENT,
+  `piste` enum('fr','ar') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'fr',
+  `matricule_ens` int NOT NULL DEFAULT 0,
+  `IDClasses` int NOT NULL,
+  `val_annee` varchar(10) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `trim_debut` tinyint unsigned NOT NULL DEFAULT 1,
+  `cree_le` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_ens_classe_periode` (`piste`,`IDClasses`,`val_annee`,`trim_debut`,`matricule_ens`),
+  KEY `idx_ecp_ens` (`matricule_ens`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 DROP TABLE IF EXISTS `etablissement`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;

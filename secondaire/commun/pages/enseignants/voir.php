@@ -28,6 +28,14 @@ $derniers_bulletins = db_all(
     [$mat]
 );
 
+// Situation (en service / muté / parti / retraité), migration secondaire v22
+$situation_dispo = db_colonne_existe('enseignant', 'statut_ens');
+$en_service      = !$situation_dispo || ($ens['statut_ens'] ?? 'actif') === 'actif';
+$gere_fiche      = sec_fiche_gerable($ens);
+$nb_traces       = $situation_dispo && $en_service && $gere_fiche ? count(sec_traces_enseignant($mat)) : -1;
+$nb_affect_cours = $en_service ? 0 : (int) db_val(
+    "SELECT COUNT(*) FROM dispenser WHERE matricule_ens=? AND val_annee=?", [$mat, (string) (get_annee_active()['libelle'] ?? '')]);
+
 $titre_page = 'Fiche personnel';
 require_once __DIR__ . '/../../../../noyau/layout/header.php';
 ?>
@@ -39,6 +47,7 @@ require_once __DIR__ . '/../../../../noyau/layout/header.php';
       <?= h(($ens['civilite_ens'] ? $ens['civilite_ens'] . ' ' : '') . mb_strtoupper($ens['nom_ens']) . ' ' . ($ens['prenom_ens'] ?? '')) ?>
     </h4>
     <?php if ($ens['matricule']): ?><div class="sub"><span class="badge-code">Matricule <?= h($ens['matricule']) ?></span></div><?php endif; ?>
+    <?php if (!$en_service): ?><span class="badge bg-danger"><?= h(SEC_SITUATIONS[$ens['statut_ens']] ?? 'Parti') ?></span><?php endif; ?>
   </div>
   <a href="<?= APP_URL ?>/secondaire/commun/pages/enseignants/form.php?id=<?= (int) $ens['matricule_ens'] ?>" class="btn btn-primary btn-sm ms-auto">
     <i class="bi bi-pencil me-1"></i>Modifier
@@ -137,6 +146,63 @@ require_once __DIR__ . '/../../../../noyau/layout/header.php';
     <?php endif; ?>
   </div>
   <div class="col-lg-4">
+    <?php // Situation (v22, 24/10/2026) : départ au lieu d'une suppression, voir depart.php
+    if ($situation_dispo && ($en_service ? $gere_fiche : true)): ?>
+    <div class="card mb-2" style="<?= $en_service ? '' : 'border:1px solid #fca5a5;background:#fef2f2' ?>">
+      <div class="card-header fw-semibold"><i class="bi bi-person-walking me-1"></i>Situation</div>
+      <div class="card-body" style="font-size:.85rem">
+        <?php if ($en_service): ?>
+          <div class="mb-2"><span class="badge bg-success">En service</span></div>
+          <form method="post" action="<?= APP_URL ?>/secondaire/commun/pages/enseignants/depart.php" class="row g-2">
+            <?= csrf_champ() ?>
+            <input type="hidden" name="action" value="depart">
+            <input type="hidden" name="matricule_ens" value="<?= $mat ?>">
+            <div class="col-6">
+              <select name="statut_ens" class="form-select form-select-sm" required>
+                <option value="mute">Muté</option><option value="parti">Parti</option><option value="retraite">Retraité</option>
+              </select>
+            </div>
+            <div class="col-6"><input type="date" name="date_depart" class="form-control form-control-sm" value="<?= date('Y-m-d') ?>" required></div>
+            <div class="col-12"><input type="text" name="motif_depart" class="form-control form-control-sm" maxlength="255" placeholder="Motif / nouvelle affectation (facultatif)"></div>
+            <div class="col-12">
+              <button class="btn btn-outline-danger btn-sm w-100"
+                      onclick="return confirm('Déclarer ce départ ? La fiche est conservée (nom sur les anciens bulletins), elle sort des listes et le compte de connexion est désactivé.')">
+                <i class="bi bi-box-arrow-right me-1"></i>Déclarer le départ
+              </button>
+            </div>
+          </form>
+          <?php if ($nb_traces === 0): ?>
+          <form method="post" action="<?= APP_URL ?>/secondaire/commun/pages/enseignants/depart.php" class="mt-2">
+            <?= csrf_champ() ?>
+            <input type="hidden" name="action" value="supprimer">
+            <input type="hidden" name="matricule_ens" value="<?= $mat ?>">
+            <button class="btn btn-link btn-sm text-danger p-0" onclick="return confirm('Supprimer définitivement cette fiche (aucun historique) et son compte ?')">
+              <i class="bi bi-trash me-1"></i>Supprimer la fiche (créée par erreur)
+            </button>
+          </form>
+          <?php endif; ?>
+        <?php else: ?>
+          <div class="mb-1"><span class="badge bg-danger"><?= h(SEC_SITUATIONS[$ens['statut_ens']] ?? 'Parti') ?></span>
+            depuis le <?= h(date_fr($ens['date_depart'])) ?></div>
+          <?php if ($ens['motif_depart']): ?><div class="text-muted mb-2"><?= h($ens['motif_depart']) ?></div><?php endif; ?>
+          <?php if ($nb_affect_cours): ?>
+            <div class="alert alert-warning py-1 px-2 small mb-2">Encore affecté à <?= $nb_affect_cours ?> matière(s) cette année :
+              <a href="<?= APP_URL ?>/secondaire/commun/pages/matieres/liste.php?onglet=enseignants">désigner le remplaçant</a>.</div>
+          <?php endif; ?>
+          <?php if ($gere_fiche): ?>
+          <form method="post" action="<?= APP_URL ?>/secondaire/commun/pages/enseignants/depart.php">
+            <?= csrf_champ() ?>
+            <input type="hidden" name="action" value="reintegrer">
+            <input type="hidden" name="matricule_ens" value="<?= $mat ?>">
+            <button class="btn btn-outline-success btn-sm w-100" onclick="return confirm('Remettre en service ?')">
+              <i class="bi bi-arrow-counterclockwise me-1"></i>Réintégrer
+            </button>
+          </form>
+          <?php endif; ?>
+        <?php endif; ?>
+      </div>
+    </div>
+    <?php endif; ?>
     <div class="card mb-2">
       <div class="card-body text-center">
         <div class="avatar mx-auto mb-2" style="width:64px;height:64px;font-size:1.4rem">

@@ -38,18 +38,20 @@ $menu = [
         ['Élèves',  'secondaire/commun/pages/eleves/liste.php',  'people',    ['ADMIN','PROVISEUR', 'FONDATEUR','CENSEUR','SG','SECRETAIRE']],
         ['Classes', 'secondaire/commun/pages/classes/liste.php', 'door-open', ['ADMIN','PROVISEUR', 'FONDATEUR','CENSEUR']],
     ],
+    // 'pp' (5e élément) : pour l'ENSEIGNANT, entrée affichée seulement s'il est
+    // professeur principal d'une classe (menu_entree_visible(), 24/10/2026).
     'Pédagogie' => [
         ['Matières',             'secondaire/commun/pages/matieres/liste.php',         'journal-bookmark',   ['ADMIN','PROVISEUR', 'FONDATEUR','CENSEUR']],
         ['Notes',                'secondaire/general/pages/notes/index.php',            'pencil-square',      ['ADMIN','PROVISEUR', 'FONDATEUR','CENSEUR','ENSEIGNANT']],
         ['Absences',             'secondaire/commun/pages/absences/index.php',         'person-x',           ['ADMIN','PROVISEUR', 'FONDATEUR','CENSEUR','ENSEIGNANT']],
-        ['Bulletins',            'secondaire/general/pages/bulletins/index.php',        'file-earmark-text',  ['ADMIN','PROVISEUR', 'FONDATEUR','CENSEUR','ENSEIGNANT']],
-        ['Conseil de Classe',    'secondaire/commun/pages/conseil_classe/index.php',   'mortarboard',         ['ADMIN','PROVISEUR', 'FONDATEUR','CENSEUR','SG','ENSEIGNANT']],
+        ['Bulletins',            'secondaire/general/pages/bulletins/index.php',        'file-earmark-text',  ['ADMIN','PROVISEUR', 'FONDATEUR','CENSEUR','ENSEIGNANT'], 'pp'],
+        ['Conseil de Classe',    'secondaire/commun/pages/conseil_classe/index.php',   'mortarboard',         ['ADMIN','PROVISEUR', 'FONDATEUR','CENSEUR','SG','ENSEIGNANT'], 'pp'],
         ['Statistiques',         'secondaire/commun/pages/statistiques/index.php',     'bar-chart-line',      ['ADMIN','PROVISEUR', 'FONDATEUR','CENSEUR','ENSEIGNANT']],
-        ['Documents de classe',  'secondaire/commun/pages/statistiques/documents.php', 'files',                ['ADMIN','PROVISEUR', 'FONDATEUR','CENSEUR','ENSEIGNANT']],
-        ['Résultat annuel',      'secondaire/commun/pages/statistiques/resultat_annuel.php', 'trophy',         ['ADMIN','PROVISEUR', 'FONDATEUR','CENSEUR','ENSEIGNANT']],
+        ['Documents de classe',  'secondaire/commun/pages/statistiques/documents.php', 'files',                ['ADMIN','PROVISEUR', 'FONDATEUR','CENSEUR','ENSEIGNANT'], 'pp'],
+        ['Résultat annuel',      'secondaire/commun/pages/statistiques/resultat_annuel.php', 'trophy',         ['ADMIN','PROVISEUR', 'FONDATEUR','CENSEUR','ENSEIGNANT'], 'pp'],
     ],
     'Discipline' => [
-        ['Discipline', 'secondaire/commun/pages/discipline/index.php', 'shield-exclamation', ['ADMIN','CENSEUR','PROVISEUR','FONDATEUR','SG','ENSEIGNANT']],
+        ['Discipline', 'secondaire/commun/pages/discipline/index.php', 'shield-exclamation', ['ADMIN','CENSEUR','PROVISEUR','FONDATEUR','SG','ENSEIGNANT'], 'pp'],
     ],
     // Module Emploi du temps (migration secondaire v17, 15/10/2026) : construit
     // par le Censeur (écriture ADMIN/PROVISEUR/CENSEUR, voir _edt_lib.php),

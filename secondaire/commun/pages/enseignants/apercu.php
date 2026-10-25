@@ -139,7 +139,7 @@ require_once __DIR__ . '/../../../../noyau/layout/header.php';
 
       <div class="border-start ms-1 ps-2 d-flex align-items-center gap-2">
         <?php if ($etab_sig_ens && !$doc_expire && !$mode_autonome): ?>
-        <div class="chk-signature form-check form-check-inline mb-0" style="user-select:none">
+        <div class="chk-signature sig-libre form-check form-check-inline mb-0" style="user-select:none">
           <input class="form-check-input" type="checkbox" id="chkSigEns" onchange="appliquerSigEns()">
           <label class="form-check-label small" for="chkSigEns">Signature numérique</label>
         </div>

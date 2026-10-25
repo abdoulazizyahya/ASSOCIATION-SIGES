@@ -128,6 +128,10 @@ if ($onglet === 'par_classe') {
                     [$id_mat, $id_cl_aff, $id_groupe]);
             db_exec("DELETE FROM dispenser WHERE id_mat=? AND IDClasses=? AND val_annee=?",
                     [$id_mat, $id_cl_aff, $val_annee]);
+            if (sec_periodes_dispo()) {
+                db_exec("DELETE FROM dispenser_periode WHERE id_mat=? AND IDClasses=? AND val_annee=?",
+                        [$id_mat, $id_cl_aff, $val_annee]);
+            }
             flash_set('succes', 'Matière retirée.');
             rediriger("secondaire/commun/pages/matieres/liste.php?onglet=par_classe&niveau_aff=" . urlencode($niveau_aff) . "&classe_aff=$id_cl_aff");
         }
@@ -275,12 +279,18 @@ if ($onglet === 'competences_trim') {
 //  ONGLET 3 — Affectation des enseignants
 // ══════════════════════════════════════════════════════════════
 $disciplines_ens  = [];
+$historique_ens   = [];
 $nb_affectes      = 0;
 $total_coeff_ens  = 0;
 $enseignants      = [];
 
 if ($onglet === 'enseignants') {
-    $enseignants = db_all("SELECT * FROM enseignant ORDER BY nom_ens, prenom_ens");
+    // Enseignants en service (+ en_service=0 pour ceux partis, gardés seulement
+    // là où ils sont encore affectés, signalés « parti »), 24/10/2026.
+    $enseignants = db_all("SELECT e.*, (" . sec_sql_ens_en_service('e') . ") AS en_service FROM enseignant e ORDER BY e.nom_ens, e.prenom_ens");
+    // Trimestres de l'année : un changement d'enseignant s'applique « à partir du » trimestre choisi.
+    $trims_ens  = db_all("SELECT t.id, t.libelle, t.ordre FROM trimestre t JOIN annee_scolaire a ON a.id=t.id_annee AND a.active=1 ORDER BY t.ordre");
+    $ordre_cour = sec_ordre_trimestre_courant();
 
     if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         csrf_verifier();
@@ -289,12 +299,8 @@ if ($onglet === 'enseignants') {
         if ($action === 'save_ens' && $id_cl_ens) {
             $id_mat    = (int)post('id_mat');
             $matricule = (int)post('matricule_ens');
-            db_exec("DELETE FROM dispenser WHERE IDClasses=? AND id_mat=? AND val_annee=?",
-                    [$id_cl_ens, $id_mat, $val_annee]);
-            if ($matricule) {
-                db_exec("INSERT INTO dispenser (matricule_ens,IDClasses,id_mat,val_annee) VALUES (?,?,?,?)",
-                        [$matricule, $id_cl_ens, $id_mat, $val_annee]);
-            }
+            $trim_deb  = (int)post('trim_debut') ?: $ordre_cour;
+            sec_affecter_enseignant($id_cl_ens, $id_mat, $val_annee, $matricule, $trim_deb);
             header('Content-Type: application/json');
             echo json_encode(['ok' => true]);
             exit;
@@ -331,6 +337,7 @@ if ($onglet === 'enseignants') {
              ORDER BY d.id_groupe, d.ordre, m.libelle",
             [$val_annee, $id_cl_ens]
         );
+        $historique_ens  = sec_historique_affectations($id_cl_ens, $val_annee);
         $total_coeff_ens = array_sum(array_column($disciplines_ens, 'coef'));
         $nb_affectes     = count(array_filter($disciplines_ens, fn($d) => $d['matricule_ens_aff']));
         $pp = db_one(
@@ -1268,6 +1275,17 @@ function reinitCompForm() {
     <i class="bi bi-search text-muted" style="font-size:.85rem"></i>
     <input type="text" id="filtre-ens" class="form-control form-control-sm" style="max-width:300px"
            placeholder="Filtrer les enseignants dans les listes...">
+    <?php if (sec_periodes_dispo() && $trims_ens): ?>
+    <label for="trim-debut-ens" class="text-nowrap ms-2" style="font-size:.78rem"
+           title="Remplacement en cours d'année : les bulletins des trimestres précédents gardent l'ancien enseignant. Choisir le 1er trimestre corrige une erreur d'affectation.">
+      <i class="bi bi-arrow-left-right me-1 text-primary"></i>Changement valable à partir du
+    </label>
+    <select id="trim-debut-ens" class="form-select form-select-sm" style="width:auto;font-size:.78rem">
+      <?php foreach ($trims_ens as $t): ?>
+        <option value="<?= (int) $t['ordre'] ?>" <?= (int) $t['ordre'] === $ordre_cour ? 'selected' : '' ?>><?= h($t['libelle']) ?></option>
+      <?php endforeach; ?>
+    </select>
+    <?php endif; ?>
     <span class="text-muted ms-auto" style="font-size:.75rem">
       Les modifications sont sauvegardées automatiquement
       <i class="bi bi-lightning-charge-fill text-warning ms-1"></i>
@@ -1340,17 +1358,27 @@ function reinitCompForm() {
                     style="max-width:320px;font-size:.78rem;border-color:<?= $assigned?'#86efac':'#fde68a' ?>"
                     data-id-mat="<?= $d['id_mat'] ?>">
               <option value="">— Non affecté —</option>
-              <?php foreach ($enseignants as $e): ?>
+              <?php foreach ($enseignants as $e):
+                $choisi = $d['matricule_ens_aff'] == $e['matricule_ens'];
+                if (!$e['en_service'] && !$choisi) continue;   // parti / muté : plus proposé ?>
                 <option value="<?= $e['matricule_ens'] ?>"
                         data-nom="<?= strtolower(h($e['nom_ens'].' '.($e['prenom_ens']??''))) ?>"
-                        <?= ($d['matricule_ens_aff']==$e['matricule_ens'])?'selected':'' ?>>
+                        <?= $choisi ? 'selected' : '' ?>>
                   <?= h(trim($e['nom_ens'].' '.($e['prenom_ens']??''))) ?>
                   <?php if ($e['id_fonction'] && $e['id_fonction']!='ENSEIGNANT'): ?>
                     (<?= h($e['id_fonction']) ?>)
                   <?php endif; ?>
+                  <?= $e['en_service'] ? '' : '— ' . h(mb_strtolower(SEC_SITUATIONS[$e['statut_ens']] ?? 'parti')) . ', à remplacer' ?>
                 </option>
               <?php endforeach; ?>
             </select>
+            <?php if (!empty($historique_ens[(int) $d['id_mat']])): ?>
+              <div class="text-muted mt-1" style="font-size:.7rem">
+                <i class="bi bi-clock-history me-1"></i>
+                <?= implode(' · ', array_map(fn($p) => 'T' . (int) $p['trim_debut'] . ' : '
+                      . ((int) $p['matricule_ens'] ? h($p['nom'] ?: '?') : '<em>personne</em>'), $historique_ens[(int) $d['id_mat']])) ?>
+              </div>
+            <?php endif; ?>
           </td>
           <td style="padding:6px 10px;text-align:center">
             <?php if ($assigned): ?>
@@ -1397,6 +1425,7 @@ function reinitCompForm() {
                   style="font-size:.82rem">
             <option value="">— Aucun —</option>
             <?php foreach ($enseignants as $e):
+              if (!$e['en_service'] && !($pp && $pp['matricule_ens'] == $e['matricule_ens'])) continue;   // parti / muté
               $nom_e = trim($e['nom_ens'].' '.($e['prenom_ens']??''));
             ?>
               <option value="<?= $e['matricule_ens'] ?>"
@@ -1435,6 +1464,8 @@ document.addEventListener('change', function(e) {
     fd.append('action', 'save_ens');
     fd.append('id_mat', sel.dataset.idMat);
     fd.append('matricule_ens', sel.value);
+    var trimDeb = document.getElementById('trim-debut-ens');
+    if (trimDeb) fd.append('trim_debut', trimDeb.value);
     fd.append('csrf', document.getElementById('csrf_token').value);
     var row  = sel.closest('tr');
     var icon = row.querySelector('td:last-child i');

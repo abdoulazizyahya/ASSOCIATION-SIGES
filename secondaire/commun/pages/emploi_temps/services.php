@@ -33,6 +33,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $ecrire) {
             if (!$mat || ($h <= 0 && !$ens)) continue;
             if ($sid) db_exec("UPDATE edt_service SET id_mat=?, matricule_ens=?, heures=?, duree_min=?, duree_max=?, id_salle=?, code_commun=?, commentaire=? WHERE id=? AND id_annee=?",
                               [$mat, $ens, $h, $dmin, $dmax, $salle, $cc, $com, $sid, $a]);
+            // Code commun ajouté / retiré après coup : les séances déjà placées le suivent (25/10/2026)
+            if ($sid) db_exec("UPDATE edt_seance SET code_commun=? WHERE id_service=? AND id_annee=?", [$cc, $sid, $a]);
             else db_exec("INSERT INTO edt_service (id_annee,id_classe,id_mat,matricule_ens,heures,duree_min,duree_max,id_salle,code_commun,commentaire) VALUES (?,?,?,?,?,?,?,?,?,?)",
                          [$a, $id_classe, $mat, $ens, $h, $dmin, $dmax, $salle, $cc, $com]);
             $n++;

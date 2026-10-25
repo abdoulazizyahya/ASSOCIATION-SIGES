@@ -240,6 +240,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $sid = (int)post('seq_id');
         db_exec("UPDATE sequence SET active=0");
         db_exec("UPDATE sequence SET active=1 WHERE id=?", [$sid]);
+        sec_synchroniser_affectations();   // remplaçant prévu à partir du trimestre de cette séquence
         flash_set('succes', 'Évaluation activée.');
         rediriger('secondaire/commun/pages/parametres/index.php?onglet=evaluations');
     }
@@ -267,6 +268,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($t) {
             db_exec("UPDATE trimestre SET active=0 WHERE id_annee=?", [$t['id_annee']]);
             db_exec("UPDATE trimestre SET active=1 WHERE id=?", [$id_trim_new]);
+            sec_synchroniser_affectations();
             $ok = true;
         }
         // Requête AJAX (bandeau « Trimestre actif ») : réponse JSON, pas de
@@ -298,6 +300,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                          ORDER BY date_debut DESC LIMIT 1");
             if ($a) {
                 db_exec("UPDATE sequence SET active=1 WHERE id=?", [$a['id']]);
+                sec_synchroniser_affectations();
                 flash_set('succes', 'Vérification effectuée — évaluation activée.');
             } else {
                 flash_set('info', 'Vérification effectuée — aucune évaluation à activer pour aujourd\'hui.');

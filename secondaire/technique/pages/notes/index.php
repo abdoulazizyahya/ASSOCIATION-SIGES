@@ -415,9 +415,23 @@ if ($onglet === 'non_saisis' && $seq_active) {
 }
 
 // ══════════════════════════════════════════════════════════════
-//  ONGLET 5 — Relevé vierge (PDF/Excel téléchargeables, aucune saisie)
+//  ONGLET 5 — Relevé de notes (24/10/2026) : VIERGE (formulaire à remplir à la
+//  main) ou REMPLI (notes saisies d'une matière, une colonne par évaluation).
 // ══════════════════════════════════════════════════════════════
-$id_cl_rv = (int)($_GET['classe_rv'] ?? 0);
+$id_cl_rv    = (int)($_GET['classe_rv'] ?? 0);
+$mode_rv     = ($_GET['mode_rv'] ?? '') === 'rempli' ? 'rempli' : 'vierge';
+$id_mat_rv   = (int)($_GET['mat_rv'] ?? 0);
+$matieres_rv = [];
+if ($onglet === 'releve_vierge' && $id_cl_rv) {
+    // Matières de la classe ; l'enseignant ne voit que celles qu'il enseigne.
+    $matieres_rv = $is_admin
+        ? db_all("SELECT m.id, m.libelle FROM discipline d JOIN matiere m ON m.id=d.id_mat WHERE d.IDClasses=? ORDER BY d.ordre, m.libelle", [$id_cl_rv])
+        : db_all("SELECT m.id, m.libelle FROM discipline d JOIN matiere m ON m.id=d.id_mat
+                  JOIN dispenser p ON p.IDClasses=d.IDClasses AND p.id_mat=d.id_mat AND p.val_annee=? AND p.matricule_ens=?
+                  WHERE d.IDClasses=? ORDER BY d.ordre, m.libelle", [$val_annee, (int) $mat_ens, $id_cl_rv]);
+    if ($id_mat_rv && !in_array($id_mat_rv, array_map('intval', array_column($matieres_rv, 'id')), true)) $id_mat_rv = 0;
+}
+if ($mode_rv === 'rempli' && !$id_mat_rv) $mode_rv = 'vierge';   // rempli : une matière précise
 
 // Mode "partiel" (AJAX) : réponse limitée au contenu de #notes-zone, sans
 // noyau/layout/header.php ni noyau/layout/footer.php — voir initAjaxZone()/chargerPartiel()
@@ -494,7 +508,7 @@ if (!$es_partiel) {
   <li class="nav-item">
     <a class="nav-link <?= $onglet==='releve_vierge'?'active':'' ?>" data-ajax-nav
        href="<?= APP_URL ?>/secondaire/technique/pages/notes/index.php?onglet=releve_vierge<?= $id_cl_rv?"&classe_rv=$id_cl_rv":'' ?>">
-      <i class="bi bi-file-earmark-spreadsheet me-1"></i>Relevé vierge
+      <i class="bi bi-file-earmark-spreadsheet me-1"></i>Relevé de notes
     </a>
   </li>
 </ul>
@@ -1316,14 +1330,26 @@ document.addEventListener('DOMContentLoaded', function(){
 
 <?php elseif ($onglet === 'releve_vierge'): ?>
 <!-- ══════════════════════════════════════════════════
-     ONGLET 5 — Relevé vierge (à imprimer)
+     ONGLET 5 — Relevé de notes : vierge ou rempli (24/10/2026)
 ══════════════════════════════════════════════════ -->
+<?php
+  $q_rv   = 'classe=' . $id_cl_rv . '&mode=' . $mode_rv . ($id_mat_rv ? '&mat=' . $id_mat_rv : '');
+  $url_rv = APP_URL . '/secondaire/technique/pages/notes/pdf_releve_vierge.php?' . $q_rv;
+  $classe_rv_lbl = 'Toutes les classes';
+  if ($id_cl_rv) {
+      $classe_rv_lbl = '';
+      foreach ($classes as $c) { if ($c['id'] == $id_cl_rv) { $classe_rv_lbl = $c['designation']; break; } }
+  }
+  $mat_rv_lbl = '';
+  foreach ($matieres_rv as $m) { if ((int) $m['id'] === $id_mat_rv) { $mat_rv_lbl = $m['libelle']; break; } }
+  $titre_rv = 'Relevé de notes ' . $mode_rv . ' — ' . $classe_rv_lbl . ($mat_rv_lbl ? ' — ' . $mat_rv_lbl : '');
+?>
 <div class="card mb-3">
   <div class="card-body">
-    <div class="section-titre mb-2"><i class="bi bi-file-earmark-spreadsheet me-1 text-primary"></i>Relevé de notes vierge</div>
+    <div class="section-titre mb-2"><i class="bi bi-file-earmark-spreadsheet me-1 text-primary"></i>Relevé de notes</div>
     <form method="get" class="row g-2 align-items-end" data-ajax-nav-form>
       <input type="hidden" name="onglet" value="releve_vierge">
-      <div class="col-md-5">
+      <div class="col-md-4">
         <label class="form-label fw-semibold">Classe</label>
         <select name="classe_rv" class="form-select" data-ajax-nav-auto>
           <option value="0" <?= $id_cl_rv==0?'selected':''?>>— Toutes les classes —</option>
@@ -1332,39 +1358,53 @@ document.addEventListener('DOMContentLoaded', function(){
           <?php endforeach; ?>
         </select>
       </div>
+      <div class="col-md-4">
+        <label class="form-label fw-semibold">Matière</label>
+        <select name="mat_rv" class="form-select" data-ajax-nav-auto <?= $id_cl_rv ? '' : 'disabled' ?>>
+          <option value="0"><?= $id_cl_rv ? '— Aucune (à remplir à la main) —' : '— Choisir d\'abord une classe —' ?></option>
+          <?php foreach ($matieres_rv as $m): ?>
+            <option value="<?= (int) $m['id'] ?>" <?= (int) $m['id'] === $id_mat_rv ? 'selected' : '' ?>><?= h($m['libelle']) ?></option>
+          <?php endforeach; ?>
+        </select>
+      </div>
+      <div class="col-md-4">
+        <label class="form-label fw-semibold">Type de relevé</label>
+        <select name="mode_rv" class="form-select" data-ajax-nav-auto>
+          <option value="vierge" <?= $mode_rv === 'vierge' ? 'selected' : '' ?>>Vierge (à remplir à la main)</option>
+          <option value="rempli" <?= $mode_rv === 'rempli' ? 'selected' : '' ?> <?= $id_mat_rv ? '' : 'disabled' ?>>Rempli (notes saisies)<?= $id_mat_rv ? '' : ' — choisir une matière' ?></option>
+        </select>
+      </div>
     </form>
-    <div class="mt-3">
-      <a class="btn btn-sm" style="background:#1a2744;color:#fff" target="_blank"
-         href="<?= APP_URL ?>/secondaire/technique/pages/notes/pdf_releve_vierge.php?classe=<?= $id_cl_rv ?>&dl=1">
+    <div class="mt-3 d-flex flex-wrap gap-2">
+      <button type="button" class="btn btn-sm btn-primary"
+              onclick="afficherApercu(<?= h(json_encode($url_rv)) ?>, <?= h(json_encode($titre_rv)) ?>, 'releve_notes_matiere', 'portrait')">
+        <i class="bi bi-eye me-1"></i>Afficher / imprimer
+      </button>
+      <a class="btn btn-sm" style="background:#1a2744;color:#fff" target="_blank" href="<?= h($url_rv) ?>&dl=1">
         <i class="bi bi-file-earmark-pdf me-1"></i>Télécharger en PDF
       </a>
-      <a class="btn btn-sm btn-outline-success ms-2"
+      <?php if ($mode_rv === 'vierge'): ?>
+      <a class="btn btn-sm btn-outline-success"
          href="<?= APP_URL ?>/secondaire/technique/pages/notes/excel_releve_vierge.php?classe=<?= $id_cl_rv ?>">
-        <i class="bi bi-file-earmark-excel me-1"></i>Télécharger en Excel
+        <i class="bi bi-file-earmark-excel me-1"></i>Télécharger en Excel (vierge)
       </a>
+      <?php endif; ?>
     </div>
+    <?php if ($mode_rv === 'rempli'): ?>
+      <div class="text-muted mt-2" style="font-size:.78rem"><i class="bi bi-info-circle me-1"></i>Une colonne par évaluation (séquence) de l'année, avec les notes saisies en <?= h($mat_rv_lbl) ?> ; case vide = note non saisie.</div>
+    <?php endif; ?>
   </div>
 </div>
 
-<?php
-  $classe_rv_lbl = 'Toutes les classes';
-  if ($id_cl_rv) {
-      $classe_rv_lbl = '';
-      foreach ($classes as $c) { if ($c['id'] == $id_cl_rv) { $classe_rv_lbl = $c['designation']; break; } }
-  }
-?>
 <div class="card">
   <div class="card-header py-2" style="background:#f0f4ff">
-    <span class="fw-semibold" style="color:#1a2744">
-      <i class="bi bi-eye me-1"></i>Aperçu — <?= h($classe_rv_lbl) ?>
-    </span>
+    <span class="fw-semibold" style="color:#1a2744"><i class="bi bi-eye me-1"></i>Aperçu — <?= h($titre_rv) ?></span>
   </div>
   <div class="card-body p-0">
-    <iframe src="<?= APP_URL ?>/secondaire/technique/pages/notes/pdf_releve_vierge.php?classe=<?= $id_cl_rv ?>"
-            style="width:100%;height:80vh;border:none;display:block" title="Aperçu relevé vierge"></iframe>
+    <iframe src="<?= h($url_rv) ?>"
+            style="width:100%;height:80vh;border:none;display:block" title="Aperçu du relevé de notes"></iframe>
   </div>
 </div>
-
 <?php endif; // fin onglet non_saisis / releve_vierge (fin chaine if/elseif onglets) ?>
 
 <?php endif; // fin bloc seq_bloquee ?>

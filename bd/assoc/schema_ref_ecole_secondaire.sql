@@ -265,6 +265,19 @@ CREATE TABLE `dispenser` (
   KEY `matricule_ens` (`matricule_ens`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
+DROP TABLE IF EXISTS `dispenser_periode`;
+CREATE TABLE `dispenser_periode` (
+  `id` int unsigned NOT NULL AUTO_INCREMENT,
+  `matricule_ens` int NOT NULL DEFAULT 0,
+  `IDClasses` int NOT NULL,
+  `id_mat` int NOT NULL,
+  `val_annee` varchar(10) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `trim_debut` tinyint unsigned NOT NULL DEFAULT 1,
+  `cree_le` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_disp_periode` (`IDClasses`,`id_mat`,`val_annee`,`trim_debut`),
+  KEY `idx_disp_periode_ens` (`matricule_ens`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 DROP TABLE IF EXISTS `eleve`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
@@ -343,6 +356,9 @@ CREATE TABLE `enseignant` (
   `mode_paiement` varchar(30) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `nom_banque` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `compte_bancaire` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `statut_ens` varchar(10) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'actif',
+  `date_depart` date DEFAULT NULL,
+  `motif_depart` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   PRIMARY KEY (`matricule_ens`),
   UNIQUE KEY `uq_enseignant_matricule` (`matricule`),
   KEY `id_grade` (`id_grade`)

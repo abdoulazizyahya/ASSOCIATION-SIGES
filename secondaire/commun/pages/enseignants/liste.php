@@ -20,6 +20,15 @@ if ($q !== '') {
             . ($gere_comptes ? ' OR u.login LIKE ?' : '');
     $params = array_fill(0, $gere_comptes ? 6 : 5, "%$q%");
 }
+// Situation (v22, 24/10/2026) : en service par défaut ; « anciens » = mutés, partis, retraités.
+$situation_dispo = db_colonne_existe('enseignant', 'statut_ens');
+$situation = $situation_dispo && in_array($_GET['situation'] ?? '', ['anciens', 'tous'], true) ? $_GET['situation'] : 'actifs';
+if ($situation_dispo && $situation !== 'tous') {
+    $cond  = sec_sql_ens_en_service('e');
+    $where = ($where ? '(' . substr($where, 6) . ') AND ' : '') . ($situation === 'actifs' ? $cond : "NOT ($cond)");
+    $where = 'WHERE ' . $where;
+}
+$nb_anciens = $situation_dispo ? (int) db_val("SELECT COUNT(*) FROM enseignant e WHERE NOT (" . sec_sql_ens_en_service('e') . ")") : 0;
 
 // Tri par colonne (clic sur l'en-tête) et pagination, 17/10/2026. Les cases vides
 // restent toujours en dernier, quel que soit le sens du tri.
@@ -43,11 +52,12 @@ $nb_pages = $pp ? max(1, (int) ceil($total / $pp)) : 1;
 $page     = min($nb_pages, max(1, (int) ($_GET['page'] ?? 1)));
 $limite   = $pp ? ' LIMIT ' . $pp . ' OFFSET ' . (($page - 1) * $pp) : '';
 $enseignants = db_all("SELECT e.*, u.login, u.actif AS compte_actif FROM enseignant e $join_compte $where ORDER BY $ordre$limite", $params);
-$sans_compte = $gere_comptes ? (int) db_val("SELECT COUNT(*) FROM enseignant e $join_compte WHERE u.id IS NULL") : 0;
+$sans_compte = $gere_comptes ? (int) db_val("SELECT COUNT(*) FROM enseignant e $join_compte WHERE u.id IS NULL AND " . sec_sql_ens_en_service("e")) : 0;   // pas de compte pour les anciens
 
 // URL de la liste avec les paramètres courants, modifiés par $chg (null = retiré)
-$url_liste = function (array $chg = []) use ($q, $tri, $sens, $pp): string {
-    $p = array_merge(['q' => $q, 'tri' => $tri === 'nom' ? null : $tri, 'sens' => $sens === 'DESC' ? 'desc' : null, 'pp' => $pp === 25 ? null : $pp], $chg);
+$url_liste = function (array $chg = []) use ($q, $tri, $sens, $pp, $situation): string {
+    $p = array_merge(['q' => $q, 'tri' => $tri === 'nom' ? null : $tri, 'sens' => $sens === 'DESC' ? 'desc' : null, 'pp' => $pp === 25 ? null : $pp,
+                      'situation' => $situation === 'actifs' ? null : $situation], $chg);
     $p = array_filter($p, fn($v) => $v !== null && $v !== '');
     return APP_URL . '/secondaire/commun/pages/enseignants/liste.php' . ($p ? '?' . http_build_query($p) : '');
 };
@@ -101,6 +111,13 @@ require_once __DIR__ . '/../../../../noyau/layout/header.php';
       <input type="search" name="q" value="<?= h($q) ?>" placeholder="Nom, matricule, fonction, téléphone<?= $gere_comptes ? ', identifiant' : '' ?>…" class="form-control form-control-sm" style="max-width:340px">
       <?php if ($tri !== 'nom'): ?><input type="hidden" name="tri" value="<?= h($tri) ?>"><?php endif; ?>
       <?php if ($sens === 'DESC'): ?><input type="hidden" name="sens" value="desc"><?php endif; ?>
+      <?php if ($situation_dispo): ?>
+      <select name="situation" class="form-select form-select-sm" style="width:auto" onchange="this.form.submit()" title="Mutés, partis, retraités : fiches conservées pour l'historique">
+        <option value="actifs" <?= $situation === 'actifs' ? 'selected' : '' ?>>En service</option>
+        <option value="anciens" <?= $situation === 'anciens' ? 'selected' : '' ?>>Anciens (mutés, partis…)<?= $nb_anciens ? " ($nb_anciens)" : '' ?></option>
+        <option value="tous" <?= $situation === 'tous' ? 'selected' : '' ?>>Tous</option>
+      </select>
+      <?php endif; ?>
       <button class="btn btn-outline-primary btn-sm"><i class="bi bi-search"></i></button>
       <?php if ($q): ?><a href="<?= h($url_liste(['q' => null, 'page' => null])) ?>" class="btn btn-outline-secondary btn-sm"><i class="bi bi-x-lg"></i></a><?php endif; ?>
       <div class="ms-auto d-flex align-items-center gap-1" style="font-size:.78rem">
@@ -142,6 +159,9 @@ require_once __DIR__ . '/../../../../noyau/layout/header.php';
                  class="fw-semibold text-decoration-none" style="font-size:.82rem">
                 <?= h(($e['civilite_ens'] ? $e['civilite_ens'] . ' ' : '') . mb_strtoupper($e['nom_ens']) . ' ' . ($e['prenom_ens'] ?? '')) ?>
               </a>
+              <?php if (($e['statut_ens'] ?? 'actif') !== 'actif'): ?>
+                <span class="badge bg-danger ms-1" style="font-size:.62rem"><?= h(SEC_SITUATIONS[$e['statut_ens']] ?? $e['statut_ens']) ?><?= $e['date_depart'] ? ' le ' . h(date_fr($e['date_depart'])) : '' ?></span>
+              <?php endif; ?>
             </td>
             <td style="font-size:.78rem">
               <?= h($e['id_fonction'] ?: '—') ?>

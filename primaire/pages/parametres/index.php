@@ -275,6 +275,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $sid = (int) post('seq_id');
         db_exec("UPDATE sequence SET etat=0");
         db_exec("UPDATE sequence SET etat=1 WHERE id_seq=?", [$sid]);
+        prim_synchroniser_affectations();   // titulaire remplaçant prévu à partir du trimestre de cette séquence (v65)
         flash_set('succes', 'Évaluation activée.');
         rediriger('primaire/pages/parametres/index.php?onglet=evaluations');
     }

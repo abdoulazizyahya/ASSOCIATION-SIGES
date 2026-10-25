@@ -156,6 +156,67 @@ require_once __DIR__ . '/../../../noyau/layout/header.php';
   </div>
 
   <div class="col-lg-4">
+    <?php // Situation (v65, 24/10/2026) : départ au lieu d'une suppression, voir depart.php
+    $statut_e    = $ens['statut_ens'] ?? 'actif';
+    $depart_dispo = db_colonne_existe('enseignant', 'date_depart') && $statut_e !== 'systeme'
+                    && (string) $mat !== (string) matricule_ens_courant() && fiche_gerable($mat, (string) $ens['id_fonction']);
+    if ($depart_dispo):
+      $va_e = get_annee_active()['val_annee'] ?? '';
+      $classes_e = (int) db_val("SELECT (SELECT COUNT(*) FROM enseignat_classe WHERE matricule_ens=? AND val_annee=?)
+                                      + (SELECT COUNT(*) FROM enseignat_classe_arabe WHERE matricule_ens=? AND val_annee=?)", [$mat, $va_e, $mat, $va_e]); ?>
+    <div class="card mb-2" style="<?= $statut_e === 'actif' ? '' : 'border:1px solid #fca5a5;background:#fef2f2' ?>">
+      <div class="card-header fw-semibold"><i class="bi bi-person-walking me-1"></i>Situation</div>
+      <div class="card-body" style="font-size:.85rem">
+        <?php if (in_array($statut_e, ['actif', 'inactif'], true)): ?>
+          <div class="mb-2"><span class="badge <?= $statut_e === 'actif' ? 'bg-success' : 'bg-secondary' ?>"><?= h(PRIM_SITUATIONS[$statut_e]) ?></span></div>
+          <form method="post" action="<?= APP_URL ?>/primaire/pages/enseignants/depart.php" class="row g-2">
+            <?= csrf_champ() ?>
+            <input type="hidden" name="action" value="depart">
+            <input type="hidden" name="matricule_ens" value="<?= $mat ?>">
+            <div class="col-6">
+              <select name="statut_ens" class="form-select form-select-sm" required>
+                <option value="mute">Muté(e)</option><option value="parti">Parti(e)</option><option value="retraite">Retraité(e)</option>
+              </select>
+            </div>
+            <div class="col-6"><input type="date" name="date_depart" class="form-control form-control-sm" value="<?= date('Y-m-d') ?>" required></div>
+            <div class="col-12"><input type="text" name="motif_depart" class="form-control form-control-sm" maxlength="255" placeholder="Motif / nouvelle affectation (facultatif)"></div>
+            <div class="col-12">
+              <button class="btn btn-outline-danger btn-sm w-100"
+                      onclick="return confirm('Déclarer ce départ ? La fiche est conservée (nom sur les anciens bulletins), elle sort des listes et le compte de connexion est désactivé.')">
+                <i class="bi bi-box-arrow-right me-1"></i>Déclarer le départ
+              </button>
+            </div>
+          </form>
+          <?php if (!prim_traces_enseignant($mat)): ?>
+          <form method="post" action="<?= APP_URL ?>/primaire/pages/enseignants/depart.php" class="mt-2">
+            <?= csrf_champ() ?>
+            <input type="hidden" name="action" value="supprimer">
+            <input type="hidden" name="matricule_ens" value="<?= $mat ?>">
+            <button class="btn btn-link btn-sm text-danger p-0" onclick="return confirm('Supprimer définitivement cette fiche (aucun historique) et son compte ?')">
+              <i class="bi bi-trash me-1"></i>Supprimer la fiche (créée par erreur)
+            </button>
+          </form>
+          <?php endif; ?>
+        <?php else: ?>
+          <div class="mb-1"><span class="badge bg-danger"><?= h(PRIM_SITUATIONS[$statut_e] ?? $statut_e) ?></span>
+            <?= !empty($ens['date_depart']) ? 'depuis le ' . h(date_fr($ens['date_depart'])) : '' ?></div>
+          <?php if (!empty($ens['motif_depart'])): ?><div class="text-muted mb-2"><?= h($ens['motif_depart']) ?></div><?php endif; ?>
+          <?php if ($classes_e): ?>
+            <div class="alert alert-warning py-1 px-2 small mb-2">Encore titulaire de <?= $classes_e ?> classe(s) cette année :
+              <a href="<?= APP_URL ?>/primaire/pages/enseignants/liste.php?onglet=affectation">désigner le remplaçant</a>.</div>
+          <?php endif; ?>
+          <form method="post" action="<?= APP_URL ?>/primaire/pages/enseignants/depart.php">
+            <?= csrf_champ() ?>
+            <input type="hidden" name="action" value="reintegrer">
+            <input type="hidden" name="matricule_ens" value="<?= $mat ?>">
+            <button class="btn btn-outline-success btn-sm w-100" onclick="return confirm('Remettre en service ?')">
+              <i class="bi bi-arrow-counterclockwise me-1"></i>Réintégrer
+            </button>
+          </form>
+        <?php endif; ?>
+      </div>
+    </div>
+    <?php endif; ?>
     <?php require __DIR__ . '/_compte_carte.php'; // compte de connexion (17/10/2026) ?>
 
     <?php if ($paie_ecole): ?>

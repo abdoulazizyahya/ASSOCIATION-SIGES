@@ -13,9 +13,9 @@ require_once __DIR__ . '/../fonctions.php';
 // DIRECTEUR (primaire) ou ADMIN/PROVISEUR (secondaire, schema_ref_ecole_
 // secondaire.sql) — 'DIRECTEUR' seul refusait TOUJOURS l'accès à un compte
 // secondaire (rôle inexistant côté secondaire).
-exiger_role(function_exists('type_enseignement_courant') && type_enseignement_courant() === 'secondaire'
-    ? ['ADMIN', 'PROVISEUR']
-    : ['DIRECTEUR']);
+// Depuis le 24/10/2026 : la personne qui imprime ajuste la position (la décision
+// d'apposer ou non la signature appartient au propriétaire, voir fonctions.php).
+exiger_connexion();
 
 header('Content-Type: application/json; charset=utf-8');
 

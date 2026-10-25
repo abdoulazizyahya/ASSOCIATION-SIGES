@@ -238,7 +238,7 @@ if ($id_classe && $periode_choisie) {
 
 $fmt = fn(?float $v): string => $v === null ? '—' : rtrim(rtrim(number_format($v,2,'.',''),'0'),'.');
 $etab_sig_bull = signature_configuree('chef_etablissement');
-$peut_configurer_sig_bull = signature_role_autorisee('chef_etablissement', role_connecte());
+$peut_configurer_sig_bull = signature_politique()["bulletin"];   // signature décidée par le propriétaire ; la personne qui imprime ajuste la position (24/10/2026)
 
 function pdf_url_bull(int $id_eleve, string $vue, int $id_trim, int $id_annee, bool $dl=false): string {
     if ($vue === 'annee') {

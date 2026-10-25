@@ -303,7 +303,7 @@ $disciplines = db_all(
             TRIM(CONCAT(e.nom_ens,' ',COALESCE(e.prenom_ens,''))) AS enseignant
      FROM discipline d JOIN matiere m ON m.id=d.id_mat AND m.actif=1
      LEFT JOIN dispenser disp ON disp.id_mat=d.id_mat AND disp.IDClasses=d.IDClasses AND disp.val_annee=?
-     LEFT JOIN enseignant e ON e.matricule_ens=disp.matricule_ens
+     LEFT JOIN enseignant e ON e.matricule_ens=" . sec_sql_enseignant_trimestre($val_annee, (int) db_val("SELECT ordre FROM trimestre WHERE id=?", [(int) $id_trim])) . "   -- enseignant DE CE TRIMESTRE (remplacements, v22)
      WHERE d.IDClasses=? ORDER BY d.ordre, m.libelle",
     [$val_annee, $id_classe]
 );

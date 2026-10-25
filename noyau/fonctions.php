@@ -37,6 +37,56 @@ if (!empty($_POST['_formb64']) && is_string($_POST['_formb64'])) {
     unset($paires, $morceaux, $decode, $p);
 }
 
+// ── Signature numérique : décision du PROPRIÉTAIRE par type de document ──
+// (24/10/2026) Le propriétaire choisit, dans le portail association
+// (association/signatures_documents.php), les documents qui portent la
+// signature numérique (ex. bulletin : non ; PV, relevé, tableau d'honneur :
+// oui). La personne qui imprime ne choisit plus : le paramètre GET
+// « signature » que lit chaque document est fixé ici, avant le document,
+// d'après la catégorie du script. Elle peut toujours ajuster la position.
+// Documents du personnel (attestation, prise de service) : hors règle, ils
+// suivent le circuit de validation (Paramètres → Documents enseignants).
+const SIGNATURE_CATEGORIES = [
+    'bulletin'        => ['Bulletins de notes',            true,  ['/bulletins/pdf', 'primaire/pdf/bulletin_']],
+    'pv'              => ['PV de conseil de classe',       true,  ['conseil_classe/pdf.php', 'primaire/pdf/conseil_pv']],
+    'releve'          => ['Relevés de notes',              true,  ['conseil_classe/pdf_releve', 'conseil_classe/excel_releve', 'primaire/pdf/releve_notes', 'notes/pdf_releve']],
+    'tableau_honneur' => ['Tableaux d\'honneur',           true,  ['tableau_honneur/pdf_certificat', 'certificat_tableau_honneur']],
+    'statistiques'    => ['Fiches et rapports statistiques', true, ['statistiques/pdf_', 'statistiques/excel_', 'statistiques_arabe/excel_', 'primaire/pdf/statistiques', 'fiche_statistique_classe']],
+    'resultats'       => ['Résultats annuels / meilleurs élèves', true, ['/pdf/resultat_', 'resultat_annuel/excel', 'resultat_annuel_arabe/excel']],
+    'scolarite'       => ['Certificats de scolarité, cartes, fiches et listes d\'élèves', true, ['certificat_scolarite', '/pdf/cartes.php', '/pdf/fiche_eleve', '/pdf/liste_eleves']],
+    'finances'        => ['Rapports financiers (paiements, dépenses)', true, ['paiements/pdf_', 'primaire/pdf/finances_', 'primaire/pdf/depenses_', 'finances/excel_', 'depenses/excel_']],
+];
+/** Valeurs par défaut tant que le propriétaire n'a rien enregistré (exemple de la demande du 24/10/2026). */
+const SIGNATURE_DEFAUTS = ['bulletin' => 0, 'pv' => 1, 'releve' => 1, 'tableau_honneur' => 1, 'statistiques' => 1,
+                           'resultats' => 0, 'scolarite' => 0, 'finances' => 0];
+
+/** Catégorie du document généré par le script $chemin (SCRIPT_NAME par défaut), ou null. */
+function signature_categorie(?string $chemin = null): ?string {
+    $chemin = str_replace('\\', '/', $chemin ?? ($_SERVER['SCRIPT_NAME'] ?? ''));
+    foreach (SIGNATURE_CATEGORIES as $cat => [, , $motifs]) {
+        foreach ($motifs as $m) if (str_contains($chemin, $m)) return $cat;
+    }
+    return null;
+}
+
+/** Politique en vigueur : [catégorie => bool]. */
+function signature_politique(): array {
+    static $p = null;
+    if ($p !== null) return $p;
+    $enr = function_exists('assoc_param') ? json_decode((string) assoc_param('signature_documents', ''), true) : null;
+    $p = [];
+    foreach (SIGNATURE_DEFAUTS as $cat => $def) $p[$cat] = (bool) (is_array($enr) && array_key_exists($cat, $enr) ? $enr[$cat] : $def);
+    return $p;
+}
+
+if (($__cat_sig = signature_categorie()) !== null) {
+    $_GET['signature'] = signature_politique()[$__cat_sig] ? '1' : '0';
+}
+// Fenêtre « Ajuster la position » : le document est rendu SANS signature, l'image
+// est posée par-dessus pour être déplacée (noyau/layout/footer.php, urlSansSignature()).
+if (($_GET['signature_pos'] ?? '') === '1') $_GET['signature'] = '0';
+unset($__cat_sig);
+
 // Démarre la session si pas déjà démarrée
 // Nom de cookie + path dédiés à CETTE application : plusieurs projets PHP
 // indépendants tournent sur le même hôte (localhost/ABZ_MBE/, .../LAM_ABZ/,
@@ -333,7 +383,38 @@ function menu_entree_visible(string $groupe, array $it): bool {
         || array_intersect($ctx['roles'], $it[3])
         || in_array($nc, ['lecture', 'ecriture'], true);
     if (!$par_role) return false;
+    // Condition 'pp' (5e élément, secondaire, 24/10/2026) : ouverte à l'ENSEIGNANT
+    // seulement s'il est professeur principal d'une classe cette année (sinon la
+    // page le renvoyait au tableau de bord). Les autres rôles listés la gardent.
+    if (($it[4] ?? null) === 'pp' && !$ctx['voit_tout'] && !in_array($nc, ['lecture', 'ecriture'], true)
+        && !array_intersect($ctx['roles'], array_diff($it[3] ?? [], ['ENSEIGNANT']))
+        && !sec_est_professeur_principal()) {
+        return false;
+    }
     return menu_acces_autorise($groupe, $it[1]);
+}
+
+/** Secondaire : la personne connectée est-elle professeur principal d'au moins une classe cette année ? */
+function sec_est_professeur_principal(): bool {
+    static $r = null;
+    if ($r !== null) return $r;
+    $mat = function_exists('matricule_ens_courant') ? matricule_ens_courant() : null;
+    if (!$mat) return $r = false;
+    try {
+        // Année passée en paramètre : jointure directe impossible (collations différentes,
+        // annee_scolaire.libelle utf8mb4_0900_ai_ci / val_annee utf8mb4_unicode_ci).
+        $va = (string) db_val("SELECT libelle FROM annee_scolaire WHERE active = 1 LIMIT 1");
+        return $r = (bool) db_val("SELECT 1 FROM enseignat_principal WHERE matricule_ens = ? AND val_annee = ? LIMIT 1", [(int) $mat, $va]);
+    } catch (\Throwable $e) { return $r = false; }   // schéma primaire : pas de professeur principal
+}
+
+/** Secondaire : classes (lignes classe) dont la personne connectée est professeur principal cette année. */
+function sec_classes_pp(): array {
+    $mat = function_exists('matricule_ens_courant') ? matricule_ens_courant() : null;
+    if (!$mat) return [];
+    $va = (string) db_val("SELECT libelle FROM annee_scolaire WHERE active = 1 LIMIT 1");   // voir sec_est_professeur_principal()
+    return db_all("SELECT c.* FROM enseignat_principal ep JOIN classe c ON c.id = ep.IDClasses
+                   WHERE ep.matricule_ens = ? AND ep.val_annee = ? AND c.archivee = 0 ORDER BY c.ordre, c.designation", [(int) $mat, $va]);
 }
 
 /**
@@ -1670,6 +1751,345 @@ function provisionner_trimestres_annee(int $id_annee): void {
 function activer_trimestre(int $id_trimestre): void {
     db_exec("UPDATE trimestre SET active=0");
     db_exec("UPDATE trimestre SET active=1 WHERE id=?", [$id_trimestre]);
+    sec_synchroniser_affectations();   // remplaçant prévu à partir de ce trimestre
+}
+
+// ── Affectations enseignant ↔ matière ↔ classe PAR PÉRIODE (secondaire v22, 24/10/2026) ──
+// `dispenser` = affectation EN COURS (une ligne par classe/matière/année), lue
+// partout : saisie des notes, emploi du temps, statistiques, droits d'accès…
+// `dispenser_periode` = historique : l'enseignant de chaque période, à partir
+// d'un trimestre (ordre 1, 2, 3) ; matricule_ens = 0 : plus personne à partir
+// de ce trimestre. Le bulletin d'un trimestre affiche l'enseignant de CE
+// trimestre (sec_sql_enseignant_trimestre()), même s'il est parti depuis.
+
+/** Migration v22 appliquée sur l'école courante ? */
+function sec_periodes_dispo(): bool {
+    return db_colonne_existe('dispenser_periode', 'trim_debut');
+}
+
+/** Ordre (1, 2, 3) du trimestre en cours : celui de la séquence active, sinon le trimestre actif. */
+function sec_ordre_trimestre_courant(): int {
+    $o = db_val("SELECT t.ordre FROM sequence s JOIN trimestre t ON t.id = s.id_trim
+                 JOIN annee_scolaire a ON a.id = t.id_annee AND a.active = 1 WHERE s.active = 1 LIMIT 1")
+      ?: db_val("SELECT t.ordre FROM trimestre t JOIN annee_scolaire a ON a.id = t.id_annee AND a.active = 1
+                 WHERE t.active = 1 LIMIT 1");
+    return max(1, (int) ($o ?: 1));
+}
+
+/**
+ * Affecte $matricule (0 = personne) à la matière $id_mat de la classe $id_classe
+ * À PARTIR du trimestre $trim_debut : les périodes déjà saisies pour ce
+ * trimestre et les suivants sont remplacées, les précédentes conservées.
+ * Choisir le 1er trimestre corrige donc une erreur d'affectation sans créer
+ * de remplacement. Met à jour l'affectation en cours (dispenser).
+ */
+function sec_affecter_enseignant(int $id_classe, int $id_mat, string $val_annee, int $matricule, int $trim_debut = 1): void {
+    $trim_debut = max(1, $trim_debut);
+    if (sec_periodes_dispo()) {
+        // Affectation en cours sans historique (écrite avant v22 ou par un autre
+        // chemin) : elle devient la période du 1er trimestre avant le remplacement.
+        $sans_hist = !db_val("SELECT 1 FROM dispenser_periode WHERE IDClasses=? AND id_mat=? AND val_annee=? LIMIT 1",
+                             [$id_classe, $id_mat, $val_annee]);
+        $en_cours  = db_val("SELECT matricule_ens FROM dispenser WHERE IDClasses=? AND id_mat=? AND val_annee=?",
+                            [$id_classe, $id_mat, $val_annee]);
+        if ($sans_hist && $en_cours !== null && $trim_debut > 1) {
+            db_exec("INSERT INTO dispenser_periode (matricule_ens, IDClasses, id_mat, val_annee, trim_debut) VALUES (?,?,?,?,1)",
+                    [(int) $en_cours, $id_classe, $id_mat, $val_annee]);
+        }
+        db_exec("DELETE FROM dispenser_periode WHERE IDClasses=? AND id_mat=? AND val_annee=? AND trim_debut>=?",
+                [$id_classe, $id_mat, $val_annee, $trim_debut]);
+        $avant = db_val("SELECT matricule_ens FROM dispenser_periode WHERE IDClasses=? AND id_mat=? AND val_annee=?
+                         ORDER BY trim_debut DESC LIMIT 1", [$id_classe, $id_mat, $val_annee]);
+        // Inutile d'ouvrir une période identique à la précédente ; « personne » dès le T1 = aucune ligne.
+        if ((int) $avant !== $matricule && !($matricule === 0 && $avant === null)) {
+            db_exec("INSERT INTO dispenser_periode (matricule_ens, IDClasses, id_mat, val_annee, trim_debut) VALUES (?,?,?,?,?)",
+                    [$matricule, $id_classe, $id_mat, $val_annee, $trim_debut]);
+        }
+        sec_synchroniser_affectations($id_classe, $id_mat, $val_annee);
+        return;
+    }
+    db_exec("DELETE FROM dispenser WHERE IDClasses=? AND id_mat=? AND val_annee=?", [$id_classe, $id_mat, $val_annee]);
+    if ($matricule) {
+        db_exec("INSERT INTO dispenser (matricule_ens, IDClasses, id_mat, val_annee) VALUES (?,?,?,?)",
+                [$matricule, $id_classe, $id_mat, $val_annee]);
+    }
+}
+
+/**
+ * Recalcule l'affectation en cours (dispenser) d'après l'historique et le
+ * trimestre en cours : une classe/matière précise, ou toute l'année active
+ * (changement de trimestre). Sans période ≤ trimestre en cours (remplaçant
+ * saisi à l'avance seulement), la période la plus ancienne fait foi.
+ */
+function sec_synchroniser_affectations(?int $id_classe = null, ?int $id_mat = null, ?string $val_annee = null): void {
+    if (!sec_periodes_dispo()) return;
+    $val_annee = $val_annee ?? (string) db_val("SELECT libelle FROM annee_scolaire WHERE active=1 LIMIT 1");
+    if ($val_annee === '') return;
+    $ordre = sec_ordre_trimestre_courant();
+    $cles = $id_classe !== null
+        ? [['IDClasses' => $id_classe, 'id_mat' => $id_mat]]
+        : db_all("SELECT DISTINCT IDClasses, id_mat FROM dispenser_periode WHERE val_annee=?", [$val_annee]);
+    foreach ($cles as $k) {
+        $p = [$k['IDClasses'], $k['id_mat'], $val_annee];
+        $mat = db_val("SELECT matricule_ens FROM dispenser_periode WHERE IDClasses=? AND id_mat=? AND val_annee=? AND trim_debut<=?
+                       ORDER BY trim_debut DESC LIMIT 1", array_merge($p, [$ordre]))
+            ?? db_val("SELECT matricule_ens FROM dispenser_periode WHERE IDClasses=? AND id_mat=? AND val_annee=?
+                       ORDER BY trim_debut LIMIT 1", $p);
+        $actuel = db_val("SELECT matricule_ens FROM dispenser WHERE IDClasses=? AND id_mat=? AND val_annee=?", $p);
+        if ((int) $mat === (int) $actuel && ($mat === null) === ($actuel === null)) continue;
+        db_exec("DELETE FROM dispenser WHERE IDClasses=? AND id_mat=? AND val_annee=?", $p);
+        if ((int) $mat) {
+            db_exec("INSERT INTO dispenser (matricule_ens, IDClasses, id_mat, val_annee) VALUES (?,?,?,?)",
+                    [(int) $mat, $k['IDClasses'], $k['id_mat'], $val_annee]);
+        }
+    }
+}
+
+/**
+ * Expression SQL du matricule de l'enseignant d'une discipline (alias `d` :
+ * id_mat, IDClasses) pour le trimestre d'ordre $ordre — à utiliser à la place
+ * de `disp.matricule_ens` (alias `disp` = jointure dispenser de l'année) dans
+ * les bulletins. Sans période connue : l'affectation en cours.
+ */
+function sec_sql_enseignant_trimestre(string $val_annee, int $ordre): string {
+    if ($ordre < 1 || !sec_periodes_dispo() || !preg_match('~^\d{4}/\d{4}$~', $val_annee)) return 'disp.matricule_ens';   // trimestre inconnu : en cours
+    $o = max(1, $ordre);
+    return "COALESCE((SELECT p.matricule_ens FROM dispenser_periode p
+                      WHERE p.IDClasses = d.IDClasses AND p.id_mat = d.id_mat AND p.val_annee = '$val_annee' AND p.trim_debut <= $o
+                      ORDER BY p.trim_debut DESC LIMIT 1), disp.matricule_ens)";
+}
+
+/** Historique d'une classe : [id_mat => [[trim_debut, matricule_ens, nom], …]] (au moins 2 périodes). */
+function sec_historique_affectations(int $id_classe, string $val_annee): array {
+    if (!sec_periodes_dispo()) return [];
+    $h = [];
+    foreach (db_all("SELECT p.id_mat, p.trim_debut, p.matricule_ens,
+                            TRIM(CONCAT(COALESCE(e.nom_ens,''), ' ', COALESCE(e.prenom_ens,''))) AS nom
+                     FROM dispenser_periode p LEFT JOIN enseignant e ON e.matricule_ens = p.matricule_ens
+                     WHERE p.IDClasses=? AND p.val_annee=? ORDER BY p.id_mat, p.trim_debut", [$id_classe, $val_annee]) as $r) {
+        $h[(int) $r['id_mat']][] = $r;
+    }
+    return array_filter($h, fn($l) => count($l) > 1);
+}
+
+// ── Situation d'un membre du personnel (secondaire v22) ──
+// Muté / parti / retraité : la fiche n'est plus supprimée. Il sort des listes
+// de choix (affectations, emploi du temps, paie, comptes) mais reste sur les
+// anciens bulletins, contrats, bulletins de paie…
+const SEC_SITUATIONS = ['actif' => 'En service', 'mute' => 'Muté', 'parti' => 'Parti', 'retraite' => 'Retraité'];
+
+/**
+ * La personne connectée peut-elle déclarer le départ / supprimer cette fiche ?
+ * Admin, Fondateur, propriétaire : toutes ; Proviseur : son personnel, jamais
+ * lui-même ni un chef d'établissement, un Fondateur ou un Admin.
+ */
+function sec_fiche_gerable(array $ens): bool {
+    if (voit_tous_les_comptes() || in_array(role_connecte(), ['ADMIN', 'FONDATEUR'], true)) return true;
+    if (role_connecte() !== 'PROVISEUR') return false;
+    if ((string) $ens['matricule_ens'] === (string) matricule_ens_courant()) return false;
+    return !in_array(sec_role_depuis_fonction($ens['id_fonction'] ?? ''), ['PROVISEUR', 'FONDATEUR', 'ADMIN'], true);
+}
+
+/**
+ * Traces laissées par un membre du personnel : [libellé => nombre]. Une fiche
+ * sans aucune trace (créée par erreur) peut être supprimée ; sinon on déclare
+ * un départ, pour garder son nom sur les bulletins, la paie, les contrats…
+ */
+function sec_traces_enseignant(int $matricule_ens): array {
+    $sources = [
+        'affectations (matières)'   => "SELECT COUNT(*) FROM dispenser WHERE matricule_ens=?",
+        'historique d\'affectations' => "SELECT COUNT(*) FROM dispenser_periode WHERE matricule_ens=?",
+        'classes (prof. principal)' => "SELECT COUNT(*) FROM enseignat_principal WHERE matricule_ens=?",
+        'surveillance générale'     => "SELECT COUNT(*) FROM sg WHERE matricule_ens=?",
+        'emploi du temps'           => "SELECT COUNT(*) FROM edt_service WHERE matricule_ens=?",
+        'bulletins de paie'         => "SELECT COUNT(*) FROM bulletin_paie WHERE matricule_ens=?",
+        'avances sur salaire'       => "SELECT COUNT(*) FROM avance_salaire WHERE matricule_ens=?",
+        'contrats'                  => "SELECT COUNT(*) FROM contrat_enseignant WHERE matricule_ens=?",
+        'congés'                    => "SELECT COUNT(*) FROM conge_enseignant WHERE matricule_ens=?",
+        'demandes de documents'     => "SELECT COUNT(*) FROM demande_document WHERE matricule_ens=?",
+    ];
+    $traces = [];
+    foreach ($sources as $lib => $sql) {
+        try { $n = (int) db_val($sql, [$matricule_ens]); } catch (\Throwable $e) { $n = 0; }   // table absente
+        if ($n > 0) $traces[$lib] = $n;
+    }
+    return $traces;
+}
+
+/** Paie du mois $mois/$annee : en service, ou parti pendant ce mois ou après — [condition SQL sur alias e, paramètres]. */
+function sec_sql_ens_paye_mois(int $annee, int $mois): array {
+    if (!db_colonne_existe('enseignant', 'statut_ens')) return ['1=1', []];
+    return ['(' . sec_sql_ens_en_service('e') . ' OR e.date_depart >= ?)', [sprintf('%04d-%02d-01', $annee, $mois)]];
+}
+
+/** Condition SQL « encore en service » (vraie partout si la migration v22 n'est pas appliquée). */
+function sec_sql_ens_en_service(string $alias = 'e'): string {
+    if (!db_colonne_existe('enseignant', 'statut_ens')) return '1=1';
+    $p = $alias !== '' ? $alias . '.' : '';
+    return "COALESCE({$p}statut_ens, 'actif') = 'actif'";
+}
+
+// ── PRIMAIRE : titulaires de classe PAR TRIMESTRE (migration v65, 24/10/2026) ──
+// Même principe que le secondaire ci-dessus, à l'échelle de la CLASSE (un ou
+// plusieurs titulaires) et par piste : 'fr' = enseignat_classe, 'ar' =
+// enseignat_classe_arabe (affectation EN COURS, lue partout). L'historique
+// enseignat_classe_periode garde l'ensemble des titulaires de chaque période,
+// à partir d'un trimestre (rang 1, 2, 3 dans l'année — le trimestre primaire
+// n'a pas de colonne « ordre ») ; matricule_ens = 0 : plus personne.
+const PRIM_PISTES = ['fr' => 'enseignat_classe', 'ar' => 'enseignat_classe_arabe'];
+// Situation d'un membre du personnel (primaire) : 'inactif' = désactivé (statut.php, existant), les autres = départ (v65).
+const PRIM_SITUATIONS = ['actif' => 'En service', 'inactif' => 'Inactif', 'mute' => 'Muté', 'parti' => 'Parti', 'retraite' => 'Retraité'];
+
+/** Paie primaire : « OR parti pendant ce mois ou après » (à ajouter après la condition statut actif, alias e). */
+function prim_sql_depart_mois(?array $periode): string {
+    return $periode && db_colonne_existe('enseignant', 'date_depart')
+        ? " OR (e.statut_ens IN ('mute','parti','retraite') AND e.date_depart >= ?)" : '';
+}
+function prim_param_depart_mois(?array $periode): array {
+    return prim_sql_depart_mois($periode) !== '' ? [sprintf('%04d-%02d-01', (int) $periode['annee'], (int) $periode['mois'])] : [];
+}
+
+/** Primaire : traces d'un membre du personnel (voir sec_traces_enseignant()) — [libellé => nombre]. */
+function prim_traces_enseignant(int $matricule_ens): array {
+    $sources = [
+        'classes (piste française)' => "SELECT COUNT(*) FROM enseignat_classe WHERE matricule_ens=?",
+        'classes (piste arabe)'     => "SELECT COUNT(*) FROM enseignat_classe_arabe WHERE matricule_ens=?",
+        'historique d\'affectations' => "SELECT COUNT(*) FROM enseignat_classe_periode WHERE matricule_ens=?",
+        'emploi du temps'           => "SELECT COUNT(*) FROM edt_service WHERE matricule_ens=?",
+        'bulletins de paie'         => "SELECT COUNT(*) FROM bulletin_paie WHERE matricule_ens=?",
+        'avances sur salaire'       => "SELECT COUNT(*) FROM avance_salaire WHERE matricule_ens=?",
+        'contrats'                  => "SELECT COUNT(*) FROM contrat_enseignant WHERE matricule_ens=?",
+        'congés'                    => "SELECT COUNT(*) FROM conge_enseignant WHERE matricule_ens=?",
+    ];
+    $traces = [];
+    foreach ($sources as $lib => $sql) {
+        try { $n = (int) db_val($sql, [$matricule_ens]); } catch (\Throwable $e) { $n = 0; }
+        if ($n > 0) $traces[$lib] = $n;
+    }
+    return $traces;
+}
+
+function prim_periodes_dispo(): bool {
+    return db_colonne_existe('enseignat_classe_periode', 'trim_debut');
+}
+
+/** Rang (1, 2, 3) d'un trimestre primaire dans son année. */
+function prim_ordre_trimestre(int $id_trim): int {
+    return max(1, (int) db_val("SELECT COUNT(*) FROM trimestre t2 JOIN trimestre t ON t.id_trim=? AND t2.id_annee=t.id_annee
+                                WHERE t2.id_trim <= t.id_trim", [$id_trim]));
+}
+
+/** Rang du trimestre en cours : celui de la séquence active (etat = 1) de l'année active. */
+function prim_ordre_trimestre_courant(): int {
+    $t = db_val("SELECT s.id_trim FROM sequence s JOIN trimestre t ON t.id_trim=s.id_trim
+                 JOIN annee_scolaire a ON a.val_annee=t.id_annee AND a.Etat_annee_scolaire=1 WHERE s.etat=1 LIMIT 1");
+    return $t ? prim_ordre_trimestre((int) $t) : 1;
+}
+
+/** Titulaires d'une période : liste triée de matricules (0 = personne). */
+function _prim_set_periode(string $piste, int $id_classe, string $va, string $cond, array $p): ?array {
+    $t = db_val("SELECT trim_debut FROM enseignat_classe_periode WHERE piste=? AND IDClasses=? AND val_annee=? AND $cond",
+                array_merge([$piste, $id_classe, $va], $p));
+    if ($t === null) return null;
+    $m = array_map('intval', array_column(db_all("SELECT matricule_ens FROM enseignat_classe_periode
+                                                  WHERE piste=? AND IDClasses=? AND val_annee=? AND trim_debut=?",
+                                                  [$piste, $id_classe, $va, $t]), 'matricule_ens'));
+    sort($m);
+    return $m;
+}
+
+/**
+ * Enregistre l'onglet « Affectation des classes » : $coches = ['fr'|'ar' =>
+ * [[matricule, IDClasses], …]] pour l'année $va. Une classe dont les
+ * titulaires changent reçoit une nouvelle période à partir du trimestre
+ * $trim_debut (1 = correction, sans historique) ; les autres restent intactes.
+ * Retourne le nombre d'affectations enregistrées.
+ */
+function prim_enregistrer_affectations(string $va, array $coches, int $trim_debut): int {
+    $trim_debut = max(1, $trim_debut);
+    $total = 0;
+    foreach (PRIM_PISTES as $piste => $table) {
+        $nouv = [];
+        foreach ($coches[$piste] ?? [] as [$mat, $idc]) { $nouv[(int) $idc][] = (int) $mat; $total++; }
+        $anc = [];
+        foreach (db_all("SELECT matricule_ens, IDClasses FROM $table WHERE val_annee=?", [$va]) as $r) $anc[(int) $r['IDClasses']][] = (int) $r['matricule_ens'];
+        if (!prim_periodes_dispo()) {   // avant v65 : remplacement simple, comme auparavant
+            db_exec("DELETE FROM $table WHERE val_annee=?", [$va]);
+            foreach ($nouv as $idc => $mats) foreach ($mats as $m) db_exec("INSERT IGNORE INTO $table (matricule_ens, IDClasses, val_annee) VALUES (?,?,?)", [$m, $idc, $va]);
+            continue;
+        }
+        foreach (array_unique(array_merge(array_keys($nouv), array_keys($anc))) as $idc) {
+            $n = array_values(array_unique($nouv[$idc] ?? [])); sort($n);
+            $a = array_values(array_unique($anc[$idc] ?? []));  sort($a);
+            if ($n === $a) continue;
+            $sans_hist = _prim_set_periode($piste, $idc, $va, '1=1', []) === null;
+            if ($sans_hist && $a && $trim_debut > 1) {   // affectation antérieure sans historique : elle devient le T1
+                foreach ($a as $m) db_exec("INSERT IGNORE INTO enseignat_classe_periode (piste, matricule_ens, IDClasses, val_annee, trim_debut) VALUES (?,?,?,?,1)", [$piste, $m, $idc, $va]);
+            }
+            db_exec("DELETE FROM enseignat_classe_periode WHERE piste=? AND IDClasses=? AND val_annee=? AND trim_debut>=?", [$piste, $idc, $va, $trim_debut]);
+            $prec = _prim_set_periode($piste, $idc, $va, 'trim_debut < ? ORDER BY trim_debut DESC LIMIT 1', [$trim_debut]);
+            $cible = $n ?: [0];
+            if ($prec !== $cible && !($prec === null && !$n)) {
+                foreach ($cible as $m) db_exec("INSERT INTO enseignat_classe_periode (piste, matricule_ens, IDClasses, val_annee, trim_debut) VALUES (?,?,?,?,?)", [$piste, $m, $idc, $va, $trim_debut]);
+            }
+            prim_synchroniser_affectations($va, $piste, $idc);
+        }
+    }
+    return $total;
+}
+
+/**
+ * Recalcule l'affectation en cours (enseignat_classe / _arabe) d'après
+ * l'historique et le trimestre en cours : une classe d'une piste, ou toute
+ * l'année active (changement de séquence / de trimestre).
+ */
+function prim_synchroniser_affectations(?string $va = null, ?string $piste = null, ?int $id_classe = null): void {
+    if (!prim_periodes_dispo()) return;
+    $va = $va ?? (string) db_val("SELECT val_annee FROM annee_scolaire WHERE Etat_annee_scolaire=1 LIMIT 1");
+    if ($va === '') return;
+    $ordre = prim_ordre_trimestre_courant();
+    $cles = $id_classe !== null ? [['piste' => $piste, 'IDClasses' => $id_classe]]
+          : db_all("SELECT DISTINCT piste, IDClasses FROM enseignat_classe_periode WHERE val_annee=?", [$va]);
+    foreach ($cles as $k) {
+        $table = PRIM_PISTES[$k['piste']] ?? null;
+        if (!$table) continue;
+        $set = _prim_set_periode($k['piste'], (int) $k['IDClasses'], $va, 'trim_debut <= ? ORDER BY trim_debut DESC LIMIT 1', [$ordre])
+            ?? _prim_set_periode($k['piste'], (int) $k['IDClasses'], $va, '1=1 ORDER BY trim_debut LIMIT 1', []);
+        if ($set === null) continue;
+        $set = array_values(array_filter($set));
+        $actuel = array_map('intval', array_column(db_all("SELECT matricule_ens FROM $table WHERE IDClasses=? AND val_annee=?", [$k['IDClasses'], $va]), 'matricule_ens'));
+        sort($actuel);
+        if ($actuel === $set) continue;
+        db_exec("DELETE FROM $table WHERE IDClasses=? AND val_annee=?", [$k['IDClasses'], $va]);
+        foreach ($set as $m) db_exec("INSERT IGNORE INTO $table (matricule_ens, IDClasses, val_annee) VALUES (?,?,?)", [$m, $k['IDClasses'], $va]);
+    }
+}
+
+/** Titulaire (civilité, nom, prénom) d'une classe pour le bulletin du trimestre $id_trim. */
+function prim_titulaire_trimestre(int $id_classe, string $va, int $id_trim, string $piste = 'fr'): ?array {
+    $table = PRIM_PISTES[$piste] ?? 'enseignat_classe';
+    if ($id_trim > 0 && prim_periodes_dispo()) {
+        $set = _prim_set_periode($piste, $id_classe, $va, 'trim_debut <= ? ORDER BY trim_debut DESC LIMIT 1', [prim_ordre_trimestre($id_trim)]);
+        if ($set !== null) {
+            $m = array_values(array_filter($set));
+            return $m ? db_one("SELECT civilite_ens, nom_ens, prenom_ens FROM enseignant WHERE matricule_ens=?", [$m[0]]) : null;
+        }
+    }
+    return db_one("SELECT e.civilite_ens, e.nom_ens, e.prenom_ens FROM enseignant e JOIN $table d ON e.matricule_ens=d.matricule_ens
+                   WHERE d.IDClasses=? AND d.val_annee=? LIMIT 1", [$id_classe, $va]);
+}
+
+/** Historique d'une année : ['fr'|'ar' => [IDClasses => [trim_debut => [noms]]]] pour les classes à ≥ 2 périodes. */
+function prim_historique_affectations(string $va): array {
+    if (!prim_periodes_dispo()) return [];
+    $h = [];
+    foreach (db_all("SELECT p.piste, p.IDClasses, p.trim_debut, p.matricule_ens, TRIM(CONCAT(COALESCE(e.nom_ens,''),' ',COALESCE(e.prenom_ens,''))) AS nom
+                     FROM enseignat_classe_periode p LEFT JOIN enseignant e ON e.matricule_ens=p.matricule_ens
+                     WHERE p.val_annee=? ORDER BY p.piste, p.IDClasses, p.trim_debut, e.nom_ens", [$va]) as $r) {
+        $h[$r['piste']][(int) $r['IDClasses']][(int) $r['trim_debut']][] = (int) $r['matricule_ens'] ? ($r['nom'] ?: '?') : 'personne';
+    }
+    foreach ($h as $p => $cl) $h[$p] = array_filter($cl, fn($t) => count($t) > 1);
+    return $h;
 }
 
 // Idem pour la séquence active — get_sequence_active() (fonctions.php) fait
@@ -1681,6 +2101,7 @@ function activer_trimestre(int $id_trimestre): void {
 function activer_sequence(int $id_sequence): void {
     db_exec("UPDATE sequence SET active=0");
     db_exec("UPDATE sequence SET active=1 WHERE id=?", [$id_sequence]);
+    sec_synchroniser_affectations();   // passage à une séquence d'un autre trimestre
 }
 
 // Retire l'état « actif » des trimestres et séquences d'une année désactivée
@@ -1772,7 +2193,10 @@ function auto_activer_sequences(): void {
                AND s.date_debut <= CURDATE() AND s.date_fin >= CURDATE()
              ORDER BY s.date_debut DESC LIMIT 1"
         );
-        if ($a) db_exec("UPDATE sequence SET active=1 WHERE id=?", [$a['id']]);
+        if ($a) {
+            db_exec("UPDATE sequence SET active=1 WHERE id=?", [$a['id']]);
+            sec_synchroniser_affectations();   // nouvelle séquence, peut-être d'un autre trimestre
+        }
     }
 }
 
