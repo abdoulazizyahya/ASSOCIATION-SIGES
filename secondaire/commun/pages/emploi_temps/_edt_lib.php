@@ -574,6 +574,18 @@ function edt_charges_enseignants(int $a): array {
         if ($s['code_commun']) { if (isset($out[$e]['communs'][$s['code_commun']])) continue; $out[$e]['communs'][$s['code_commun']] = true; }
         $out[$e]['attribuees'] = ($out[$e]['attribuees'] ?? 0) + (float) $s['heures'];
     }
+    // Heures rendues communes dans la grille seulement (code sur la séance, pas sur les
+    // services) : chaque classe les compte dans son service ; l'enseignant ne les fait
+    // qu'une fois. On retire les doublons, service par service (25/10/2026).
+    $grp = [];
+    foreach (db_all("SELECT q.matricule_ens, q.code_commun, q.jour, q.id_creneau, s.id sid, s.code_commun scode
+                     FROM edt_seance q JOIN edt_service s ON s.id=q.id_service
+                     WHERE q.id_annee=? AND q.matricule_ens IS NOT NULL AND q.code_commun IS NOT NULL AND s.matricule_ens=q.matricule_ens", [$a]) as $q)
+        $grp[$q['matricule_ens'] . '|' . $q['code_commun'] . '|' . $q['jour'] . '|' . $q['id_creneau']][$q['scode'] ? 'c' . $q['scode'] : 's' . $q['sid']] = true;
+    foreach ($grp as $k => $cles) if (count($cles) > 1) {
+        $e = (int) strtok($k, '|');
+        $out[$e]['attribuees'] = ($out[$e]['attribuees'] ?? 0) - (count($cles) - 1);
+    }
     foreach (db_all("SELECT matricule_ens, COUNT(DISTINCT jour, id_creneau) n FROM edt_seance WHERE id_annee=? AND matricule_ens IS NOT NULL GROUP BY matricule_ens", [$a]) as $r)
         $out[(int) $r['matricule_ens']]['placees'] = (int) $r['n'];
     return $out;
