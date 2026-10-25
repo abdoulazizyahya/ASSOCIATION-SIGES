@@ -1,0 +1,25 @@
+# Fins de ligne uniformes (25/10/2026) : LF dans le dépôt ET sur le disque, quel
+# que soit le réglage core.autocrlf du poste — plus d'avertissements « LF will be
+# replaced by CRLF ». Les scripts Windows gardent CRLF.
+* text=auto eol=lf
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# Binaires : jamais convertis
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.webp binary
+*.pdf binary
+*.zip binary
+*.gz binary
+*.xlsx binary
+*.docx binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.eot binary
+*.otf binary
+*.z binary
