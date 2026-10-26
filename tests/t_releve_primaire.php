@@ -46,6 +46,16 @@ foreach (assoc_all("SELECT code FROM etablissement WHERE actif=1 AND type_enseig
     ok(str_contains($t, pdf_u($comp['nom_comp'])) || str_contains($t, mb_substr(pdf_u($comp['nom_comp']), 0, 20)), 'vierge d\'une compétence : son libellé en en-tête');
     ok(str_contains($t, '/ ' . rtrim(rtrim(number_format((float) $comp['total_points'], 2, ',', ''), '0'), ',') . ' |'), 'vierge d\'une compétence : barème rappelé (total / ' . (float) $comp['total_points'] . ')');
 
+    // Fiche anonyme : ni classe ni noms ; plus grande classe + 10 lignes. Fiche nominative + 5 lignes vides.
+    $max = (int) db_val("SELECT MAX(n) FROM (SELECT COUNT(*) n FROM inscrire WHERE val_annee=? GROUP BY IDClasses) t", [$va]);
+    $premier = (string) db_val("SELECT e.Nom_elv FROM eleve e JOIN inscrire i ON i.id_eleve=e.id_eleve WHERE i.IDClasses=? AND i.val_annee=? ORDER BY e.Nom_elv LIMIT 1", [$cl, $va]);
+    $t = releve_texte(['piste' => 'fr', 'anonyme' => '1', 'seq' => 'annee']);
+    ok(str_contains($t, '| ' . ($max + 10) . ' |') && !str_contains($t, '| ' . ($max + 11) . ' |'), 'fiche anonyme : ' . ($max + 10) . ' lignes (plus grande classe ' . $max . ' + 10)');
+    ok(!str_contains($t, pdf_u(mb_strtoupper($premier))) && !str_contains($t, pdf_u('Classe : ') . ' | ' . pdf_u('CE')), 'fiche anonyme : aucun nom d\'élève');
+    $n_cl = (int) db_val("SELECT COUNT(*) FROM inscrire WHERE IDClasses=? AND val_annee=?", [$cl, $va]);
+    $t = releve_texte(['piste' => 'fr', 'classe' => $cl, 'vides' => 5]);
+    ok(str_contains($t, '| ' . ($n_cl + 5) . ' |') && !str_contains($t, '| ' . ($n_cl + 6) . ' |') && str_contains($t, pdf_u(mb_strtoupper($premier))), "fiche nominative + 5 lignes vides : " . ($n_cl + 5) . ' lignes');
+
     test_transaction(function () use ($cl, $seq, $comp, $mat, $els, $va) {
         // élève 1 : notes = barème complet ; élève 2 : moitié (cote NA)
         foreach ($els as $k => $id) {

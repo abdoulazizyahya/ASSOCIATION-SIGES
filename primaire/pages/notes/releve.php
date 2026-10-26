@@ -25,6 +25,11 @@ $seqs = db_all("SELECT s.id_seq, s.libelle_seq, t.libelle_trim FROM sequence s J
 $id_seq = (int) ($_GET['seq'] ?? (get_sequence_active()['id_seq'] ?? 0));
 if (!in_array($id_seq, array_map('intval', array_column($seqs, 'id_seq')), true)) $id_seq = 0;
 $annuel = ($_GET['seq'] ?? '') === 'annee';   // toute l'année : les 3 trimestres sur une page
+// Fiche anonyme (sans classe, noms ni sexe : autant de lignes que la plus grande classe)
+// et lignes vides en plus sous la liste (26/10/2026)
+$anonyme = ($_GET['anonyme'] ?? '') === '1';
+$vides = max(0, min(40, (int) ($_GET['vides'] ?? ($anonyme ? 10 : 0))));
+if ($anonyme) { $id_classe = 0; $item = 0; $_GET['mode'] = 'vierge'; }
 
 $rel_items = [];
 if ($id_classe) {
@@ -38,10 +43,12 @@ if ($id_classe) {
 if ($item > 0 && !in_array($item, array_column($rel_items, 'id'), true)) $item = 0;
 if ($mode === 'rempli' && ((!$id_seq && !$annuel) || $item === 0)) $mode = 'vierge';   // rempli : une évaluation et une compétence / matière (ou toutes)
 
-$q = http_build_query(['piste' => $piste, 'classe' => $id_classe, 'item' => $item, 'seq' => $annuel ? 'annee' : $id_seq, 'mode' => $mode]);
+if ($anonyme) $mode = 'vierge';
+$q = http_build_query(['piste' => $piste, 'classe' => $id_classe, 'item' => $item, 'seq' => $annuel ? 'annee' : $id_seq, 'mode' => $mode]
+    + ($anonyme ? ['anonyme' => 1] : []) + ($vides || $anonyme ? ['vides' => $vides] : []));
 $url = APP_URL . '/primaire/pdf/releve_notes_evaluation.php?' . $q;
 $lib = fn(array $l, $id, $k) => array_values(array_filter($l, fn($x) => (int) $x[$k] === (int) $id))[0] ?? null;
-$titre = 'Relevé de notes ' . $mode . ' — ' . ($lib($classes, $id_classe, 'IDClasses')['DesignationClasses'] ?? '')
+$titre = 'Relevé de notes ' . $mode . ' — ' . ($anonyme ? 'fiche anonyme' : ($lib($classes, $id_classe, 'IDClasses')['DesignationClasses'] ?? ''))
        . ($item > 0 ? ' — ' . ($lib($rel_items, $item, 'id')['libelle'] ?? '') : ($item === -1 ? ' — toutes' : ''));
 $titre_page = 'Relevé de notes';
 require_once __DIR__ . '/../../../noyau/layout/header.php';
@@ -59,7 +66,7 @@ require_once __DIR__ . '/../../../noyau/layout/header.php';
       <select name="piste" class="form-select form-select-sm" onchange="this.form.classe.value=0;this.form.item.value=0;this.form.submit()">
         <option value="fr" <?= $piste === 'fr' ? 'selected' : '' ?>>Française</option><option value="ar" <?= $piste === 'ar' ? 'selected' : '' ?>>Arabe</option></select></div>
     <div class="col-md-2"><label class="form-label fw-semibold small">Classe</label>
-      <select name="classe" class="form-select form-select-sm" onchange="this.form.item.value=0;this.form.submit()"><option value="0">— Choisir —</option>
+      <select name="classe" class="form-select form-select-sm" onchange="this.form.item.value=0;this.form.submit()" <?= $anonyme ? 'disabled' : '' ?>><option value="0">— Choisir —</option>
       <?php foreach ($classes as $c): ?><option value="<?= (int) $c['IDClasses'] ?>" <?= (int) $c['IDClasses'] === $id_classe ? 'selected' : '' ?>><?= h($c['DesignationClasses']) ?></option><?php endforeach; ?></select></div>
     <div class="col-md-4"><label class="form-label fw-semibold small"><?= $piste === 'fr' ? 'Compétence' : 'Matière' ?></label>
       <select name="item" class="form-select form-select-sm" onchange="this.form.submit()" <?= $id_classe ? '' : 'disabled' ?>>
@@ -75,19 +82,25 @@ require_once __DIR__ . '/../../../noyau/layout/header.php';
     <div class="col-md-2"><label class="form-label fw-semibold small">Type</label>
       <select name="mode" class="form-select form-select-sm" onchange="this.form.submit()">
         <option value="vierge">Vierge</option>
-        <option value="rempli" <?= $mode === 'rempli' ? 'selected' : '' ?> <?= ($id_seq || $annuel) && $item !== 0 ? '' : 'disabled' ?>>Rempli (notes saisies)</option></select></div>
+        <option value="rempli" <?= $mode === 'rempli' ? 'selected' : '' ?> <?= ($id_seq || $annuel) && $item !== 0 && !$anonyme ? '' : 'disabled' ?>>Rempli (notes saisies)</option></select></div>
+    <div class="col-md-4 d-flex align-items-center gap-2">
+      <div class="form-check m-0"><input class="form-check-input" type="checkbox" name="anonyme" value="1" id="chkAnon" <?= $anonyme ? 'checked' : '' ?> onchange="this.form.vides.value=this.checked?10:0;this.form.submit()">
+        <label class="form-check-label small" for="chkAnon">Fiche anonyme (sans classe, noms ni sexe)</label></div></div>
+    <div class="col-md-2"><label class="form-label fw-semibold small">Lignes vides en plus</label>
+      <select name="vides" class="form-select form-select-sm" onchange="this.form.submit()"><?php foreach ([0, 5, 10, 15, 20, 30] as $v): ?><option value="<?= $v ?>" <?= $v === $vides ? 'selected' : '' ?>><?= $v ?></option><?php endforeach; ?></select></div>
   </form>
-  <?php if ($id_classe): ?>
+  <?php if ($id_classe || $anonyme): ?>
   <div class="mt-3 d-flex flex-wrap gap-2 align-items-center">
     <button type="button" class="btn btn-sm btn-primary" onclick="afficherApercu(<?= h(json_encode($url)) ?>, <?= h(json_encode($titre)) ?>, 'releve_notes_evaluation', 'portrait')"><i class="bi bi-eye me-1"></i>Afficher / imprimer</button>
     <a class="btn btn-sm" style="background:#1a2744;color:#fff" href="<?= h($url) ?>&dl=1"><i class="bi bi-file-earmark-pdf me-1"></i>Télécharger en PDF</a>
     <span class="small text-muted"><?= $piste === 'fr' ? 'Colonnes : Orale, Écrite, Pratique, Savoir-être selon le barème de la compétence, puis total et cote.' : 'Colonnes : Oral, Écrit, Pratique selon le barème de la matière, puis total et cote.' ?>
       <?= $annuel ? " Toute l'année sur une fiche : pour chaque trimestre, chaque évaluation (UA) avec ses critères et son total, la note du trimestre, puis la note annuelle et sa cote (A4 paysage)." : '' ?>
-      <?= $mode === 'vierge' && !$id_seq && !$annuel ? ' Le rempli demande une évaluation et une compétence / matière.' : '' ?></span>
+      <?= $anonyme ? ' Fiche anonyme : autant de lignes que la plus grande classe de l\'année, plus ' . $vides . ' ligne(s) vide(s) ; critères génériques.' : '' ?>
+      <?= $mode === 'vierge' && !$id_seq && !$annuel && !$anonyme ? ' Le rempli demande une évaluation et une compétence / matière.' : '' ?></span>
   </div>
   <?php endif; ?>
 </div></div>
-<?php if ($id_classe): ?>
+<?php if ($id_classe || $anonyme): ?>
 <div class="card"><div class="card-header py-2" style="background:#f0f4ff"><span class="fw-semibold"><i class="bi bi-eye me-1"></i>Aperçu — <?= h($titre) ?></span></div>
   <div class="card-body p-0"><iframe src="<?= h($url) ?>" style="width:100%;height:80vh;border:none;display:block" title="Aperçu du relevé de notes"></iframe></div></div>
 <?php else: ?>
