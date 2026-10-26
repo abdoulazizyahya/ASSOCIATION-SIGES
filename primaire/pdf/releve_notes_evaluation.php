@@ -164,7 +164,8 @@ foreach ($pages as $it) {
         if ($rempli && $it) $piste === 'fr' ? precharger_notes_sequence_classe($id_classe, $val_annee) : precharger_notes_sequence_classe_arabe($id_classe);
         $nb_crit = count($cols) + ($rempli ? 1 : 0);   // critères (+ Tot. au rempli) pour chaque évaluation
         // Vierge : ni Moy. — la place va à la colonne des noms, écrits à la main (26/10/2026)
-        $w_no = 6; $w_sexe = 5.5; $w_nom = $rempli ? 42 : 80; $w_an = $rempli ? 12 : 0; $w_cote = $rempli ? 10 : 0;
+        // Pas de colonne Sexe (26/10/2026) : sa largeur va aux noms
+        $w_no = 6; $w_sexe = 0; $w_nom = $rempli ? 47.5 : 85.5; $w_an = $rempli ? 12 : 0; $w_cote = $rempli ? 10 : 0;
         $nb = 0;
         foreach ($trims as $t) $nb += max(1, count($t['seqs'])) * $nb_crit + ($rempli ? 1 : 0);
         $w_c = $nb ? ($uw - $w_no - $w_nom - $w_sexe - $w_an - $w_cote) / $nb : 0;
@@ -180,7 +181,6 @@ foreach ($pages as $it) {
             $x = $ml;
             $bloc($x, $y, $w_no, $H, 'N°'); $x += $w_no;
             $bloc($x, $y, $w_nom, $H, 'Noms et prénoms', '', 12); $x += $w_nom;
-            $bloc($x, $y, $w_sexe, $H, 'S.'); $x += $w_sexe;
             foreach ($trims as $t) {
                 $seqs = $t['seqs'] ?: [['libelle_seq' => 'Éval.']];
                 $bloc($x, $y, $w_c * (count($seqs) * $nb_crit + ($rempli ? 1 : 0)), $h1, $t['libelle_trim'], '', 12);
@@ -219,7 +219,6 @@ foreach ($pages as $it) {
             $nom_el = mb_strtoupper((string) $el['Nom_elv']) . ' ' . ($el['Prenom_elv'] ?? '');
             while (mb_strlen($nom_el) > 4 && $pdf->GetStringWidth(pdf_u($nom_el)) > $w_nom - 1.5) $nom_el = mb_substr($nom_el, 0, -2) . '.';   // tient dans la colonne
             $pdf->Cell($w_nom, $h_row, pdf_u($nom_el), 1, 0, 'L', $fill);
-            $pdf->Cell($w_sexe, $h_row, pdf_u(mb_strtoupper(mb_substr((string) $el['Sexe_elv'], 0, 1))), 1, 0, 'C', $fill);
             $moys = [];
             foreach ($trims as $t) {
                 foreach ($t['seqs'] ?: [null] as $s) {
