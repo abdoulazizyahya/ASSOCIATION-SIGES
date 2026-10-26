@@ -61,6 +61,17 @@ foreach (assoc_all("SELECT code FROM etablissement WHERE actif=1 AND type_enseig
         $t = releve_texte(['piste' => 'ar', 'classe' => $cl, 'item' => $mat['id_mat'], 'seq' => $seq, 'mode' => 'rempli']);
         $tot = rtrim(rtrim(number_format((float) $mat['bareme']['total_points'], 2, ',', ''), '0'), ',');
         ok(str_contains($t, '(ARABE)') && str_contains($t, 'Oral') && !str_contains($t, 'Savoir') && str_contains($t, "| $tot | A+"), "rempli (arabe) : Oral/Écrit/Pratique, total $tot, cote A+");
+        // Toute l'année : seule l'UA1 du T1 est notée → note du T1 = note annuelle = cette note
+        $tot = rtrim(rtrim(number_format((float) $comp['total_points'], 2, ',', ''), '0'), ',');
+        $t = releve_texte(['piste' => 'fr', 'classe' => $cl, 'item' => $comp['id_comp'], 'seq' => 'annee', 'mode' => 'rempli']);
+        ok(str_contains($t, 'Annuelle') && str_contains($t, 'Moy.') && str_contains($t, pdf_u("Toute l'année")), 'année (fr) : colonnes par trimestre, Moy., Annuelle');
+        ok(str_contains($t, "| $tot | $tot | $tot | A+"), "année (fr) : UA1 $tot → T1 $tot → annuelle $tot, cote A+");
+        $tot_ar = rtrim(rtrim(number_format((float) $mat['bareme']['total_points'], 2, ',', ''), '0'), ',');
+        $t = releve_texte(['piste' => 'ar', 'classe' => $cl, 'item' => $mat['id_mat'], 'seq' => 'annee', 'mode' => 'rempli']);
+        ok(str_contains($t, "| $tot_ar | $tot_ar | $tot_ar | A+"), "année (arabe) : UA1 $tot_ar → T1 → annuelle, cote A+");
+        $t = releve_texte(['piste' => 'fr', 'classe' => $cl, 'seq' => 'annee']);
+        ok(str_contains($t, 'Annuelle') && substr_count($t, 'Trimestre') >= 3, 'année vierge : les 3 trimestres en colonnes');
+
         $t = releve_texte(['piste' => 'fr', 'classe' => $cl, 'item' => -1, 'seq' => $seq, 'mode' => 'rempli']);
         egal(count(competences_classe($cl, $va)), substr_count($t, 'RELEV'), 'rempli « toutes » : une page par compétence');
     });

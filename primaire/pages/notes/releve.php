@@ -24,6 +24,7 @@ $mode = ($_GET['mode'] ?? '') === 'rempli' ? 'rempli' : 'vierge';
 $seqs = db_all("SELECT s.id_seq, s.libelle_seq, t.libelle_trim FROM sequence s JOIN trimestre t ON t.id_trim = s.id_trim WHERE t.id_annee = ? ORDER BY s.id_seq", [$val_annee]);
 $id_seq = (int) ($_GET['seq'] ?? (get_sequence_active()['id_seq'] ?? 0));
 if (!in_array($id_seq, array_map('intval', array_column($seqs, 'id_seq')), true)) $id_seq = 0;
+$annuel = ($_GET['seq'] ?? '') === 'annee';   // toute l'année : les 3 trimestres sur une page
 
 $rel_items = [];
 if ($id_classe) {
@@ -35,9 +36,9 @@ if ($id_classe) {
                     'bareme' => $m['bareme'] ? 'O ' . (float) $m['bareme']['orale'] . ' · É ' . (float) $m['bareme']['ecrite'] . ' · P ' . (float) $m['bareme']['pratique'] . ' = ' . (float) $m['bareme']['total_points'] : 'barème non configuré'];
 }
 if ($item > 0 && !in_array($item, array_column($rel_items, 'id'), true)) $item = 0;
-if ($mode === 'rempli' && (!$id_seq || $item === 0)) $mode = 'vierge';   // rempli : une évaluation et une compétence / matière (ou toutes)
+if ($mode === 'rempli' && ((!$id_seq && !$annuel) || $item === 0)) $mode = 'vierge';   // rempli : une évaluation et une compétence / matière (ou toutes)
 
-$q = http_build_query(['piste' => $piste, 'classe' => $id_classe, 'item' => $item, 'seq' => $id_seq, 'mode' => $mode]);
+$q = http_build_query(['piste' => $piste, 'classe' => $id_classe, 'item' => $item, 'seq' => $annuel ? 'annee' : $id_seq, 'mode' => $mode]);
 $url = APP_URL . '/primaire/pdf/releve_notes_evaluation.php?' . $q;
 $lib = fn(array $l, $id, $k) => array_values(array_filter($l, fn($x) => (int) $x[$k] === (int) $id))[0] ?? null;
 $titre = 'Relevé de notes ' . $mode . ' — ' . ($lib($classes, $id_classe, 'IDClasses')['DesignationClasses'] ?? '')
@@ -69,18 +70,20 @@ require_once __DIR__ . '/../../../noyau/layout/header.php';
         <?php endforeach; if ($g !== null) echo '</optgroup>'; ?></select></div>
     <div class="col-md-2"><label class="form-label fw-semibold small">Évaluation</label>
       <select name="seq" class="form-select form-select-sm" onchange="this.form.submit()"><option value="0">— À compléter —</option>
+      <option value="annee" <?= $annuel ? 'selected' : '' ?>>— Toute l'année (3 trimestres) —</option>
       <?php foreach ($seqs as $s): ?><option value="<?= (int) $s['id_seq'] ?>" <?= (int) $s['id_seq'] === $id_seq ? 'selected' : '' ?>><?= h($s['libelle_seq'] . ' (' . $s['libelle_trim'] . ')') ?></option><?php endforeach; ?></select></div>
     <div class="col-md-2"><label class="form-label fw-semibold small">Type</label>
       <select name="mode" class="form-select form-select-sm" onchange="this.form.submit()">
         <option value="vierge">Vierge</option>
-        <option value="rempli" <?= $mode === 'rempli' ? 'selected' : '' ?> <?= $id_seq && $item !== 0 ? '' : 'disabled' ?>>Rempli (notes saisies)</option></select></div>
+        <option value="rempli" <?= $mode === 'rempli' ? 'selected' : '' ?> <?= ($id_seq || $annuel) && $item !== 0 ? '' : 'disabled' ?>>Rempli (notes saisies)</option></select></div>
   </form>
   <?php if ($id_classe): ?>
   <div class="mt-3 d-flex flex-wrap gap-2 align-items-center">
     <button type="button" class="btn btn-sm btn-primary" onclick="afficherApercu(<?= h(json_encode($url)) ?>, <?= h(json_encode($titre)) ?>, 'releve_notes_evaluation', 'portrait')"><i class="bi bi-eye me-1"></i>Afficher / imprimer</button>
     <a class="btn btn-sm" style="background:#1a2744;color:#fff" href="<?= h($url) ?>&dl=1"><i class="bi bi-file-earmark-pdf me-1"></i>Télécharger en PDF</a>
     <span class="small text-muted"><?= $piste === 'fr' ? 'Colonnes : Orale, Écrite, Pratique, Savoir-être selon le barème de la compétence, puis total et cote.' : 'Colonnes : Oral, Écrit, Pratique selon le barème de la matière, puis total et cote.' ?>
-      <?= $mode === 'vierge' && !$id_seq ? ' Le rempli demande une évaluation et une compétence / matière.' : '' ?></span>
+      <?= $annuel ? " Toute l'année : par trimestre, le total de chaque évaluation et la note du trimestre, puis la note annuelle et sa cote (page en paysage)." : '' ?>
+      <?= $mode === 'vierge' && !$id_seq && !$annuel ? ' Le rempli demande une évaluation et une compétence / matière.' : '' ?></span>
   </div>
   <?php endif; ?>
 </div></div>
