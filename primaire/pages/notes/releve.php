@@ -82,7 +82,7 @@ require_once __DIR__ . '/../../../noyau/layout/header.php';
     <button type="button" class="btn btn-sm btn-primary" onclick="afficherApercu(<?= h(json_encode($url)) ?>, <?= h(json_encode($titre)) ?>, 'releve_notes_evaluation', 'portrait')"><i class="bi bi-eye me-1"></i>Afficher / imprimer</button>
     <a class="btn btn-sm" style="background:#1a2744;color:#fff" href="<?= h($url) ?>&dl=1"><i class="bi bi-file-earmark-pdf me-1"></i>Télécharger en PDF</a>
     <span class="small text-muted"><?= $piste === 'fr' ? 'Colonnes : Orale, Écrite, Pratique, Savoir-être selon le barème de la compétence, puis total et cote.' : 'Colonnes : Oral, Écrit, Pratique selon le barème de la matière, puis total et cote.' ?>
-      <?= $annuel ? " Toute l'année : par trimestre, le total de chaque évaluation et la note du trimestre, puis la note annuelle et sa cote (page en paysage)." : '' ?>
+      <?= $annuel ? " Toute l'année sur une fiche : pour chaque trimestre, chaque évaluation (UA) avec ses critères et son total, la note du trimestre, puis la note annuelle et sa cote (A4 paysage)." : '' ?>
       <?= $mode === 'vierge' && !$id_seq && !$annuel ? ' Le rempli demande une évaluation et une compétence / matière.' : '' ?></span>
   </div>
   <?php endif; ?>

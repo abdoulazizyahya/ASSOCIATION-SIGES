@@ -66,6 +66,9 @@ foreach (assoc_all("SELECT code FROM etablissement WHERE actif=1 AND type_enseig
         $t = releve_texte(['piste' => 'fr', 'classe' => $cl, 'item' => $comp['id_comp'], 'seq' => 'annee', 'mode' => 'rempli']);
         ok(str_contains($t, 'Annuelle') && str_contains($t, 'Moy.') && str_contains($t, pdf_u("Toute l'année")), 'année (fr) : colonnes par trimestre, Moy., Annuelle');
         ok(str_contains($t, "| $tot | $tot | $tot | A+"), "année (fr) : UA1 $tot → T1 $tot → annuelle $tot, cote A+");
+        $crit = [];
+        foreach (['orale', 'ecrite', 'pratique', 'savoir_etre'] as $k) if ((float) $comp[$k] > 0) $crit[] = rtrim(rtrim(number_format((float) $comp[$k], 2, ',', ''), '0'), ',');
+        ok(str_contains($t, '| ' . implode(' | ', $crit) . " | $tot |"), 'année (fr) : détail des critères de l\'UA1 (' . implode(', ', $crit) . ") puis son total");
         $tot_ar = rtrim(rtrim(number_format((float) $mat['bareme']['total_points'], 2, ',', ''), '0'), ',');
         $t = releve_texte(['piste' => 'ar', 'classe' => $cl, 'item' => $mat['id_mat'], 'seq' => 'annee', 'mode' => 'rempli']);
         ok(str_contains($t, "| $tot_ar | $tot_ar | $tot_ar | A+"), "année (arabe) : UA1 $tot_ar → T1 → annuelle, cote A+");
