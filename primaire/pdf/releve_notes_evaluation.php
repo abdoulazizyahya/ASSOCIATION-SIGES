@@ -155,13 +155,14 @@ foreach ($pages as $it) {
         // Vierge (26/10/2026) : fiche de l'année à remplir au stylo — ni Tot., ni Annuelle,
         // ni Cote, et des cases plus hautes et plus larges.
         $pdf->Cell($uw, 4, pdf_u(implode(' · ', $legende) . ($rempli ? ' · Tot. = total de l\'évaluation' . ($total_bar ? ' / ' . $fmt($total_bar) : '') : '')
-            . ' · Moy. = note du trimestre' . ($rempli ? ' · Annuelle = moyenne des trimestres.' : '.')), 0, 1);
+            . ($rempli ? ' · Moy. = note du trimestre · Annuelle = moyenne des trimestres.' : '.')), 0, 1);
         $pdf->Ln(0.5);
         if ($rempli && $it) $piste === 'fr' ? precharger_notes_sequence_classe($id_classe, $val_annee) : precharger_notes_sequence_classe_arabe($id_classe);
         $nb_crit = count($cols) + ($rempli ? 1 : 0);   // critères (+ Tot. au rempli) pour chaque évaluation
-        $w_no = 6; $w_sexe = 5.5; $w_nom = 42; $w_an = $rempli ? 12 : 0; $w_cote = $rempli ? 10 : 0;
+        // Vierge : ni Moy. — la place va à la colonne des noms, écrits à la main (26/10/2026)
+        $w_no = 6; $w_sexe = 5.5; $w_nom = $rempli ? 42 : 70; $w_an = $rempli ? 12 : 0; $w_cote = $rempli ? 10 : 0;
         $nb = 0;
-        foreach ($trims as $t) $nb += max(1, count($t['seqs'])) * $nb_crit + 1;
+        foreach ($trims as $t) $nb += max(1, count($t['seqs'])) * $nb_crit + ($rempli ? 1 : 0);
         $w_c = $nb ? ($uw - $w_no - $w_nom - $w_sexe - $w_an - $w_cote) / $nb : 0;
         $entete_annee = function () use ($rempli, $pdf, $ml, $w_no, $w_nom, $w_sexe, $w_c, $w_an, $w_cote, $trims, $fmt, $total_bar, $cols, $abr, $bar, $nb_crit) {
             $pdf->SetFillColor(204, 222, 248); $pdf->SetTextColor(18, 42, 96); $pdf->SetDrawColor(0); $pdf->SetLineWidth(0.15);
@@ -178,13 +179,13 @@ foreach ($pages as $it) {
             $bloc($x, $y, $w_sexe, $H, 'S.'); $x += $w_sexe;
             foreach ($trims as $t) {
                 $seqs = $t['seqs'] ?: [['libelle_seq' => 'Éval.']];
-                $bloc($x, $y, $w_c * (count($seqs) * $nb_crit + 1), $h1, $t['libelle_trim'], '', 7);
+                $bloc($x, $y, $w_c * (count($seqs) * $nb_crit + ($rempli ? 1 : 0)), $h1, $t['libelle_trim'], '', 7);
                 foreach ($seqs as $s) {
                     $bloc($x, $y + $h1, $w_c * $nb_crit, $h2, $s['libelle_seq']);
                     foreach ($cols as $k => $_) { $bloc($x, $y + $h1 + $h2, $w_c, $h3, $abr[$k], $bar ? '/' . $fmt($bar[$k]) : ''); $x += $w_c; }
                     if ($rempli) $pdf->SetFillColor(222, 234, 251); if ($rempli) $bloc($x, $y + $h1 + $h2, $w_c, $h3, 'Tot.', $total_bar ? '/' . $fmt($total_bar) : ''); $pdf->SetFillColor(204, 222, 248); if ($rempli) $x += $w_c;
                 }
-                $pdf->SetFillColor(184, 207, 243); $bloc($x, $y + $h1, $w_c, $h2 + $h3, 'Moy.', $total_bar ? '/' . $fmt($total_bar) : ''); $pdf->SetFillColor(204, 222, 248); $x += $w_c;
+                if ($rempli) $pdf->SetFillColor(184, 207, 243); if ($rempli) $bloc($x, $y + $h1, $w_c, $h2 + $h3, 'Moy.', $total_bar ? '/' . $fmt($total_bar) : ''); $pdf->SetFillColor(204, 222, 248); if ($rempli) $x += $w_c;
             }
             if ($rempli) { $bloc($x, $y, $w_an, $H, 'Annuelle', $total_bar ? '/ ' . $fmt($total_bar) : ''); $x += $w_an; $bloc($x, $y, $w_cote, $H, 'Cote'); }
             $pdf->SetTextColor(0); $pdf->SetXY($ml, $y + $H);
@@ -235,6 +236,7 @@ foreach ($pages as $it) {
                     ? note_competence_trimestre($id, $it['id'], $id_classe, (int) $t['id_trim'], $val_annee)['moyenne']
                     : points_matiere_trimestre_arabe($id, $it['id'], $id_classe, (int) $t['id_trim'], $val_annee);
                 if ($m !== null) $moys[] = (float) $m;
+                if (!$rempli) continue;
                 $pdf->SetFont('Arial', 'B', 6.5); $pdf->SetFillColor(222, 231, 251);
                 $pdf->Cell($w_c, $h_row, $fmt($m), 1, 0, 'C', true);
                 $pdf->SetFillColor(243, 247, 253);
