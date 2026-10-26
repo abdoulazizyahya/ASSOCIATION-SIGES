@@ -108,28 +108,32 @@ foreach ($pages as $it) {
         pdf_entete($pdf, $etab, $pw, $ml, null, 0.85);
         pdf_bandeau($pdf, 'RELEVÉ DE NOTES' . ($piste === 'ar' ? ' (ARABE)' : ''), 'GRADE SHEET' . ($piste === 'ar' ? ' (ARABIC TRACK)' : ''), $pw, $ml);
         $ligne = function (string $lib, ?string $val, float $w) use ($pdf) {
-            $pdf->SetFont('Arial', 'B', 11); $pdf->Cell($pdf->GetStringWidth(pdf_u($lib)) + 1.5, 7, pdf_u($lib), 0, 0);
-            $pdf->SetFont('Arial', '', 11);
-            $reste = $w - $pdf->GetStringWidth(pdf_u($lib)) - 1.5;
-            if ($val !== null && $val !== '') $pdf->Cell($reste, 7, pdf_u(mb_strimwidth($val, 0, 95, '…')), 0, 0);
-            else { $x = $pdf->GetX(); $y = $pdf->GetY() + 5.6; pdf_ligne_pointillee($pdf, $x, $y, $x + $reste - 2, $y); $pdf->Cell($reste, 7, '', 0, 0); }
+            $pdf->SetFont('Arial', 'B', 13); $wl = $pdf->GetStringWidth(pdf_u($lib)) + 1.5;   // mesuré en gras, comme imprimé
+            $pdf->Cell($wl, 8, pdf_u($lib), 0, 0);
+            $pdf->SetFont('Arial', '', 13);
+            $reste = $w - $wl;
+            if ($val !== null && $val !== '') {
+                while (mb_strlen($val) > 4 && $pdf->GetStringWidth(pdf_u($val)) > $reste - 1) $val = mb_substr($val, 0, -2) . '.';   // tient sur la ligne
+                $pdf->Cell($reste, 8, pdf_u($val), 0, 0);
+            }
+            else { $x = $pdf->GetX(); $y = $pdf->GetY() + 6.4; pdf_ligne_pointillee($pdf, $x, $y, $x + $reste - 2, $y); $pdf->Cell($reste, 8, '', 0, 0); }
         };
-        $pdf->SetX($ml); $ligne('Classe : ', $classe['DesignationClasses'] ?? null, $uw * 0.45); $ligne('Année scolaire : ', $val_annee, $uw * 0.55); $pdf->Ln(7);
-        $pdf->SetX($ml); $ligne($annuel ? 'Période : ' : 'Évaluation : ', $periode_lib, $uw * 0.45); $ligne('Enseignant(e) : ', $enseignant, $uw * 0.55); $pdf->Ln(7);
-        $pdf->SetX($ml); $ligne($piste === 'fr' ? 'Compétence : ' : 'Matière : ', $it ? $it['libelle'] : null, $uw); $pdf->Ln(7);
-        if ($it && $it['groupe']) { $pdf->SetX($ml); $pdf->SetFont('Arial', 'I', 9.5); $pdf->Cell($uw, 5, pdf_u(($piste === 'fr' ? 'Groupe : ' : 'Groupe de matières : ') . $it['groupe']), 0, 1); }
+        $pdf->SetX($ml); $ligne('Classe : ', $classe['DesignationClasses'] ?? null, $uw * 0.45); $ligne('Année scolaire : ', $val_annee, $uw * 0.55); $pdf->Ln(8);
+        $pdf->SetX($ml); $ligne($annuel ? 'Période : ' : 'Évaluation : ', $periode_lib, $uw * 0.45); $ligne('Enseignant(e) : ', $enseignant, $uw * 0.55); $pdf->Ln(8);
+        $pdf->SetX($ml); $ligne($piste === 'fr' ? 'Compétence : ' : 'Matière : ', $it ? $it['libelle'] : null, $uw); $pdf->Ln(8);
+        if ($it && $it['groupe']) { $pdf->SetX($ml); $pdf->SetFont('Arial', 'I', 11); $pdf->Cell($uw, 6, pdf_u(($piste === 'fr' ? 'Groupe : ' : 'Groupe de matières : ') . $it['groupe']), 0, 1); }
         $pdf->Ln(2);
     };
     $w_no = 9; $w_sexe = 9; $w_tot = 18; $w_cote = 15;
     $w_nom = 62;
     $w_c = count($cols) ? ($uw - $w_no - $w_nom - $w_sexe - $w_tot - $w_cote) / count($cols) : 0;
     $entete_tableau = function () use ($fmt, $pdf, $ml, $w_no, $w_nom, $w_sexe, $w_c, $w_tot, $w_cote, $cols, $bar, $total_bar) {
-        $pdf->SetX($ml); $pdf->SetFont('Arial', 'B', 9); $pdf->SetFillColor(204, 222, 248); $pdf->SetTextColor(18, 42, 96);
-        $h = 12; $y = $pdf->GetY();
+        $pdf->SetX($ml); $pdf->SetFont('Arial', 'B', 10.5); $pdf->SetFillColor(204, 222, 248); $pdf->SetTextColor(18, 42, 96);
+        $h = 13; $y = $pdf->GetY();
         $cell = function (float $w, string $l1, string $l2 = '') use ($pdf, $h, $y) {
             $x = $pdf->GetX(); $pdf->Rect($x, $y, $w, $h, 'DF');
-            $pdf->SetXY($x, $y + ($l2 === '' ? 3.8 : 1.6)); $pdf->Cell($w, 4.4, pdf_u($l1), 0, 2, 'C');
-            if ($l2 !== '') { $pdf->SetFont('Arial', '', 7.5); $pdf->Cell($w, 4.2, pdf_u($l2), 0, 0, 'C'); $pdf->SetFont('Arial', 'B', 9); }
+            $pdf->SetXY($x, $y + ($l2 === '' ? 4 : 1.6)); $pdf->Cell($w, 5, pdf_u($l1), 0, 2, 'C');
+            if ($l2 !== '') { $pdf->SetFont('Arial', '', 8.5); $pdf->Cell($w, 4.6, pdf_u($l2), 0, 0, 'C'); $pdf->SetFont('Arial', 'B', 10.5); }
             $pdf->SetXY($x + $w, $y);
         };
         $cell($w_no, 'N°'); $cell($w_nom, 'Noms et prénoms'); $cell($w_sexe, 'Sexe');
@@ -151,35 +155,35 @@ foreach ($pages as $it) {
         $abr = $piste === 'fr' ? ['orale' => 'O', 'ecrite' => 'É', 'pratique' => 'P', 'savoir_etre' => 'SE'] : ['orale' => 'O', 'ecrite' => 'É', 'pratique' => 'P'];
         $legende = [];
         foreach ($cols as $k => [$fr]) $legende[] = $abr[$k] . ' = ' . $fr . ($bar ? ' / ' . $fmt($bar[$k]) : '');
-        $pdf->SetX($ml); $pdf->SetFont('Arial', '', 9);
+        $pdf->SetX($ml); $pdf->SetFont('Arial', '', 10.5);
         // Vierge (26/10/2026) : fiche de l'année à remplir au stylo — ni Tot., ni Annuelle,
         // ni Cote, et des cases plus hautes et plus larges.
-        $pdf->Cell($uw, 5, pdf_u(implode(' · ', $legende) . ($rempli ? ' · Tot. = total de l\'évaluation' . ($total_bar ? ' / ' . $fmt($total_bar) : '') : '')
+        $pdf->Cell($uw, 6, pdf_u(implode(' · ', $legende) . ($rempli ? ' · Tot. = total de l\'évaluation' . ($total_bar ? ' / ' . $fmt($total_bar) : '') : '')
             . ($rempli ? ' · Moy. = note du trimestre · Annuelle = moyenne des trimestres.' : '.')), 0, 1);
         $pdf->Ln(0.5);
         if ($rempli && $it) $piste === 'fr' ? precharger_notes_sequence_classe($id_classe, $val_annee) : precharger_notes_sequence_classe_arabe($id_classe);
         $nb_crit = count($cols) + ($rempli ? 1 : 0);   // critères (+ Tot. au rempli) pour chaque évaluation
         // Vierge : ni Moy. — la place va à la colonne des noms, écrits à la main (26/10/2026)
-        $w_no = 6; $w_sexe = 5.5; $w_nom = $rempli ? 42 : 70; $w_an = $rempli ? 12 : 0; $w_cote = $rempli ? 10 : 0;
+        $w_no = 6; $w_sexe = 5.5; $w_nom = $rempli ? 42 : 80; $w_an = $rempli ? 12 : 0; $w_cote = $rempli ? 10 : 0;
         $nb = 0;
         foreach ($trims as $t) $nb += max(1, count($t['seqs'])) * $nb_crit + ($rempli ? 1 : 0);
         $w_c = $nb ? ($uw - $w_no - $w_nom - $w_sexe - $w_an - $w_cote) / $nb : 0;
         $entete_annee = function () use ($rempli, $pdf, $ml, $w_no, $w_nom, $w_sexe, $w_c, $w_an, $w_cote, $trims, $fmt, $total_bar, $cols, $abr, $bar, $nb_crit) {
             $pdf->SetFillColor(204, 222, 248); $pdf->SetTextColor(18, 42, 96); $pdf->SetDrawColor(0); $pdf->SetLineWidth(0.15);
-            $y = $pdf->GetY(); $h1 = 6.5; $h2 = 5.5; $h3 = 8.5; $H = $h1 + $h2 + $h3;
-            $bloc = function (float $x, float $yy, float $w, float $h, string $t, string $t2 = '', float $taille = 8.5) use ($pdf) {
+            $y = $pdf->GetY(); $h1 = 7.5; $h2 = 6.5; $h3 = 9.5; $H = $h1 + $h2 + $h3;
+            $bloc = function (float $x, float $yy, float $w, float $h, string $t, string $t2 = '', float $taille = 0) use ($pdf, $rempli) {
                 $pdf->Rect($x, $yy, $w, $h, 'DF');
-                $pdf->SetFont('Arial', 'B', $taille);
-                $pdf->SetXY($x, $yy + ($t2 === '' ? ($h - 4) / 2 : 0.6)); $pdf->Cell($w, 4, pdf_u($t), 0, 2, 'C');
-                if ($t2 !== '') { $pdf->SetFont('Arial', '', 7); $pdf->Cell($w, 3.4, pdf_u($t2), 0, 0, 'C'); }
+                $pdf->SetFont('Arial', 'B', $taille ?: ($rempli ? 9 : 10.5));   // rempli : cases étroites
+                $pdf->SetXY($x, $yy + ($t2 === '' ? ($h - 4.6) / 2 : 0.6)); $pdf->Cell($w, 4.6, pdf_u($t), 0, 2, 'C');
+                if ($t2 !== '') { $pdf->SetFont('Arial', '', 8); $pdf->Cell($w, 3.8, pdf_u($t2), 0, 0, 'C'); }
             };
             $x = $ml;
             $bloc($x, $y, $w_no, $H, 'N°'); $x += $w_no;
-            $bloc($x, $y, $w_nom, $H, 'Noms et prénoms', '', 10); $x += $w_nom;
+            $bloc($x, $y, $w_nom, $H, 'Noms et prénoms', '', 12); $x += $w_nom;
             $bloc($x, $y, $w_sexe, $H, 'S.'); $x += $w_sexe;
             foreach ($trims as $t) {
                 $seqs = $t['seqs'] ?: [['libelle_seq' => 'Éval.']];
-                $bloc($x, $y, $w_c * (count($seqs) * $nb_crit + ($rempli ? 1 : 0)), $h1, $t['libelle_trim'], '', 10);
+                $bloc($x, $y, $w_c * (count($seqs) * $nb_crit + ($rempli ? 1 : 0)), $h1, $t['libelle_trim'], '', 12);
                 foreach ($seqs as $s) {
                     $bloc($x, $y + $h1, $w_c * $nb_crit, $h2, $s['libelle_seq']);
                     foreach ($cols as $k => $_) { $bloc($x, $y + $h1 + $h2, $w_c, $h3, $abr[$k], $bar ? '/' . $fmt($bar[$k]) : ''); $x += $w_c; }
@@ -206,11 +210,11 @@ foreach ($pages as $it) {
                     'total' => (float) $r['note_orale'] + (float) $r['note_ecrite'] + (float) $r['note_pratique']];
         };
         $entete_annee();
-        $h_row = $rempli ? 6.2 : 8.5; $n = 1; $remplies = 0;   // vierge : de quoi écrire au stylo
+        $h_row = $rempli ? 6.2 : 9.5; $n = 1; $remplies = 0;   // vierge : de quoi écrire au stylo
         foreach ($eleves as $el) {
             if ($pdf->GetY() + $h_row > $ph - 24) { $pdf->AddPage(); pdf_filigrane($pdf, $etab, $pw, $ph); $pdf->SetY(10); $entete_annee(); }
             $id = (int) $el['id_eleve']; $fill = $n % 2 === 0;
-            $pdf->SetX($ml); $pdf->SetFont('Arial', '', $rempli ? 8 : 10); $pdf->SetFillColor(243, 247, 253);
+            $pdf->SetX($ml); $pdf->SetFont('Arial', '', $rempli ? 8 : 12); $pdf->SetFillColor(243, 247, 253);
             $pdf->Cell($w_no, $h_row, (string) $n, 1, 0, 'C', $fill);
             $nom_el = mb_strtoupper((string) $el['Nom_elv']) . ' ' . ($el['Prenom_elv'] ?? '');
             while (mb_strlen($nom_el) > 4 && $pdf->GetStringWidth(pdf_u($nom_el)) > $w_nom - 1.5) $nom_el = mb_substr($nom_el, 0, -2) . '.';   // tient dans la colonne
@@ -253,14 +257,14 @@ foreach ($pages as $it) {
         if (!$eleves) { $pdf->SetX($ml); $pdf->Cell($uw, 8, pdf_u('Aucun élève inscrit dans cette classe.'), 1, 1, 'C'); }
     } else {
     $entete_tableau();
-    $h_row = 7.5; $n = 1; $remplies = 0;
+    $h_row = 8.5; $n = 1; $remplies = 0;
     foreach ($eleves as $el) {
         if ($pdf->GetY() + $h_row > $ph - 28) { $pdf->AddPage(); pdf_filigrane($pdf, $etab, $pw, $ph); $pdf->SetY(12); $entete_tableau(); }
         $id = (int) $el['id_eleve'];
         $d = $donnees[$id] ?? null;
         $annulee = $rempli && evaluation_annulee_pour_eleve($id, $id_seq, $val_annee);
         $abs_j = $rempli && !$d && $piste === 'fr' && $it && absence_justifiee_val($id, $it['id'], $id_seq, $id_classe, $val_annee);
-        $pdf->SetX($ml); $pdf->SetFont('Arial', '', 9.5);
+        $pdf->SetX($ml); $pdf->SetFont('Arial', '', 11);
         $pdf->SetFillColor(243, 247, 253); $fill = $n % 2 === 0;
         $pdf->Cell($w_no, $h_row, (string) $n, 1, 0, 'C', $fill);
         $nom_el = mb_strtoupper((string) $el['Nom_elv']) . ' ' . ($el['Prenom_elv'] ?? '');
@@ -273,7 +277,7 @@ foreach ($pages as $it) {
             if ($v !== null) $total = ($total ?? 0) + (float) $v;
             $pdf->Cell($w_c, $h_row, $annulee || $abs_j ? '' : $fmt($v), 1, 0, 'C', $fill);
         }
-        $pdf->SetFont('Arial', 'B', 9.5);
+        $pdf->SetFont('Arial', 'B', 11);
         if ($annulee || $abs_j) {
             $pdf->Cell($w_tot + $w_cote, $h_row, pdf_u($annulee ? 'Évaluation annulée' : 'Absence justifiée'), 1, 0, 'C', $fill);
         } else {
@@ -289,15 +293,15 @@ foreach ($pages as $it) {
     }   // fin relevé d'une évaluation
 
     // Pied : effectif, signatures (enseignant ; chef selon la décision du propriétaire)
-    $pdf->Ln(2); $pdf->SetX($ml); $pdf->SetFont('Arial', '', 9);
+    $pdf->Ln(2); $pdf->SetX($ml); $pdf->SetFont('Arial', '', 10.5);
     $nb = $nb_reels; $nf = count(array_filter($eleves, fn($e) => mb_strtoupper(mb_substr((string) $e['Sexe_elv'], 0, 1)) === 'F'));
-    $pdf->Cell($uw, 4, pdf_u(($anonyme ? 'Effectif : ........  (F : ......, G : ......)' : "Effectif : $nb (F : $nf, G : " . ($nb - $nf) . ')') . ($rempli ? " — Élèves notés : $remplies" : '')
-        . ($annuel && !$rempli ? '' : ' — Cote : NA non acquis, ECA en cours d\'acquisition, A acquis, A+ acquis avec facilité.')), 0, 1);
+    $pdf->MultiCell($uw, 5.5, pdf_u(($anonyme ? 'Effectif : ........  (F : ......, G : ......)' : "Effectif : $nb (F : $nf, G : " . ($nb - $nf) . ')') . ($rempli ? " — Élèves notés : $remplies" : '')
+        . ($annuel && !$rempli ? '' : ' — Cote : NA non acquis, ECA en cours d\'acquisition, A acquis, A+ acquis avec facilité.')), 0, 'L');   // texte agrandi : retour à la ligne si besoin
     $y = max($pdf->GetY() + 3, $ph - 30);
-    $pdf->SetFont('Arial', '', 10);
+    $pdf->SetFont('Arial', '', 11.5);
     $pdf->SetXY($ml, $y); $pdf->Cell($uw / 2, 4.5, pdf_u('L\'enseignant(e)'), 0, 0, 'C');
-    $pdf->Cell($uw / 2, 4.5, pdf_u(lieu_signature_pdf($etab) . 'le ' . date('d/m/Y')), 0, 1, 'C');
-    $pdf->SetX($ml + $uw / 2); $pdf->SetFont('Arial', 'B', 10); $pdf->Cell($uw / 2, 5.5, pdf_u(mb_strtoupper($titre_chef)), 0, 1, 'C');
+    $pdf->Cell($uw / 2, 6, pdf_u(lieu_signature_pdf($etab) . 'le ' . date('d/m/Y')), 0, 1, 'C');
+    $pdf->SetX($ml + $uw / 2); $pdf->SetFont('Arial', 'B', 11.5); $pdf->Cell($uw / 2, 6, pdf_u(mb_strtoupper($titre_chef)), 0, 1, 'C');
     if (($_GET['signature'] ?? '0') === '1') {
         $sw = 28;
         pdf_signature_appliquer_jn($pdf, 'releve_notes_evaluation', 0, 0, $pw, $ph,
