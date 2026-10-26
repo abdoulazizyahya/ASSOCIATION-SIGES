@@ -432,6 +432,11 @@ if (!$es_partiel) {
       <i class="bi bi-exclamation-triangle me-1"></i>Non saisies
     </a>
   </li>
+  <li class="nav-item">
+    <a class="nav-link" href="<?= APP_URL ?>/primaire/pages/notes/releve.php?piste=ar">
+      <i class="bi bi-file-earmark-spreadsheet me-1"></i>Relevé de notes
+    </a>
+  </li>
 </ul>
 
 

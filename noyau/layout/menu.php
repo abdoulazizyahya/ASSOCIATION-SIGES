@@ -68,6 +68,7 @@ $menu = [
     'Pédagogie' => [
         ['Saisie des notes',       'primaire/pages/notes/index.php',       'pencil-square', ['DIRECTEUR','ENSEIGNANT','SECRETAIRE']],
         ['Notes justifiées',       'primaire/pages/notes/absence_justifiee.php', 'person-x', ['DIRECTEUR','ENSEIGNANT','SECRETAIRE']],
+        ['Relevé de notes',        'primaire/pages/notes/releve.php?piste=fr', 'file-earmark-spreadsheet', ['DIRECTEUR','ENSEIGNANT','SECRETAIRE']],   // vierge ou rempli (26/10/2026)
         ['Annulation d\'évaluation','primaire/pages/notes/annulation_evaluation.php', 'calendar-x', ['SECRETAIRE']],
         ['Bulletins',              'primaire/pages/bulletins/index.php',   'file-earmark-text', ['DIRECTEUR','ENSEIGNANT','SECRETAIRE']],
         ['Statistiques',           'primaire/pages/statistiques/index.php','bar-chart-line', ['DIRECTEUR','ENSEIGNANT','SECRETAIRE']],
@@ -79,6 +80,7 @@ $menu = [
         ['--', 'Arabe'],
         ['Saisie des notes',    'primaire/pages/notes_arabe/index.php',            'pencil-square',     ['DIRECTEUR','ENSEIGNANT','SECRETAIRE']],
         ['Notes justifiées',    'primaire/pages/notes_arabe/absence_justifiee.php','person-x',          ['DIRECTEUR','ENSEIGNANT','SECRETAIRE']],
+        ['Relevé de notes',        'primaire/pages/notes/releve.php?piste=ar', 'file-earmark-spreadsheet', ['DIRECTEUR','ENSEIGNANT','SECRETAIRE']],   // vierge ou rempli (26/10/2026)
         ['Bulletins',           'primaire/pages/bulletins_arabe/index.php',        'file-earmark-text', ['DIRECTEUR','ENSEIGNANT','SECRETAIRE']],
         ['Statistiques',        'primaire/pages/statistiques_arabe/index.php',     'bar-chart-line',    ['DIRECTEUR','ENSEIGNANT','SECRETAIRE']],
         ['Documents de classe', 'primaire/pages/statistiques_arabe/documents.php', 'files',             ['DIRECTEUR','ENSEIGNANT','SECRETAIRE']],
