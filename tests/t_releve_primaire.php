@@ -73,7 +73,8 @@ foreach (assoc_all("SELECT code FROM etablissement WHERE actif=1 AND type_enseig
         $t = releve_texte(['piste' => 'ar', 'classe' => $cl, 'item' => $mat['id_mat'], 'seq' => 'annee', 'mode' => 'rempli']);
         ok(str_contains($t, "| $tot_ar | $tot_ar | $tot_ar | A+"), "année (arabe) : UA1 $tot_ar → T1 → annuelle, cote A+");
         $t = releve_texte(['piste' => 'fr', 'classe' => $cl, 'seq' => 'annee']);
-        ok(str_contains($t, 'Annuelle') && substr_count($t, 'Trimestre') >= 3, 'année vierge : les 3 trimestres en colonnes');
+        ok(substr_count($t, 'Trimestre') >= 3 && str_contains($t, 'Moy.'), 'année vierge : les 3 trimestres en colonnes, avec Moy.');
+        ok(!str_contains($t, 'Annuelle') && !str_contains($t, 'Tot.') && !str_contains($t, '| Cote'), 'année vierge : ni Tot., ni Annuelle, ni Cote (fiche à remplir au stylo)');
 
         $t = releve_texte(['piste' => 'fr', 'classe' => $cl, 'item' => -1, 'seq' => $seq, 'mode' => 'rempli']);
         egal(count(competences_classe($cl, $va)), substr_count($t, 'RELEV'), 'rempli « toutes » : une page par compétence');
