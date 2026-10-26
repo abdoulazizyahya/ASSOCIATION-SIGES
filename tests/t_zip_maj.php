@@ -5,7 +5,8 @@ require __DIR__ . '/_amorce.php';
 require_once 'bd/lib/mise_a_jour.php';
 
 $zip = sys_get_temp_dir() . '/siges_test_maj.zip';
-exec(escapeshellarg(PHP_BINARY) . ' deploy/outils/construire_zip.php HEAD~1 ' . escapeshellarg(str_replace('\\', '/', $zip)) . ' 2>&1', $sortie, $rc);
+$depart = trim((string) shell_exec('git rev-list -n1 HEAD -- noyau')) . '~1';   // dernier commit qui touche l'application
+exec(escapeshellarg(PHP_BINARY) . ' deploy/outils/construire_zip.php ' . escapeshellarg($depart) . ' ' . escapeshellarg(str_replace('\\', '/', $zip)) . ' 2>&1', $sortie, $rc);
 egal(0, $rc, 'construire_zip.php sans erreur');
 $an = maj_analyser($zip);
 ok($an['ok'] && $an['verifie'], 'zip construit : accepté, empreintes vérifiées (' . count($an['fichiers']) . ' fichiers)');

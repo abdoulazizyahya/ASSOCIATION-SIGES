@@ -3612,7 +3612,105 @@ function etab_pour_pdf(array $etab): array {
  * sinon « Le Directeur / The Director » (primaire) ou « Le Proviseur /
  * The Principal » (secondaire).  = sortie de etab_pour_pdf().
  */
+// ── Changement de chef d'établissement en cours d'année (26/10/2026) ──────
+//  Table chef_historique (migrations primaire v67 / secondaire v23) : un chef
+//  remplacé garde son titre et sa signature pour les documents de SA période.
+//  Les documents d'une période (bulletins, PV, relevés, tableaux d'honneur,
+//  statistiques, résultats) se rattachent à un trimestre par leurs paramètres
+//  (trim / seq / annee) ; les autres (certificats, reçus…) : chef actuel.
+const CHEF_CATEGORIES_PERIODE = ['bulletin', 'pv', 'releve', 'tableau_honneur', 'statistiques', 'resultats'];
+
+function chef_historique_dispo(): bool {
+    static $r = [];
+    $cle = db_cache_cle('chef_hist');
+    return $r[$cle] ??= (bool) db_val("SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'chef_historique'");
+}
+/** 1re année d'une année scolaire « 2026/2027 » ou « 2026-2027 » → 2026 (0 si inconnue). */
+function chef_annee_debut(?string $libelle): int { return (int) substr(trim((string) $libelle), 0, 4); }
+
+/** Période [année de début, rang du trimestre] du document généré par cette requête, ou null (= aujourd'hui). 99 = toute l'année. */
+function chef_periode_document(): ?array {
+    if (!in_array(signature_categorie(), CHEF_CATEGORIES_PERIODE, true)) return null;
+    $sec = function_exists('type_enseignement_courant') && type_enseignement_courant() === 'secondaire';
+    $trim = (int) ($_GET['trim'] ?? 0); $seq = (int) ($_GET['seq'] ?? 0); $an = (int) ($_GET['annee'] ?? 0);
+    try {
+        if ($sec) {
+            if (!$trim && $seq) $trim = (int) db_val("SELECT id_trim FROM sequence WHERE id=?", [$seq]);
+            if ($trim) {
+                $t = db_one("SELECT t.ordre, a.libelle FROM trimestre t JOIN annee_scolaire a ON a.id=t.id_annee WHERE t.id=?", [$trim]);
+                return $t ? [chef_annee_debut($t['libelle']), (int) $t['ordre']] : null;
+            }
+            if ($an) { $l = db_val("SELECT libelle FROM annee_scolaire WHERE id=?", [$an]); return $l ? [chef_annee_debut($l), 99] : null; }
+            return null;
+        }
+        if ($trim) {
+            $va = db_val("SELECT id_annee FROM trimestre WHERE id_trim=?", [$trim]);
+            return $va ? [chef_annee_debut($va), prim_ordre_trimestre($trim)] : null;
+        }
+    } catch (\Throwable $e) {}
+    return null;
+}
+
+/** Chef remplacé qui signe le document de cette requête (ligne chef_historique), ou null = chef actuel. */
+function chef_archive_document(): ?array {
+    static $cache = [];
+    if (!chef_historique_dispo() || !($p = chef_periode_document())) return null;
+    [$a, $o] = $p;
+    $cle = db_cache_cle('chef_doc') . "|$a|$o";
+    if (!array_key_exists($cle, $cache)) {
+        $cache[$cle] = db_one("SELECT * FROM chef_historique WHERE remplace_annee > ? OR (remplace_annee = ? AND remplace_trim > ?)
+                               ORDER BY remplace_annee, remplace_trim LIMIT 1", [$a, $a, $o]);
+    }
+    return $cache[$cle];
+}
+/**
+ * Enregistre l'arrivée d'un nouveau chef à partir du trimestre ($annee_debut, $ordre) :
+ * l'ancien (titre + copie figée de sa signature) passe dans chef_historique, puis
+ * $image devient la signature actuelle, enregistrée comme dans Paramètres.
+ * Titres vides = inchangés. Appelée par noyau/chef_etablissement.php.
+ */
+function chef_enregistrer_changement(int $annee_debut, int $ordre, string $image, string $ext, string $titre_fr = '', string $titre_en = '', string $note = ''): void {
+    $sec  = type_enseignement_courant() === 'secondaire';
+    $base = __DIR__ . '/../assets/uploads';
+    $etab = get_etablissement();
+    [$ancien_fr, $ancien_en] = titres_chef_pdf($etab);
+    $actuel = $sec ? db_val("SELECT fichier FROM signature_titulaire WHERE code='chef_etablissement'") : ($etab['signature'] ?? null);
+    $copie = null;
+    if ($actuel && is_file("$base/$actuel")) {
+        $copie = upload_prefixe_etab() . 'chef_archive_' . date('Ymd_His') . '.' . pathinfo($actuel, PATHINFO_EXTENSION);
+        upload_dir_etab($base);
+        if (!@copy("$base/$actuel", "$base/$copie")) $copie = null;
+    }
+    db_exec("INSERT INTO chef_historique (titre_fr, titre_en, signature, remplace_annee, remplace_trim, note) VALUES (?,?,?,?,?,?)",
+            [$ancien_fr, $ancien_en, $copie, $annee_debut, $ordre, $note !== '' ? $note : null]);
+    if ($sec) {
+        $nouveau = upload_prefixe_etab() . 'signature_chef_etablissement.png';
+        if (signature_traiter_transparence($image, upload_dir_etab($base) . 'signature_chef_etablissement.png'))
+            db_exec("UPDATE signature_titulaire SET fichier=? WHERE code='chef_etablissement'", [$nouveau]);
+        if ($titre_fr !== '' || $titre_en !== '')
+            db_exec("UPDATE etablissement SET chef_etablissement=COALESCE(NULLIF(?,''),chef_etablissement), chef_etablissement_en=COALESCE(NULLIF(?,''),chef_etablissement_en) WHERE id=?", [$titre_fr, $titre_en, $etab['id']]);
+    } else {
+        $nouveau = upload_prefixe_etab() . 'signature_directeur.' . $ext;
+        $dest = upload_dir_etab($base) . 'signature_directeur.' . $ext;
+        if (is_uploaded_file($image) ? move_uploaded_file($image, $dest) : @copy($image, $dest))
+            db_exec("UPDATE etablissement SET signature=? WHERE IDEtablissement=?", [$nouveau, $etab['IDEtablissement']]);
+        if ($titre_fr !== '' || $titre_en !== '')
+            db_exec("UPDATE etablissement SET fonction_dirigeant_fr=COALESCE(NULLIF(?,''),fonction_dirigeant_fr), fonction_dirigeant_en=COALESCE(NULLIF(?,''),fonction_dirigeant_en) WHERE IDEtablissement=?", [$titre_fr, $titre_en, $etab['IDEtablissement']]);
+    }
+    if (isset($GLOBALS['_db_cache_globales'])) $GLOBALS['_db_cache_globales'] = [];   // get_etablissement() relu
+}
+/** Chemin absolu de la signature d'un chef remplacé (null s'il n'en avait pas). */
+function chef_archive_signature(array $r): ?string {
+    if (empty($r['signature'])) return null;
+    $c = __DIR__ . '/../assets/uploads/' . $r['signature'];
+    return is_file($c) ? $c : null;
+}
+
 function titres_chef_pdf(array $etab): array {
+    if ($r = chef_archive_document()) {   // document d'une période où l'ancien chef était en poste
+        $etab['chef_etablissement'] = $r['titre_fr'] ?? '';
+        $etab['chef_etablissement_en'] = $r['titre_en'] ?? '';
+    }
     $sec = function_exists('type_enseignement_courant') && type_enseignement_courant() === 'secondaire';
     $casse = fn(string $t): string => mb_convert_case(mb_strtolower(trim($t)), MB_CASE_TITLE);
     $fr = trim((string) ($etab['chef_etablissement'] ?? ''));
@@ -3631,6 +3729,7 @@ function lieu_signature_pdf(array $etab): string {
 // signataire dans jaynitaare, contrairement au catalogue multi-signataires
 // signature_titulaire d'ABZ_MBE) ou null si non configurée.
 function signature_etablissement_chemin(): ?string {
+    if ($r = chef_archive_document()) return chef_archive_signature($r);   // chef de la période du document
     $etab = get_etablissement();
     if (empty($etab['signature'])) return null;
     $chemin = __DIR__ . '/../assets/uploads/' . $etab['signature'];
@@ -4160,6 +4259,7 @@ function get_signature_titulaires(): array {
 
 // ==== signature_chemin ====
 function signature_chemin(string $code): ?string {
+    if ($code === 'chef_etablissement' && ($r = chef_archive_document())) return chef_archive_signature($r);   // chef de la période du document
     $fichier = db_val("SELECT fichier FROM signature_titulaire WHERE code=?", [$code]);
     if (empty($fichier)) return null;
     $chemin = __DIR__ . '/../assets/uploads/' . $fichier;

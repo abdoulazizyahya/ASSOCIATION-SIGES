@@ -557,6 +557,7 @@ if (!$es_partiel) {
             <div class="text-muted" style="font-size:.78rem;margin-bottom:.6rem">Aucune signature configurée.</div>
           <?php endif; ?>
           <input type="file" name="signature" accept="image/jpeg,image/png" class="form-control form-control-sm">
+          <div class="small mt-1"><a href="<?= APP_URL ?>/noyau/chef_etablissement.php"><i class="bi bi-person-badge me-1"></i>Changement de chef en cours d'année</a> <span class="text-muted">— garde l'ancienne signature pour les trimestres précédents.</span></div>
           <div class="form-text" style="font-size:.68rem">
             JPG/PNG — max 2 Mo. Jamais appliquée automatiquement : une case à cocher la propose à chaque impression.
           </div>

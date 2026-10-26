@@ -545,6 +545,7 @@ require_once __DIR__ . '/../../../../noyau/layout/header.php';
             </div>
           <?php endif; ?>
           <input type="file" name="signature" class="form-control" accept="image/jpeg,image/png">
+          <div class="small mt-1"><a href="<?= APP_URL ?>/noyau/chef_etablissement.php"><i class="bi bi-person-badge me-1"></i>Changement de chef en cours d'année</a> <span class="text-muted">— garde l'ancienne signature pour les trimestres précédents.</span></div>
           <div class="form-text" style="font-size:.72rem">
             Image de la signature (idéalement PNG à fond transparent). Jamais appliquée automatiquement :
             chaque impression propose de l'ajouter ou non au document.

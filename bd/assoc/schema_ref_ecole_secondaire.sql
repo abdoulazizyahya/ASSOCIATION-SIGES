@@ -1276,6 +1276,20 @@ CREATE TABLE IF NOT EXISTS `edt_contrainte` (
   KEY `idx_edt_contrainte_annee` (`id_annee`, `actif`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- Changement de chef en cours d'année (migrations primaire v67 / secondaire v23, 26/10/2026)
+CREATE TABLE IF NOT EXISTS `chef_historique` (
+  `id` int unsigned NOT NULL AUTO_INCREMENT,
+  `titre_fr` varchar(150) DEFAULT NULL,
+  `titre_en` varchar(150) DEFAULT NULL,
+  `signature` varchar(255) DEFAULT NULL,
+  `remplace_annee` smallint unsigned NOT NULL,
+  `remplace_trim` tinyint unsigned NOT NULL DEFAULT 1,
+  `note` varchar(150) DEFAULT NULL,
+  `cree_le` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_chef_remplace` (`remplace_annee`,`remplace_trim`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 /*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
 
 /*!40101 SET SQL_MODE=@OLD_SQL_MODE */;
