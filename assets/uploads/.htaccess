@@ -4,4 +4,3 @@
 <FilesMatch "\.(?i:php\d?|phtml|phar|pht|pl|py|cgi|sh|asp|aspx|jsp)$">
     Require all denied
 </FilesMatch>
-Options -Indexes

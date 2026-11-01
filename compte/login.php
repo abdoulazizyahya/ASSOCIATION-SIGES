@@ -327,10 +327,13 @@ if (preg_match_all('/\b[\p{L}]/u', $marque_defaut, $mm) && count($mm[0]) > 1) {
     <a href="<?= APP_URL ?>/compte/mot_de_passe_oublie.php" style="color:#3a6cff;text-decoration:none">Mot de passe oublié ?</a>
   </div>
   <?php if (annuaire_dispo()): ?>
-  <div style="border-top:1px solid #eef0f4;margin-top:1rem;padding-top:.9rem;text-align:center">
-    <a href="<?= APP_URL ?>/association/login.php" style="font-size:.78rem;color:#6b7280;text-decoration:none">
-      <?php // Vitrine désactivée (Réglages du site → connexion directe) : on ne met pas l'association en avant ?>
-      <?php if (page_entree_site() === 'connexion'): ?>
+  <?php // Vitrine désactivée (Réglages du site → connexion directe) : lien invisible
+        // (blanc sur blanc, sans trait ni curseur de lien) ; seul qui sait où cliquer l'ouvre.
+        $acces_cache = page_entree_site() === 'connexion'; ?>
+  <div style="<?= $acces_cache ? '' : 'border-top:1px solid #eef0f4;' ?>margin-top:1rem;padding-top:.9rem;text-align:center">
+    <a href="<?= APP_URL ?>/association/login.php" tabindex="<?= $acces_cache ? '-1' : '0' ?>"
+       style="font-size:.78rem;color:<?= $acces_cache ? '#fff;cursor:default;user-select:none' : '#6b7280' ?>;text-decoration:none">
+      <?php if ($acces_cache): ?>
         <i class="bi bi-shield-lock me-1"></i>Espace réservé
       <?php else: ?>
         <i class="bi bi-buildings me-1"></i>Espace association
