@@ -9,10 +9,12 @@
 //   1. clic sur un élève (photo unitaire) — corbeille pour la supprimer ;
 //   2. séance photo au téléphone (photos_seance.php, via QR code) ;
 //   3. import en lot (appareil numérique / dossier : association par
-//      matricule ou nom dans le nom du fichier, sinon par ordre) ;
+//      NIU, matricule ou nom dans le nom du fichier, sinon par ordre) ;
+//   5. export ZIP (photos_export.php) : fichiers nommés par NIU, sinon matricule,
+//      réimportables tels quels les années suivantes.
 //   4. planche scannée (photos 4x4 collées en grille sur une feuille).
 // Variables attendues : $id_classe, $peut_gerer.
-require_once __DIR__ . '/_photos_lib.php';
+require_once __DIR__ . '/_photos_depot_lib.php';
 if (empty($peut_gerer)) { echo '<div class="text-muted small py-3">Accès réservé.</div>'; return; }
 
 if (!$id_classe) { ?>
@@ -26,7 +28,7 @@ $classe_ph = photos_classe($id_classe);
 $eleves_ph = photos_eleves_classe($id_classe);
 $nb_ph   = count($eleves_ph);
 $nb_avec = count(array_filter($eleves_ph, fn($e) => $e['photo']));
-$nb_sans_mat = count(array_filter($eleves_ph, fn($e) => trim($e['mat']) === ''));
+$nb_sans_mat = count(array_filter($eleves_ph, fn($e) => $e['niu'] === '' && trim($e['mat']) === ''));
 
 // Adresse absolue de la séance photo pour le QR code : sur « localhost »,
 // hote_verif_reseau() donne l'IP réseau du PC (un téléphone ne peut pas
@@ -63,13 +65,40 @@ $url_seance = ($https ? 'https' : 'http') . '://' . hote_verif_reseau() . photos
       <button type="button" class="btn btn-outline-secondary btn-sm" onclick="document.getElementById('phFichierPlanche').click()">
         <i class="bi bi-grid-3x3 me-1"></i>Planche scannée
       </button>
+      <div class="btn-group btn-group-sm">
+        <a class="btn btn-outline-success" href="<?= h(photos_base_url() . '/photos_export.php?classe=' . $id_classe) ?>"
+           title="Photos de la classe en ZIP, chaque fichier nommé par le NIU de l'élève (sinon son matricule) : réutilisables l'année suivante">
+          <i class="bi bi-download me-1"></i>Télécharger (ZIP)
+        </a>
+        <button type="button" class="btn btn-outline-success dropdown-toggle dropdown-toggle-split" data-bs-toggle="dropdown"></button>
+        <ul class="dropdown-menu dropdown-menu-end">
+          <li><a class="dropdown-item small" href="<?= h(photos_base_url() . '/photos_export.php?classe=toutes') ?>"><i class="bi bi-collection me-1"></i>Toutes les classes (un dossier par classe)</a></li>
+        </ul>
+      </div>
       <input type="file" id="phFichiersLot" accept="image/*" multiple class="d-none" onchange="photosImporterLot(this)">
       <input type="file" id="phFichierPlanche" accept="image/*" class="d-none" onchange="photosOuvrirPlanche(this)">
       <input type="file" id="phFichierUnique" accept="image/*" class="d-none" onchange="photosFichierUnique(this)">
     </div>
+    <?php
+    // Dossier de dépôt de l'école (photos copiées à la main, nommées NIU ou matricule).
+    $depot_attente = count(photos_depot_fichiers());
+    ?>
+    <div class="d-flex flex-wrap align-items-center gap-2 mt-2 pt-2 border-top" style="font-size:.78rem" id="phDepot">
+      <i class="bi bi-folder2-open text-primary"></i>
+      <span>Dossier de dépôt de l'école : <code><?= h(photos_depot_libelle()) ?></code>
+        — <strong id="phDepotNb"><?= $depot_attente ?></strong> photo(s) en attente</span>
+      <span class="text-muted">(fichiers nommés par NIU ou matricule, copiés sans passer par l'application ; toutes classes confondues)</span>
+      <div class="form-check mb-0 ms-auto">
+        <input class="form-check-input" type="checkbox" id="phDepotRemplacer">
+        <label class="form-check-label" for="phDepotRemplacer">Remplacer les photos existantes</label>
+      </div>
+      <button type="button" class="btn btn-sm btn-outline-primary" onclick="photosDepot()">
+        <i class="bi bi-box-arrow-in-down me-1"></i>Récupérer les photos du dossier
+      </button>
+    </div>
     <?php if ($nb_sans_mat): ?>
       <div class="alert alert-warning py-1 px-2 mt-2 mb-0" style="font-size:.76rem">
-        <i class="bi bi-exclamation-triangle me-1"></i><?= $nb_sans_mat ?> élève(s) sans matricule : leurs photos ne pourront pas être
+        <i class="bi bi-exclamation-triangle me-1"></i><?= $nb_sans_mat ?> élève(s) sans NIU ni matricule : leurs photos ne pourront pas être
         associées automatiquement par nom de fichier lors d'un import (association par ordre ou manuelle uniquement).
       </div>
     <?php endif; ?>
@@ -96,7 +125,7 @@ $url_seance = ($https ? 'https' : 'http') . '://' . hote_verif_reseau() . photos
       </div>
       <div class="card-body p-1 text-center">
         <div class="fw-semibold text-truncate" style="font-size:.74rem" title="<?= h($e['nom']) ?>"><?= h($e['nom']) ?></div>
-        <div class="text-muted" style="font-size:.66rem"><?= $e['mat'] !== '' ? h($e['mat']) : '<span class="text-danger">sans matricule</span>' ?></div>
+        <div class="text-muted" style="font-size:.66rem"><?= $e['niu'] !== '' || $e['mat'] !== '' ? h($e['fichier']) : '<span class="text-danger">sans NIU ni matricule</span>' ?></div>
       </div>
     </div>
   </div>

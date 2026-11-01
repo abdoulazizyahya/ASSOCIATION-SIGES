@@ -5,7 +5,7 @@
 // secondaire : secondaire/commun/pages/eleves/liste.php), jamais par le fragment
 // _eleves_photos.php (rechargé en AJAX au primaire : ses <script> ne
 // s'exécuteraient pas). Requiert $peut_gerer (déjà vérifié par l'appelant).
-require_once __DIR__ . '/_photos_lib.php';
+require_once __DIR__ . '/_photos_depot_lib.php';
 ?>
 <link rel="stylesheet" href="<?= APP_URL ?>/assets/vendor/cropper/cropper.min.css">
 <style>
@@ -77,6 +77,28 @@ require_once __DIR__ . '/_photos_lib.php';
       <div class="modal-footer py-2">
         <button class="btn btn-primary btn-sm" onclick="photosDecouperPlanche()"><i class="bi bi-scissors me-1"></i>Découper et vérifier</button>
         <button class="btn btn-light btn-sm" data-bs-dismiss="modal">Annuler</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="phModalDepot" tabindex="-1" data-bs-backdrop="static">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header py-2">
+        <h6 class="modal-title fw-bold"><i class="bi bi-folder2-open me-1 text-primary"></i>Photos du dossier de dépôt</h6>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body py-2">
+        <div id="phDepotResume" class="mb-2" style="font-size:.82rem"></div>
+        <table class="table table-sm align-middle mb-0" style="font-size:.78rem">
+          <thead><tr><th>Fichier</th><th>Élève</th><th style="width:38%">Résultat</th></tr></thead>
+          <tbody id="phDepotCorps"></tbody>
+        </table>
+      </div>
+      <div class="modal-footer py-2">
+        <span class="me-auto text-muted" style="font-size:.74rem">Photos enregistrées : rangées dans <code>traitees/</code> du dossier. Les autres restent en place : renommez-les (NIU ou matricule) puis relancez.</span>
+        <button class="btn btn-light btn-sm" data-bs-dismiss="modal">Fermer</button>
       </div>
     </div>
   </div>
@@ -209,8 +231,8 @@ function phOuvrirRevue(titre, aide) {
 function phRendreRevue() {
   const d = phDonnees();
   const opts = ['<option value="0">— Ignorer cette photo —</option>']
-    .concat(d.eleves.map(e => '<option value="' + e.id + '">' + phEchapper(e.nom + (e.mat ? ' (' + e.mat + ')' : '')) + (e.photo ? ' • a déjà une photo' : '') + '</option>'));
-  const badge = { matricule: ['success', 'matricule'], nom: ['success', 'nom'], ordre: ['warning text-dark', 'par ordre — à vérifier'], manuel: ['primary', 'choix manuel'], vide: ['secondary', 'case vide'], aucun: ['secondary', 'non associée'] };
+    .concat(d.eleves.map(e => '<option value="' + e.id + '">' + phEchapper(e.nom + (e.niu || e.mat ? ' (' + (e.niu || e.mat) + ')' : '')) + (e.photo ? ' • a déjà une photo' : '') + '</option>'));
+  const badge = { niu: ['success', 'NIU'], matricule: ['success', 'matricule'], nom: ['success', 'nom'], ordre: ['warning text-dark', 'par ordre — à vérifier'], manuel: ['primary', 'choix manuel'], vide: ['secondary', 'case vide'], aucun: ['secondary', 'non associée'] };
   const comptes = {};
   phRevue.forEach(it => { if (it.id) comptes[it.id] = (comptes[it.id] || 0) + 1; });
   document.getElementById('phRevueCorps').innerHTML = phRevue.map((it, i) => {
@@ -228,7 +250,7 @@ function phRendreRevue() {
   const n = phRevue.filter(it => it.id).length;
   document.getElementById('phRevueEtat').textContent = n + ' photo(s) à enregistrer sur ' + phRevue.length;
 }
-function phChangerEleve(i, v) { phRevue[i].id = parseInt(v, 10) || 0; if (phRevue[i].id && phRevue[i].methode !== 'matricule' && phRevue[i].methode !== 'nom') phRevue[i].methode = 'manuel'; phRendreRevue(); }
+function phChangerEleve(i, v) { phRevue[i].id = parseInt(v, 10) || 0; if (phRevue[i].id && !['niu', 'matricule', 'nom'].includes(phRevue[i].methode)) phRevue[i].methode = 'manuel'; phRendreRevue(); }
 function phRecadrerRevue(i) {
   const it = phRevue[i], e = it.id ? phEleve(it.id) : null;
   PhotosEleves.recadrer(it.src, url => { it.data = url; phRendreRevue(); }, e ? e.nom : it.libelle);
@@ -259,8 +281,9 @@ async function photosImporterLot(input) {
   input.value = '';
   if (!fichiers.length) return;
   const d = phDonnees();
-  const parMat = new Map(), parNom = new Map();
+  const parNiu = new Map(), parMat = new Map(), parNom = new Map();
   d.eleves.forEach(e => {
+    const u = PhotosEleves.normaliser(e.niu); if (u) parNiu.set(u, e.id);
     const m = PhotosEleves.normaliser(e.mat); if (m) parMat.set(m, e.id);
     const n = PhotosEleves.normaliser(e.nom); if (n) parNom.set(n, e.id);
   });
@@ -272,9 +295,12 @@ async function photosImporterLot(input) {
     try { img = PhotosEleves.reduire(await PhotosEleves.chargerImage(f), 1600); } catch (e) { continue; }
     const base = PhotosEleves.normaliser(f.name.replace(/\.[^.]+$/, ''));
     let id = 0, methode = 'aucun';
-    if (parMat.has(base)) { id = parMat.get(base); methode = 'matricule'; }
+    // NIU d'abord (nom des fichiers exportés, identique d'une année à l'autre), puis matricule, puis nom.
+    if (parNiu.has(base)) { id = parNiu.get(base); methode = 'niu'; }
+    else if (parMat.has(base)) { id = parMat.get(base); methode = 'matricule'; }
     else {
-      for (const [m, i] of parMat) if (m.length >= 4 && base.includes(m)) { id = i; methode = 'matricule'; break; }
+      for (const [u, i] of parNiu) if (u.length >= 6 && base.includes(u)) { id = i; methode = 'niu'; break; }
+      if (!id) for (const [m, i] of parMat) if (m.length >= 4 && base.includes(m)) { id = i; methode = 'matricule'; break; }
       if (!id) for (const [n, i] of parNom) if (n.length >= 5 && (base === n || base.includes(n))) { id = i; methode = 'nom'; break; }
     }
     if (id && pris.has(id)) { id = 0; methode = 'aucun'; }
@@ -287,8 +313,8 @@ async function photosImporterLot(input) {
   phRevue.filter(it => !it.id).forEach(it => { const e = restants.shift(); if (e) { it.id = e.id; it.methode = 'ordre'; } });
   if (!phRevue.length) { alert('Aucune image lisible dans la sélection.'); return; }
   phOuvrirRevue('Import de ' + phRevue.length + ' photo(s)',
-    'Association automatique : <strong>matricule</strong> ou <strong>nom</strong> de l\'élève dans le nom du fichier ' +
-    '(ex. <code>GSBI-2026-014.jpg</code>), sinon <strong>par ordre</strong> (fichiers triés par nom ↔ élèves dans l\'ordre alphabétique' +
+    'Association automatique : <strong>NIU</strong>, <strong>matricule</strong> ou <strong>nom</strong> de l\'élève dans le nom du fichier ' +
+    '(ex. <code>PMCMIN260023.jpg</code>, nom des photos du bouton « Télécharger (ZIP) »), sinon <strong>par ordre</strong> (fichiers triés par nom ↔ élèves dans l\'ordre alphabétique' +
     (document.getElementById('phSansPhoto')?.checked ? ', seulement ceux sans photo' : '') + '). ' +
     'Vérifiez surtout les lignes « par ordre », corrigez avec la liste déroulante, recadrez avec <i class="bi bi-crop"></i>.');
 }
@@ -352,6 +378,45 @@ function photosDecouperPlanche() {
     'Les cases sont associées <strong>dans l\'ordre</strong> aux élèves de la liste' +
     (document.getElementById('phSansPhoto')?.checked ? ' (seulement ceux sans photo)' : '') +
     '. Vérifiez chaque ligne, corrigez l\'élève si besoin et ajustez le cadrage avec <i class="bi bi-crop"></i>.');
+}
+
+// ── Dossier de dépôt de l'école (photos copiées à la main) ──────────
+const PH_DEPOT = <?= json_encode(photos_base_url() . '/photos_depot.php') ?>;
+async function photosDepot() {
+  const nb = parseInt(document.getElementById('phDepotNb')?.textContent || '0', 10);
+  if (!nb && !confirm('Aucune photo en attente n\'a été trouvée à l\'ouverture de l\'onglet. Vérifier quand même le dossier ?')) return;
+  const remplacer = document.getElementById('phDepotRemplacer')?.checked;
+  const libelles = {
+    ok: ['success', 'enregistrée'], existe: ['secondary', 'déjà une photo (non remplacée)'], inconnu: ['warning text-dark', 'NIU / matricule introuvable'],
+    ambigu: ['danger', 'NIU / matricule commun à plusieurs élèves'], doublon: ['secondary', 'autre fichier pour le même élève'],
+    illisible: ['danger', 'image illisible'], erreur: ['danger', 'erreur']
+  };
+  const corps = document.getElementById('phDepotCorps'), resume = document.getElementById('phDepotResume');
+  corps.innerHTML = ''; resume.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Traitement en cours…';
+  bootstrap.Modal.getOrCreateInstance(document.getElementById('phModalDepot')).show();
+  const toutes = []; let total = 0, tour = 0, r;
+  do {
+    const fd = new FormData(); fd.append('csrf', PH_CSRF); fd.append('remplacer', remplacer ? '1' : '0');
+    try { r = await (await fetch(PH_DEPOT, { method: 'POST', body: fd, credentials: 'same-origin' })).json(); }
+    catch (e) { r = { ok: false, message: 'réponse invalide du serveur' }; }
+    if (!r.ok) { resume.innerHTML = '<span class="text-danger">' + phEchapper(r.message || 'Échec') + '</span>'; return; }
+    total += r.enregistrees;
+    // Lignes « en attente » : seules celles du dernier tour comptent (les fichiers enregistrés quittent le dossier).
+    toutes.push(...r.lignes.filter(l => l.etat === 'ok'));
+    r.lignes.forEach(l => { if (l.etat === 'ok' && l.url && phEleve(l.id)) phMarquerCarte(l.id, 'ok', l.url); });
+    if (r.reste) resume.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>' + total + ' photo(s) enregistrée(s), ' + r.reste + ' restante(s)…';
+  } while (r.reste > 0 && r.enregistrees > 0 && ++tour < 100);
+  const lignes = toutes.concat(r.lignes.filter(l => l.etat !== 'ok'));
+  const restent = r.lignes.filter(l => l.etat !== 'ok').length;
+  corps.innerHTML = lignes.length ? lignes.map(l => {
+    const b = libelles[l.etat] || ['secondary', l.etat];
+    return '<tr><td class="text-break">' + phEchapper(l.fichier) + '</td><td>' + phEchapper(l.eleve || '—') +
+      (l.par ? ' <span class="text-muted">(' + l.par + ')</span>' : '') + '</td><td><span class="badge bg-' + b[0] + '">' + b[1] + '</span>' +
+      (l.message ? ' <span class="text-danger">' + phEchapper(l.message) + '</span>' : '') + '</td></tr>';
+  }).join('') : '<tr><td colspan="3" class="text-muted text-center py-3">Aucune image dans <code>' + phEchapper(r.dossier) + '</code>.</td></tr>';
+  resume.innerHTML = '<strong>' + total + '</strong> photo(s) enregistrée(s)' + (restent ? ', <strong>' + restent + '</strong> fichier(s) laissé(s) dans le dossier' : '') +
+    ' — dossier <code>' + phEchapper(r.dossier) + '</code>.';
+  const n = document.getElementById('phDepotNb'); if (n) n.textContent = restent;
 }
 
 // ── Séance photo au téléphone (QR code) ─────────────────────────────

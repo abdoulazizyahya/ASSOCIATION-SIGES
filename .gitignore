@@ -15,6 +15,8 @@
 /assets/uploads/eleves/*
 !/assets/uploads/eleves/.htaccess
 /assets/uploads/dossiers_eleves/
+/assets/uploads/photos_depot/*
+!/assets/uploads/photos_depot/.htaccess
 /assets/uploads/profils/
 
 # ── Images propres à chaque école (logos, signatures, bordures) déposées

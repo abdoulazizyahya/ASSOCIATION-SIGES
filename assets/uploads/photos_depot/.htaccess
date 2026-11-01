@@ -1,0 +1,9 @@
+# Dépôt manuel des photos d'élèves (un sous-dossier par école) : jamais servi
+# par le web — lu côté serveur par noyau/partage/eleves/_photos_depot_lib.php.
+<IfModule mod_authz_core.c>
+    Require all denied
+</IfModule>
+<IfModule !mod_authz_core.c>
+    Order deny,allow
+    Deny from all
+</IfModule>

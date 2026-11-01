@@ -47,40 +47,68 @@ function photos_classe(int $id_classe): ?array {
 }
 
 // Élèves ACTIFS inscrits cette année dans la classe, ordre alphabétique :
-// [id, mat, nom, photo (bool), url].
+// [id, mat, niu, nom, photo (bool), url, fichier (nom du fichier photo :
+// NIU, sinon matricule — voir photo_nom_fichier())].
 function photos_eleves_classe(int $id_classe): array {
     $annee = get_annee_active();
     if (photos_est_secondaire()) {
         $rows = db_all(
-            "SELECT e.id, e.matricule AS mat, e.nom, e.prenom, e.sexe, e.photo
+            "SELECT e.id, e.matricule AS mat, e.niu, e.nom, e.prenom, e.sexe, e.photo
              FROM eleve e JOIN inscription i ON i.id_eleve=e.id AND i.id_annee=?
              WHERE i.id_classe=? AND e.statut='actif' ORDER BY e.nom, e.prenom",
             [(int) ($annee['id'] ?? 0), $id_classe]);
-        return array_map(function ($e) {
+        return array_map(fn($e) => photos_avec_fichier($e), array_map(function ($e) {
             // Photo en base (photo='bd') ou ancien fichier pas encore converti :
             // toujours servie par la page protégée (secondaire/commun/pages/eleves/photo.php).
             $a = photo_sec_presente($e['photo'] ?? null);
             return [
                 'id'    => (int) $e['id'],
                 'mat'   => (string) ($e['mat'] ?? ''),
+                'niu'   => trim((string) ($e['niu'] ?? '')),
                 'nom'   => trim(mb_strtoupper((string) $e['nom']) . ' ' . ($e['prenom'] ?? '')),
                 'photo' => $a,
                 'url'   => $a ? url_photo_eleve_sec((int) $e['id'], true, (string) $e['sexe']) . '&v=' . substr(md5((string) $e['photo'] . $e['id']), 0, 6) : photos_avatar((string) $e['sexe']),
             ];
-        }, $rows);
+        }, $rows));
     }
     $rows = db_all(
-        "SELECT e.id_eleve, e.Mat_elv, e.Nom_elv, e.Prenom_elv, e.Sexe_elv, (e.Photo_elv IS NOT NULL) AS a_photo
+        "SELECT e.id_eleve, e.Mat_elv, e.niu, e.Nom_elv, e.Prenom_elv, e.Sexe_elv, (e.Photo_elv IS NOT NULL) AS a_photo
          FROM eleve e JOIN inscrire i ON i.id_eleve=e.id_eleve AND i.val_annee=?
          WHERE i.IDClasses=? AND e.statut='actif' ORDER BY e.Nom_elv, e.Prenom_elv",
         [$annee['val_annee'] ?? '', $id_classe]);
-    return array_map(fn($e) => [
+    return array_map(fn($e) => photos_avec_fichier([
         'id'    => (int) $e['id_eleve'],
         'mat'   => (string) ($e['Mat_elv'] ?? ''),
+        'niu'   => trim((string) ($e['niu'] ?? '')),
         'nom'   => trim(mb_strtoupper((string) $e['Nom_elv']) . ' ' . ($e['Prenom_elv'] ?? '')),
         'photo' => (bool) $e['a_photo'],
         'url'   => url_photo_eleve((int) $e['id_eleve'], (bool) $e['a_photo'], (string) $e['Sexe_elv']),
-    ], $rows);
+    ]), $rows);
+}
+
+// Nom du fichier photo d'un élève (sans extension), primaire comme secondaire :
+// son NIU — identifiant unique et définitif, le même toutes les années et dans
+// toutes les écoles de l'association, donc les photos exportées restent
+// réutilisables l'année suivante — sinon son matricule, sinon « eleve_<id> ».
+// Caractères réservés des systèmes de fichiers remplacés par « - ».
+function photo_nom_fichier(string $niu, string $mat, int $id): string {
+    foreach ([$niu, $mat] as $v) {
+        $v = trim((string) preg_replace('#[\\\\/:*?"<>|\s]+#u', '-', trim($v)), '-.');
+        if ($v !== '') return $v;
+    }
+    return 'eleve_' . $id;
+}
+
+function photos_avec_fichier(array $e): array {
+    $e['fichier'] = photo_nom_fichier($e['niu'], $e['mat'], $e['id']);
+    return $e;
+}
+
+// Binaire de la photo d'un élève (null si aucune / pas une image).
+function photo_eleve_binaire(int $id): ?string {
+    if (photos_est_secondaire()) return photo_sec_binaire($id);
+    $b = db_val("SELECT Photo_elv FROM eleve WHERE id_eleve=?", [$id]);
+    return blob_est_image($b) ? (string) $b : null;
 }
 
 // Ligne élève minimale (id, sexe, photo actuelle au secondaire) ou null.
