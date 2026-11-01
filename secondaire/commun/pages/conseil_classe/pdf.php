@@ -248,9 +248,7 @@ if (empty($eleves_raw)) {
 // ── Zone de signatures ────────────────────────────────────────────
 $pdf->Ln(10);
 if ($pdf->GetY() > $pdf->GetPageHeight() - 40) $pdf->AddPage();
-$pdf->SetFont('Arial', '', 8);
-$pdf->SetX($marge);
-$pdf->Cell($w, 5, pvpdf_u('Fait à/Done at ' . ($etab['ville'] ?? '') . ', le/on ' . date('d/m/Y')), 0, 1, 'L');
+pdf_fait_a_bilingue($pdf, $marge, $w, lieu_edition_documents($etab), 'L', 8, 'pvpdf_u');
 $pdf->Ln(6);
 
 $sigCols = [

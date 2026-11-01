@@ -32,7 +32,7 @@ $creneaux = edt_creneaux($a);
 $jours = edt_jours_ouvres($a);
 $samediTxt = (string) edt_param($a, 'samedi_texte', 'RATTRAPAGE ET DEVOIRS SURVEILLÉS');
 $nb = array_values(array_filter(array_map('trim', explode("\n", (string) edt_param($a, 'pdf_nb', "Cet emploi de temps est essentiellement provisoire.\nTout changement opéré dans cet emploi de temps ne sera valide que s'il est confirmé par le Censeur.\nTous les enseignants qui ont cours à 07h30 min les lundi et vendredi sont tenus d'assister au rassemblement de 07h10 min.")))));
-$ville = (string) edt_param($a, 'pdf_ville', $etab['ville'] ?? '');
+$ville = (string) edt_param($a, 'pdf_ville', lieu_edition_documents($etab));
 
 if ($tous) {
     $cibles = $vue === 'classe'

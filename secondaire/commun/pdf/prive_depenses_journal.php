@@ -26,7 +26,7 @@ $sql = "SELECT d.id, d.date_depense, d.montant, d.libelle, d.beneficiaire,
                cd.libelle AS categorie_libelle, u.nom, u.prenom
         FROM depense_privee d
         JOIN categorie_depense_privee cd ON cd.id = d.id_categorie
-        LEFT JOIN utilisateur u ON u.id = d.id_utilisateur
+        LEFT JOIN utilisateur u ON u.id = d.id_utilisateur" . sec_sql_compte_affichable('u') . "
         WHERE d.id_annee = ? AND d.date_depense BETWEEN ? AND ?";
 if ($id_categorie) { $sql .= " AND d.id_categorie = ?"; $params[] = $id_categorie; }
 $sql .= " ORDER BY d.date_depense, d.id";
@@ -111,9 +111,7 @@ $pdf->Ln(8);
 if ($pdf->GetY() > $ph - 30) { $pdf->AddPage(); pdf_filigrane($pdf, $etab, $pw, $ph); }
 $w_sign = ($pw - 24) * 0.4;
 $x_sign = $pw - 12 - $w_sign;
-$pdf->SetFont('Arial', '', 9);
-$pdf->SetX($x_sign);
-$pdf->Cell($w_sign, 5, pdf_u('Fait à ' . (($etab['lieu'] ?: $etab['ville']) ?: '') . ', le ' . date('d/m/Y')), 0, 1, 'R');
+pdf_fait_a_bilingue($pdf, $x_sign, $w_sign, (($etab['lieu'] ?: $etab['ville']) ?: ''), 'R', 9);
 $pdf->SetFont('Arial', 'B', 9);
 $pdf->SetX($x_sign);
 $pdf->Cell($w_sign, 5, pdf_u(mb_strtoupper($etab['chef_etablissement'] ?: 'LE PROVISEUR') . ','), 0, 1, 'R');

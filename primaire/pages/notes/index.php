@@ -408,6 +408,10 @@ if (!in_array($id_seq_ns, array_column($seqs_trim_actif_ns, 'id_seq'), true)) {
 
 if ($onglet === 'non_saisis' && $seq_active) {
     $where_cl_a = $id_cl_ns ? "AND d.IDClasses = " . (int) $id_cl_ns : '';
+    // Enseignant(e) : seulement ses classes — jamais un lien « saisir » vers
+    // une classe qui lui serait ensuite refusée (31/10/2026).
+    $ids_vis_ns = classes_ids_visibles($val_annee, 'fr');
+    if ($ids_vis_ns !== null) $where_cl_a .= $ids_vis_ns ? ' AND d.IDClasses IN (' . implode(',', array_map('intval', $ids_vis_ns)) . ')' : ' AND 1=0';
     // n.Section + m_en.nom_comp (jumeau par code_comp) : ce tableau croise
     // plusieurs classes à la fois, potentiellement Fr et An mélangées — même
     // bascule de libellé que jn_libelle_comp()/jn_section_en() plus haut,

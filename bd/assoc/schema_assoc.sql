@@ -216,6 +216,13 @@ CREATE TABLE IF NOT EXISTS `journal_audit` (
   `geo_ville`        varchar(80)  DEFAULT NULL,
   `geo_operateur`    varchar(120) DEFAULT NULL,
   `device_id`        varchar(40)  DEFAULT NULL,           -- cookie durable (appareil_device_id()) — lie la ligne à appareil_connu
+  -- Position GPS du navigateur, si autorisée après la connexion (31/10/2026,
+  -- bd/lib/audit.php::audit_gps_enregistrer — ajoutées d'office sur une base existante)
+  `gps_lat`          decimal(9,6) DEFAULT NULL,
+  `gps_lon`          decimal(9,6) DEFAULT NULL,
+  `gps_precision`    int          DEFAULT NULL,            -- mètres
+  `gps_ville`        varchar(80)  DEFAULT NULL,
+  `gps_region`       varchar(80)  DEFAULT NULL,
   PRIMARY KEY (`id`),
   KEY `k_date`   (`date`),
   KEY `k_etab`   (`id_etablissement`,`date`),

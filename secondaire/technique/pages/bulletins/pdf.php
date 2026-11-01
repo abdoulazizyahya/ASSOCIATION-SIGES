@@ -228,6 +228,7 @@ $all_enrolled = db_all(
 );
 $enrolled_ids = array_column($all_enrolled, 'id');
 $nb_inscrits  = count($enrolled_ids);
+sec_series_charger((int)$insc['id_classe'], $id_annee); // classe mixte : matières par série
 
 // ── Notes brutes ──────────────────────────────────────────────────
 $all_notes_raw = [];
@@ -269,9 +270,11 @@ foreach ($all_notes_raw as $row) {
 
 // ── Fonctions helpers ─────────────────────────────────────────────
 function note_eff_bull(int $eid, int $id_mat, int $sid, array $ni, array $aj, array $nc, int $nb_ins): array {
+    if (sec_hors_serie($eid, $id_mat)) return [null, true]; // classe mixte : matière d'une autre série
     if (isset($ni[$eid][$id_mat][$sid])) return [$ni[$eid][$id_mat][$sid], false];
     if (isset($aj[$eid][$id_mat][$sid])) return [null, true]; // exclu (justifié)
     $cnt = $nc[$id_mat][$sid] ?? 0;
+    $nb_ins = sec_effectif_groupe($eid, $id_mat, $nb_ins); // classe mixte : effectif du groupe
     if ($nb_ins > 0 && $cnt >= ceil($nb_ins / 2)) return [0.0, false]; // absent = 0
     return [null, false];
 }
@@ -338,6 +341,7 @@ function moy_eleve_bull(int $eid, array $discs, array $seq_ids, array $ni, array
     $tot = 0; $coef = 0; $nb_data = 0;
     foreach ($discs as $d) {
         if (!in_array($d['id_mat'], $mats_avec_notes)) continue;
+        if (sec_hors_serie($eid, (int)$d['id_mat'])) { $nb_mats_an--; continue; } // classe mixte
         $avg = mat_avg_bull($eid, $d['id_mat'], $seq_ids, $ni, $aj, $nc, $nb_ins);
         if ($avg !== null) { $tot += $avg * $d['coef']; $coef += $d['coef']; $nb_data++; }
     }
@@ -750,6 +754,10 @@ $pdf->SetY(max($pdf->GetY(), $y_photo + $photo_h));
 $pdf->Ln(1);
 $y_table0 = $pdf->GetY();
 $hdr_h = 5.5;
+
+// Classe mixte : le bulletin n'affiche que les matières que l'élève suit
+// (communes + celles de sa série) — les calculs de classe ci-dessus sont faits.
+$disciplines = array_values(array_filter($disciplines, fn($d) => !sec_hors_serie($id_eleve, (int)$d['id_mat'])));
 
 // Regrouper disciplines par groupe — calculé ici (avant le tableau, au lieu
 // de juste avant la boucle d'affichage) pour connaître le nombre de lignes à

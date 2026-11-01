@@ -360,9 +360,7 @@ $pdf->Ln(8);
 if ($pdf->GetY() > $ph - 25) { $pdf->AddPage(); pdf_filigrane($pdf, $etab, $pw, $ph); }
 $w_sign = $uw * 0.35;
 $x_sign = $pw - 8 - $w_sign;
-$pdf->SetFont('Arial', '', 8.5);
-$pdf->SetX($x_sign);
-$pdf->Cell($w_sign, 5, u('Fait à ' . ($etab['ville'] ?? '') . ', le ' . date('d/m/Y')), 0, 1, 'R');
+pdf_fait_a_bilingue($pdf, $x_sign, $w_sign, lieu_edition_documents($etab), 'R', 8.5, 'u');
 $pdf->SetFont('Arial', 'B', 8.5);
 $pdf->SetX($x_sign);
 $pdf->Cell($w_sign, 5, u(strtoupper($etab['chef_etablissement'] ?? 'LE PROVISEUR') . ','), 0, 1, 'R');

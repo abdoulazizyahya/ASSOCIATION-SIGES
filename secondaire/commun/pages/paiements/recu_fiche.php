@@ -115,7 +115,7 @@ function recu_fiche_dessiner_bloc(
 
     $pdf->SetFont('Arial', 'B', 8);
     $pdf->SetXY($xi, $cy);
-    $pdf->Cell($wi, 4, pdf_u(mb_strtoupper($etab['ville'] ?? 'MBÉ', 'UTF-8') . ', le ' . date('d/m/Y')), 0, 1, 'R');
+    $pdf->Cell($wi, 4, pdf_u(mb_strtoupper(lieu_edition_documents($etab) ?: 'MBÉ', 'UTF-8') . ', le ' . date('d/m/Y')), 0, 1, 'R');
     $pdf->SetFont('Arial', 'I', 5.5);
     $pdf->SetX($xi);
     $pdf->Cell($wi, 2.6, 'On', 0, 1, 'R');

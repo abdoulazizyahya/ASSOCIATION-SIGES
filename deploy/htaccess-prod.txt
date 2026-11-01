@@ -70,12 +70,27 @@
 #  bd/ contient les runners (installer, migrations, sauvegardes, pool).
 #  Les débloquer ponctuellement (par IP) le temps d'une opération d'admin,
 #  puis re-commenter.
-RedirectMatch 403 ^/(bd|\.git|deploy)(/|$)
+RedirectMatch 403 ^/(bd|\.git|deploy|tests)(/|$)
 
 # Exemple : autoriser les runners bd/ depuis une IP d'admin seulement
 # <If "%{REQUEST_URI} =~ m#^/bd/#">
 #     Require ip 41.202.0.0/16
 # </If>
+
+# ── En-têtes de sécurité (01/11/2026) ──────────────────────────────
+#  HSTS : le navigateur n'ouvre plus jamais le site en HTTP (1 an).
+#  CSP  : seules les ressources du site lui-même, des polices Google et de
+#         cdn.jsdelivr.net (export Excel) sont chargées ; aucune page ne
+#         peut être affichée dans le cadre d'un autre site. Vérifiée sur
+#         les pages principales (tableau de bord, élèves, journal,
+#         statistiques, paiements, conseil, emploi du temps, association).
+#  Si un module cesse de fonctionner, commenter la ligne CSP et prévenir.
+<IfModule mod_headers.c>
+    Header always set Strict-Transport-Security "max-age=31536000"
+    Header always set Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self'; frame-src 'self' blob: data:; worker-src 'self' blob:; object-src 'self' blob:; base-uri 'self'; form-action 'self'; frame-ancestors 'self'"
+    Header always set X-Content-Type-Options "nosniff"
+    Header always set Referrer-Policy "strict-origin-when-cross-origin"
+</IfModule>
 
 # ── Cache statique léger ──────────────────────────────────────────
 <IfModule mod_expires.c>

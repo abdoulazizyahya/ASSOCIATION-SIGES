@@ -438,7 +438,7 @@ function dessiner_bulletin_annuel_arabe(
     $y += 6;
     $pdf->SetFont('helvetica', 'B', 8);
     $pdf->SetXY($x0, $y);
-    $pdf->Cell(199 - 10, 5, 'Fait a Ngaoundere le, ' . date('d/m/Y') . '   /', 0, 0, 'C');
+    $pdf->Cell(199 - 10, 5, 'Fait a ' . (lieu_edition_documents() ?: 'Ngaoundere') . ' le, ' . date('d/m/Y') . '   /', 0, 0, 'C');
     $pdf->SetFont('amirib', '', 8);
     $pdf->SetRTL(true, false);
     $pdf->SetXY($x0 + (199 - 10) / 2 + 26, $y + 4.5, true);

@@ -811,8 +811,16 @@ initAjaxZone(<?= json_encode($ajax_zone_id) ?>);
     var sens = th.dataset.sens === 'asc' ? 'desc' : 'asc';
     table.querySelectorAll('thead th').forEach(function (t) { delete t.dataset.sens; });
     th.dataset.sens = sens;
-    var lignes = Array.prototype.filter.call(corps.rows, function (r) { return r.cells.length > idx; });
-    var val = function (r) { var c = r.cells[idx]; return (c.dataset.tri !== undefined ? c.dataset.tri : c.textContent).trim(); };
+    // Bandeaux de groupe (ex. séries d'une classe mixte, tr.ligne-serie) : sans
+    // objet une fois les lignes réordonnées — masqués (31/10/2026).
+    Array.prototype.forEach.call(corps.querySelectorAll('tr.ligne-serie'), function (r) { r.style.display = 'none'; });
+    var lignes = Array.prototype.filter.call(corps.rows, function (r) { return r.cells.length > idx && !r.classList.contains('ligne-serie'); });
+    var val = function (r) {
+      var c = r.cells[idx];
+      if (c.dataset.tri !== undefined) return c.dataset.tri.trim();
+      var champ = c.querySelector('input:not([type=hidden]):not([type=checkbox]), select');   // ex. note en cours de saisie
+      return (champ ? champ.value : c.textContent).trim();
+    };
     lignes.sort(function (a, b) {
       var r = val(a).localeCompare(val(b), 'fr', { numeric: true, sensitivity: 'base' });
       return sens === 'asc' ? r : -r;
@@ -833,5 +841,6 @@ table.table-triable thead th[data-sens="asc"]::after{content:'\25B2';opacity:.8}
 table.table-triable thead th[data-sens="desc"]::after{content:'\25BC';opacity:.8}
 </style>
 <?= function_exists('db_stats_html') ? db_stats_html() : '' /* N requêtes SQL — en local uniquement */ ?>
+<?= function_exists('audit_gps_script') ? audit_gps_script() : '' /* position GPS après connexion (31/10/2026) */ ?>
 </body>
 </html>

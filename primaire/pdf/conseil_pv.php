@@ -204,9 +204,7 @@ if (empty($eleves_raw)) {
 // signature manuscrite, cohérent avec la réalité de l'établissement).
 $pdf->Ln(10);
 if ($pdf->GetY() > $pdf->GetPageHeight() - 40) $pdf->AddPage();
-$pdf->SetFont('Arial', '', 8);
-$pdf->SetX($marge);
-$pdf->Cell($w, 5, pdf_u('Fait à/Done at ' . (($etab['lieu'] ?: $etab['ville']) ?? '') . ', le/on ' . date('d/m/Y')), 0, 1, 'L');
+pdf_fait_a_bilingue($pdf, $marge, $w, (($etab['lieu'] ?: $etab['ville']) ?? ''), 'L', 8);
 $pdf->Ln(6);
 
 $sigCols = [

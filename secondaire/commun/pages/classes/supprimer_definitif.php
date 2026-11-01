@@ -6,7 +6,7 @@
 require_once __DIR__ . '/../../../../config/config.php';
 require_once __DIR__ . '/../../../../noyau/connexion.php';
 require_once __DIR__ . '/../../../../noyau/fonctions.php';
-exiger_role(['ADMIN', 'PROVISEUR', 'FONDATEUR']);
+exiger_role(SEC_ROLES_SUPPRESSION);   // Admin, Proviseur/Principal, fondateur, propriétaire
 csrf_verifier();
 
 $id = (int) ($_GET['id'] ?? 0);
@@ -24,7 +24,14 @@ if (!$classe) {
 } elseif ($nb_inscrits > 0) {
     flash_set('erreur', "Suppression impossible : $nb_inscrits inscription(s) enregistrée(s) dans cette classe. Retirez d'abord les élèves.");
 } else {
+    // Réglages pédagogiques de la classe (tables sans clé étrangère) : matières,
+    // séries, enseignants, professeur principal, SG, services d'emploi du temps.
+    foreach (['discipline' => 'IDClasses', 'discipline_serie' => 'IDClasses', 'dispenser' => 'IDClasses',
+              'dispenser_periode' => 'IDClasses', 'enseignat_principal' => 'IDClasses', 'sg' => 'IDClasses',
+              'edt_service' => 'id_classe'] as $t => $col) {
+        if (db_colonne_existe($t, $col)) db_exec("DELETE FROM `$t` WHERE `$col`=?", [$id]);
+    }
     db_exec("DELETE FROM classe WHERE id=?", [$id]);
     flash_set('succes', 'Classe « ' . $classe['designation'] . ' » supprimée définitivement.');
 }
-rediriger('secondaire/commun/pages/classes/liste.php?onglet=archivees');
+rediriger('secondaire/commun/pages/classes/liste.php' . (($_GET['retour'] ?? '') === 'actives' ? '' : '?onglet=archivees'));

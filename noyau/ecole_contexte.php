@@ -29,6 +29,9 @@ function ecole_session_demarrer(): void {
             'path'     => APP_URL . '/',
             'httponly' => true,
             'samesite' => 'Lax',
+            // HTTPS (en ligne) : cookie jamais envoyé en clair (01/11/2026) ; LAN en HTTP inchangé.
+            'secure'   => (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
+                          || strtolower((string) ($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '')) === 'https',
         ]);
         session_start();
     }

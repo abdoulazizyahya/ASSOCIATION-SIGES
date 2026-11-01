@@ -320,6 +320,7 @@ $all_enrolled = db_all(
 );
 $enrolled_ids = array_column($all_enrolled, 'id');
 $nb_inscrits  = count($enrolled_ids);
+sec_series_charger($id_classe, $id_annee); // classe mixte : matières par série
 
 // Notes brutes
 $all_notes_raw = [];
@@ -360,9 +361,11 @@ foreach ($all_notes_raw as $row) {
 
 // Note effective (eid, mat, seq)
 function note_eff_c(int $eid, int $id_mat, int $sid, array $ni, array $aj, array $nc, int $nb_ins): array {
+    if (sec_hors_serie($eid, $id_mat)) return [null, true]; // classe mixte : matière d'une autre série
     if (isset($ni[$eid][$id_mat][$sid])) return [$ni[$eid][$id_mat][$sid], false];
     if (isset($aj[$eid][$id_mat][$sid])) return [null, true];
     $cnt = $nc[$id_mat][$sid] ?? 0;
+    $nb_ins = sec_effectif_groupe($eid, $id_mat, $nb_ins); // classe mixte : effectif du groupe
     if ($nb_ins > 0 && $cnt >= ceil($nb_ins / 2)) return [0.0, false];
     return [null, false];
 }
@@ -405,6 +408,7 @@ function moy_eleve_c(int $eid, array $discs, array $sq, array $ni, array $aj, ar
     $tot = 0; $coef = 0; $nd = 0;
     foreach ($discs as $d) {
         if (!in_array($d['id_mat'], $man)) continue;
+        if (sec_hors_serie($eid, (int)$d['id_mat'])) { $nman--; continue; } // classe mixte
         $avg = mat_avg_c($eid, $d['id_mat'], $sq, $ni, $aj, $nc, $nb_ins);
         if ($avg !== null) { $tot += $avg * $d['coef']; $coef += $d['coef']; $nd++; }
     }
@@ -566,6 +570,13 @@ foreach ([0, 1] as $idx) {
 
 foreach ($eleves as $el) {
     $id_eleve = (int)$el['id'];
+    // Classe mixte : seules les matières que l'élève suit (communes + sa série).
+    $g_tries_el = [];
+    foreach ($g_tries as $glb => $mats) {
+        $mats = array_values(array_filter($mats, fn($d) => !sec_hors_serie($id_eleve, (int)$d['id_mat'])));
+        if ($mats) $g_tries_el[$glb] = $mats;
+    }
+    $nb_mats_el = array_sum(array_map('count', $g_tries_el));
     $eleve    = $el; // déjà chargé en entier (e.* dans la requête $eleves ci-dessus)
     if (!isset($insc_statut_par_eleve_c[$id_eleve])) continue;
     $insc = ['classe' => $classe_designation_c, 'statut' => $insc_statut_par_eleve_c[$id_eleve]];
@@ -809,7 +820,7 @@ foreach ($eleves as $el) {
     // demande explicite — d'où 6*$h_ligne. $h_bas ne reste utilisé que pour
     // l'en-tête DECISION/OBSERVATIONS.)
     $footer_fixe_c  = 1 + 6 * $h_ligne + 1 + $h_bas + count($decs) * $h_dec;
-    $n_lignes_tab_c = count($disciplines) + count($g_tries);
+    $n_lignes_tab_c = $nb_mats_el + count($g_tries_el);
     $row_h = $n_lignes_tab_c > 0
         ? max(3.2, min(4.5, ($bas_dispo_c - $y_table0 - 5.5 - $footer_fixe_c) / $n_lignes_tab_c))
         : 4.5;
@@ -840,7 +851,7 @@ foreach ($eleves as $el) {
     $pdf->SetFillColor(255, 255, 255);
 
     // Lignes par groupe
-    foreach ($g_tries as $glb => $mats) {
+    foreach ($g_tries_el as $glb => $mats) {
         $grp_pts = 0; $grp_coef = 0;
 
         foreach ($mats as $d) {

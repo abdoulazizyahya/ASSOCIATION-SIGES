@@ -91,9 +91,12 @@ if ($id_classe && $id_matiere && $id_seq) {
          FROM eleve e
          JOIN inscription i ON i.id_eleve=e.id AND i.id_classe=? AND i.id_annee=?
          LEFT JOIN serie s ON s.id=i.id_serie
-         WHERE e.statut='actif' ORDER BY e.nom, e.prenom",
+         WHERE e.statut='actif' ORDER BY s.libelle IS NULL, s.libelle, e.nom, e.prenom",   // classe mixte : regroupés par série
         [$id_classe, $id_annee]
     );
+    // Classe mixte : seuls les élèves qui suivent la matière ; le seuil
+    // « comptera 0 » se calcule sur ce groupe (voir sec_effectif_groupe()).
+    $eleves_raw  = sec_filtrer_eleves_matiere($eleves_raw, $id_classe, $id_annee, $id_matiere);
     $nb_inscrits = count($eleves_raw);
 
     $notes = db_all(
@@ -221,6 +224,7 @@ require_once __DIR__ . '/../../../../noyau/layout/header.php';
         </thead>
         <tbody>
           <?php foreach ($eleves as $i => $el): ?>
+          <?= sec_ligne_serie($eleves, $i, 7) ?>
           <?php
             $tr_class = $el['a_note'] ? '' : ($el['a_risque'] ? 'row-risque' : '');
             if ($el['justifie']) $tr_class = 'row-ok';

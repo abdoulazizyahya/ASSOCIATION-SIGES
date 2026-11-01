@@ -75,10 +75,11 @@ $csrf = $_SESSION['csrf_discipline'];
 $eleves = [];
 if ($id_classe && $id_trim) {
     $eleves = db_all(
-        "SELECT e.id, e.matricule, e.nom, e.prenom
+        "SELECT e.id, e.matricule, e.nom, e.prenom, s.libelle AS serie
          FROM eleve e
          JOIN inscription i ON i.id_eleve=e.id AND i.id_classe=? AND i.id_annee=?
-         WHERE e.statut='actif' ORDER BY e.nom, e.prenom",
+         LEFT JOIN serie s ON s.id=i.id_serie
+         WHERE e.statut='actif' ORDER BY s.libelle IS NULL, s.libelle, e.nom, e.prenom",   // classe mixte : regroupés par série
         [$id_classe, $id_annee]
     );
 }
@@ -229,6 +230,7 @@ require_once __DIR__ . '/../../../../noyau/layout/header.php';
         </thead>
         <tbody>
           <?php foreach ($eleves as $i => $el): ?>
+          <?= sec_ligne_serie($eleves, $i, $onglet === 'absences' ? 4 : 3) ?>
           <?php $d = $data_idx[$el['matricule']] ?? []; ?>
           <tr>
             <td class="text-muted"><?= $i + 1 ?></td>

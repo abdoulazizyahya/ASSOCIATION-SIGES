@@ -285,7 +285,7 @@ $pdf->MultiCell($uw, 3.5, u(
 $pdf->Ln(8);
 $pdf->SetFont('Arial', '', 11);
 $pdf->SetX($ml + $uw * 0.55);
-$pdf->Cell($uw * 0.45, 4.6, u(($etab['ville'] ?? '') . ', le ' . date('d/m/Y') . '.'), 0, 1, 'C');
+$pdf->Cell($uw * 0.45, 4.6, u(lieu_edition_documents($etab) . ', le ' . date('d/m/Y') . '.'), 0, 1, 'C');
 $pdf->SetFont('Arial', 'I', 9);
 $pdf->SetX($ml + $uw * 0.55);
 $pdf->Cell($uw * 0.45, 3.3, 'On', 0, 1, 'C');

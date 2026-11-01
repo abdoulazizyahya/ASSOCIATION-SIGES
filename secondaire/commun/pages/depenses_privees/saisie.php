@@ -52,7 +52,7 @@ $recentes = db_all(
     "SELECT d.*, cd.libelle AS categorie_libelle, u.nom, u.prenom
      FROM depense_privee d
      JOIN categorie_depense_privee cd ON cd.id = d.id_categorie
-     LEFT JOIN utilisateur u ON u.id = d.id_utilisateur
+     LEFT JOIN utilisateur u ON u.id = d.id_utilisateur" . sec_sql_compte_affichable('u') . "
      WHERE d.id_annee = ?
      ORDER BY d.date_depense DESC, d.id DESC
      LIMIT 20",

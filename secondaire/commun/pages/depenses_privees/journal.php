@@ -23,7 +23,7 @@ $params = [$id_annee, $date_debut, $date_fin];
 $sql = "SELECT d.*, cd.libelle AS categorie_libelle, u.nom, u.prenom
         FROM depense_privee d
         JOIN categorie_depense_privee cd ON cd.id = d.id_categorie
-        LEFT JOIN utilisateur u ON u.id = d.id_utilisateur
+        LEFT JOIN utilisateur u ON u.id = d.id_utilisateur" . sec_sql_compte_affichable('u') . "
         WHERE d.id_annee = ? AND d.date_depense BETWEEN ? AND ?";
 if ($id_categorie) { $sql .= " AND d.id_categorie = ?"; $params[] = $id_categorie; }
 $sql .= " ORDER BY d.date_depense, d.id";

@@ -664,6 +664,7 @@ CREATE TABLE `etablissement` (
   `departement_en` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `arrondissement_en` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `lieu_etab` varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `lieu_edition` varchar(100) DEFAULT NULL,
   `pays_etab_ar` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `region_ar` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `departement_ar` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,

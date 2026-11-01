@@ -125,7 +125,7 @@ foreach ($frames as [$x0, $y0]) {
     $pdf->SetXY($xi, $cy);
     $pdf->Cell($wi * 0.62, 3.4, pdf_u('Adresse du Parent ou Contact Téléphonique : '), 0, 0);
     $pdf->SetFont('Arial', 'B', 8);
-    $pdf->Cell($wi * 0.38, 3.4, pdf_u(mb_strtoupper($etab['ville'] ?? 'MBÉ', 'UTF-8') . ', le ' . date('d/m/Y')), 0, 1, 'R');
+    $pdf->Cell($wi * 0.38, 3.4, pdf_u(mb_strtoupper(lieu_edition_documents($etab) ?: 'MBÉ', 'UTF-8') . ', le ' . date('d/m/Y')), 0, 1, 'R');
     $pdf->SetFont('Arial', 'I', 5.2);
     $pdf->SetTextColor(110);
     $pdf->SetX($xi);

@@ -278,8 +278,7 @@ function dossier_render_one(FPDF $pdf, array $e, array $etab, string $val_annee)
 
     // Bloc signature
     $pdf->Ln(8);
-    $pdf->SetX($ml + $uw*0.58); $pdf->SetFont('Arial','',9);
-    $pdf->Cell($uw*0.42, 5, ud((get_etablissement()['ville'] ?? '').', le/on '.date('d/m/Y')), 0, 1, 'C');
+    pdf_fait_a_bilingue($pdf, $ml + $uw*0.58, $uw*0.42, lieu_edition_documents(), 'C', 9, 'ud');
     $pdf->SetX($ml + $uw*0.58); $pdf->SetFont('Arial','B',9);
     $pdf->Cell($uw*0.42, 5, ud('Le Proviseur / The Principal'), 0, 1, 'C');
     // Signature numérique (uniquement si demandée à l'impression — jamais

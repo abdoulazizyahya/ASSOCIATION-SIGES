@@ -146,9 +146,66 @@ function audit_vue_appareil(array $l): string
     return $out;
 }
 
-/** « Ville, Pays » (opérateur réseau en info-bulle). */
+/**
+ * Clic sur une position GPS (demande du 01/11/2026) : l'application Google Maps
+ * en premier ; si elle n'est pas installée, la carte OpenStreetMap (href du lien).
+ *  - Android : lien « intent » vers Google Maps, repli automatique sur l'URL OSM ;
+ *  - iPhone/iPad : schéma comgooglemaps:// ; si la page est toujours affichée
+ *    1,5 s plus tard, l'application n'existe pas → OSM ;
+ *  - ordinateur : Google Maps (site web) dans un nouvel onglet (01/11/2026).
+ * Script émis une seule fois par page.
+ */
+function audit_vue_script_carte(): string
+{
+    static $emis = false;
+    if ($emis) return '';
+    $emis = true;
+    return <<<'JS'
+<script>
+function ouvrirCarteGps(a) {
+  var lat = a.dataset.lat, lon = a.dataset.lon, osm = a.href, ua = navigator.userAgent;
+  if (/Android/i.test(ua)) {
+    location.href = 'intent://maps.google.com/maps?q=' + lat + ',' + lon
+      + '#Intent;scheme=https;package=com.google.android.apps.maps;S.browser_fallback_url='
+      + encodeURIComponent(osm) + ';end';
+    return false;
+  }
+  if (/iPhone|iPad|iPod/i.test(ua)) {
+    var t = setTimeout(function () { if (!document.hidden) location.href = osm; }, 1500);
+    document.addEventListener('visibilitychange', function () { if (document.hidden) clearTimeout(t); }, {once: true});
+    location.href = 'comgooglemaps://?q=' + lat + ',' + lon + '&center=' + lat + ',' + lon + '&zoom=15';
+    return false;
+  }
+  // Ordinateur : Google Maps (site web) dans un nouvel onglet.
+  window.open('https://www.google.com/maps/search/?api=1&query=' + lat + ',' + lon, '_blank', 'noopener');
+  return false;
+}
+</script>
+JS;
+}
+
+/** « Ville, Pays » (opérateur réseau en info-bulle). Position GPS en priorité (31/10/2026). */
 function audit_vue_localisation(array $l): string
 {
+    if (!empty($l['gps_lat'])) {
+        $v = trim((string) ($l['gps_ville'] ?? ''));
+        $r = trim((string) ($l['gps_region'] ?? ''));
+        $lieu = trim($v . ($v !== '' && $r !== '' ? ', ' : '') . $r);
+        if ($lieu === '') $lieu = number_format((float) $l['gps_lat'], 4, '.', '') . ', ' . number_format((float) $l['gps_lon'], 4, '.', '');
+        $prec  = (int) ($l['gps_precision'] ?? 0);
+        $la = rawurlencode((string) $l['gps_lat']); $lo = rawurlencode((string) $l['gps_lon']);
+        $carte = "https://www.openstreetmap.org/?mlat=$la&mlon=$lo#map=13/$la/$lo";
+        $txt_prec = $prec ? ($prec >= 1000 ? round($prec / 1000, 1) . ' km' : $prec . ' m') : '';
+        // Précision > 5 km : estimation du navigateur d'après l'IP, pas un GPS.
+        $approx = $prec > (defined('AUDIT_GPS_PRECISION_MAX') ? AUDIT_GPS_PRECISION_MAX : 5000);
+        $titre = ($approx ? "Estimation du navigateur d'après l'adresse internet (localisation de l'appareil indisponible)" : 'Position GPS du navigateur')
+               . ($txt_prec ? ' (± ' . $txt_prec . ')' : '');
+        return audit_vue_script_carte()
+             . '<a href="' . h($carte) . '" target="_blank" rel="noopener" class="text-decoration-none" title="' . h($titre) . '"'
+             . ' data-lat="' . h((string) $l['gps_lat']) . '" data-lon="' . h((string) $l['gps_lon']) . '" onclick="return ouvrirCarteGps(this)">'
+             . '<i class="bi bi-geo-alt-fill ' . ($approx ? 'text-warning' : 'text-success') . ' me-1"></i>' . h($lieu)
+             . ($approx ? ' <small class="text-muted">(± ' . h($txt_prec) . ', approx.)</small>' : '') . '</a>';
+    }
     $ville = $l['geo_ville'] ?? '';
     $pays  = $l['geo_pays'] ?? '';
     $aff   = trim($ville . ($ville && $pays ? ', ' : '') . $pays);
@@ -156,6 +213,9 @@ function audit_vue_localisation(array $l): string
         $aff = trim((string) ($l['geo_region'] ?? '')) ?: '';
     }
     if ($aff === '') return '<span class="text-muted2">—</span>';
-    $op = $l['geo_operateur'] ?? '';
-    return '<span' . ($op ? ' title="' . h($op) . '"' : '') . '>' . h($aff) . '</span>';
+    // Ville de l'IP = passerelle de l'opérateur, pas la position réelle.
+    $op    = $l['geo_operateur'] ?? '';
+    $titre = "Localisation approximative d'après l'adresse IP (passerelle de l'opérateur"
+           . ($op ? ' : ' . $op : '') . ') — position GPS non autorisée';
+    return '<span title="' . h($titre) . '">' . h($aff) . ' <small class="text-muted">(approx.)</small></span>';
 }

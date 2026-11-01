@@ -8,7 +8,7 @@
 //    discipline_arabe) + total + cote.
 // Une colonne par critère du barème (critère à 0 point = pas de colonne), barème
 // rappelé dans l'en-tête. « Toutes » : une page par compétence / matière.
-// GET : piste (fr|ar), classe, item (id_comp / id_mat ; 0 = feuille générique,
+// GET : piste (fr|ar), classe (« toutes » = toutes les classes visibles, à la suite), item (id_comp / id_mat ; 0 = feuille générique,
 //       -1 = toutes), seq (évaluation ; 0 = à compléter ; « annee » = les 3 trimestres :/n//       critères et total de chaque évaluation, note du trimestre, note annuelle,/n//       cote — A4 paysage),/n//       mode (vierge|rempli), dl.
 require_once __DIR__ . '/../../config/config.php';
 require_once __DIR__ . '/../../noyau/connexion.php';
@@ -21,7 +21,9 @@ require_once __DIR__ . '/header_pdf.php';
 
 $piste = ($_GET['piste'] ?? 'fr') === 'ar' ? 'ar' : 'fr';
 $val_annee = (string) (get_annee_active()['val_annee'] ?? '');
-$id_classe = (int) ($_GET['classe'] ?? 0);
+// classe=toutes (01/11/2026) : toutes les classes visibles ayant des inscrits, à la suite
+$toutes = ($_GET['classe'] ?? '') === 'toutes';
+$id_classe = $toutes ? 0 : (int) ($_GET['classe'] ?? 0);
 exiger_acces_classe($id_classe, $val_annee, $piste);   // enseignant : seulement ses classes
 $item = (int) ($_GET['item'] ?? 0);
 $annuel = ($_GET['seq'] ?? '') === 'annee';   // toute l'année : les 3 trimestres (26/10/2026)
@@ -33,10 +35,20 @@ $dl = ($_GET['dl'] ?? '0') === '1';
 // « vides » : lignes vides ajoutées sous la liste (aussi sur une fiche nominative vierge).
 $anonyme = ($_GET['anonyme'] ?? '') === '1';
 $vides = max(0, min(40, (int) ($_GET['vides'] ?? ($anonyme ? 10 : 0))));
-if ($anonyme) { $id_classe = 0; $item = 0; $rempli = false; }
-$classe = $id_classe ? db_one("SELECT * FROM classe WHERE IDClasses=?", [$id_classe]) : null;
-if (!$classe && !$anonyme) die('Classe introuvable.');
-$seq = $id_seq ? db_one("SELECT s.id_seq, s.libelle_seq, t.id_trim, t.libelle_trim FROM sequence s JOIN trimestre t ON t.id_trim=s.id_trim WHERE s.id_seq=? AND t.id_annee=?", [$id_seq, $val_annee]) : null;
+if ($anonyme) { $id_classe = 0; $item = 0; $rempli = false; $toutes = false; }
+if ($toutes) {
+    if ($item > 0) $item = 0;   // compétences / matières propres à chaque classe : aucune, ou toutes
+    $ids_classes = array_map('intval', array_column(filtrer_classes_visibles(db_all(
+        "SELECT c.IDClasses FROM classe c LEFT JOIN niveau n ON n.LibelleNiveau = c.Niveau
+         WHERE EXISTS (SELECT 1 FROM inscrire i WHERE i.IDClasses = c.IDClasses AND i.val_annee = ?)
+         ORDER BY n.OrdreNiveau, c.DesignationClasses", [$val_annee]), $val_annee, $piste), 'IDClasses'));
+    if (!$ids_classes) die('Aucune classe accessible.');
+    @set_time_limit(300);
+} else {
+    $ids_classes = [$id_classe];
+    if (!$anonyme && !db_val("SELECT 1 FROM classe WHERE IDClasses=?", [$id_classe])) die('Classe introuvable.');
+}
+$seq =$id_seq ? db_one("SELECT s.id_seq, s.libelle_seq, t.id_trim, t.libelle_trim FROM sequence s JOIN trimestre t ON t.id_trim=s.id_trim WHERE s.id_seq=? AND t.id_annee=?", [$id_seq, $val_annee]) : null;
 if ($rempli && !$seq && !$annuel) $rempli = false;   // rempli : une évaluation précise, ou toute l'année
 // Année : trimestres et leurs évaluations, dans l'ordre
 $trims = [];
@@ -47,6 +59,52 @@ if ($annuel) foreach (db_all("SELECT id_trim, libelle_trim FROM trimestre WHERE 
 $criteres = $piste === 'fr'
     ? ['orale' => ['Orale', 'Oral', 'note_orale'], 'ecrite' => ['Écrite', 'Written', 'note_ecrite'], 'pratique' => ['Pratique', 'Practical', 'note_pratique'], 'savoir_etre' => ['Savoir-être', 'Attitude', 'note_savoir_etre']]
     : ['orale' => ['Oral', 'Oral', 'note_orale'], 'ecrite' => ['Écrit', 'Written', 'note_ecrite'], 'pratique' => ['Pratique', 'Practical', 'note_pratique']];
+
+$etab = etab_pour_pdf(get_etablissement());
+[$titre_chef, $titre_chef_en] = titres_chef_pdf(get_etablissement());
+$nom_ens = fn(?array $t) => $t ? trim(($t['nom_ens'] ?? '') . ' ' . ($t['prenom_ens'] ?? '')) : null;
+$periode_lib = $annuel ? "Toute l'année (" . count($trims) . ' trimestres)' : ($seq ? $seq['libelle_seq'] . ' — ' . $seq['libelle_trim'] : null);
+$fmt = fn($v) => $v === null || $v === '' ? '' : rtrim(rtrim(number_format((float) $v, 2, ',', ''), '0'), ',');
+// Cellule du nom (01/11/2026) : police réduite selon la longueur du nom (de $max à $min pt),
+// tronqué seulement s'il ne tient toujours pas à la plus petite taille.
+$cellule_nom = function (FPDF $pdf, float $w, float $h, array $el, bool $fill, float $max, float $min): void {
+    $nom = pdf_u(trim(mb_strtoupper((string) $el['Nom_elv']) . ' ' . ($el['Prenom_elv'] ?? '')));
+    $t = $max;
+    $pdf->SetFont('Arial', '', $t);
+    while ($t > $min && $pdf->GetStringWidth($nom) > $w - 1.5) { $t -= 0.5; $pdf->SetFont('Arial', '', $t); }
+    while (strlen($nom) > 4 && $pdf->GetStringWidth($nom) > $w - 1.5) $nom = substr($nom, 0, -2) . '.';
+    $pdf->Cell($w, $h, $nom, 1, 0, 'L', $fill);
+};
+
+$pdf = new FPDF($annuel ? 'L' : 'P', 'mm', 'A4');   // l'année : paysage (une colonne par évaluation)
+$ml = $annuel ? 7 : 10;   // l'année : marges réduites (une trentaine de colonnes)
+$pdf->SetMargins($ml, $ml, $ml);
+$pdf->SetAutoPageBreak(false);
+$pw = $pdf->GetPageWidth(); $ph = $pdf->GetPageHeight(); $uw = $pw - 2 * $ml;
+
+// Tableau statistique des effectifs (01/11/2026, comme le relevé du secondaire) :
+// Nouveaux / Redoublants / Total × Garçons / Filles / Total, en haut à droite.
+// $eff null (fiche anonyme) : cases vides, à remplir à la main.
+$tab_w_lib = 24; $tab_w_n = 14; $tab_h = 5;
+$tab_w = $tab_w_lib + 3 * $tab_w_n;
+$tableau_effectifs = function (?array $eff, float $x, float $y) use ($pdf, $tab_w_lib, $tab_w_n, $tab_h): void {
+    $pdf->SetDrawColor(30, 79, 216); $pdf->SetLineWidth(0.2); $pdf->SetTextColor(18, 42, 96);
+    $pdf->SetFillColor(204, 222, 248); $pdf->SetFont('Arial', 'B', 8);
+    $pdf->SetXY($x, $y);
+    $pdf->Cell($tab_w_lib, $tab_h, 'Effectif', 1, 0, 'C', true);
+    foreach (['Garçons', 'Filles', 'Total'] as $t) $pdf->Cell($tab_w_n, $tab_h, pdf_u($t), 1, 0, 'C', true);
+    foreach (['nouveau' => 'Nouveaux', 'redoublant' => 'Redoublants', 'total' => 'Total'] as $k => $lib) {
+        $y += $tab_h; $pdf->SetXY($x, $y);
+        $pdf->SetFillColor(204, 222, 248); $pdf->SetFont('Arial', 'B', 8.5); $pdf->SetTextColor(18, 42, 96);
+        $pdf->Cell($tab_w_lib, $tab_h, pdf_u($lib), 1, 0, 'L', true);
+        $pdf->SetTextColor(0); $pdf->SetFillColor(236, 241, 252); $pdf->SetFont('Arial', $k === 'total' ? 'B' : '', 9.5);
+        foreach (['M', 'F', 'T'] as $c) $pdf->Cell($tab_w_n, $tab_h, $eff === null ? '' : (string) $eff[$k][$c], 1, 0, 'C', $k === 'total');
+    }
+    $pdf->SetTextColor(0); $pdf->SetDrawColor(0);
+};
+
+foreach ($ids_classes as $id_classe) {
+$classe = $id_classe ? db_one("SELECT * FROM classe WHERE IDClasses=?", [$id_classe]) : null;
 
 // Compétences (fr) ou matières (ar) de la classe, avec leur barème
 if ($piste === 'fr') {
@@ -61,23 +119,29 @@ if ($piste === 'fr') {
 }
 $pages = $item === -1 ? $items : ($item > 0 ? array_values(array_filter($items, fn($i) => $i['id'] === $item)) : [null]);
 if ($item > 0 && !$pages) die('Compétence ou matière inconnue pour cette classe.');
+if (!$pages) $pages = [null];   // « toutes » sans compétence / matière configurée : feuille générique
 
-$eleves = $anonyme ? [] : db_all("SELECT e.id_eleve, e.Nom_elv, e.Prenom_elv, e.Sexe_elv FROM eleve e JOIN inscrire i ON i.id_eleve=e.id_eleve
+$eleves = $anonyme ? [] : db_all("SELECT e.id_eleve, e.Nom_elv, e.Prenom_elv, e.Sexe_elv, i.Statut_elv FROM eleve e JOIN inscrire i ON i.id_eleve=e.id_eleve
                   WHERE i.IDClasses=? AND i.val_annee=? ORDER BY e.Nom_elv, e.Prenom_elv", [$id_classe, $val_annee]);
 $nb_reels = count($eleves);
+$eff = null;
+if (!$anonyme) {
+    $eff = [];
+    foreach (['nouveau', 'redoublant', 'total'] as $k) $eff[$k] = ['M' => 0, 'F' => 0, 'T' => 0];
+    foreach ($eleves as $e) {
+        $sx = stripos((string) $e['Sexe_elv'], 'F') === 0 ? 'F' : 'M';
+        foreach ([($e['Statut_elv'] ?? 'Non') === 'Oui' ? 'redoublant' : 'nouveau', 'total'] as $k) { $eff[$k][$sx]++; $eff[$k]['T']++; }
+    }
+}
 $lignes_vides = ($anonyme ? (int) db_val("SELECT MAX(n) FROM (SELECT COUNT(*) n FROM inscrire WHERE val_annee=? GROUP BY IDClasses) t", [$val_annee]) : 0) + $vides;
-for ($i = 0; $i < $lignes_vides; $i++) $eleves[] = ['id_eleve' => 0, 'Nom_elv' => '', 'Prenom_elv' => '', 'Sexe_elv' => ''];
-$etab = etab_pour_pdf(get_etablissement());
-[$titre_chef, $titre_chef_en] = titres_chef_pdf(get_etablissement());
+for ($i = 0; $i < $lignes_vides; $i++) $eleves[] = ['id_eleve' => 0, 'Nom_elv' => '', 'Prenom_elv' => '', 'Sexe_elv' => '', 'Statut_elv' => ''];
 $enseignant = null;
-$nom_ens = fn(?array $t) => $t ? trim(($t['nom_ens'] ?? '') . ' ' . ($t['prenom_ens'] ?? '')) : null;
 if ($seq) $enseignant = $nom_ens(prim_titulaire_trimestre($id_classe, $val_annee, (int) $seq['id_trim'], $piste));
 if ($annuel) {   // un nom, ou un par trimestre si l'enseignant a changé en cours d'année
     $parT = [];
     foreach ($trims as $i => $t) if ($n = $nom_ens(prim_titulaire_trimestre($id_classe, $val_annee, (int) $t['id_trim'], $piste))) $parT['T' . ($i + 1)] = $n;
     $enseignant = count(array_unique($parT)) > 1 ? implode(' ; ', array_map(fn($k, $v) => "$k : $v", array_keys($parT), $parT)) : (array_values($parT)[0] ?? null);
 }
-$periode_lib = $annuel ? "Toute l'année (" . count($trims) . ' trimestres)' : ($seq ? $seq['libelle_seq'] . ' — ' . $seq['libelle_trim'] : null);
 
 /** Notes saisies d'une évaluation pour un item : [id_eleve => ligne] ; null si vierge. */
 $notes = function (?array $it) use ($rempli, $piste, $id_classe, $id_seq, $val_annee): array {
@@ -87,13 +151,6 @@ $notes = function (?array $it) use ($rempli, $piste, $id_classe, $id_seq, $val_a
         : db_all("SELECT id_eleve, note_orale, note_ecrite, note_pratique FROM composer_sequence_arabe WHERE classe=? AND id_mat=? AND id_seq=?", [$id_classe, $it['id'], $id_seq]);
     return array_column($rows, null, 'id_eleve');
 };
-$fmt = fn($v) => $v === null || $v === '' ? '' : rtrim(rtrim(number_format((float) $v, 2, ',', ''), '0'), ',');
-
-$pdf = new FPDF($annuel ? 'L' : 'P', 'mm', 'A4');   // l'année : paysage (une colonne par évaluation)
-$ml = $annuel ? 7 : 10;   // l'année : marges réduites (une trentaine de colonnes)
-$pdf->SetMargins($ml, $ml, $ml);
-$pdf->SetAutoPageBreak(false);
-$pw = $pdf->GetPageWidth(); $ph = $pdf->GetPageHeight(); $uw = $pw - 2 * $ml;
 
 foreach ($pages as $it) {
     $bar = $it['bareme'] ?? null;
@@ -103,7 +160,7 @@ foreach ($pages as $it) {
     $total_bar = $bar ? (float) $bar['total_points'] : null;
     $donnees = $notes($it);
 
-    $entete = function () use ($pdf, $etab, $pw, $ml, $uw, $classe, $val_annee, $periode_lib, $annuel, $it, $enseignant, $piste) {
+    $entete = function () use ($pdf, $etab, $pw, $ml, $uw, $classe, $val_annee, $periode_lib, $annuel, $it, $enseignant, $piste, $eff, $tableau_effectifs, $tab_w, $tab_h) {
         pdf_filigrane($pdf, $etab, $pw, $pdf->GetPageHeight());
         pdf_entete($pdf, $etab, $pw, $ml, null, 0.85);
         pdf_bandeau($pdf, 'RELEVÉ DE NOTES' . ($piste === 'ar' ? ' (ARABE)' : ''), 'GRADE SHEET' . ($piste === 'ar' ? ' (ARABIC TRACK)' : ''), $pw, $ml);
@@ -118,8 +175,14 @@ foreach ($pages as $it) {
             }
             else { $x = $pdf->GetX(); $y = $pdf->GetY() + 6.4; pdf_ligne_pointillee($pdf, $x, $y, $x + $reste - 2, $y); $pdf->Cell($reste, 8, '', 0, 0); }
         };
-        $pdf->SetX($ml); $ligne('Classe : ', $classe['DesignationClasses'] ?? null, $uw * 0.45); $ligne('Année scolaire : ', $val_annee, $uw * 0.55); $pdf->Ln(8);
-        $pdf->SetX($ml); $ligne($annuel ? 'Période : ' : 'Évaluation : ', $periode_lib, $uw * 0.45); $ligne('Enseignant(e) : ', $enseignant, $uw * 0.55); $pdf->Ln(8);
+        // Informations à gauche, tableau statistique des effectifs à droite (01/11/2026)
+        $y0 = $pdf->GetY(); $wi = $uw - $tab_w - 4;
+        $pdf->SetX($ml); $ligne('Classe : ', $classe['DesignationClasses'] ?? null, $wi * 0.45); $ligne('Année scolaire : ', $val_annee, $wi * 0.55); $pdf->Ln(7.5);
+        $pdf->SetX($ml); $ligne($annuel ? 'Période : ' : 'Évaluation : ', $periode_lib, $wi); $pdf->Ln(7.5);
+        $pdf->SetX($ml); $ligne('Enseignant(e) : ', $enseignant, $wi); $pdf->Ln(7.5);
+        $y1 = $pdf->GetY();
+        $tableau_effectifs($eff, $ml + $uw - $tab_w, $y0 + 1);
+        $pdf->SetY(max($y1, $y0 + 1 + 4 * $tab_h + 1));
         $pdf->SetX($ml); $ligne($piste === 'fr' ? 'Compétence : ' : 'Matière : ', $it ? $it['libelle'] : null, $uw); $pdf->Ln(8);
         if ($it && $it['groupe']) { $pdf->SetX($ml); $pdf->SetFont('Arial', 'I', 11); $pdf->Cell($uw, 6, pdf_u(($piste === 'fr' ? 'Groupe : ' : 'Groupe de matières : ') . $it['groupe']), 0, 1); }
         $pdf->Ln(2);
@@ -165,7 +228,8 @@ foreach ($pages as $it) {
         $nb_crit = count($cols) + ($rempli ? 1 : 0);   // critères (+ Tot. au rempli) pour chaque évaluation
         // Vierge : ni Moy. — la place va à la colonne des noms, écrits à la main (26/10/2026)
         // Pas de colonne Sexe (26/10/2026) : sa largeur va aux noms
-        $w_no = 6; $w_sexe = 0; $w_nom = $rempli ? 47.5 : 85.5; $w_an = $rempli ? 12 : 0; $w_cote = $rempli ? 10 : 0;
+        // Colonne Sexe juste après le nom (01/11/2026), prise sur la largeur des noms
+        $w_no = 6; $w_sexe = $rempli ? 6 : 9; $w_nom = $rempli ? 41.5 : 76.5; $w_an = $rempli ? 12 : 0; $w_cote = $rempli ? 10 : 0;
         $nb = 0;
         foreach ($trims as $t) $nb += max(1, count($t['seqs'])) * $nb_crit + ($rempli ? 1 : 0);
         $w_c = $nb ? ($uw - $w_no - $w_nom - $w_sexe - $w_an - $w_cote) / $nb : 0;
@@ -181,6 +245,7 @@ foreach ($pages as $it) {
             $x = $ml;
             $bloc($x, $y, $w_no, $H, 'N°'); $x += $w_no;
             $bloc($x, $y, $w_nom, $H, 'Noms et prénoms', '', 12); $x += $w_nom;
+            $bloc($x, $y, $w_sexe, $H, $rempli ? 'S.' : 'Sexe', '', $rempli ? 8 : 9); $x += $w_sexe;
             foreach ($trims as $t) {
                 $seqs = $t['seqs'] ?: [['libelle_seq' => 'Éval.']];
                 $bloc($x, $y, $w_c * (count($seqs) * $nb_crit + ($rempli ? 1 : 0)), $h1, $t['libelle_trim'], '', 12);
@@ -216,9 +281,9 @@ foreach ($pages as $it) {
             $id = (int) $el['id_eleve']; $fill = $n % 2 === 0;
             $pdf->SetX($ml); $pdf->SetFont('Arial', '', $rempli ? 8 : 12); $pdf->SetFillColor(243, 247, 253);
             $pdf->Cell($w_no, $h_row, (string) $n, 1, 0, 'C', $fill);
-            $nom_el = mb_strtoupper((string) $el['Nom_elv']) . ' ' . ($el['Prenom_elv'] ?? '');
-            while (mb_strlen($nom_el) > 4 && $pdf->GetStringWidth(pdf_u($nom_el)) > $w_nom - 1.5) $nom_el = mb_substr($nom_el, 0, -2) . '.';   // tient dans la colonne
-            $pdf->Cell($w_nom, $h_row, pdf_u($nom_el), 1, 0, 'L', $fill);
+            $cellule_nom($pdf, $w_nom, $h_row, $el, $fill, $rempli ? 8 : 10.5, $rempli ? 5.5 : 7);
+            $pdf->SetFont('Arial', '', $rempli ? 7.5 : 10);
+            $pdf->Cell($w_sexe, $h_row, pdf_u(mb_strtoupper(mb_substr((string) $el['Sexe_elv'], 0, 1))), 1, 0, 'C', $fill);
             $moys = [];
             foreach ($trims as $t) {
                 foreach ($t['seqs'] ?: [null] as $s) {
@@ -266,9 +331,8 @@ foreach ($pages as $it) {
         $pdf->SetX($ml); $pdf->SetFont('Arial', '', 11);
         $pdf->SetFillColor(243, 247, 253); $fill = $n % 2 === 0;
         $pdf->Cell($w_no, $h_row, (string) $n, 1, 0, 'C', $fill);
-        $nom_el = mb_strtoupper((string) $el['Nom_elv']) . ' ' . ($el['Prenom_elv'] ?? '');
-        while (mb_strlen($nom_el) > 4 && $pdf->GetStringWidth(pdf_u($nom_el)) > $w_nom - 1.5) $nom_el = mb_substr($nom_el, 0, -2) . '.';   // tient dans la colonne
-        $pdf->Cell($w_nom, $h_row, pdf_u($nom_el), 1, 0, 'L', $fill);
+        $cellule_nom($pdf, $w_nom, $h_row, $el, $fill, 9.5, 6.5);
+        $pdf->SetFont('Arial', '', 11);
         $pdf->Cell($w_sexe, $h_row, pdf_u(mb_strtoupper(mb_substr((string) $el['Sexe_elv'], 0, 1))), 1, 0, 'C', $fill);
         $total = null;
         foreach ($cols as $k => [, , $colonne]) {
@@ -291,11 +355,12 @@ foreach ($pages as $it) {
     if (!$eleves) { $pdf->SetX($ml); $pdf->Cell($uw, 8, pdf_u('Aucun élève inscrit dans cette classe.'), 1, 1, 'C'); }
     }   // fin relevé d'une évaluation
 
-    // Pied : effectif, signatures (enseignant ; chef selon la décision du propriétaire)
+    // Pied : élèves notés, cotes, signatures (enseignant ; chef selon la décision du propriétaire).
+    // L'effectif est dans le tableau statistique de l'en-tête (01/11/2026).
     $pdf->Ln(2); $pdf->SetX($ml); $pdf->SetFont('Arial', '', 10.5);
-    $nb = $nb_reels; $nf = count(array_filter($eleves, fn($e) => mb_strtoupper(mb_substr((string) $e['Sexe_elv'], 0, 1)) === 'F'));
-    $pdf->MultiCell($uw, 5.5, pdf_u(($anonyme ? 'Effectif : ........  (F : ......, G : ......)' : "Effectif : $nb (F : $nf, G : " . ($nb - $nf) . ')') . ($rempli ? " — Élèves notés : $remplies" : '')
-        . ($annuel && !$rempli ? '' : ' — Cote : NA non acquis, ECA en cours d\'acquisition, A acquis, A+ acquis avec facilité.')), 0, 'L');   // texte agrandi : retour à la ligne si besoin
+    $pied = array_filter([$rempli ? "Élèves notés : $remplies / $nb_reels" : '',
+                          $annuel && !$rempli ? '' : 'Cote : NA non acquis, ECA en cours d\'acquisition, A acquis, A+ acquis avec facilité.']);
+    if ($pied) $pdf->MultiCell($uw, 5.5, pdf_u(implode(' — ', $pied)), 0, 'L');   // texte agrandi : retour à la ligne si besoin
     $y = max($pdf->GetY() + 3, $ph - 30);
     $pdf->SetFont('Arial', '', 11.5);
     $pdf->SetXY($ml, $y); $pdf->Cell($uw / 2, 4.5, pdf_u('L\'enseignant(e)'), 0, 0, 'C');
@@ -306,8 +371,9 @@ foreach ($pages as $it) {
         pdf_signature_appliquer_jn($pdf, 'releve_notes_evaluation', 0, 0, $pw, $ph,
             ['x_pct' => ($ml + $uw * 0.75 - $sw / 2) / $pw * 100, 'y_pct' => ($pdf->GetY() + 0.5) / $ph * 100, 'w_pct' => $sw / $pw * 100, 'h_pct' => null]);
     }
-}
+}   // fin page (compétence / matière)
+}   // fin classe
 
-$nom = 'releve_' . ($rempli ? 'rempli' : 'vierge') . '_' . $piste . '_' . preg_replace('/\W+/u', '_', $classe['DesignationClasses'] ?? 'anonyme')
+$nom = 'releve_' . ($rempli ? 'rempli' : 'vierge') . '_' . $piste . '_' . ($toutes ? 'toutes_classes' : preg_replace('/\W+/u', '_', $classe['DesignationClasses'] ?? 'anonyme'))
      . ($seq ? '_' . preg_replace('/\W+/u', '_', $seq['libelle_seq']) : '') . '.pdf';
 $pdf->Output($dl ? 'D' : 'I', $nom);

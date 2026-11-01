@@ -181,7 +181,8 @@ foreach ($classes as $c) {
                  onclick="return confirm('Désarchiver cette classe et la rendre à nouveau active ?')">
                 <i class="bi bi-arrow-counterclockwise" style="font-size:.78rem"></i>
               </a>
-              <?php if ((int) $c['nb_inscrits_total'] > 0): ?>
+              <?php if (!sec_peut_supprimer()): ?>
+              <?php elseif ((int) $c['nb_inscrits_total'] > 0): ?>
               <span class="btn btn-sm btn-light text-muted disabled" style="padding:3px 7px;opacity:.4"
                     title="Suppression impossible : <?= (int) $c['nb_inscrits_total'] ?> inscription(s) enregistrée(s) dans cette classe">
                 <i class="bi bi-trash" style="font-size:.78rem"></i>
@@ -207,6 +208,14 @@ foreach ($classes as $c) {
                  onclick="return confirm('Archiver cette classe ?')">
                 <i class="bi bi-archive" style="font-size:.78rem"></i>
               </a>
+              <?php if (sec_peut_supprimer() && (int) $c['nb_inscrits_total'] === 0): ?>
+              <!-- Classe vide (aucun élève inscrit, toutes années) : suppression directe -->
+              <a href="<?= APP_URL ?>/secondaire/commun/pages/classes/supprimer_definitif.php?id=<?= (int) $c['id'] ?>&retour=actives&csrf=<?= csrf_generer() ?>"
+                 class="btn btn-sm btn-light text-danger" style="padding:3px 7px" title="Supprimer définitivement (classe vide)"
+                 onclick="return confirm('Supprimer définitivement la classe « <?= h(addslashes($c['designation'])) ?> » ? Elle n\'a aucun élève inscrit. Ses matières et affectations d\'enseignants seront aussi retirées.')">
+                <i class="bi bi-trash" style="font-size:.78rem"></i>
+              </a>
+              <?php endif; ?>
               <?php endif; ?>
             </td>
           </tr>

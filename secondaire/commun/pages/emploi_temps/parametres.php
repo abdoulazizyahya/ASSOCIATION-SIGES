@@ -192,7 +192,7 @@ echo edt_css();
       <label class="form-label small mb-1">Ligne du samedi (laisser vide pour ne pas l'afficher)</label>
       <input class="form-control form-control-sm mb-2" name="samedi_texte" value="<?= h(edt_param($a, 'samedi_texte', 'RATTRAPAGE ET DEVOIRS SURVEILLÉS')) ?>">
       <label class="form-label small mb-1">Lieu de signature (« … , le »)</label>
-      <input class="form-control form-control-sm mb-2" name="pdf_ville" value="<?= h(edt_param($a, 'pdf_ville', $etab['ville'] ?? '')) ?>">
+      <input class="form-control form-control-sm mb-2" name="pdf_ville" value="<?= h(edt_param($a, 'pdf_ville', lieu_edition_documents($etab))) ?>">
       <label class="form-label small mb-1">Notes de bas de page (une par ligne)</label>
       <textarea class="form-control form-control-sm" rows="4" name="pdf_nb"><?= h(edt_param($a, 'pdf_nb', "Cet emploi de temps est essentiellement provisoire.\nTout changement opéré dans cet emploi de temps ne sera valide que s'il est confirmé par le Censeur.\nTous les enseignants qui ont cours à 07h30 min les lundi et vendredi sont tenus d'assister au rassemblement de 07h10 min.")) ?></textarea>
     </div>

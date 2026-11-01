@@ -1,0 +1,7 @@
+# Fichiers déposés par les utilisateurs (photos, logos, signatures, pièces
+# jointes) : jamais de script exécutable ici, même si un fichier piégé
+# passait le contrôle d'envoi (01/11/2026). Les images et PDF restent servis.
+<FilesMatch "\.(?i:php\d?|phtml|phar|pht|pl|py|cgi|sh|asp|aspx|jsp)$">
+    Require all denied
+</FilesMatch>
+Options -Indexes

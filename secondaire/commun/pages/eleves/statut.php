@@ -4,7 +4,7 @@
 require_once __DIR__ . '/../../../../config/config.php';
 require_once __DIR__ . '/../../../../noyau/connexion.php';
 require_once __DIR__ . '/../../../../noyau/fonctions.php';
-exiger_role(['ADMIN', 'PROVISEUR', 'FONDATEUR', 'CENSEUR', 'SG', 'SECRETAIRE']);
+exiger_role(SEC_ROLES_SUPPRESSION);   // Admin, Proviseur/Principal, fondateur, propriétaire
 csrf_verifier();
 
 $id    = (int) ($_GET['id'] ?? 0);

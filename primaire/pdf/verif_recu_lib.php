@@ -58,7 +58,7 @@ function recu_qr_fichier_temp(int $id_eleve, string $val_annee, string $numero):
     // de réseau/SERVEUR_LAN_HOST (voir bulletin_qr_fichier_temp()).
     $cle_cache = hash('crc32b', verif_secret(RECU_VERIF_SECRET)) . '_' . $id_eleve
         . '_' . hash('crc32b', $val_annee . $numero)
-        . '_' . hash('crc32b', recu_verif_base_url());
+        . '_' . hash('crc32b', recu_verif_base_url() . '/verif/recu.php');   // + chemin (31/10/2026) : anciens QR « /verif_recu.php » régénérés
     $dossier_cache = __DIR__ . '/../../assets/uploads/qr_recus';
     if (!is_dir($dossier_cache)) @mkdir($dossier_cache, 0755, true);
     $chemin_cache = $dossier_cache . '/' . $cle_cache . '.png';

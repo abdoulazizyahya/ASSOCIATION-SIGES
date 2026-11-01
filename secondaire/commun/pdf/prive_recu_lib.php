@@ -169,7 +169,7 @@ function prive_dessiner_recu_eleve(FPDF $pdf, int $id_eleve, int $id_classe, int
 
         // ── Signature ────────────────────────────────────────────────
         $pdf->SetFont('Arial', '', 8);
-        $pdf->Text(150, 56.5 + $offY, $u(($etab_brut['ville'] ?: '') . ', le ' . date('d/m/Y')));
+        $pdf->Text(150, 56.5 + $offY, $u(lieu_edition_documents($etab_brut) . ', le ' . date('d/m/Y')));
         $pdf->SetFont('Arial', 'I', 7);
         $pdf->Text(164.88, 59 + $offY, $u('On'));
         $pdf->SetFont('Arial', 'B', 10);

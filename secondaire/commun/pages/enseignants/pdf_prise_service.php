@@ -290,7 +290,7 @@ if ($pdf->GetY() + 24 > $pdf->GetPageHeight() - 18) {
 }
 $y_sig_block = $pdf->GetY();
 $pdf->SetX($ml+$uw*0.55);$pdf->SetFont('Times','',12);
-$pdf->Cell($uw*0.45,6,ud((get_etablissement()['ville'] ?? '').', Le………………….'),0,1,'R');
+$pdf->Cell($uw*0.45,6,ud(lieu_edition_documents().', Le………………….'),0,1,'R');
 $pdf->SetX($ml+$uw*0.55);$pdf->SetFont('Times','B',18);
 $pdf->Cell($uw*0.45,9,'Le Proviseur',0,1,'C');
 $pdf->SetX($ml+$uw*0.55);$pdf->SetFont('Times','',14);

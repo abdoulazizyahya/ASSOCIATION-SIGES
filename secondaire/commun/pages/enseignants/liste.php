@@ -12,7 +12,7 @@ $q = trim($_GET['q'] ?? '');
 // Comptes de connexion (17/10/2026) : gérés depuis la fiche, plus depuis Paramètres → Utilisateurs.
 $gere_comptes = sec_peut_gerer_comptes();
 $join_compte = "LEFT JOIN (SELECT matricule_ens, MIN(id) AS id FROM utilisateur
-                           WHERE matricule_ens IS NOT NULL AND compte_systeme=0 GROUP BY matricule_ens) uc ON uc.matricule_ens=e.matricule_ens
+                           WHERE matricule_ens IS NOT NULL AND compte_systeme=0 AND role<>'ADMIN' GROUP BY matricule_ens) uc ON uc.matricule_ens=e.matricule_ens
                 LEFT JOIN utilisateur u ON u.id=uc.id";
 $where = ''; $params = [];
 if ($q !== '') {

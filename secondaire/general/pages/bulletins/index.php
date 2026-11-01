@@ -4,6 +4,8 @@ require_once __DIR__ . '/../../../../config/config.php';
 require_once __DIR__ . '/../../../../noyau/connexion.php';
 require_once __DIR__ . '/../../../../noyau/fonctions.php';
 aiguiller_page_technique('secondaire/technique/pages/bulletins/index.php');   // école technique : notes par séquence
+// Modèle de bulletin du cycle (Paramètres, migration v28) : APC ↔ « Matières ».
+sec_aiguiller_modele((int) ($_GET['classe'] ?? 0), 'secondaire/general/pages/bulletins_matieres/index.php', 'secondaire/general/pages/bulletins/index.php', false);
 exiger_connexion();
 
 $role      = role_connecte();
@@ -91,6 +93,7 @@ function bull_moys_classe_comp(int $id_classe, int $id_trim_x, int $id_annee, ar
          WHERE d.IDClasses=?", [$id_classe]
     );
     if (empty($disciplines)) return [];
+    sec_series_charger($id_classe, $id_annee); // classe mixte : matières par série
     $code_niveau = db_val("SELECT code_niveau FROM classe WHERE id=?", [$id_classe]);
 
     $competences_par_mat = [];
@@ -122,14 +125,15 @@ function bull_moys_classe_comp(int $id_classe, int $id_trim_x, int $id_annee, ar
     }
     $nb_ins = count($eleve_ids);
 
-    $mat_avg = function(int $eid, array $comps) use ($notes_idx, $notes_count, $nb_ins): ?float {
+    $mat_avg = function(int $eid, int $id_mat, array $comps) use ($notes_idx, $notes_count, $nb_ins): ?float {
         $tot = 0; $cnt = 0;
+        $nb_groupe = sec_effectif_groupe($eid, $id_mat, $nb_ins); // classe mixte : effectif du groupe
         foreach ($comps as $c) {
             $cid = (int)$c['id'];
             $v = $notes_idx[$eid][$cid] ?? null;
             if ($v === null) {
                 $n = $notes_count[$cid] ?? 0;
-                if ($nb_ins > 0 && $n >= ceil($nb_ins / 2)) $v = 0.0; // absent majoritaire = 0
+                if ($nb_groupe > 0 && $n >= ceil($nb_groupe / 2)) $v = 0.0; // absent majoritaire = 0
             }
             if ($v !== null) { $tot += $v; $cnt++; }
         }
@@ -146,14 +150,15 @@ function bull_moys_classe_comp(int $id_classe, int $id_trim_x, int $id_annee, ar
 
     $out = [];
     foreach ($eleve_ids as $eid) {
-        $tot = 0; $coef = 0; $nb_data = 0;
+        $tot = 0; $coef = 0; $nb_data = 0; $nb_mats_eleve = $nb_mats_avec_notes;
         foreach ($disciplines as $d) {
             if (!in_array($d['id_mat'], $mats_avec_notes)) continue;
-            $avg = $mat_avg($eid, $competences_par_mat[$d['id_mat']] ?? []);
+            if (sec_hors_serie($eid, (int)$d['id_mat'])) { $nb_mats_eleve--; continue; } // matière d'une autre série
+            $avg = $mat_avg($eid, (int)$d['id_mat'], $competences_par_mat[$d['id_mat']] ?? []);
             if ($avg !== null) { $tot += $avg * $d['coef']; $coef += $d['coef']; $nb_data++; }
         }
         $moy = $coef > 0 ? $tot / $coef : null;
-        $classe_ok = $nb_mats_avec_notes > 0 && $nb_data >= ceil($nb_mats_avec_notes / 2);
+        $classe_ok = $nb_mats_eleve > 0 && $nb_data >= ceil($nb_mats_eleve / 2);
         $out[$eid] = ($classe_ok && $moy !== null) ? $moy : null;
     }
     return $out;

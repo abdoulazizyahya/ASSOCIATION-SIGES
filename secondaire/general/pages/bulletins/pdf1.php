@@ -683,7 +683,7 @@ $pdf->MultiCell($w_obs, count($decisions) * $h_bas, '', 1, 'L');
 $pdf->Ln(2);
 $pdf->SetFont('Arial', '', 7);
 $pdf->SetX($ml + $uw * 0.55);
-$pdf->Cell($uw * 0.45, 5, u((get_etablissement()['ville'] ?? '') . ', le ' . date('d-m-Y') . '.'), 0, 1, 'R');
+$pdf->Cell($uw * 0.45, 5, u(lieu_edition_documents() . ', le ' . date('d-m-Y') . '.'), 0, 1, 'R');
 $pdf->SetX($ml + $uw * 0.6);
 $pdf->SetFont('Arial', 'B', 7);
 $pdf->Cell($uw * 0.35, 5, u(strtoupper($etab['chef_etablissement'] ?? 'LE PROVISEUR') . ','), 0, 1, 'C');

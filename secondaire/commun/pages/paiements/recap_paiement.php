@@ -196,7 +196,7 @@ foreach ($frames as $i => [$x0, $y0]) {
     $pdf->Image($qr_tmp, $qr_x, $qr_y, $qr_taille, $qr_taille, 'PNG');
     $pdf->SetFont('Arial', '', 6.5);
     $pdf->SetXY($x0 + $w0 / 2 - 25, $qr_y + $qr_taille + 0.3);
-    $pdf->Cell(50, 3, pdf_u(mb_strtoupper($etab['ville'] ?? 'MBÉ', 'UTF-8') . ', le ' . date('d/m/Y')), 0, 1, 'C');
+    $pdf->Cell(50, 3, pdf_u(mb_strtoupper(lieu_edition_documents($etab) ?: 'MBÉ', 'UTF-8') . ', le ' . date('d/m/Y')), 0, 1, 'C');
     $pdf->SetFont('Arial', 'I', 5.5);
     $pdf->SetX($x0 + $w0 / 2 - 25);
     $pdf->Cell(50, 2.4, 'On', 0, 0, 'C');

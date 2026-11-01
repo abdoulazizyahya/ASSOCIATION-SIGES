@@ -39,9 +39,19 @@ require_once __DIR__ . '/../../../../noyau/layout/header.php';
 ?>
 <div class="page-titre d-flex justify-content-between align-items-center">
   <h4><i class="bi bi-people me-1 text-primary"></i>Utilisateurs</h4>
-  <a href="<?= APP_URL ?>/secondaire/commun/pages/utilisateurs/form.php" class="btn btn-primary btn-sm">
-    <i class="bi bi-plus-lg me-1"></i>Ajouter
-  </a>
+  <div class="d-flex gap-1">
+    <!-- Liste des comptes avec identifiants et mots de passe imprimables (export.php) -->
+    <button type="button" class="btn btn-outline-danger btn-sm"
+            onclick="exporterComptes('pdf')" title="Comptes cochés (tous si aucun)">
+      <i class="bi bi-file-earmark-pdf me-1"></i>PDF <span class="nb-sel-comptes"></span>
+    </button>
+    <button type="button" class="btn btn-outline-success btn-sm" onclick="exporterComptes('xlsx')" title="Comptes cochés (tous si aucun)">
+      <i class="bi bi-file-earmark-excel me-1"></i>Excel <span class="nb-sel-comptes"></span>
+    </button>
+    <a href="<?= APP_URL ?>/secondaire/commun/pages/utilisateurs/form.php" class="btn btn-primary btn-sm">
+      <i class="bi bi-plus-lg me-1"></i>Ajouter
+    </a>
+  </div>
 </div>
 
 <div class="card">
@@ -49,15 +59,17 @@ require_once __DIR__ . '/../../../../noyau/layout/header.php';
     <table class="table table-abz table-hover mb-0 table-triable">
       <thead>
         <tr>
+          <th style="width:30px" data-sans-tri><input type="checkbox" class="form-check-input" id="chkTousComptes" title="Tout cocher (impression)"></th>
           <th data-sens="asc">Nom</th><th>Identifiant</th><th>Mot de passe</th><th>Rôle</th><th>Statut</th><th class="text-end" data-sans-tri>Actions</th>
         </tr>
       </thead>
       <tbody>
         <?php if (empty($users)): ?>
-          <tr><td colspan="6" class="text-center text-muted py-4">Aucun utilisateur.</td></tr>
+          <tr><td colspan="7" class="text-center text-muted py-4">Aucun utilisateur.</td></tr>
         <?php else: foreach ($users as $u): ?>
           <tr>
             <?php $nom_complet = trim(mb_strtoupper($u['nom_aff']) . ' ' . $u['prenom_aff']); ?>
+            <td><input type="checkbox" class="form-check-input chk-compte" value="<?= (int) $u['id'] ?>" title="À imprimer"></td>
             <td class="fw-semibold" data-tri="<?= h($nom_complet ?: $u['login']) ?>">
               <div><?= $nom_complet !== '' ? h($nom_complet) : '<span class="text-muted fw-normal">—</span>' ?></div>
               <small class="text-muted"><?= h($u['email_aff']) ?></small>
@@ -119,4 +131,26 @@ require_once __DIR__ . '/../../../../noyau/layout/header.php';
     </table>
   </div>
 </div>
+<script>
+// Impression des comptes : seulement ceux cochés (tous si aucun n'est coché).
+function comptesCoches() {
+  return Array.prototype.map.call(document.querySelectorAll('.chk-compte:checked'), function (c) { return c.value; });
+}
+function majNbComptes() {
+  var n = comptesCoches().length;
+  document.querySelectorAll('.nb-sel-comptes').forEach(function (el) { el.textContent = n ? '(' + n + ')' : ''; });
+}
+document.addEventListener('change', function (e) {
+  if (e.target.id === 'chkTousComptes') {
+    document.querySelectorAll('.chk-compte').forEach(function (c) { c.checked = e.target.checked; });
+  }
+  if (e.target.id === 'chkTousComptes' || e.target.classList.contains('chk-compte')) majNbComptes();
+});
+function exporterComptes(format) {
+  var ids = comptesCoches();
+  var url = '<?= APP_URL ?>/secondaire/commun/pages/utilisateurs/export.php?format=' + format + (ids.length ? '&ids=' + ids.join(',') : '');
+  if (format === 'pdf') afficherApercu(url, 'Comptes utilisateurs', null, 'portrait');
+  else window.location.href = url;
+}
+</script>
 <?php require_once __DIR__ . '/../../../../noyau/layout/footer.php'; ?>

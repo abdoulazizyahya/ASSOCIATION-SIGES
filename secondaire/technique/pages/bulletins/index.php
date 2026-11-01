@@ -145,6 +145,7 @@ if ($id_classe && $periode_choisie) {
             $notes_count[$m][$s] = ($notes_count[$m][$s] ?? 0) + 1;
         }
         $nb_inscrits = count($eleves_raw);
+        sec_series_charger($id_classe, $id_annee); // classe mixte : matières par série
 
         // Absences justifiées (mêmes séquences)
         $abs_just = [];
@@ -161,10 +162,12 @@ if ($id_classe && $periode_choisie) {
         // Identique à note_eff_bull()/note_eff_c() utilisées dans pdf.php et pdf_classe.php :
         // note existante > absence justifiée (exclue) > absent majoritaire (0) > pas encore noté (null)
         $note_eff = function(int $eid, int $id_mat, int $sid) use ($notes_idx, $abs_just, $notes_count, $nb_inscrits): array {
+            if (sec_hors_serie($eid, $id_mat)) return [null, true]; // classe mixte : matière d'une autre série
             if (isset($notes_idx[$eid][$id_mat][$sid])) return [$notes_idx[$eid][$id_mat][$sid], false];
             if (isset($abs_just[$eid][$id_mat][$sid])) return [null, true];
             $cnt = $notes_count[$id_mat][$sid] ?? 0;
-            if ($nb_inscrits > 0 && $cnt >= ceil($nb_inscrits / 2)) return [0.0, false];
+            $nb = sec_effectif_groupe($eid, $id_mat, $nb_inscrits); // classe mixte : effectif du groupe
+            if ($nb > 0 && $cnt >= ceil($nb / 2)) return [0.0, false];
             return [null, false];
         };
 

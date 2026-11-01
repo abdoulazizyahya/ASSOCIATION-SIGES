@@ -14,6 +14,7 @@ use PhpOffice\PhpSpreadsheet\Style\Fill;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 
 $id_classe = (int) ($_GET['classe'] ?? 0);
+$id_serie  = (int) ($_GET['serie'] ?? 0);
 
 $annee    = get_annee_active();
 $id_annee = (int) ($annee['id'] ?? 0);
@@ -34,14 +35,16 @@ if ($ids_classes_vis !== null) {
     }
 }
 if ($id_classe) { $where[] = "i.id_classe=?"; $params[] = $id_classe; }
+if ($id_serie)  { $where[] = "i.id_serie=?";  $params[] = $id_serie; }
 $sql_where = 'WHERE ' . implode(' AND ', $where);
 
 $eleves = db_all(
     "SELECT e.id, e.matricule, e.niu, e.nom, e.prenom, e.sexe, e.date_naiss, e.lieu_naiss,
-            c.designation AS classe, i.statut
+            c.designation AS classe, s.libelle AS serie, i.statut
      FROM eleve e
      JOIN inscription i ON i.id_eleve = e.id
      LEFT JOIN classe c ON c.id = i.id_classe
+     LEFT JOIN serie s ON s.id = i.id_serie
      $sql_where
      ORDER BY e.nom, e.prenom",
     $params
@@ -54,18 +57,18 @@ $sheet = $sp->getActiveSheet();
 $sheet->setTitle('Élèves');
 
 // ── En-tête établissement ─────────────────────────────────────
-$sheet->mergeCells('A1:J1');
+$sheet->mergeCells('A1:K1');
 $sheet->setCellValue('A1', $etab['nom_fr'] ?? APP_NOM);
 $sheet->getStyle('A1')->getFont()->setBold(true)->setSize(13);
 $sheet->getStyle('A1')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
 
-$sheet->mergeCells('A2:J2');
+$sheet->mergeCells('A2:K2');
 $sheet->setCellValue('A2', 'Liste des élèves — Année scolaire ' . ($annee['libelle'] ?? '') . ' — Classe : ' . ($classe['designation'] ?? 'Toutes'));
 $sheet->getStyle('A2')->getFont()->setItalic(true)->setSize(10);
 $sheet->getStyle('A2')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
 
 // ── En-tête colonnes ──────────────────────────────────────────
-$colonnes = ['N°', 'Matricule', 'NIU', 'Nom', 'Prénom(s)', 'Sexe', 'Date naiss.', 'Lieu naiss.', 'Classe', 'Statut'];
+$colonnes = ['N°', 'Matricule', 'NIU', 'Nom', 'Prénom(s)', 'Sexe', 'Date naiss.', 'Lieu naiss.', 'Classe', 'Série/LV2', 'Statut'];
 $ligne_entete = 4;
 foreach ($colonnes as $i => $lbl) {
     $sheet->setCellValue([$i + 1, $ligne_entete], $lbl);
@@ -88,7 +91,8 @@ foreach ($eleves as $e) {
     $sheet->setCellValue([7, $r], $e['date_naiss'] ? date('d/m/Y', strtotime($e['date_naiss'])) : '—');
     $sheet->setCellValue([8, $r], $e['lieu_naiss'] ?: '—');
     $sheet->setCellValue([9, $r], $e['classe'] ?: '—');
-    $sheet->setCellValue([10, $r], $e['statut'] ?: '—');
+    $sheet->setCellValue([10, $r], $e['serie'] ?: '—');
+    $sheet->setCellValue([11, $r], libelle_statut_insc($e['statut']));   // « Oui » ou « Redoublant » = redoublant
     $r++;
 }
 

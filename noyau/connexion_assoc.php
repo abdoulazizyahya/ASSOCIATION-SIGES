@@ -516,26 +516,27 @@ function charger_schema_ecole(mysqli &$l, array $seed, string $type = 'primaire'
 // pour le chef d'établissement, à la place du défaut.
 // $statut : 'public' | 'prive' (secondaire).
 // Retour : liste de ['role'=>…, 'login'=>…, 'pwd'=>…] (comptes à mot de passe = identifiant).
+// Comptes par défaut : nom = la fonction, sans prénom (plus de « Général », 30/10/2026).
 function comptes_defaut_definitions(string $type, string $statut = 'public', ?string $directeur_login = null): array {
     if ($type === 'secondaire') {
         $prive = $statut === 'prive';
         $c = [
             ['role' => 'PROVISEUR',  'login' => $directeur_login ?: ($prive ? 'principal' : 'proviseur'),
-             'nom' => $prive ? 'Principal' : 'Proviseur', 'prenom' => 'Général'],
-            ['role' => 'CENSEUR',    'login' => 'censeur',    'nom' => 'Censeur',    'prenom' => 'Général'],
-            ['role' => 'SECRETAIRE', 'login' => 'secretaire', 'nom' => 'Secrétaire', 'prenom' => 'Général'],
-            ['role' => 'INTENDANT',  'login' => 'intendant',  'nom' => 'Intendant',  'prenom' => 'Général'],
+             'nom' => $prive ? 'Principal' : 'Proviseur', 'prenom' => ''],
+            ['role' => 'CENSEUR',    'login' => 'censeur',    'nom' => 'Censeur',    'prenom' => ''],
+            ['role' => 'SECRETAIRE', 'login' => 'secretaire', 'nom' => 'Secrétaire', 'prenom' => ''],
+            ['role' => 'INTENDANT',  'login' => 'intendant',  'nom' => 'Intendant',  'prenom' => ''],
         ];
-        if ($prive) $c[] = ['role' => 'FONDATEUR', 'login' => 'fondateur', 'nom' => 'Fondateur', 'prenom' => 'Général'];
+        if ($prive) $c[] = ['role' => 'FONDATEUR', 'login' => 'fondateur', 'nom' => 'Fondateur', 'prenom' => ''];
         return $c;
     }
     // Primaire : le Directeur reste ; compte fondateur pour une école PRIVÉE seulement
     // (une école publique n'a pas de fondateur, 17/10/2026).
     $c = [
-        ['role' => 'DIRECTEUR', 'login' => $directeur_login ?: 'directeur', 'nom' => 'Directeur', 'prenom' => 'Général'],
+        ['role' => 'DIRECTEUR', 'login' => $directeur_login ?: 'directeur', 'nom' => 'Directeur', 'prenom' => ''],
         ['role' => 'COMPTABLE', 'login' => 'financier', 'nom' => 'Agent', 'prenom' => 'Financier'],
     ];
-    if ($statut === 'prive') array_unshift($c, ['role' => 'FONDATEUR', 'login' => 'fondateur', 'nom' => 'Fondateur', 'prenom' => 'Général']);
+    if ($statut === 'prive') array_unshift($c, ['role' => 'FONDATEUR', 'login' => 'fondateur', 'nom' => 'Fondateur', 'prenom' => '']);
     return $c;
 }
 
@@ -656,7 +657,7 @@ function charger_seed_ref_ecole_secondaire(mysqli $l, string $ordre = 'general')
         // PAS les références pédagogiques du général (sections Fr/An,
         // niveaux 6e-3e, séries de langue, matières APC) — remplacées par
         // celles d'ABZ_MBE (bd/assoc/seed_ref_ecole_technique.sql).
-        $sql = preg_replace('/^INSERT IGNORE INTO `(section_classe|niveau|groupe|serie|matiere)`.*?;[ \t]*$/ms', '', $sql);
+        $sql = preg_replace('/^INSERT IGNORE INTO `(section_classe|niveau|groupe|serie|matiere|bulletin_modele_cycle)`.*?;[ \t]*$/ms', '', $sql);
         $tech = @file_get_contents(__DIR__ . '/../bd/assoc/seed_ref_ecole_technique.sql');
         if ($tech !== false) $sql .= "\n" . $tech;
     }

@@ -103,6 +103,9 @@ function session_init() {
             'path'     => APP_URL . '/',
             'httponly' => true,
             'samesite' => 'Lax',
+            // HTTPS (en ligne) : cookie jamais envoyé en clair (01/11/2026) ; LAN en HTTP inchangé.
+            'secure'   => (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
+                          || strtolower((string) ($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '')) === 'https',
         ]);
         session_start();
     }
@@ -581,8 +584,34 @@ function sec_compte_visible(array $u): bool {
     if ((int) ($u['id'] ?? 0) === (int) ($_SESSION['user_id'] ?? 0)) return true;
     if (voit_tous_les_comptes()) return true;
     if (!empty($u['compte_systeme'])) return false;
+    // Comptes administrateur : invisibles pour tous les autres comptes, comme
+    // le compte propriétaire (demande du 30/10/2026).
+    if (($u['role'] ?? '') === 'ADMIN') return false;
     if (($u['role'] ?? '') === 'FONDATEUR' && !in_array(role_connecte(), ['ADMIN', 'FONDATEUR'], true)) return false;
     return true;
+}
+
+/**
+ * Secondaire : condition à ajouter à un `LEFT JOIN utilisateur <alias>` pour
+ * que le compte propriétaire et les comptes administrateur n'apparaissent
+ * NULLE PART (journaux, auteurs de saisie, listes…) — leur nom est alors vide
+ * (« — »). Sans effet pour le propriétaire / l'association. 30/10/2026.
+ */
+function sec_sql_compte_affichable(string $alias = 'u'): string {
+    if (voit_tous_les_comptes()) return '';
+    $id = (int) ($_SESSION['user_id'] ?? 0);   // son propre compte reste visible
+    return " AND ({$alias}.id = $id OR ({$alias}.compte_systeme = 0 AND {$alias}.role <> 'ADMIN'))";
+}
+
+/** Secondaire : logins invisibles pour la personne connectée (propriétaires +
+ *  administrateurs, sauf elle-même) — journal d'audit. */
+function sec_logins_invisibles(): array {
+    if (voit_tous_les_comptes()) return [];
+    $l = array_keys(function_exists('comptes_proprietaires') ? comptes_proprietaires() : []);
+    try {
+        foreach (db_all("SELECT login FROM utilisateur WHERE (compte_systeme = 1 OR role = 'ADMIN') AND id <> ?", [(int) ($_SESSION['user_id'] ?? 0)]) as $r) $l[] = $r['login'];
+    } catch (\Throwable $e) { /* base primaire : pas de table utilisateur */ }
+    return array_values(array_unique($l));
 }
 
 /** Secondaire : la personne connectée peut-elle modifier / supprimer ce compte ? */
@@ -916,8 +945,44 @@ function secondaire_auto_matieres_classe(int $id_classe, ?string $code_niveau, ?
         return 0;
     }
     if (est_technique()) return secondaire_auto_matieres_classe_technique($id_classe);
+    if (in_array($code_niveau, ['2nde', '1ere', 'Tle'], true)) return secondaire_auto_matieres_2nd_cycle($id_classe, $code_niveau);
     $n = secondaire_copier_matieres_niveau($id_classe, $code_niveau, $libelle_section);
-    return $n > 0 ? $n : secondaire_deriver_matieres_competences($id_classe, $code_niveau, $libelle_section);
+    if ($n <= 0) $n = secondaire_deriver_matieres_competences($id_classe, $code_niveau, $libelle_section);
+    if ($n <= 0) return $n;
+    secondaire_ajuster_lv2_classe($id_classe, $code_niveau);
+    return (int) db_val("SELECT COUNT(*) FROM discipline WHERE IDClasses=?", [$id_classe]);
+}
+
+/**
+ * LV2 d'une nouvelle classe (niveau unique 4ème/3ème depuis la migration
+ * secondaire v25) : une classe dont la série est une LV2 (« Espagnol ») ne
+ * garde que « LVII - ESPAGNOL » ; une classe sans série LV2 (classe mixte)
+ * reçoit toutes les LV2 du niveau — à réserver ensuite à leur série dans
+ * Matières → Affectation par classe (discipline_serie, v24). Sans cela, une
+ * classe copiée sur une classe sœur « 4ème ESP » n'aurait que l'espagnol.
+ */
+function secondaire_ajuster_lv2_classe(int $id_classe, ?string $code_niveau): void {
+    if (!$code_niveau) return;
+    $lv2 = db_all("SELECT DISTINCT m.id, m.libelle FROM competence c JOIN matiere m ON m.id=c.id_matiere AND m.actif=1
+                   WHERE c.code_niveau=? AND m.libelle LIKE 'LVII%'", [$code_niveau]);
+    $id_groupe = (int) db_val("SELECT id_groupe FROM discipline WHERE IDClasses=? LIMIT 1", [$id_classe]);
+    if (count($lv2) < 2 || !$id_groupe) return;
+    $serie  = mb_strtoupper(trim((string) db_val("SELECT s.libelle FROM classe c JOIN serie s ON s.id=c.id_serie WHERE c.id=?", [$id_classe])));
+    $propre = $serie !== '' ? array_values(array_filter($lv2, fn($m) => str_ends_with(mb_strtoupper(trim($m['libelle'])), ' ' . $serie))) : [];
+    if ($propre) {
+        foreach ($lv2 as $m) {
+            if ((int) $m['id'] !== (int) $propre[0]['id']) db_exec("DELETE FROM discipline WHERE IDClasses=? AND id_mat=?", [$id_classe, (int) $m['id']]);
+        }
+        [$coef, $ordre] = secondaire_reference_coefficients()[$code_niveau . '|' . trim($propre[0]['libelle'])] ?? [1, 1];
+        db_exec("INSERT IGNORE INTO discipline (id_mat, IDClasses, id_groupe, coef, ordre) VALUES (?,?,?,?,?)",
+                [(int) $propre[0]['id'], $id_classe, $id_groupe, $coef, (string) $ordre]);
+        return;
+    }
+    foreach ($lv2 as $m) {
+        [$coef, $ordre] = secondaire_reference_coefficients()[$code_niveau . '|' . trim($m['libelle'])] ?? [1, 1];
+        db_exec("INSERT IGNORE INTO discipline (id_mat, IDClasses, id_groupe, coef, ordre) VALUES (?,?,?,?,?)",
+                [(int) $m['id'], $id_classe, $id_groupe, $coef, (string) $ordre]);
+    }
 }
 
 /**
@@ -1302,6 +1367,120 @@ function post(string $key, string $default = ''): string {
 }
 
 // Jeton CSRF
+// Demande de position GPS juste après la connexion (bd/lib/audit.php,
+// audit_gps_enregistrer — 31/10/2026). Une seule fois par connexion : la
+// réponse (position, refus ou échec) libère l'attente côté serveur.
+function audit_gps_script(): string {
+    $g = $_SESSION['audit_gps'] ?? null;
+    if (!is_array($g) || empty($g['jeton'])) return '';
+    $url = APP_URL . '/noyau/ajax/geo_position.php';
+    return '<script>(function(){var u=' . json_encode($url) . ',t=' . json_encode($g['jeton']) . ';'
+         . 'function env(d){d.jeton=t;d.facultatif=1;var f=new FormData();for(var k in d)f.append(k,d[k]);'
+         . 'fetch(u,{method:"POST",body:f,credentials:"same-origin"}).catch(function(){});}'
+         . 'if(!navigator.geolocation||!window.isSecureContext){env({refus:"indisponible"});return;}'
+         . 'navigator.geolocation.getCurrentPosition(function(p){env({lat:p.coords.latitude,lon:p.coords.longitude,precision:Math.round(p.coords.accuracy||0)});},'
+         . 'function(e){env({refus:e&&e.code===1?"refus":"echec"});},{enableHighAccuracy:true,timeout:20000,maximumAge:600000});})();</script>';
+}
+
+// Position OBLIGATOIRE (demande du 31/10/2026) : tant que le navigateur n'a
+// pas transmis sa position pour la connexion en cours, aucune page ne
+// s'ouvre — écran de blocage avec instructions. Un navigateur ne donne
+// JAMAIS la position sans l'accord de la personne : on ne peut qu'empêcher
+// d'utiliser l'application sans cet accord.
+// Exceptions (sinon blocage définitif possible) :
+//  - comptes propriétaires (école ou association) : jamais bloqués ;
+//  - page en HTTP hors localhost (WAMP ouvert par l'IP du réseau local) :
+//    les navigateurs y désactivent la géolocalisation ;
+//  - appareil sans localisation possible (pas de GPS/Wi-Fi, service coupé) :
+//    accès rendu après 3 essais infructueux, la ligne garde la localisation IP.
+function audit_gps_contexte_sur(): bool {
+    if (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') return true;
+    if (strtolower((string) ($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '')) === 'https') return true;
+    $hote = strtolower(explode(':', (string) ($_SERVER['HTTP_HOST'] ?? ''))[0]);
+    return in_array($hote, ['localhost', '127.0.0.1', '[::1]'], true) || str_ends_with($hote, '.localhost');
+}
+
+function audit_gps_exiger(string $url_deconnexion): void {
+    $g = $_SESSION['audit_gps'] ?? null;
+    if (!is_array($g) || empty($g['jeton'])) return;
+    $exempt = !empty($_SESSION['user']['compte_systeme'])
+        || (function_exists('est_proprietaire_ecole') && est_proprietaire_ecole())
+        || (function_exists('est_proprietaire_association') && est_proprietaire_association());
+    if ($exempt || !audit_gps_contexte_sur()) return;   // demande facultative (audit_gps_script, pied de page)
+    if (isset($_GET['partiel']) || strtolower($_SERVER['HTTP_X_REQUESTED_WITH'] ?? '') === 'xmlhttprequest') {
+        http_response_code(403);
+        exit('Localisation requise : rechargez la page.');
+    }
+    $url = APP_URL . '/noyau/ajax/geo_position.php';
+    http_response_code(200);
+    header('Cache-Control: no-store');
+    ?><!DOCTYPE html>
+<html lang="fr"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Localisation requise</title>
+<link rel="stylesheet" href="<?= APP_URL ?>/assets/vendor/bootstrap/css/bootstrap.min.css">
+<link rel="stylesheet" href="<?= APP_URL ?>/assets/vendor/bootstrap-icons/bootstrap-icons.min.css">
+<style>body{background:#0f1a3a;min-height:100vh;display:flex;align-items:center;justify-content:center;font-family:system-ui,sans-serif}
+.carte{background:#fff;border-radius:16px;padding:2rem 1.6rem;max-width:460px;width:92%;text-align:center;box-shadow:0 10px 40px rgba(0,0,0,.35)}
+.ic{font-size:3rem;color:#c9a227}</style></head>
+<body><div class="carte">
+  <div class="ic"><i class="bi bi-geo-alt-fill"></i></div>
+  <h4 class="mt-2">Localisation obligatoire</h4>
+  <p class="text-muted mb-3" id="msg">Pour accéder à l'application, autorisez votre position lorsque le navigateur vous la demande.</p>
+  <div id="attente" class="mb-3"><div class="spinner-border spinner-border-sm text-primary me-2"></div>Demande de la position…</div>
+  <div id="aide" class="text-start small d-none mb-3">
+    <strong>Pour autoriser la position :</strong>
+    <ul class="mb-0 ps-3">
+      <li>Cliquez sur l'icône <i class="bi bi-sliders"></i> ou <i class="bi bi-lock"></i> à gauche de l'adresse du site, puis mettez <em>Position</em> sur <em>Autoriser</em>.</li>
+      <li>Sur téléphone : activez aussi la <em>Localisation</em> du téléphone (paramètres rapides).</li>
+      <li>Sur ordinateur Windows : <em>Paramètres → Confidentialité et sécurité → Localisation</em> : activez <em>Services de localisation</em> et l'accès pour les applications de bureau, et allumez le <em>Wi-Fi</em> (même sans vous y connecter) — sans cela, la position n'est qu'une estimation à ± 50 km.</li>
+      <li>Puis appuyez sur « Réessayer ».</li>
+    </ul>
+  </div>
+  <button type="button" class="btn btn-primary btn-sm d-none" id="reessayer" onclick="demander()"><i class="bi bi-arrow-repeat me-1"></i>Réessayer</button>
+  <a href="<?= h($url_deconnexion) ?>" class="btn btn-outline-secondary btn-sm ms-1">Se déconnecter</a>
+</div>
+<script>
+var U = <?= json_encode($url) ?>, T = <?= json_encode($g['jeton']) ?>;
+function envoyer(d, suite) {
+  d.jeton = T; var f = new FormData(); for (var k in d) f.append(k, d[k]);
+  fetch(U, {method: 'POST', body: f, credentials: 'same-origin'}).then(function (r) { return r.json(); })
+    .then(function (j) { suite(j); }).catch(function () { suite({}); });
+}
+function echec(texte) {
+  document.getElementById('attente').classList.add('d-none');
+  document.getElementById('msg').textContent = texte;
+  document.getElementById('aide').classList.remove('d-none');
+  document.getElementById('reessayer').classList.remove('d-none');
+}
+function demander() {
+  document.getElementById('attente').classList.remove('d-none');
+  document.getElementById('reessayer').classList.add('d-none');
+  if (!navigator.geolocation) { envoyer({refus: 'echec'}, function (j) { if (j.libre) location.reload(); else echec("Ce navigateur ne fournit pas la position."); }); return; }
+  navigator.geolocation.getCurrentPosition(function (p) {
+    envoyer({lat: p.coords.latitude, lon: p.coords.longitude, precision: Math.round(p.coords.accuracy || 0)},
+            function (j) {
+              if (j.libre) { location.reload(); return; }
+              var km = Math.round((p.coords.accuracy || 0) / 1000);
+              echec(j.imprecis
+                ? "Position trop imprécise (± " + km + " km) : l'appareil n'a donné qu'une estimation d'après l'adresse internet. Activez la localisation de l'appareil puis réessayez."
+                : "La position n'a pas pu être enregistrée. Réessayez.");
+            });
+  }, function (e) {
+    var refus = e && e.code === 1;
+    envoyer({refus: refus ? 'refus' : 'echec'}, function (j) {
+      if (j.libre) { location.reload(); return; }
+      echec(refus ? "Vous avez refusé la localisation : l'accès à l'application reste bloqué tant qu'elle n'est pas autorisée."
+                  : "Votre position n'a pas pu être déterminée. Activez la localisation de l'appareil puis réessayez.");
+    });
+  }, {enableHighAccuracy: true, timeout: 20000, maximumAge: 600000});
+}
+demander();
+</script>
+</body></html>
+<?php
+    exit;
+}
+
 function csrf_generer(): string {
     session_init();
     if (empty($_SESSION['csrf'])) {
@@ -2909,6 +3088,34 @@ function niu_eleve(array $eleve): string {
     return trim((string) ($eleve['niu'] ?? ''));
 }
 
+/**
+ * PDF (FPDF) : « Fait à <lieu>, le <date> » puis, juste en dessous, l'anglais
+ * aligné mot à mot : « Done at » commence sous « Fait à », « on » sous « le ».
+ * La ligne est placée dans la zone [$x, $x + $w] selon $align (L, C, R) ;
+ * le curseur repart ensuite à la marge gauche, sous les deux lignes.
+ * $u : fonction d'encodage du document (pdf_u, pvpdf_u…).
+ */
+function pdf_fait_a_bilingue($pdf, float $x, float $w, string $lieu, string $align = 'R', float $taille = 9, ?callable $u = null): void {
+    $u = $u ?? 'pdf_u';
+    $debut = $u('Fait à ' . $lieu . ', ');
+    $le    = $u('le ' . date('d/m/Y'));
+    $pdf->SetFont('Arial', '', $taille);
+    $l_fr  = $pdf->GetStringWidth($debut . $le);
+    // Cellules de largeur = texte + 2 mm (marge interne FPDF de 1 mm de chaque côté)
+    $x0    = $align === 'R' ? $x + $w - $l_fr - 2 : ($align === 'C' ? $x + ($w - $l_fr) / 2 - 1 : $x);
+    $x_le  = $x0 + $pdf->GetStringWidth($debut);
+    $y     = $pdf->GetY();
+    $pdf->SetXY($x0, $y);
+    $pdf->Cell($l_fr, 4.2, $debut . $le, 0, 0, 'L');
+    $pdf->SetFont('Arial', 'I', max(6, $taille - 2.5));
+    $pdf->SetXY($x0, $y + 3.8);
+    $pdf->Cell($x_le - $x0, 3, 'Done at', 0, 0, 'L');
+    $pdf->SetXY($x_le, $y + 3.8);
+    $pdf->Cell($pdf->GetStringWidth('on') + 1, 3, 'on', 0, 0, 'L');
+    $pdf->SetFont('Arial', '', $taille);
+    $pdf->SetY($y + 7.2);
+}
+
 // ── Statut d'inscription (Redoublant ?) ──────────────────────────
 // `inscrire.Statut_elv` est un champ historique Oui/Non (« Redoublant * »
 // dans le formulaire legacy, voir jaynitaare/php/form_enreg_eleve.php) — pas
@@ -2921,7 +3128,13 @@ function normaliser_statut_insc(?string $s): string {
 }
 
 function libelle_statut_insc(?string $s): string {
-    return $s === 'Oui' ? 'Redoublant' : 'Nouveau';
+    return est_redoublant($s) ? 'Redoublant' : 'Nouveau';
+}
+
+/** Redoublant ? Les deux écritures coexistent en base : 'Oui'/'Non' (données
+ *  reprises d'ABZ_MBE) et 'Redoublant'/'Nouveau'/'Ancien' (fiche élève, import). */
+function est_redoublant(?string $s): bool {
+    return normaliser_statut_insc($s) === 'Oui';
 }
 
 // ── Pagination ────────────────────────────────────────────────
@@ -3005,13 +3218,61 @@ function fonctions_assignables(): array {
 // plus haut dans ce fichier — format/périmètre configurables, table
 // matricule_config) : deux systèmes de matricule différents, jamais
 // interchangeables, une confusion de nom aurait été dangereuse ici.
+/**
+ * Préfixe et suffixe du matricule interne (migration secondaire v32) :
+ * réglés dans Élèves → Import & matricules ; préfixe vide = sigle de l'école.
+ * Matricule = préfixe + année (2 chiffres) + numéro (4 chiffres) + suffixe,
+ * ex. « LB260001L » (01/11/2026), « LYBILAM260001 » sans réglage.
+ */
+function sec_matricule_format(): array {
+    $cols = db_colonne_existe('etablissement', 'matricule_prefixe') ? ', matricule_prefixe, matricule_suffixe' : '';
+    $etab = db_one("SELECT sigle$cols FROM etablissement LIMIT 1") ?? [];
+    $net  = fn($v) => preg_replace('/[^A-Z0-9]/', '', strtoupper((string) $v));
+    return [$net($etab['matricule_prefixe'] ?? '') ?: ($net($etab['sigle'] ?? '') ?: 'SEC'), $net($etab['matricule_suffixe'] ?? '')];
+}
+
+/**
+ * Renomme les matricules existants d'un format à l'autre : seuls ceux de la
+ * forme exacte « ancien préfixe + chiffres + ancien suffixe » changent, le
+ * numéro (année + séquence) est conservé. Refus complet si un nouveau
+ * matricule existe déjà. Renvoie le nombre de matricules renommés.
+ */
+function sec_matricule_renommer(string $ancien_p, string $ancien_s, string $nouveau_p, string $nouveau_s): int {
+    if ($ancien_p === $nouveau_p && $ancien_s === $nouveau_s) return 0;
+    $re = '/^' . preg_quote($ancien_p, '/') . '([0-9]{6,})' . preg_quote($ancien_s, '/') . '$/';
+    $a_faire = [];
+    foreach (db_all("SELECT id, matricule FROM eleve WHERE matricule LIKE ?", [$ancien_p . '%']) as $e) {
+        if (preg_match($re, (string) $e['matricule'], $m)) $a_faire[(int) $e['id']] = $nouveau_p . $m[1] . $nouveau_s;
+    }
+    $pris = $a_faire ? array_column(db_all("SELECT matricule FROM eleve WHERE matricule IN (" . implode(',', array_fill(0, count($a_faire), '?')) . ")
+                                            AND id NOT IN (" . implode(',', array_keys($a_faire)) . ")", array_values($a_faire)), 'matricule') : [];
+    if ($pris) throw new RuntimeException('Matricule(s) déjà attribué(s) : ' . implode(', ', array_slice($pris, 0, 5)));
+    foreach ($a_faire as $id => $mat) db_exec("UPDATE eleve SET matricule=? WHERE id=?", [$mat, $id]);
+    return count($a_faire);
+}
+
+/**
+ * Année du matricule : début de l'année scolaire active (« 2026-2027 » → 26),
+ * pas la date du jour — un élève inscrit en janvier 2027 reste un « 26 »
+ * (01/11/2026). Repli sur l'année civile si aucune année scolaire.
+ */
+function sec_matricule_annee(): string {
+    return preg_match('/(\d{4})/', (string) (get_annee_active()['libelle'] ?? ''), $m) ? substr($m[1], 2) : date('y');
+}
+
 function gen_matricule_secondaire(): string {
-    $etab  = db_one("SELECT sigle FROM etablissement LIMIT 1");
-    $sigle = preg_replace('/[^A-Z0-9]/', '', strtoupper($etab['sigle'] ?? 'SEC'));
-    $annee = date('y');
-    $next  = (int) db_val("SELECT COALESCE(MAX(id), 0) + 1 FROM eleve");
+    [$sigle, $suffixe] = sec_matricule_format();
+    $annee = sec_matricule_annee();
+    // Numéro suivant = plus grand numéro déjà attribué avec ce préfixe, cette
+    // année et ce suffixe, + 1 (01/11/2026) — et non plus MAX(id) + 1 : l'id
+    // auto-incrémenté saute (imports annulés, élèves supprimés), d'où des
+    // matricules non consécutifs (LB260001L puis LB265316L).
+    $re = '^' . preg_quote($sigle . $annee) . '[0-9]{4,}' . preg_quote($suffixe) . '$';
+    $next = 1 + (int) db_val(
+        "SELECT MAX(CAST(SUBSTRING(matricule, ?, CHAR_LENGTH(matricule) - ? - ?) AS UNSIGNED)) FROM eleve WHERE matricule REGEXP ?",
+        [strlen($sigle . $annee) + 1, strlen($sigle . $annee), strlen($suffixe), $re]);
     do {
-        $mat    = $sigle . $annee . str_pad((string) $next, 4, '0', STR_PAD_LEFT);
+        $mat    = $sigle . $annee . str_pad((string) $next, 4, '0', STR_PAD_LEFT) . $suffixe;
         $existe = db_val("SELECT COUNT(*) FROM eleve WHERE matricule = ?", [$mat]);
         $next++;
     } while ($existe);
@@ -3567,7 +3828,7 @@ function etab_pour_pdf(array $etab): array {
             'nom_fr' => $etab['nom_fr'] ?? '', 'nom_en' => $etab['nom_en'] ?? '', 'sigle' => $etab['sigle'] ?? '',
             'immatriculation' => $etab['immatriculation'] ?? '', 'boite_postale' => $etab['boite_postale'] ?? '',
             'telephone' => $etab['telephone'] ?? '', 'email' => $etab['email'] ?? '', 'ville' => $etab['ville'] ?? '',
-            'lieu' => $etab['ville'] ?? '',
+            'lieu' => trim((string) ($etab['lieu_edition'] ?? '')) ?: ($etab['ville'] ?? ''),   // lieu d'édition (v30, 01/11/2026)
             'region_fr' => $etab['region_fr'] ?? '', 'departement_fr' => $etab['departement_fr'] ?? '',
             'arrondissement_fr' => $etab['arrondissement_fr'] ?? '',
             'region_en' => $etab['region_en'] ?? '', 'division_en' => $etab['division_en'] ?? '',
@@ -3589,7 +3850,9 @@ function etab_pour_pdf(array $etab): array {
         // VILLE de l'établissement en priorité (demande du 01/10/2026 —
         // « Fait à Général » apparaissait avec le lieu-dit), le lieu-dit
         // (etab.lieu_etab, ex. « Bamyanga ») seulement si la ville est vide.
-        'lieu'              => trim((string) ($etab['ville_etab'] ?? '')) ?: ($etab['lieu_etab'] ?? ''),
+        // Lieu d'édition saisi dans les paramètres (v69, 01/11/2026) en priorité :
+        // la ville de l'école n'est pas toujours là où les documents sont faits.
+        'lieu'              => trim((string) ($etab['lieu_edition'] ?? '')) ?: (trim((string) ($etab['ville_etab'] ?? '')) ?: ($etab['lieu_etab'] ?? '')),
         'region_fr'         => $etab['region_etab_fr'] ?? '',
         // `departement_fr`/`arrondissement_fr` : colonnes réelles de
         // `etablissement` — pas `delegation_regional_fr`/
@@ -3719,10 +3982,24 @@ function titres_chef_pdf(array $etab): array {
             $en !== '' ? $casse($en) : ($sec ? 'The Principal' : 'The Director')];
 }
 
-/** « Ngaoundéré, » (ville de l'école, sinon lieu-dit) ou '' si aucun. */
+/** « Ngaoundéré, » (lieu d'édition, sinon ville / lieu-dit) ou '' si aucun. */
 function lieu_signature_pdf(array $etab): string {
-    $l = trim((string) (($etab['ville'] ?? '') ?: ($etab['lieu'] ?? '')));
+    $l = trim((string) (($etab['lieu'] ?? '') ?: ($etab['ville'] ?? '')));
     return $l !== '' ? $l . ', ' : '';
+}
+
+/**
+ * Lieu d'édition des documents (« Fait à LAM, le … ») : celui des paramètres
+ * de l'école, sinon sa ville (01/11/2026 — ex. lycée bilingue de Lam : ville
+ * Figuil, documents établis à LAM). À utiliser pour toute mention « fait à » ;
+ * l'adresse (B.P. … ville) garde la ville.
+ */
+function lieu_edition_documents(?array $etab = null): string {
+    $etab ??= get_etablissement();
+    $l = trim((string) ($etab['lieu_edition'] ?? ''));
+    if ($l !== '') return $l;
+    if (!array_key_exists('lieu_edition', $etab) && trim((string) ($etab['lieu'] ?? '')) !== '') return trim((string) $etab['lieu']);   // sortie de etab_pour_pdf()
+    return trim((string) ($etab['ville'] ?? '')) ?: trim((string) (($etab['ville_etab'] ?? '') ?: ($etab['lieu_etab'] ?? '')));
 }
 
 // Chemin de la signature numérique de l'établissement (Directeur — un seul
@@ -4543,6 +4820,264 @@ function identite_ens_manquants(array $e): array {
     return $manquants;
 }
 
+// ==== sec_peut_supprimer ====
+/**
+ * Secondaire : désactiver / supprimer un élève et supprimer une classe sont
+ * réservés au chef d'établissement (Proviseur / Principal), au fondateur, à
+ * l'administrateur et aux comptes propriétaires (exiger_role() les laisse
+ * toujours passer).
+ * Demande du 30/10/2026.
+ */
+const SEC_ROLES_SUPPRESSION = ['ADMIN', 'PROVISEUR', 'FONDATEUR'];
+function sec_peut_supprimer(): bool {
+    if (function_exists('est_proprietaire_ecole') && est_proprietaire_ecole()) return true;
+    return in_array(role_connecte(), SEC_ROLES_SUPPRESSION, true);
+}
+
+// ==== sec_modele_matieres ====
+/**
+ * Modèle de bulletin d'une classe du secondaire GÉNÉRAL (migration v28) :
+ * réglé par cycle (niveau.id_cycle) dans Paramètres → Modèle de bulletin.
+ * true = « Matières » (notes par séquence, bulletin par matière : pages
+ * secondaire/general/pages/notes_matieres/ et bulletins_matieres/) ; false =
+ * APC (compétences). Toujours false au technique (qui a ses propres pages).
+ */
+function sec_modele_matieres(int $id_classe): bool {
+    static $cache = [];
+    if ($id_classe <= 0 || est_technique()) return false;
+    if (!array_key_exists($id_classe, $cache)) {
+        try {
+            $cache[$id_classe] = db_val("SELECT b.modele FROM classe c JOIN niveau n ON n.code_niveau = c.code_niveau
+                                         JOIN bulletin_modele_cycle b ON b.id_cycle = n.id_cycle COLLATE utf8mb4_unicode_ci WHERE c.id = ?", [$id_classe]) === 'MATIERES';
+        } catch (\Throwable $e) { $cache[$id_classe] = false; }   // migration v28 pas encore passée
+    }
+    return $cache[$id_classe];
+}
+
+/** Au moins un cycle de l'école est-il en modèle « Matières » ? */
+function sec_un_cycle_matieres(): bool {
+    static $r = null;
+    if ($r === null) {
+        try { $r = !est_technique() && (bool) db_val("SELECT COUNT(*) FROM bulletin_modele_cycle WHERE modele = 'MATIERES'"); }
+        catch (\Throwable $e) { $r = false; }
+    }
+    return $r;
+}
+
+/** Envoie vers la version « Matières » ou APC d'une page selon le modèle de
+ *  la classe demandée, en gardant toute la requête (rien au technique). */
+function sec_aiguiller_modele(int $id_classe, string $page_matieres, string $page_apc, bool $on_est_matieres): void {
+    if (!$id_classe || est_technique() || sec_modele_matieres($id_classe) === $on_est_matieres) return;
+    // Rechargement AJAX d'un filtre (ajaxSelectReload, sans « partiel ») :
+    // réponse sans la zone attendue → la page recharge l'adresse entière, qui
+    // est alors redirigée. chargerPartiel() (footer, avec « partiel=1 ») suit
+    // la redirection et ouvre l'adresse finale : « partiel » en est retiré.
+    if (($_SERVER['HTTP_X_REQUESTED_WITH'] ?? '') === 'XMLHttpRequest' && !isset($_GET['partiel'])) {
+        echo '<!doctype html><title>Redirection</title>';
+        exit;
+    }
+    $q = $_GET;
+    unset($q['partiel']);
+    $qs = http_build_query($q);
+    header('Location: ' . APP_URL . '/' . ($on_est_matieres ? $page_apc : $page_matieres) . ($qs !== '' ? '?' . $qs : ''), true, 307);
+    exit;
+}
+
+/** Mode du dernier chargement de données de classe (pv_charger_donnees_comp()) :
+ *  true = notes par séquence (technique ou classe « Matières »). Lu par
+ *  pv_moy_generale_comp() / pv_moy_annuelle_comp() pour la règle à appliquer. */
+function pv_mode_matieres(?bool $etat = null): bool {
+    static $m = false;
+    if ($etat !== null) $m = $etat;
+    return $m;
+}
+
+/**
+ * Matières d'une nouvelle classe du 2nd cycle (2nde, 1ère, Tle) d'après sa
+ * série et bd/secondaire/reference_programme_2nd_cycle.php (arrêté
+ * n°92/22/MINESEC — modèle, ajustable par l'école). Chaque matière va dans
+ * le « 1er GROUPE » ou le « 2e GROUPE » de la section (« 1st / 2nd GROUP »
+ * en anglophone), sinon dans le premier groupe de la section.
+ * Langues vivantes II (« LVII ») : classe A4 commune → toutes les LV2
+ * actives, chacune réservée aux élèves de sa série (discipline_serie, v24) ;
+ * classe dont la série est une LV2 (« Allemand ») → programme A4 avec cette
+ * seule LV2. L'ancienne série « A » est lue comme A4. Sans série reconnue :
+ * rien (l'école ajoute ses matières à la main).
+ */
+function secondaire_auto_matieres_2nd_cycle(int $id_classe, string $code_niveau): int {
+    $c = db_one("SELECT c.libelle_section, s.libelle AS serie FROM classe c LEFT JOIN serie s ON s.id = c.id_serie WHERE c.id = ?", [$id_classe]);
+    $f = __DIR__ . '/../bd/secondaire/reference_programme_2nd_cycle.php';
+    $prog = is_file($f) ? (require $f) : [];
+    $serie = trim((string) ($c['serie'] ?? ''));
+    $section = $c['libelle_section'] ?: 'Fr';
+    $series = array_column(db_all("SELECT id, libelle FROM serie"), 'id', 'libelle');
+    $lv2_seule = null;   // série d'une classe mono-LV2 (« Allemand »)
+    if ($serie === 'A') $serie = 'A4';
+    if (!isset($prog[$code_niveau][$serie]) && $serie !== '') {
+        foreach (db_all("SELECT libelle FROM matiere WHERE libelle LIKE 'LVII%'") as $m) {
+            if (mb_strtoupper(trim(substr($m['libelle'], strrpos($m['libelle'], ' ')))) === mb_strtoupper($serie)) { $lv2_seule = $m['libelle']; $serie = 'A4'; break; }
+        }
+    }
+    $liste = $prog[$code_niveau][$serie] ?? [];
+    $premier = (int) db_val("SELECT id_groupe_comp FROM groupe WHERE id_section = ? ORDER BY id_groupe_comp LIMIT 1", [$section])
+            ?: (int) db_val("SELECT id_groupe_comp FROM groupe ORDER BY id_groupe_comp LIMIT 1");
+    $noms = $section === 'An' ? [1 => '1st GROUP', 2 => '2nd GROUP'] : [1 => '1er GROUPE', 2 => '2e GROUPE'];
+    $groupes = [];
+    foreach ($noms as $k => $lib) {
+        $groupes[$k] = (int) db_val("SELECT id_groupe_comp FROM groupe WHERE libelle_groupe_comp = ? AND id_section = ? LIMIT 1", [$lib, $section]) ?: $premier;
+    }
+    if (!$liste || !$premier) return 0;
+    $mats = array_column(db_all("SELECT id, libelle FROM matiere WHERE actif = 1"), 'id', 'libelle');
+    $reserve = db_colonne_existe('discipline_serie', 'id_serie');
+    $n = 0;
+    foreach ($liste as $lib => [$coef, $ordre, $grp]) {
+        if ($lib === 'LVII') {
+            $ids = array_filter($mats, fn($id, $l) => str_starts_with($l, 'LVII') && ($lv2_seule === null || $l === $lv2_seule), ARRAY_FILTER_USE_BOTH);
+        } else {
+            $ids = isset($mats[$lib]) ? [$lib => $mats[$lib]] : [];
+        }
+        foreach ($ids as $l => $id_mat) {
+            db_exec("INSERT IGNORE INTO discipline (id_mat, IDClasses, id_groupe, coef, ordre) VALUES (?,?,?,?,?)",
+                    [(int) $id_mat, $id_classe, $groupes[$grp] ?? $premier, $coef, (string) $ordre]);
+            // LV2 d'une classe commune : réservée aux élèves de sa série
+            if ($lib === 'LVII' && $lv2_seule === null && $reserve) {
+                $nom_serie = mb_convert_case(mb_strtolower(trim(substr($l, strrpos($l, ' ')))), MB_CASE_TITLE);
+                if (isset($series[$nom_serie])) db_exec("INSERT IGNORE INTO discipline_serie (IDClasses, id_mat, id_serie) VALUES (?,?,?)", [$id_classe, (int) $id_mat, (int) $series[$nom_serie]]);
+            }
+            $n++;
+        }
+    }
+    return $n;
+}
+
+/**
+ * Libellés bilingues des bulletins « Matières » (01/11/2026) : « FRANÇAIS /
+ * French », « 1er GROUPE / 1st GROUP ». Le nom anglais (matiere.libelle_en,
+ * groupe.libelle_en — migration secondaire v31) n'est ajouté que s'il est
+ * renseigné ; sinon le libellé reste tel quel.
+ */
+function sec_sql_matiere_bilingue(string $m = 'm'): string {
+    // Nom français long (> 24 caractères) : son code court s'il existe (« ECM », « EPS »).
+    return "CASE WHEN COALESCE($m.libelle_en,'') <> '' THEN CONCAT(CASE WHEN CHAR_LENGTH($m.libelle) > 24 AND COALESCE($m.code,'') <> '' THEN $m.code ELSE $m.libelle END,' / ',$m.libelle_en) ELSE $m.libelle END";
+}
+function sec_sql_groupe_bilingue(string $g = 'g'): string {
+    return db_colonne_existe('groupe', 'libelle_en')
+        ? "CASE WHEN COALESCE($g.libelle_en,'') <> '' THEN CONCAT($g.libelle_groupe_comp,' / ',$g.libelle_en) ELSE $g.libelle_groupe_comp END"
+        : "$g.libelle_groupe_comp";
+}
+
+// ==== sec_series_matieres ====
+/**
+ * Classe mixte (migration secondaire v24) : matières de la classe RÉSERVÉES
+ * à certaines séries / LV2 — [id_mat => [id_serie, …]]. Matière absente =
+ * commune à toute la classe. Vide si la table n'existe pas encore.
+ */
+function sec_series_matieres(int $id_classe): array {
+    if (!$id_classe || !db_colonne_existe('discipline_serie', 'id_serie')) return [];
+    $out = [];
+    foreach (db_all("SELECT id_mat, id_serie FROM discipline_serie WHERE IDClasses=?", [$id_classe]) as $r) {
+        $out[(int)$r['id_mat']][] = (int)$r['id_serie'];
+    }
+    return $out;
+}
+
+// ==== sec_series_charger ====
+/**
+ * Registre (_sec_series_registre()) des matières NON suivies par les élèves d'une classe mixte, indexé
+ * par élève (un élève n'a qu'une classe par année : plusieurs classes peuvent
+ * être chargées sans conflit). À appeler une fois par classe avant tout
+ * calcul de moyenne — les chargeurs pv_charger_donnees_comp()/_technique()
+ * le font déjà. Élève sans série : ne suit aucune matière réservée.
+ * ['hors'][eid][id_mat] = true ; ['groupe'][eid][id_mat] = effectif
+ * du groupe qui suit la matière (seuil « absent majoritaire = 0 »).
+ */
+function &_sec_series_registre(): array {
+    static $reg = ['hors' => [], 'groupe' => []];
+    return $reg;
+}
+function sec_series_charger(int $id_classe, int $id_annee): void {
+    $reg = &_sec_series_registre();
+    $map = sec_series_matieres($id_classe);
+    $eleves = db_all(
+        "SELECT i.id_eleve, COALESCE(i.id_serie,0) AS id_serie FROM inscription i
+         JOIN eleve e ON e.id=i.id_eleve AND e.statut='actif'
+         WHERE i.id_classe=? AND i.id_annee=?", [$id_classe, $id_annee]);
+    foreach ($eleves as $r) { unset($reg['hors'][(int)$r['id_eleve']], $reg['groupe'][(int)$r['id_eleve']]); }
+    foreach ($map as $id_mat => $series) {
+        $suivent = array_filter($eleves, fn($r) => in_array((int)$r['id_serie'], $series, true));
+        foreach ($eleves as $r) {
+            $eid = (int)$r['id_eleve'];
+            if (in_array((int)$r['id_serie'], $series, true)) $reg['groupe'][$eid][$id_mat] = count($suivent);
+            else $reg['hors'][$eid][$id_mat] = true;
+        }
+    }
+}
+
+// ==== sec_hors_serie ====
+/** L'élève ne suit PAS cette matière (réservée à d'autres séries de sa classe) ? */
+function sec_hors_serie(int $eid, int $id_mat): bool {
+    return !empty(_sec_series_registre()['hors'][$eid][$id_mat]);
+}
+
+// ==== sec_effectif_groupe ====
+/** Effectif servant au seuil « absent majoritaire = 0 » : le groupe qui suit
+ *  la matière pour une matière réservée, sinon toute la classe. */
+function sec_effectif_groupe(int $eid, int $id_mat, int $nb_classe): int {
+    return _sec_series_registre()['groupe'][$eid][$id_mat] ?? $nb_classe;
+}
+
+// ==== sec_ligne_serie ====
+/**
+ * Classe mixte : ligne d'en-tête « Espagnol — 21 élève(s) » à insérer avant
+ * l'élève $i d'une liste TRIÉE par série (clé 'serie') quand la série change.
+ * '' si même série que l'élève précédent ou si la liste n'a qu'une série.
+ */
+function sec_ligne_serie(array $eleves, int $i, int $colspan): string {
+    $s = $eleves[$i]['serie'] ?? null;
+    if ($i > 0 && ($eleves[$i - 1]['serie'] ?? null) === $s) return '';
+    $series = array_map(fn($e) => $e['serie'] ?? null, $eleves);
+    if (count(array_unique($series, SORT_REGULAR)) < 2) return '';
+    $nb = count(array_filter($series, fn($x) => $x === $s));
+    return '<tr class="ligne-serie"><td colspan="' . $colspan . '" style="background:#fef3c7;color:#78350f;font-weight:700;font-size:.78rem;padding:4px 10px">'
+         . '<i class="bi bi-translate me-1"></i>' . h($s ?? 'Sans série') . ' — ' . $nb . ' élève(s)</td></tr>';
+}
+
+// ==== sec_options_eleves_par_serie ====
+/** <option> d'une liste d'élèves triée par série, regroupées en <optgroup>
+ *  par série dès que la classe en compte plusieurs (classe mixte). */
+function sec_options_eleves_par_serie(array $eleves, int $id_selection): string {
+    $groupes = count(array_unique(array_map(fn($e) => $e['serie'] ?? null, $eleves), SORT_REGULAR)) > 1;
+    $html = ''; $courante = false;
+    foreach ($eleves as $e) {
+        if ($groupes && ($e['serie'] ?? null) !== $courante) {
+            if ($courante !== false) $html .= '</optgroup>';
+            $courante = $e['serie'] ?? null;
+            $html .= '<optgroup label="' . h($courante ?? 'Sans série') . '">';
+        }
+        $html .= '<option value="' . (int) $e['id'] . '"' . ((int) $e['id'] === $id_selection ? ' selected' : '') . '>'
+               . h(strtoupper($e['nom']) . ' ' . ($e['prenom'] ?? '')) . '</option>';
+    }
+    return $html . ($groupes && $courante !== false ? '</optgroup>' : '');
+}
+
+// ==== sec_filtrer_eleves_matiere ====
+/** Saisie des notes d'une classe mixte : garde les élèves (clé 'id') qui
+ *  suivent la matière — communes à tous, ou réservée à leur série. */
+function sec_filtrer_eleves_matiere(array $eleves, int $id_classe, int $id_annee, int $id_mat): array {
+    if (!$eleves || !sec_series_matieres($id_classe)) return $eleves;
+    sec_series_charger($id_classe, $id_annee);
+    return array_values(array_filter($eleves, fn($e) => !sec_hors_serie((int)$e['id'], $id_mat)));
+}
+
+// ==== sec_filtrer_matieres_eleve ====
+/** Saisie par élève d'une classe mixte : retire les matières (clé $cle =
+ *  id de la matière) réservées à une autre série que la sienne. */
+function sec_filtrer_matieres_eleve(array $mats, int $id_classe, int $id_annee, int $eid, string $cle = 'id'): array {
+    if (!$mats || !sec_series_matieres($id_classe)) return $mats;
+    sec_series_charger($id_classe, $id_annee);
+    return array_values(array_filter($mats, fn($m) => !sec_hors_serie($eid, (int)$m[$cle])));
+}
+
 // ==== pv_note_effective ====
 /**
  * Note "effective" d'un élève dans une matière pour une séquence donnée :
@@ -4552,9 +5087,11 @@ function identite_ens_manquants(array $e): array {
  * - sinon (donnée manquante) -> [null, false]
  */
 function pv_note_effective(int $eid, int $id_mat, int $sid, array $notes_idx, array $abs_just, array $notes_count, int $nb_inscrits): array {
+    if (sec_hors_serie($eid, $id_mat)) return [null, true]; // classe mixte : matière d'une autre série
     if (isset($notes_idx[$eid][$id_mat][$sid])) return [$notes_idx[$eid][$id_mat][$sid], false];
     if (isset($abs_just[$eid][$id_mat][$sid])) return [null, true];
     $cnt = $notes_count[$id_mat][$sid] ?? 0;
+    $nb_inscrits = sec_effectif_groupe($eid, $id_mat, $nb_inscrits);
     if ($nb_inscrits > 0 && $cnt >= ceil($nb_inscrits / 2)) return [0.0, false];
     return [null, false];
 }
@@ -4581,6 +5118,7 @@ function pv_moy_generale(int $eid, array $disciplines, array $seq_ids, array $no
     $tot = 0; $coef = 0; $nb_data = 0;
     foreach ($disciplines as $d) {
         if (!in_array($d['id_mat'], $mats_avec_notes)) continue;
+        if (sec_hors_serie($eid, (int)$d['id_mat'])) { $nb_mats_avec_notes--; continue; } // classe mixte
         $avg = pv_moy_matiere($eid, $d['id_mat'], $seq_ids, $notes_idx, $abs_just, $notes_count, $nb_inscrits);
         if ($avg !== null) { $tot += $avg * $d['coef']; $coef += $d['coef']; $nb_data++; }
     }
@@ -4707,7 +5245,11 @@ function pv_moy_matiere_comp(int $eid, array $competences, array $notes_idx, arr
         // Technique : absence JUSTIFIÉE à cette séquence (sans note) — exclue
         // du calcul, jamais un zéro automatique (voir pv_charger_donnees_technique()).
         if (isset($c['exclus'][$eid]) && !isset($notes_idx[$eid][(int)$c['id']])) continue;
-        $v = pv_note_effective_comp($eid, (int)$c['id'], $notes_idx, $notes_count, $nb_inscrits);
+        // Classe mixte : matière d'une autre série — jamais comptée ; seuil
+        // du zéro automatique sur l'effectif du groupe qui la suit.
+        $m = (int)($c['id_matiere'] ?? 0);
+        if ($m && sec_hors_serie($eid, $m)) continue;
+        $v = pv_note_effective_comp($eid, (int)$c['id'], $notes_idx, $notes_count, $m ? sec_effectif_groupe($eid, $m, $nb_inscrits) : $nb_inscrits);
         if ($v !== null) { $tot += $v; $cnt++; }
     }
     return $cnt > 0 ? $tot / $cnt : null;
@@ -4738,9 +5280,12 @@ function pv_matiere_vraie_note_comp(int $eid, array $competences, array $notes_i
 function pv_moy_generale_comp(int $eid, array $disciplines, array $competences_par_mat, array $notes_idx, array $notes_count, int $nb_inscrits, array $mats_avec_notes, int $nb_mats_avec_notes, array $annules = []): array {
     if (!empty($annules[$eid])) return [null, false, 0.0, true]; // Règle 4 : jamais de moyenne, jamais "non classé"
     $tot = 0; $coef = 0; $nb_reelles = 0;
-    $technique = est_technique();
+    $technique = est_technique() || pv_mode_matieres();   // technique ou classe « Matières »
     foreach ($disciplines as $d) {
         if (!in_array($d['id_mat'], $mats_avec_notes)) continue;
+        // Classe mixte : une matière d'une autre série ne compte pas non plus
+        // dans le seuil de classement (Règle 2) de cet élève.
+        if (sec_hors_serie($eid, (int)$d['id_mat'])) { $nb_mats_avec_notes--; continue; }
         $comps = $competences_par_mat[$d['id_mat']] ?? [];
         $avg = pv_moy_matiere_comp($eid, $comps, $notes_idx, $notes_count, $nb_inscrits);
         if ($avg !== null) { $tot += $avg * $d['coef']; $coef += $d['coef']; }
@@ -4766,7 +5311,12 @@ function pv_moy_generale_comp(int $eid, array $disciplines, array $competences_p
  * @return array{disciplines:array, competences_par_mat:array, notes_idx:array, notes_count:array, mats_avec_notes:array, nb_mats_avec_notes:int, nb_inscrits:int, annules:array}
  */
 function pv_charger_donnees_comp(int $id_classe, int $id_trim, int $id_annee): array {
-    if (est_technique()) return pv_charger_donnees_technique($id_classe, $id_trim, $id_annee);
+    // Classe « Matières » (secondaire général, migration v28) : notes par
+    // séquence, même moteur que le technique.
+    $par_sequence = est_technique() || sec_modele_matieres($id_classe);
+    pv_mode_matieres($par_sequence);
+    if ($par_sequence) return pv_charger_donnees_technique($id_classe, $id_trim, $id_annee);
+    sec_series_charger($id_classe, $id_annee); // classe mixte : matières par série
     $disciplines = db_all(
         "SELECT d.id_mat, d.coef FROM discipline d
          JOIN matiere m ON m.id=d.id_mat AND m.actif=1
@@ -4790,7 +5340,7 @@ function pv_charger_donnees_comp(int $id_classe, int $id_trim, int $id_annee): a
     $competences_par_mat = [];
     foreach ($disciplines as $d) {
         $competences_par_mat[$d['id_mat']] = db_all(
-            "SELECT id FROM competence WHERE id_matiere=? AND code_niveau=? AND id_trim=? ORDER BY ordre",
+            "SELECT id, id_matiere FROM competence WHERE id_matiere=? AND code_niveau=? AND id_trim=? ORDER BY ordre",
             [$d['id_mat'], $code_niveau, $id_trim]
         );
     }
@@ -4846,6 +5396,7 @@ function pv_cle_unite_technique(int $id_mat, int $id_seq): int {
 }
 
 function pv_charger_donnees_technique(int $id_classe, int $id_trim, int $id_annee): array {
+    sec_series_charger($id_classe, $id_annee); // classe mixte : matières par série
     $disciplines = db_all(
         "SELECT d.id_mat, d.coef FROM discipline d
          JOIN matiere m ON m.id=d.id_mat AND m.actif=1
@@ -4894,7 +5445,7 @@ function pv_charger_donnees_technique(int $id_classe, int $id_trim, int $id_anne
         $id_mat = (int)$d['id_mat'];
         foreach ($seq_ids as $sid) {
             $k = pv_cle_unite_technique($id_mat, $sid);
-            $unites_par_mat[$id_mat][] = ['id' => $k, 'id_seq' => $sid, 'exclus' => $exclus[$k] ?? []];
+            $unites_par_mat[$id_mat][] = ['id' => $k, 'id_seq' => $sid, 'id_matiere' => $id_mat, 'exclus' => $exclus[$k] ?? []];
             if (($notes_count[$k] ?? 0) > 0 && !in_array($id_mat, $mats_avec_notes, true)) $mats_avec_notes[] = $id_mat;
         }
     }
@@ -4915,6 +5466,15 @@ function pv_charger_donnees_technique(int $id_classe, int $id_trim, int $id_anne
  * @return array [jointure unité, jointure classe cl]
  */
 function stat_jointures_notes_periode(string $in_t): array {
+    if (sec_un_cycle_matieres()) {
+        // Général avec des cycles APC ET « Matières » : notes par compétence
+        // ou par séquence, la liste des trimestres n'étant liée qu'une fois.
+        return ["JOIN trimestre tq ON tq.id IN ($in_t)
+                 LEFT JOIN competence comp ON comp.id = n.id_competence
+                 LEFT JOIN sequence sq ON sq.id = n.id_seq",
+                "JOIN classe cl ON cl.id=i.id_classe AND ((comp.id IS NOT NULL AND comp.id_trim = tq.id AND cl.code_niveau = comp.code_niveau)
+                                                       OR (comp.id IS NULL AND sq.id_trim = tq.id))"];
+    }
     if (est_technique()) {
         return ["JOIN sequence sq ON sq.id = n.id_seq AND sq.id_trim IN ($in_t)",
                 "JOIN classe cl ON cl.id=i.id_classe"];
@@ -4945,7 +5505,7 @@ function pv_moy_annuelle_comp(array $par_trim): array {
     // trimestre classé = pas de moyenne annuelle (non classé), jamais 0.
     // Sans cela, conseil de classe / résultat annuel contredisaient le
     // bulletin annuel (ex. 8,66 au bulletin, 2,89 au conseil).
-    if (function_exists('est_technique') && est_technique()) {
+    if ((function_exists('est_technique') && est_technique()) || pv_mode_matieres()) {   // + classe « Matières »
         $vals = [];
         foreach ($par_trim as $t) {
             if (empty($t['annule']) && !empty($t['classable']) && $t['moy'] !== null) $vals[] = (float) $t['moy'];

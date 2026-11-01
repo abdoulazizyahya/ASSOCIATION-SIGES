@@ -110,8 +110,7 @@ $pdf->MultiCell($uw_tbl, 4, pdf_u("Cette liste ne reprend que les décisions dé
 
 $pdf->Ln(6);
 if ($pdf->GetY() > $pdf->GetPageHeight() - 30) $pdf->AddPage();
-$pdf->SetFont('Arial', '', 9);
-$pdf->Cell(0, 5, pdf_u('Fait à ' . ($etab['ville'] ?? '') . ', le ' . date('d/m/Y')), 0, 1, 'R');
+pdf_fait_a_bilingue($pdf, 10, $pdf->GetPageWidth() - 20, lieu_edition_documents($etab), 'R', 9);   // marges de 10 mm
 $pdf->SetFont('Arial', 'B', 9);
 $pdf->Cell(0, 5, pdf_u(strtoupper($etab['chef_etablissement'] ?? 'LE PROVISEUR')), 0, 1, 'R');
 

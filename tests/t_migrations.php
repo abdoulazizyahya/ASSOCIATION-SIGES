@@ -14,7 +14,11 @@ foreach (['primaire' => 'bd/assoc/schema_ref_ecole.sql', 'secondaire' => 'bd/ass
     egal('', mysqli_error($srv), "$type : schéma de référence chargé sans erreur");
 
     $rv = rv_analyser_ecole(['id' => 0, 'code' => 'T', 'nom' => 'T', 'db_name' => $db, 'type_enseignement' => $type, 'version' => 0]);
-    egal($rv['derniere'], $rv['reelle'], "$type : le schéma de référence contient toutes les migrations (v{$rv['derniere']})"
+    // Dernière migration VÉRIFIABLE (tables/colonnes) : une migration de
+    // données seule (ex. secondaire v25) ne laisse aucune trace contrôlable.
+    $verifiables = array_keys(array_filter(rv_series()[$type]));
+    $attendu = $verifiables ? max($verifiables) : $rv['derniere'];
+    egal($attendu, $rv['reelle'], "$type : le schéma de référence contient toutes les migrations (v$attendu vérifiable, dernière v{$rv['derniere']})"
         . ($rv['manque'] ? ' — manque ' . json_encode($rv['manque'], JSON_UNESCAPED_UNICODE) : ''));
 
     $erreurs = [];

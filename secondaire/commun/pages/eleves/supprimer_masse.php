@@ -11,7 +11,7 @@
 require_once __DIR__ . '/../../../../config/config.php';
 require_once __DIR__ . '/../../../../noyau/connexion.php';
 require_once __DIR__ . '/../../../../noyau/fonctions.php';
-exiger_role(['ADMIN', 'PROVISEUR', 'FONDATEUR']);
+exiger_role(SEC_ROLES_SUPPRESSION);   // Admin, Proviseur/Principal, fondateur, propriétaire
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') rediriger('secondaire/commun/pages/eleves/liste.php');
 csrf_verifier();

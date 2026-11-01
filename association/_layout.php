@@ -50,6 +50,8 @@ function _asso_chemin_courant(): string {
 
 function asso_haut(string $titre, bool $avec_nav = true): void {
     $GLOBALS['_asso_avec_nav'] = $avec_nav;
+    // Localisation obligatoire après connexion (31/10/2026) — voir audit_gps_exiger().
+    if ($avec_nav && function_exists('audit_gps_exiger')) audit_gps_exiger(APP_URL . '/association/logout.php');
 
     $m           = function_exists('membre_connecte') ? membre_connecte() : [];
     $superadmin  = function_exists('est_superadmin_association') && est_superadmin_association();
@@ -182,6 +184,7 @@ function asso_bas(): void {
   </script>
 <?php endif; ?>
 <script src="<?= APP_URL ?>/assets/vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
+<?= $avec_nav && function_exists('audit_gps_script') ? audit_gps_script() : '' /* position GPS après connexion (31/10/2026) */ ?>
 </body>
 </html>
 <?php

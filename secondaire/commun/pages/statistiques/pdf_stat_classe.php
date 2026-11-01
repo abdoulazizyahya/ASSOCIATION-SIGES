@@ -415,7 +415,7 @@ $pdf->Ln(10);
 
 $pdf->SetFont('Arial', '', 9);
 $pdf->SetX($ml);
-$pdf->Cell($uw, 5, u((get_etablissement()['ville'] ?? '') . ', le .................................'), 0, 1, 'R');
+$pdf->Cell($uw, 5, u(lieu_edition_documents() . ', le .................................'), 0, 1, 'R');
 $pdf->Ln(2);
 // Deux colonnes : Professeur Principal (signataire du bulletin/de la classe,
 // sans image possible — nom variable par classe/enseignant) + contre-signature

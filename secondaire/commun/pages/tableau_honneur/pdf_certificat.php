@@ -519,7 +519,7 @@ foreach ($qualifies as $q) {
 
         $pdf->SetFont('Arial', 'I', 12);
         $pdf->SetXY($ml + 200, $y_box + 13);
-        $pdf->Cell($uw - 130, 6, u( $etab['ville'].   ', le ' . date('d-m-Y') . '.'), 0, 1, 'L');
+        $pdf->Cell($uw - 130, 6, u(lieu_edition_documents($etab) . ', le ' . date('d-m-Y') . '.'), 0, 1, 'L');
 
         $y_sig = $y_box + $h_box + 14;
         $pdf->SetFont('Arial', 'BU', 14);
@@ -665,7 +665,7 @@ foreach ($qualifies as $q) {
 
         $pdf->SetFont('Arial', 'I', 9.5);
         $pdf->SetXY($x_card2 + $w_card + 10, $y_card + 9);
-        $pdf->Cell($uw - ($x_card2 + $w_card + 10 - $ml), 5, u((get_etablissement()['ville'] ?? '') . ', le ' . date('d/m/Y')), 0, 1, 'L');
+        $pdf->Cell($uw - ($x_card2 + $w_card + 10 - $ml), 5, u(lieu_edition_documents() . ', le ' . date('d/m/Y')), 0, 1, 'L');
 
         // Signatures — traits colorés fins au lieu de texte souligné.
         $y_sig = $y_card + $h_card + 16;
@@ -787,7 +787,7 @@ foreach ($qualifies as $q) {
         $y_sig = $ph - 38;
         $pdf->SetY($y_sig - 6);
         $pdf->SetFont('Times', 'I', 9.5);
-        $pdf->Cell($uw, 5, u('Fait a ' . (get_etablissement()['ville'] ?? '') . ', le ' . date('d/m/Y')), 0, 1, 'R');
+        $pdf->Cell($uw, 5, u('Fait a ' . lieu_edition_documents() . ', le ' . date('d/m/Y')), 0, 1, 'R');
         $w3 = $uw / 3;
         $pdf->SetFont('Times', 'BU', 9.5);
         $pdf->SetXY($ml, $y_sig);

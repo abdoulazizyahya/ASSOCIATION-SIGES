@@ -57,7 +57,9 @@ function honneur_qr_fichier_temp(array $eleve, string $vue, int $id_periode, str
     $cle_cache = hash('crc32b', verif_secret(HONNEUR_VERIF_SECRET)) . '_' . $id_eleve . '_' . $piste . '_' . $vue . '_' . $id_periode
         // Voir bulletin_qr_fichier_temp() (primaire/pdf/verif_lib.php) : intègre l'adresse
         // réseau du serveur pour régénérer le QR après un changement d'IP.
-        . '_' . hash('crc32b', bulletin_verif_base_url())
+        . '_' . hash('crc32b', bulletin_verif_base_url() . '/verif/honneur.php')
+        // + chemin de la page de vérification (31/10/2026) : les QR mis en cache avant
+        // la réorganisation du 12/10 encodaient /verif_X.php — régénérés d'office.
         . '_' . ($photo_path !== '' && is_file($photo_path) ? hash_file('crc32b', $photo_path) : 'none');
     $dossier_cache = __DIR__ . '/../../assets/uploads/qr_honneur';
     if (!is_dir($dossier_cache)) @mkdir($dossier_cache, 0755, true);

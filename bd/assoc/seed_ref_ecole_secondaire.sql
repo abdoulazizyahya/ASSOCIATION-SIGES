@@ -18,22 +18,23 @@ INSERT IGNORE INTO `niveau` (`code_niveau`, `libelle_niv`, `id_cycle`, `ordre_ni
 ('5 eme',     '5 eme',     '1er Cycle', '2'),
 ('FORM 2',    'FORM 2',    '1er Cycle', '2'),
 ('4 eme',     '4ème',      '1er Cycle', '3'),
-('4 eme ALL', '4 eme ALL', '1er Cycle', '3'),
 ('FORM 3',    'FORM 3',    '1er Cycle', '3'),
-('4 eme ARA', '4 eme ARA', '1er Cycle', '4'),
+('3 eme',     '3ème',      '1er Cycle', '4'),
 ('FORM 4',    'FORM 4',    '1er Cycle', '4'),
-('4 eme CHI', '4 eme CHI', '1er Cycle', '5'),
-('4 eme ESP', '4 eme ESP', '1er Cycle', '5'),
 ('FORM 5',    'FORM 5',    '1er Cycle', '5'),
-('3 eme',     '3ème',      '1er Cycle', '6'),
-('3 eme ARA', '3 eme ARA', '1er Cycle', '6'),
-('3 eme CHI', '3 eme CHI', '1er Cycle', '6'),
-('3 eme ESP', '3 eme ESP', '1er Cycle', '7'),
-('3 eme ALL', '3 eme ALL', '1er Cycle', '8');
+('2nde',      'Seconde',   '2nd Cycle', '5'),
+('1ere',      'Première',  '2nd Cycle', '6'),
+('Tle',       'Terminale', '2nd Cycle', '7');
 
-INSERT IGNORE INTO `groupe` (`id_groupe_comp`, `libelle_groupe_comp`, `id_section`) VALUES
-(1, 'Programme Francophone', 'Fr'),
-(2, 'Programme Anglophone', 'An');
+INSERT IGNORE INTO `groupe` (`id_groupe_comp`, `libelle_groupe_comp`, `libelle_en`, `id_section`) VALUES
+(1, 'Programme Francophone', NULL, 'Fr'),
+(2, 'Programme Anglophone', NULL, 'An'),
+(3, '1er GROUPE', '1st GROUP', 'Fr'),
+(4, '2e GROUPE', '2nd GROUP', 'Fr'),
+(5, '3e GROUPE', '3rd GROUP', 'Fr'),
+(6, '1st GROUP', NULL, 'An'),
+(7, '2nd GROUP', NULL, 'An'),
+(8, '3rd GROUP', NULL, 'An');
 
 INSERT IGNORE INTO `serie` (`id`, `libelle`, `id_filiere`) VALUES
 (1, 'Allemand', NULL),
@@ -43,7 +44,8 @@ INSERT IGNORE INTO `serie` (`id`, `libelle`, `id_filiere`) VALUES
 (5, 'Chinois', NULL),
 (6, 'D', NULL),
 (7, 'Espagnol', NULL),
-(8, 'Italien', NULL);
+(8, 'Italien', NULL),
+(9, 'A4', NULL);   -- Lettres : Langue vivante II et Philosophie (arrêté 92/22/MINESEC)
 
 -- Opérateurs de paiement — 'CASH' (espèces) est un ID sentinelle en dur
 -- dans secondaire/pages/paiements/save.php (paiement en espèces = pas de
@@ -564,16 +566,16 @@ INSERT IGNORE INTO `arrondissement` (`id`, `id_departement`, `nom`) VALUES (361,
 INSERT IGNORE INTO `arrondissement` (`id`, `id_departement`, `nom`) VALUES (362,57,'Kumba 3');
 INSERT IGNORE INTO `arrondissement` (`id`, `id_departement`, `nom`) VALUES (363,42,'Banka');
 INSERT IGNORE INTO `arrondissement` (`id`, `id_departement`, `nom`) VALUES (364,42,'Banwa');
-INSERT IGNORE INTO `matiere` (`id`, `code`, `libelle`, `libelle_en`, `libelle_section`, `ordre`, `actif`) VALUES (1,NULL,'ANGLAIS',NULL,'Fr',1,1);
-INSERT IGNORE INTO `matiere` (`id`, `code`, `libelle`, `libelle_en`, `libelle_section`, `ordre`, `actif`) VALUES (2,NULL,'INFORMATIQUE',NULL,'Fr',2,1);
-INSERT IGNORE INTO `matiere` (`id`, `code`, `libelle`, `libelle_en`, `libelle_section`, `ordre`, `actif`) VALUES (5,NULL,'FRANÇAIS',NULL,'Fr',5,1);
-INSERT IGNORE INTO `matiere` (`id`, `code`, `libelle`, `libelle_en`, `libelle_section`, `ordre`, `actif`) VALUES (8,NULL,'ÉDUCATION À LA CITOYENNETÉ ET À LA MORALE',NULL,'Fr',14,1);
-INSERT IGNORE INTO `matiere` (`id`, `code`, `libelle`, `libelle_en`, `libelle_section`, `ordre`, `actif`) VALUES (9,NULL,'GÉOGRAPHIE',NULL,'Fr',15,1);
-INSERT IGNORE INTO `matiere` (`id`, `code`, `libelle`, `libelle_en`, `libelle_section`, `ordre`, `actif`) VALUES (10,NULL,'HISTOIRE',NULL,'Fr',16,1);
-INSERT IGNORE INTO `matiere` (`id`, `code`, `libelle`, `libelle_en`, `libelle_section`, `ordre`, `actif`) VALUES (11,NULL,'MATHÉMATIQUES',NULL,'Fr',17,1);
-INSERT IGNORE INTO `matiere` (`id`, `code`, `libelle`, `libelle_en`, `libelle_section`, `ordre`, `actif`) VALUES (12,NULL,'SCIENCES',NULL,'Fr',19,1);
-INSERT IGNORE INTO `matiere` (`id`, `code`, `libelle`, `libelle_en`, `libelle_section`, `ordre`, `actif`) VALUES (14,NULL,'ÉDUCATION PHYSIQUE ET SPORTIVE (EPS)',NULL,'Fr',21,1);
-INSERT IGNORE INTO `matiere` (`id`, `code`, `libelle`, `libelle_en`, `libelle_section`, `ordre`, `actif`) VALUES (15,NULL,'TRAVAIL MANUEL (TM)',NULL,'Fr',22,1);
+INSERT IGNORE INTO `matiere` (`id`, `code`, `libelle`, `libelle_en`, `libelle_section`, `ordre`, `actif`) VALUES (1,NULL,'ANGLAIS','English Language','Fr',1,1);
+INSERT IGNORE INTO `matiere` (`id`, `code`, `libelle`, `libelle_en`, `libelle_section`, `ordre`, `actif`) VALUES (2,NULL,'INFORMATIQUE','Computer Science','Fr',2,1);
+INSERT IGNORE INTO `matiere` (`id`, `code`, `libelle`, `libelle_en`, `libelle_section`, `ordre`, `actif`) VALUES (5,NULL,'FRANÇAIS','French','Fr',5,1);
+INSERT IGNORE INTO `matiere` (`id`, `code`, `libelle`, `libelle_en`, `libelle_section`, `ordre`, `actif`) VALUES (8,'ECM','ÉDUCATION À LA CITOYENNETÉ ET À LA MORALE','Citizenship Education','Fr',14,1);
+INSERT IGNORE INTO `matiere` (`id`, `code`, `libelle`, `libelle_en`, `libelle_section`, `ordre`, `actif`) VALUES (9,NULL,'GÉOGRAPHIE','Geography','Fr',15,1);
+INSERT IGNORE INTO `matiere` (`id`, `code`, `libelle`, `libelle_en`, `libelle_section`, `ordre`, `actif`) VALUES (10,NULL,'HISTOIRE','History','Fr',16,1);
+INSERT IGNORE INTO `matiere` (`id`, `code`, `libelle`, `libelle_en`, `libelle_section`, `ordre`, `actif`) VALUES (11,NULL,'MATHÉMATIQUES','Mathematics','Fr',17,1);
+INSERT IGNORE INTO `matiere` (`id`, `code`, `libelle`, `libelle_en`, `libelle_section`, `ordre`, `actif`) VALUES (12,NULL,'SCIENCES','Sciences','Fr',19,1);
+INSERT IGNORE INTO `matiere` (`id`, `code`, `libelle`, `libelle_en`, `libelle_section`, `ordre`, `actif`) VALUES (14,'EPS','ÉDUCATION PHYSIQUE ET SPORTIVE (EPS)','Physical Education','Fr',21,1);
+INSERT IGNORE INTO `matiere` (`id`, `code`, `libelle`, `libelle_en`, `libelle_section`, `ordre`, `actif`) VALUES (15,NULL,'TRAVAIL MANUEL (TM)','Manual Labour','Fr',22,1);
 INSERT IGNORE INTO `matiere` (`id`, `code`, `libelle`, `libelle_en`, `libelle_section`, `ordre`, `actif`) VALUES (16,NULL,'FRENCH',NULL,'An',1,1);
 INSERT IGNORE INTO `matiere` (`id`, `code`, `libelle`, `libelle_en`, `libelle_section`, `ordre`, `actif`) VALUES (17,NULL,'COMPUTER SCIENCES',NULL,'An',2,1);
 INSERT IGNORE INTO `matiere` (`id`, `code`, `libelle`, `libelle_en`, `libelle_section`, `ordre`, `actif`) VALUES (19,NULL,'LITERATURE IN ENGLISH',NULL,'An',4,1);
@@ -587,11 +589,11 @@ INSERT IGNORE INTO `matiere` (`id`, `code`, `libelle`, `libelle_en`, `libelle_se
 INSERT IGNORE INTO `matiere` (`id`, `code`, `libelle`, `libelle_en`, `libelle_section`, `ordre`, `actif`) VALUES (30,NULL,'PHYSICS',NULL,'An',20,1);
 INSERT IGNORE INTO `matiere` (`id`, `code`, `libelle`, `libelle_en`, `libelle_section`, `ordre`, `actif`) VALUES (31,NULL,'SPORTS AND PHYSICAL EDUCATION',NULL,'An',23,1);
 INSERT IGNORE INTO `matiere` (`id`, `code`, `libelle`, `libelle_en`, `libelle_section`, `ordre`, `actif`) VALUES (32,NULL,'MANUAL LABOUR',NULL,'An',24,1);
-INSERT IGNORE INTO `matiere` (`id`, `code`, `libelle`, `libelle_en`, `libelle_section`, `ordre`, `actif`) VALUES (33,NULL,'LVII - ALLEMAND',NULL,'Fr',13,1);
-INSERT IGNORE INTO `matiere` (`id`, `code`, `libelle`, `libelle_en`, `libelle_section`, `ordre`, `actif`) VALUES (34,NULL,'LVII - ARABE',NULL,'Fr',12,1);
-INSERT IGNORE INTO `matiere` (`id`, `code`, `libelle`, `libelle_en`, `libelle_section`, `ordre`, `actif`) VALUES (35,NULL,'LVII - ESPAGNOL',NULL,'Fr',11,1);
-INSERT IGNORE INTO `matiere` (`id`, `code`, `libelle`, `libelle_en`, `libelle_section`, `ordre`, `actif`) VALUES (36,NULL,'PCT',NULL,'Fr',18,1);
-INSERT IGNORE INTO `matiere` (`id`, `code`, `libelle`, `libelle_en`, `libelle_section`, `ordre`, `actif`) VALUES (37,NULL,'SVTEEHB',NULL,'Fr',19,1);
+INSERT IGNORE INTO `matiere` (`id`, `code`, `libelle`, `libelle_en`, `libelle_section`, `ordre`, `actif`) VALUES (33,NULL,'LVII - ALLEMAND','German','Fr',13,1);
+INSERT IGNORE INTO `matiere` (`id`, `code`, `libelle`, `libelle_en`, `libelle_section`, `ordre`, `actif`) VALUES (34,NULL,'LVII - ARABE','Arabic','Fr',12,1);
+INSERT IGNORE INTO `matiere` (`id`, `code`, `libelle`, `libelle_en`, `libelle_section`, `ordre`, `actif`) VALUES (35,NULL,'LVII - ESPAGNOL','Spanish','Fr',11,1);
+INSERT IGNORE INTO `matiere` (`id`, `code`, `libelle`, `libelle_en`, `libelle_section`, `ordre`, `actif`) VALUES (36,NULL,'PCT','Physics, Chemistry and Technology','Fr',18,1);
+INSERT IGNORE INTO `matiere` (`id`, `code`, `libelle`, `libelle_en`, `libelle_section`, `ordre`, `actif`) VALUES (37,NULL,'SVTEEHB','Biology','Fr',19,1);
 INSERT IGNORE INTO `matiere` (`id`, `code`, `libelle`, `libelle_en`, `libelle_section`, `ordre`, `actif`) VALUES (38,NULL,'ECONOMICS',NULL,'An',12,1);
 INSERT IGNORE INTO `matiere` (`id`, `code`, `libelle`, `libelle_en`, `libelle_section`, `ordre`, `actif`) VALUES (39,NULL,'LOGIC',NULL,'An',12,1);
 INSERT IGNORE INTO `matiere` (`id`, `code`, `libelle`, `libelle_en`, `libelle_section`, `ordre`, `actif`) VALUES (40,NULL,'HUMAN BIOLOGY',NULL,'An',14,0);
@@ -600,20 +602,28 @@ INSERT IGNORE INTO `matiere` (`id`, `code`, `libelle`, `libelle_en`, `libelle_se
 INSERT IGNORE INTO `matiere` (`id`, `code`, `libelle`, `libelle_en`, `libelle_section`, `ordre`, `actif`) VALUES (43,NULL,'ADDITIONAL MATHEMATICS',NULL,'An',18,1);
 INSERT IGNORE INTO `matiere` (`id`, `code`, `libelle`, `libelle_en`, `libelle_section`, `ordre`, `actif`) VALUES (44,NULL,'ACCOUNTING',NULL,'An',21,0);
 INSERT IGNORE INTO `matiere` (`id`, `code`, `libelle`, `libelle_en`, `libelle_section`, `ordre`, `actif`) VALUES (45,NULL,'COMMERCE',NULL,'An',22,1);
-INSERT IGNORE INTO `matiere` (`id`, `code`, `libelle`, `libelle_en`, `libelle_section`, `ordre`, `actif`) VALUES (46,NULL,'CULTURES NATIONALES',NULL,'Fr',3,0);
-INSERT IGNORE INTO `matiere` (`id`, `code`, `libelle`, `libelle_en`, `libelle_section`, `ordre`, `actif`) VALUES (47,NULL,'ÉDUCATION ARTISTIQUE ET CULTURELLE',NULL,'Fr',4,0);
-INSERT IGNORE INTO `matiere` (`id`, `code`, `libelle`, `libelle_en`, `libelle_section`, `ordre`, `actif`) VALUES (48,NULL,'LANGUES NATIONALES',NULL,'Fr',6,0);
-INSERT IGNORE INTO `matiere` (`id`, `code`, `libelle`, `libelle_en`, `libelle_section`, `ordre`, `actif`) VALUES (49,NULL,'LETTRES CLASSIQUES (LATIN)',NULL,'Fr',7,0);
-INSERT IGNORE INTO `matiere` (`id`, `code`, `libelle`, `libelle_en`, `libelle_section`, `ordre`, `actif`) VALUES (50,NULL,'ÉCONOMIE SOCIALE ET FAMILIALE (ESF)',NULL,'Fr',20,0);
-INSERT IGNORE INTO `matiere` (`id`, `code`, `libelle`, `libelle_en`, `libelle_section`, `ordre`, `actif`) VALUES (51,NULL,'LETTRES CLASSIQUES (GREC)',NULL,'Fr',8,0);
-INSERT IGNORE INTO `matiere` (`id`, `code`, `libelle`, `libelle_en`, `libelle_section`, `ordre`, `actif`) VALUES (52,NULL,'LVII - CHINOIS',NULL,'Fr',9,1);
-INSERT IGNORE INTO `matiere` (`id`, `code`, `libelle`, `libelle_en`, `libelle_section`, `ordre`, `actif`) VALUES (53,NULL,'LVII - ITALIEN',NULL,'Fr',10,0);
+INSERT IGNORE INTO `matiere` (`id`, `code`, `libelle`, `libelle_en`, `libelle_section`, `ordre`, `actif`) VALUES (46,NULL,'CULTURES NATIONALES','National Cultures','Fr',3,1);
+INSERT IGNORE INTO `matiere` (`id`, `code`, `libelle`, `libelle_en`, `libelle_section`, `ordre`, `actif`) VALUES (47,'ÉDUC. ARTISTIQUE','ÉDUCATION ARTISTIQUE ET CULTURELLE','Arts Education','Fr',4,1);
+INSERT IGNORE INTO `matiere` (`id`, `code`, `libelle`, `libelle_en`, `libelle_section`, `ordre`, `actif`) VALUES (48,NULL,'LANGUES NATIONALES','National Languages','Fr',6,1);
+INSERT IGNORE INTO `matiere` (`id`, `code`, `libelle`, `libelle_en`, `libelle_section`, `ordre`, `actif`) VALUES (49,NULL,'LETTRES CLASSIQUES (LATIN)','Latin','Fr',7,0);
+INSERT IGNORE INTO `matiere` (`id`, `code`, `libelle`, `libelle_en`, `libelle_section`, `ordre`, `actif`) VALUES (50,'ESF','ÉCONOMIE SOCIALE ET FAMILIALE (ESF)','Home Economics','Fr',20,0);
+INSERT IGNORE INTO `matiere` (`id`, `code`, `libelle`, `libelle_en`, `libelle_section`, `ordre`, `actif`) VALUES (51,NULL,'LETTRES CLASSIQUES (GREC)','Greek','Fr',8,0);
+INSERT IGNORE INTO `matiere` (`id`, `code`, `libelle`, `libelle_en`, `libelle_section`, `ordre`, `actif`) VALUES (52,NULL,'LVII - CHINOIS','Chinese','Fr',9,1);
+INSERT IGNORE INTO `matiere` (`id`, `code`, `libelle`, `libelle_en`, `libelle_section`, `ordre`, `actif`) VALUES (53,NULL,'LVII - ITALIEN','Italian','Fr',10,1);
 INSERT IGNORE INTO `matiere` (`id`, `code`, `libelle`, `libelle_en`, `libelle_section`, `ordre`, `actif`) VALUES (54,NULL,'ART AND CULTURE',NULL,'An',3,0);
 INSERT IGNORE INTO `matiere` (`id`, `code`, `libelle`, `libelle_en`, `libelle_section`, `ordre`, `actif`) VALUES (55,NULL,'NATIONAL CULTURE',NULL,'An',7,0);
 INSERT IGNORE INTO `matiere` (`id`, `code`, `libelle`, `libelle_en`, `libelle_section`, `ordre`, `actif`) VALUES (56,NULL,'NATIONAL LANGUAGES',NULL,'An',8,0);
 INSERT IGNORE INTO `matiere` (`id`, `code`, `libelle`, `libelle_en`, `libelle_section`, `ordre`, `actif`) VALUES (57,NULL,'HOME ECONOMICS',NULL,'An',12,1);
-INSERT IGNORE INTO `format_carte` (`id`, `libelle`, `largeur_mm`, `hauteur_mm`, `cartes_par_page`) VALUES (1,'8,56 ? 5,4 cm (CB/ISO)',85.6,54.0,10);
-INSERT IGNORE INTO `format_carte` (`id`, `libelle`, `largeur_mm`, `hauteur_mm`, `cartes_par_page`) VALUES (2,'12 ? 7,6 cm',120.0,76.0,6);
-INSERT IGNORE INTO `format_carte` (`id`, `libelle`, `largeur_mm`, `hauteur_mm`, `cartes_par_page`) VALUES (3,'A6  (105 ? 74 mm)',105.0,74.0,4);
-INSERT IGNORE INTO `format_carte` (`id`, `libelle`, `largeur_mm`, `hauteur_mm`, `cartes_par_page`) VALUES (4,'A5  (148 ? 105 mm)',148.0,105.0,2);
+INSERT IGNORE INTO `matiere` (`id`, `code`, `libelle`, `libelle_en`, `libelle_section`, `ordre`, `actif`) VALUES (58,NULL,'PHILOSOPHIE','Philosophy','Fr',1,1);
+-- 2nd cycle, arrêté n°92/22/MINESEC (migration secondaire v31, 01/11/2026)
+INSERT IGNORE INTO `matiere` (`id`, `code`, `libelle`, `libelle_en`, `libelle_section`, `ordre`, `actif`) VALUES (59,NULL,'LITTÉRATURE','Literature','Fr',23,1);
+INSERT IGNORE INTO `matiere` (`id`, `code`, `libelle`, `libelle_en`, `libelle_section`, `ordre`, `actif`) VALUES (60,NULL,'PHYSIQUE','Physics','Fr',24,1);
+INSERT IGNORE INTO `matiere` (`id`, `code`, `libelle`, `libelle_en`, `libelle_section`, `ordre`, `actif`) VALUES (61,NULL,'CHIMIE','Chemistry','Fr',25,1);
+
+-- Modèle de bulletin par cycle (migration secondaire v28) : APC par défaut
+INSERT IGNORE INTO `bulletin_modele_cycle` (`id_cycle`, `modele`) VALUES ('1er Cycle', 'APC'), ('2nd Cycle', 'APC');
+INSERT IGNORE INTO `format_carte` (`id`, `libelle`, `largeur_mm`, `hauteur_mm`, `cartes_par_page`) VALUES (1,'8,56 × 5,4 cm (CB/ISO)',85.6,54.0,10);
+INSERT IGNORE INTO `format_carte` (`id`, `libelle`, `largeur_mm`, `hauteur_mm`, `cartes_par_page`) VALUES (2,'12 × 7,6 cm',120.0,76.0,6);
+INSERT IGNORE INTO `format_carte` (`id`, `libelle`, `largeur_mm`, `hauteur_mm`, `cartes_par_page`) VALUES (3,'A6  (105 × 74 mm)',105.0,74.0,4);
+INSERT IGNORE INTO `format_carte` (`id`, `libelle`, `largeur_mm`, `hauteur_mm`, `cartes_par_page`) VALUES (4,'A5  (148 × 105 mm)',148.0,105.0,2);
 INSERT IGNORE INTO `format_carte` (`id`, `libelle`, `largeur_mm`, `hauteur_mm`, `cartes_par_page`) VALUES (5,'A4  pleine page',210.0,297.0,1);

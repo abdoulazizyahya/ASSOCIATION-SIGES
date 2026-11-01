@@ -139,7 +139,7 @@ $directeurs = db_all(
 $promouvables = db_all(
     "SELECT id, nom, prenom, role
      FROM utilisateur
-     WHERE actif=1 AND role<>'PROVISEUR'
+     WHERE actif=1 AND role<>'PROVISEUR' AND compte_systeme=0 AND role<>'ADMIN'   -- jamais le propriétaire ni un administrateur
      ORDER BY nom, prenom"
 );
 

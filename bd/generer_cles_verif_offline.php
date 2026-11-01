@@ -1,4 +1,5 @@
 <?php
+if (PHP_SAPI !== 'cli') { http_response_code(403); exit("Outil en ligne de commande uniquement.\n"); }   // jamais exécutable depuis le web (01/11/2026)
 // bd/generer_cles_verif_offline.php — génère une paire de clés ECDSA P-256
 // pour la signature offline des QR de bulletins (à exécuter UNE SEULE FOIS,
 // php bd/generer_cles_verif_offline.php). Affiche la clé privée (PEM, à

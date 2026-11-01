@@ -18,6 +18,14 @@ if ($depart === '' || $nom === '') exit("Usage : php deploy/outils/construire_zi
 exec('git diff --name-only --diff-filter=ACMR ' . escapeshellarg($depart) . ' HEAD', $liste, $rc);
 if ($rc !== 0) exit("Commit de départ inconnu : $depart\n");
 exec('git diff --name-only --diff-filter=D ' . escapeshellarg($depart) . ' HEAD', $supprimes);
+// --travail : ajoute aussi les modifications NON COMMITÉES (fichiers modifiés
+// et nouveaux fichiers non ignorés) — le zip reflète alors le disque, pas HEAD.
+$travail = in_array('--travail', $argv, true);
+if ($travail) {
+    exec('git diff --name-only --diff-filter=ACMR HEAD', $liste);
+    exec('git ls-files --others --exclude-standard', $liste);
+    exec('git diff --name-only --diff-filter=D HEAD', $supprimes);
+}
 foreach (array_slice($argv, 3) as $a) {
     if (!str_starts_with($a, '--avec=')) continue;
     $z = new ZipArchive();
@@ -38,7 +46,7 @@ $z = new ZipArchive();
 $z->open($dest, ZipArchive::CREATE | ZipArchive::OVERWRITE);
 foreach ($fichiers as $p => $_) $z->addFile($p, $p);
 exec('git rev-parse --short HEAD', $head);
-$z->addFromString(MAJ_MANIFESTE, json_encode(['cree_le' => date('c'), 'depuis' => $depart, 'commit' => $head[0] ?? '', 'fichiers' => $fichiers],
+$z->addFromString(MAJ_MANIFESTE, json_encode(['cree_le' => date('c'), 'depuis' => $depart, 'commit' => ($head[0] ?? '') . ($travail ? '+travail' : ''), 'fichiers' => $fichiers],
                                              JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
 $z->close();
 echo "$dest : " . count($fichiers) . " fichiers, " . round(filesize($dest) / 1024) . " Ko\n";

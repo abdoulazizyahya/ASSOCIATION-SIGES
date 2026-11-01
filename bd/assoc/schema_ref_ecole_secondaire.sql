@@ -382,11 +382,14 @@ CREATE TABLE `etablissement` (
   `nom_fr` varchar(250) NOT NULL DEFAULT '',
   `nom_en` varchar(250) DEFAULT NULL,
   `sigle` varchar(20) DEFAULT NULL,
+  `matricule_prefixe` varchar(10) DEFAULT NULL,
+  `matricule_suffixe` varchar(5) DEFAULT NULL,
   `immatriculation` varchar(50) DEFAULT NULL,
   `logo` varchar(255) DEFAULT NULL,
   `signature` varchar(255) DEFAULT NULL,
   `boite_postale` varchar(50) DEFAULT NULL,
   `ville` varchar(100) DEFAULT NULL,
+  `lieu_edition` varchar(100) DEFAULT NULL,
   `telephone` varchar(100) DEFAULT '',
   `email` varchar(150) DEFAULT '',
   `region_fr` varchar(150) DEFAULT NULL,
@@ -445,6 +448,7 @@ DROP TABLE IF EXISTS `groupe`;
 CREATE TABLE `groupe` (
   `id_groupe_comp` int NOT NULL AUTO_INCREMENT,
   `libelle_groupe_comp` varchar(250) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `libelle_en` varchar(250) DEFAULT NULL,
   `id_section` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   PRIMARY KEY (`id_groupe_comp`)
 ) ENGINE=InnoDB AUTO_INCREMENT=3 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -1066,6 +1070,7 @@ CREATE TABLE `tuteur` (
   `lien` varchar(50) DEFAULT NULL,
   `telephone` varchar(50) DEFAULT NULL,
   `profession` varchar(100) DEFAULT NULL,
+  `adresse` varchar(200) DEFAULT NULL,
   PRIMARY KEY (`id`),
   KEY `id_eleve` (`id_eleve`),
   CONSTRAINT `tuteur_ibfk_1` FOREIGN KEY (`id_eleve`) REFERENCES `eleve` (`id`) ON DELETE CASCADE
@@ -1288,6 +1293,41 @@ CREATE TABLE IF NOT EXISTS `chef_historique` (
   `cree_le` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
   UNIQUE KEY `uk_chef_remplace` (`remplace_annee`,`remplace_trim`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Classes mixtes : matière réservée à certaines séries (migration secondaire v24, 30/10/2026)
+CREATE TABLE IF NOT EXISTS `discipline_serie` (
+  `IDClasses` int NOT NULL,
+  `id_mat` int NOT NULL,
+  `id_serie` int unsigned NOT NULL,
+  PRIMARY KEY (`IDClasses`,`id_mat`,`id_serie`),
+  KEY `idx_disc_serie_serie` (`id_serie`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Informations complémentaires de l'élève, comme au primaire (migration secondaire v26, 30/10/2026)
+CREATE TABLE IF NOT EXISTS `info_supplementaires` (
+  `id_eleve` int unsigned NOT NULL,
+  `dernier_etab` varchar(250) DEFAULT NULL,
+  `derniere_classe` varchar(200) DEFAULT NULL,
+  `date_rec` date DEFAULT NULL,
+  `antecedent_med` mediumtext,
+  `frequence` varchar(250) DEFAULT NULL,
+  `autres_infos` mediumtext,
+  `handicap` varchar(5) NOT NULL DEFAULT '',
+  `nature_handicap` varchar(200) NOT NULL DEFAULT '',
+  `refugie` varchar(5) NOT NULL DEFAULT '',
+  `type_refugie` varchar(200) NOT NULL DEFAULT '',
+  `maj_le` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id_eleve`),
+  CONSTRAINT `fk_info_suppl_eleve` FOREIGN KEY (`id_eleve`) REFERENCES `eleve` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Modèle de bulletin par cycle : APC ou Matières (migration secondaire v28, 30/10/2026)
+CREATE TABLE IF NOT EXISTS `bulletin_modele_cycle` (
+  `id_cycle` varchar(50) NOT NULL,
+  `modele` enum('APC','MATIERES') NOT NULL DEFAULT 'APC',
+  `maj_le` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id_cycle`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 /*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;

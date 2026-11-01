@@ -1,4 +1,5 @@
 <?php
+if (PHP_SAPI !== 'cli') { http_response_code(403); exit("Outil en ligne de commande uniquement.\n"); }   // jamais exécutable depuis le web (01/11/2026)
 // =====================================================================
 //  bd/assoc/sauvegarder_toutes_ecoles.php
 //  Sauvegarde (mysqldump) de l'annuaire + de la base de CHAQUE école,

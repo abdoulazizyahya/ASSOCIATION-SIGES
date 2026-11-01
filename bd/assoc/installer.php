@@ -1,4 +1,5 @@
 <?php
+if (PHP_SAPI !== 'cli') { http_response_code(403); exit("Outil en ligne de commande uniquement.\n"); }   // jamais exécutable depuis le web (01/11/2026)
 // =====================================================================
 //  bd/assoc/installer.php
 //  Installe / répare une application SIGES :
@@ -77,7 +78,7 @@ if (!$a_etab) {
     if (!(int) mysqli_fetch_row(mysqli_query($le, "SELECT COUNT(*) FROM user"))[0]) {
         mysqli_query($le,
             "INSERT INTO enseignant (nom_ens, prenom_ens, id_fonction, statut_ens)
-             VALUES ('Directeur', 'Général', 'DIRECTEUR', 'actif')");
+             VALUES ('Directeur', NULL, 'DIRECTEUR', 'actif')");
         $mat = (int) mysqli_insert_id($le);
         $st  = mysqli_prepare($le,
             "INSERT INTO user (login_user, pwd_user, matricule_ens) VALUES ('admin', ?, ?)");

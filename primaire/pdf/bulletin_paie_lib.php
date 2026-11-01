@@ -215,14 +215,13 @@ function bulletin_paie_page(FPDF $pdf, array $bulletin, int $id, array $etab): v
     $x_sign = $MR - $w_sign;
     $pdf->SetFont('Arial', '', 9);
     $t_fait = pdf_u('Fait à ' . (($etab['lieu'] ?: $etab['ville']) ?: '') . ', le ' . date('d/m/Y'));
-    $pdf->SetX($x_sign);
-    $pdf->Cell($w_sign, 5, $t_fait, 0, 1, 'R');
+    pdf_fait_a_bilingue($pdf, $x_sign, $w_sign, (($etab['lieu'] ?: $etab['ville']) ?: ''), 'R', 9);   // « Done at, on » dessous
     $x_fait = $x_sign + $w_sign - $pdf->GetStringWidth($t_fait) - 1;   // début réel du texte « Fait à »
     $pdf->SetFont('Arial', 'B', 9);
     // Ligne des signatures (02/10/2026) : « LE BÉNÉFICIAIRE, » décalé vers la
     // droite (il commence là où il finissait auparavant) ; le chef
     // d'établissement aligné à gauche, ~10 px (2,6 mm) après le début de « Fait à ».
-    $pdf->Ln(5);                      // une ligne vide entre « Fait à » et les signatures
+    $pdf->Ln(3);                      // un blanc entre « Fait à / Done at » et les signatures
     $y_sign  = $pdf->GetY();
     $t_benef = pdf_u('BÉNÉFICIAIRE,');
     $pdf->SetXY($ML + $pdf->GetStringWidth($t_benef), $y_sign);

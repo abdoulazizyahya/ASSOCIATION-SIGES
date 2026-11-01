@@ -7,6 +7,7 @@
 //   audit_ua()                 → navigateur / OS / type d'appareil (User-Agent)
 //   audit_geo($ip)             → pays / région / ville / opérateur (ip-api.com + cache)
 //   audit_log($evenement, $ctx)→ écrit une ligne de journal
+//   audit_gps_enregistrer()    → position GPS du navigateur sur la ligne de connexion (31/10/2026)
 //
 // Ne lève JAMAIS d'exception : une panne du journal ne doit pas casser une
 // page ni bloquer une connexion.
@@ -154,6 +155,68 @@ function audit_geo(?string $ip): array
     return $res;
 }
 
+// ─────────────────────────────────────────────────────────────────────
+//  Position GPS du navigateur (31/10/2026)
+//  La ville déduite de l'IP est celle de la passerelle de l'opérateur
+//  (MTN/Orange/Camtel sortent par Douala ou Yaoundé) : une connexion depuis
+//  Meiganga apparaissait « Douala ». Juste après la connexion, le navigateur
+//  demande l'autorisation de position ; si elle est accordée, les
+//  coordonnées et la ville (OpenStreetMap / Nominatim) complètent la ligne.
+//  Refus ou échec : la ligne garde la localisation IP, affichée « approx. ».
+// ─────────────────────────────────────────────────────────────────────
+function audit_gps_colonnes(): bool
+{
+    static $ok = null;
+    if ($ok !== null) return $ok;
+    try {
+        if (!audit_one("SHOW COLUMNS FROM journal_audit LIKE 'gps_lat'")) {
+            audit_exec("ALTER TABLE journal_audit
+                ADD COLUMN `gps_lat` decimal(9,6) DEFAULT NULL,
+                ADD COLUMN `gps_lon` decimal(9,6) DEFAULT NULL,
+                ADD COLUMN `gps_precision` int DEFAULT NULL,
+                ADD COLUMN `gps_ville` varchar(80) DEFAULT NULL,
+                ADD COLUMN `gps_region` varchar(80) DEFAULT NULL");
+        }
+        return $ok = true;
+    } catch (\Throwable $e) {
+        return $ok = false;
+    }
+}
+
+/** Ville / région d'un point (Nominatim, niveau « ville »). [null, null] en cas d'échec. */
+function audit_gps_ville(float $lat, float $lon): array
+{
+    $url = 'https://nominatim.openstreetmap.org/reverse?format=jsonv2&zoom=12&accept-language=fr&lat='
+         . number_format($lat, 5, '.', '') . '&lon=' . number_format($lon, 5, '.', '');
+    $j = json_decode((string) _audit_http_get($url), true);
+    $a = is_array($j) ? ($j['address'] ?? []) : [];
+    $ville  = $a['city'] ?? $a['town'] ?? $a['village'] ?? $a['municipality'] ?? $a['county'] ?? null;
+    $region = $a['state'] ?? $a['region'] ?? null;
+    if ($region) $region = preg_replace("~^R[ée]gion (de l'|du |de la |des |de )~u", '', $region);   // « Région de l'Adamaoua » → « Adamaoua »
+    return [$ville ? mb_substr($ville, 0, 80) : null, $region ? mb_substr($region, 0, 80) : null];
+}
+
+/** Enregistre la position sur la ligne de connexion en attente (une seule fois). */
+// Au-delà de cette précision (mètres), ce n'est pas une vraie position : un
+// ordinateur sans GPS ni Wi-Fi exploitable reçoit du navigateur une estimation
+// d'après l'IP (± 50 km — Meiganga vu « Ngaoundéré », 31/10/2026).
+const AUDIT_GPS_PRECISION_MAX = 5000;
+
+function audit_gps_enregistrer(int $id_ligne, float $lat, float $lon, int $precision): bool
+{
+    if ($id_ligne <= 0 || abs($lat) > 90 || abs($lon) > 180 || !audit_gps_colonnes()) return false;
+    [$ville, $region] = audit_gps_ville($lat, $lon);
+    try {
+        return audit_exec(
+            "UPDATE journal_audit SET gps_lat = ?, gps_lon = ?, gps_precision = ?, gps_ville = ?, gps_region = ?
+             WHERE id = ? AND evenement = 'connexion' AND (gps_lat IS NULL OR gps_precision > " . AUDIT_GPS_PRECISION_MAX . ")",
+            [round($lat, 6), round($lon, 6), max(0, min($precision, 2000000000)), $ville, $region, $id_ligne]
+        ) > 0;
+    } catch (\Throwable $e) {
+        return false;
+    }
+}
+
 /** GET HTTP court (cURL si dispo, sinon file_get_contents). Retourne null en cas d'échec. */
 function _audit_http_get(string $url): ?string
 {
@@ -163,7 +226,7 @@ function _audit_http_get(string $url): ?string
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_TIMEOUT        => 3,
             CURLOPT_CONNECTTIMEOUT => 2,
-            CURLOPT_USERAGENT      => 'SIGES-audit',
+            CURLOPT_USERAGENT      => 'SIGES-audit (gestion scolaire)',   // Nominatim exige un User-Agent identifiable
             CURLOPT_FOLLOWLOCATION => false,
         ]);
         $out  = curl_exec($ch);
@@ -275,6 +338,11 @@ function audit_log(string $evenement, array $ctx = []): void
                 $device,
             ]
         );
+        // Connexion : la page suivante demandera la position GPS au navigateur
+        // (audit_gps_script(), fonctions.php) pour cette ligne précise.
+        if ($evenement === 'connexion' && ($id_ligne = (int) mysqli_insert_id(_audit_link())) > 0) {
+            $_SESSION['audit_gps'] = ['id' => $id_ligne, 'jeton' => bin2hex(random_bytes(16))];
+        }
     } catch (\Throwable $e) {
         // Le journal ne doit jamais interrompre la navigation.
     }

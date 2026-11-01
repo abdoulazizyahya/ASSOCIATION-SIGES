@@ -27,6 +27,9 @@ $est_superadmin = function_exists('est_superadmin_association') && est_superadmi
 // pour tous les comptes locaux (23/10/2026).
 $voit_documents = $est_superadmin || (function_exists('est_proprietaire_ecole') && est_proprietaire_ecole());
 if ($onglet === 'documents' && !$voit_documents) $onglet = 'etablissement';
+// Modèle de bulletin par cycle (APC / Matières) : secondaire GÉNÉRAL seulement (migration v28).
+$voit_modele_bulletin = !est_technique() && db_colonne_existe('bulletin_modele_cycle', 'modele');
+if ($onglet === 'modele_bulletin' && !$voit_modele_bulletin) $onglet = 'etablissement';
 
 // ══════════════════════════════════════════════════
 //  POST — Établissement
@@ -70,10 +73,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         }
         db_exec(
-            "UPDATE etablissement SET nom_fr=?,nom_en=?,sigle=?,immatriculation=?,boite_postale=?,ville=?,
+            "UPDATE etablissement SET nom_fr=?,nom_en=?,sigle=?,immatriculation=?,boite_postale=?,ville=?,lieu_edition=?,
              telephone=?,email=?,region_fr=?,region_en=?,departement_fr=?,division_en=?,
              arrondissement_fr=?,subdivision_en=?,chef_etablissement=?,chef_etablissement_en=?,logo=? WHERE id=?",
-            [post('nom_fr'),post('nom_en'),post('sigle'),post('immatriculation'),post('boite_postale'),post('ville'),
+            [post('nom_fr'),post('nom_en'),post('sigle'),post('immatriculation'),post('boite_postale'),post('ville'),(trim((string) post('lieu_edition')) ?: null),
              post('telephone'),post('email'),post('region_fr'),post('region_en'),
              post('departement_fr'),post('division_en'),post('arrondissement_fr'),
              post('subdivision_en'),post('chef_etablissement'),post('chef_etablissement_en'),$logo,$etab['id']]
@@ -311,6 +314,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         rediriger('secondaire/commun/pages/parametres/index.php?onglet=evaluations');
     }
 
+    // ── Modèle de bulletin par cycle (APC / Matières, migration v28) ─────────
+    if ($action === 'modele_bulletin' && $voit_modele_bulletin) {
+        $n = 0;
+        foreach ((array) ($_POST['modele'] ?? []) as $cycle => $m) {
+            $cycle = trim((string) $cycle);
+            if ($cycle === '' || !in_array($m, ['APC', 'MATIERES'], true)) continue;
+            if (!db_val("SELECT COUNT(*) FROM niveau WHERE id_cycle=?", [$cycle])) continue;
+            db_exec("INSERT INTO bulletin_modele_cycle (id_cycle, modele) VALUES (?, ?) ON DUPLICATE KEY UPDATE modele=VALUES(modele)", [$cycle, $m]);
+            $n++;
+        }
+        journaliser_action('modele_bulletin', null, json_encode($_POST['modele'] ?? [], JSON_UNESCAPED_UNICODE));
+        flash_set('succes', 'Modèle de bulletin enregistré pour ' . $n . ' cycle(s).');
+        rediriger('secondaire/commun/pages/parametres/index.php?onglet=modele_bulletin');
+    }
+
     // ── Mentions automatiques du bulletin ─────────
     if ($action === 'mentions') {
         $id_a = (int)post('id_annee');
@@ -427,12 +445,14 @@ require_once __DIR__ . '/../../../../noyau/layout/header.php';
       'etablissement'     => ['bi-building',   'Établissement'],
       'annees'            => ['bi-calendar3',  'Années scolaires'],
       'evaluations'       => ['bi-list-check', 'Évaluations'],
+      'modele_bulletin'   => ['bi-layout-text-window', 'Modèle de bulletin'],
       'mentions'          => ['bi-award',      'Mentions'],
       'couleurs_bulletin' => ['bi-palette2',   'Couleurs bulletin'],
       'documents'         => ['bi-file-earmark-text', 'Documents enseignants'],
       'reglages'          => ['bi-palette',    'Apparence'],
   ] as $key => [$ico, $label]):
-      if ($key === 'documents' && !$voit_documents) continue; ?>
+      if ($key === 'documents' && !$voit_documents) continue;
+      if ($key === 'modele_bulletin' && !$voit_modele_bulletin) continue; ?>
   <li class="nav-item">
     <a class="nav-link <?= $onglet===$key?'active':'' ?>"
        href="<?= APP_URL ?>/secondaire/commun/pages/parametres/index.php?onglet=<?= $key ?>">
@@ -477,6 +497,11 @@ require_once __DIR__ . '/../../../../noyau/layout/header.php';
         <div class="col-md-4">
           <label class="form-label">Ville</label>
           <input type="text" name="ville" class="form-control" value="<?= h($etab['ville']??'') ?>">
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Lieu d'édition des documents</label>
+          <input type="text" name="lieu_edition" class="form-control" value="<?= h($etab['lieu_edition']??'') ?>" placeholder="<?= h($etab['ville'] ?? '') ?>">
+          <div class="form-text">« Fait à …, le … » sur les documents. Vide = la ville.</div>
         </div>
         <div class="col-md-4">
           <label class="form-label">Téléphone</label>
@@ -1042,6 +1067,73 @@ document.getElementById('form-seq').addEventListener('submit', function(e){
     }
 });
 </script>
+
+<?php elseif ($onglet === 'modele_bulletin'): ?>
+<!-- ══════════════════════════════════════════════════
+     ONGLET : Modèle de bulletin par cycle (APC / Matières)
+     ══════════════════════════════════════════════════ -->
+<?php
+  $id_annee_mb = (int) ($annee_act['id'] ?? 0);
+  $modeles_mb  = array_column(db_all("SELECT id_cycle, modele FROM bulletin_modele_cycle"), 'modele', 'id_cycle');
+  $cycles_mb   = db_all(
+      "SELECT n.id_cycle,
+              GROUP_CONCAT(n.libelle_niv ORDER BY n.ordre_niveau, n.libelle_niv SEPARATOR ', ') AS niveaux,
+              (SELECT COUNT(*) FROM classe c JOIN niveau n2 ON n2.code_niveau=c.code_niveau WHERE n2.id_cycle=n.id_cycle AND c.archivee=0) AS nb_classes,
+              (SELECT COUNT(*) FROM note nt JOIN inscription i ON i.id_eleve=nt.id_eleve AND i.id_annee=?
+                 JOIN classe c ON c.id=i.id_classe JOIN niveau n3 ON n3.code_niveau=c.code_niveau
+               WHERE n3.id_cycle=n.id_cycle AND nt.id_competence IS NOT NULL) AS notes_comp,
+              (SELECT COUNT(*) FROM note nt JOIN inscription i ON i.id_eleve=nt.id_eleve AND i.id_annee=?
+                 JOIN classe c ON c.id=i.id_classe JOIN niveau n3 ON n3.code_niveau=c.code_niveau
+               WHERE n3.id_cycle=n.id_cycle AND nt.id_competence IS NULL AND nt.id_seq IS NOT NULL) AS notes_seq
+       FROM niveau n WHERE n.id_cycle IS NOT NULL AND n.id_cycle <> ''
+       GROUP BY n.id_cycle ORDER BY MIN(n.ordre_niveau), n.id_cycle",
+      [$id_annee_mb, $id_annee_mb]);
+?>
+<div class="alert alert-light border py-2" style="font-size:.82rem">
+  <i class="bi bi-info-circle me-1"></i>
+  Choisissez, pour chaque cycle, le modèle de bulletin et de saisie des notes :
+  <strong>APC</strong> — notes par compétence, bulletin par compétences (modèle actuel) ;
+  <strong>Matières</strong> — notes par matière et par séquence (2 par trimestre), bulletin par matière (comme l'enseignement technique).
+  Les menus Notes et Bulletins s'adaptent automatiquement à la classe choisie.
+</div>
+<form method="post">
+  <?= csrf_champ() ?>
+  <input type="hidden" name="action" value="modele_bulletin">
+  <div class="card">
+    <div class="table-responsive">
+      <table class="table table-abz mb-0 align-middle" style="font-size:.85rem">
+        <thead><tr><th>Cycle</th><th>Niveaux</th><th class="text-center">Classes</th><th class="text-center" style="width:120px">APC</th><th class="text-center" style="width:120px">Matières</th></tr></thead>
+        <tbody>
+          <?php foreach ($cycles_mb as $c):
+            $m = $modeles_mb[$c['id_cycle']] ?? 'APC';
+            $autre = $m === 'APC' ? (int) $c['notes_seq'] : (int) $c['notes_comp']; ?>
+            <tr>
+              <td class="fw-semibold"><?= h($c['id_cycle']) ?></td>
+              <td style="font-size:.78rem"><?= h($c['niveaux']) ?></td>
+              <td class="text-center"><?= (int) $c['nb_classes'] ?></td>
+              <?php foreach (['APC', 'MATIERES'] as $v): ?>
+                <td class="text-center">
+                  <input type="radio" class="form-check-input" name="modele[<?= h($c['id_cycle']) ?>]" value="<?= $v ?>" <?= $m === $v ? 'checked' : '' ?>
+                         data-notes-comp="<?= (int) $c['notes_comp'] ?>" data-notes-seq="<?= (int) $c['notes_seq'] ?>">
+                </td>
+              <?php endforeach; ?>
+            </tr>
+            <?php if ((int) $c['notes_comp'] || (int) $c['notes_seq']): ?>
+            <tr><td colspan="5" class="text-muted py-1" style="font-size:.74rem;border-top:0">
+              <i class="bi bi-exclamation-triangle text-warning me-1"></i>Cette année : <?= (int) $c['notes_comp'] ?> note(s) par compétence (APC),
+              <?= (int) $c['notes_seq'] ?> note(s) par séquence (Matières). Changer de modèle ne les efface pas, mais seules celles du
+              modèle choisi apparaissent dans la saisie et les bulletins.
+            </td></tr>
+            <?php endif; ?>
+          <?php endforeach; ?>
+        </tbody>
+      </table>
+    </div>
+    <div class="card-body py-2 border-top">
+      <button class="btn btn-primary btn-sm" onclick="return confirm('Enregistrer le modèle de bulletin de chaque cycle ?')"><i class="bi bi-save me-1"></i>Enregistrer</button>
+    </div>
+  </div>
+</form>
 
 <?php elseif ($onglet === 'mentions'): ?>
 <!-- ══════════════════════════════════════════════════

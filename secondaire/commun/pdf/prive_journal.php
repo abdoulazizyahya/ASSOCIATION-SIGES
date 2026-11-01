@@ -32,7 +32,7 @@ $sql = "SELECT p.id, p.date_paiement, p.montant_paiement, p.mode_paiement,
         JOIN eleve e ON e.id = p.id_eleve
         JOIN classe c ON c.id = p.id_classe
         LEFT JOIN obligation_privee o ON o.id = p.id_obligation
-        LEFT JOIN utilisateur u ON u.id = p.id_utilisateur
+        LEFT JOIN utilisateur u ON u.id = p.id_utilisateur" . sec_sql_compte_affichable('u') . "
         WHERE p.id_annee = ? AND p.date_paiement BETWEEN ? AND ?";
 if ($id_classe) { $sql .= " AND p.id_classe = ?"; $params[] = $id_classe; }
 if ($mode_paiement) { $sql .= " AND p.mode_paiement = ?"; $params[] = $mode_paiement; }
@@ -120,9 +120,7 @@ $pdf->Ln(8);
 if ($pdf->GetY() > $ph - 30) { $pdf->AddPage(); pdf_filigrane($pdf, $etab, $pw, $ph); }
 $w_sign = ($pw - 24) * 0.4;
 $x_sign = $pw - 12 - $w_sign;
-$pdf->SetFont('Arial', '', 9);
-$pdf->SetX($x_sign);
-$pdf->Cell($w_sign, 5, pdf_u('Fait à ' . (($etab['lieu'] ?: $etab['ville']) ?: '') . ', le ' . date('d/m/Y')), 0, 1, 'R');
+pdf_fait_a_bilingue($pdf, $x_sign, $w_sign, (($etab['lieu'] ?: $etab['ville']) ?: ''), 'R', 9);
 $pdf->SetFont('Arial', 'B', 9);
 $pdf->SetX($x_sign);
 $pdf->Cell($w_sign, 5, pdf_u(mb_strtoupper($etab['chef_etablissement'] ?: 'LE PROVISEUR') . ','), 0, 1, 'R');

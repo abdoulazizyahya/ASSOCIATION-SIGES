@@ -100,6 +100,15 @@ foreach ($comps as $c) {
     if ($mat === null) continue;
     $propre = nettoyer((string) $c['libelle']);
     if (est_francais($propre)) { $a = accentuer($propre); if ($a !== $propre) $stats['accents']++; $propre = $a; }
+    // Un seul niveau 4ème / 3ème (30/10/2026, migration secondaire v25) : LAM_ABZ
+    // dédoublait le niveau par LV2 (« 4 eme ALL », « 4 eme ESP »…) ; la LV2 est
+    // désormais la série de l'élève (classes mixtes). Les doublons des matières
+    // communes sont éliminés plus bas ($vu). LAM_ABZ rangeait aussi une
+    // compétence écrite d'espagnol 3ème (T2) sous Français.
+    if (preg_match('/^([34] eme) (ALL|ARA|CHI|ESP|ITA)$/', (string) $c['code_niveau'], $x)) {
+        $c['code_niveau'] = $x[1];
+        if ($mat === 'FRANÇAIS' && $x[1] === '3 eme' && str_contains($propre, 'messages écrits') && str_contains($propre, 'citoyenneté')) $mat = 'LVII - ESPAGNOL';
+    }
     $en = $c['libelle_en'] !== null && trim((string) $c['libelle_en']) !== '' ? nettoyer((string) $c['libelle_en']) : null;
     if ($propre !== $c['libelle']) { $stats['modifiees']++; $maj_textes[$mat][$c['libelle']] = $propre; }
     $cle = $mat . '|' . $c['code_niveau'] . '|' . $c['ordre_trim'] . '|' . mb_strtolower($propre);

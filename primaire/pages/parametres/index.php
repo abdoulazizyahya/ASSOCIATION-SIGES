@@ -108,7 +108,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 tel_etab=?, email_etab=?,
                 pays_etab_fr=?, region_etab_fr=?, departement_fr=?, arrondissement_fr=?,
                 pays_etab_en=?, region_etab_en=?, departement_en=?, arrondissement_en=?,
-                lieu_etab=?, fonction_dirigeant_fr=?, fonction_dirigeant_en=?, logo=?, signature=?,
+                lieu_etab=?, lieu_edition=?, fonction_dirigeant_fr=?, fonction_dirigeant_en=?, logo=?, signature=?,
                 arrondissement_ar=?, ecole_ar=?
              WHERE IDEtablissement=?",
             [
@@ -116,7 +116,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 post('telephone'), post('email'),
                 post('pays_fr'), post('region_fr'), post('delegation_regionale_fr'), post('delegation_departementale_fr'),
                 post('pays_en'), post('region_en'), post('delegation_regionale_en'), post('delegation_departementale_en'),
-                post('lieu'), post('fonction_dirigeant_fr'), post('fonction_dirigeant_en'), $logo, $signature,
+                post('lieu'), (trim((string) post('lieu_edition')) ?: null), post('fonction_dirigeant_fr'), post('fonction_dirigeant_en'), $logo, $signature,
                 post('arrondissement_ar'), post('ecole_ar'),
                 $etab['IDEtablissement'],
             ]
@@ -418,6 +418,11 @@ if (!$es_partiel) {
             <div class="col-md-4">
               <label class="form-label">Lieu-dit</label>
               <input type="text" name="lieu" class="form-control" value="<?= h($ve('lieu_etab')) ?>">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">Lieu d'édition des documents</label>
+              <input type="text" name="lieu_edition" class="form-control" value="<?= h($ve('lieu_edition')) ?>" placeholder="<?= h($ve('ville_etab')) ?>">
+              <div class="form-text">« Fait à …, le … » sur les documents. Vide = la ville.</div>
             </div>
             <div class="col-md-6">
               <label class="form-label">Téléphone</label>

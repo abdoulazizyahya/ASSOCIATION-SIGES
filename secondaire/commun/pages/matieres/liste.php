@@ -94,6 +94,10 @@ $groupes        = [];
 $groupes_filtre = [];
 $assigned_ids   = [];
 $classe_info    = null;
+$series_classe  = [];   // classe mixte : séries proposables [id => [libelle, nb élèves]]
+$series_mat     = [];   // [id_mat => [id_serie, …]] (discipline_serie, v24)
+$nb_sans_serie  = 0;
+$series_dispo   = db_colonne_existe('discipline_serie', 'id_serie');
 
 if ($onglet === 'par_classe') {
     $groupes = db_all("SELECT * FROM groupe ORDER BY id_groupe_comp");
@@ -126,6 +130,7 @@ if ($onglet === 'par_classe') {
             $id_groupe = (int)post('id_groupe');
             db_exec("DELETE FROM discipline WHERE id_mat=? AND IDClasses=? AND id_groupe=?",
                     [$id_mat, $id_cl_aff, $id_groupe]);
+            if ($series_dispo) db_exec("DELETE FROM discipline_serie WHERE id_mat=? AND IDClasses=?", [$id_mat, $id_cl_aff]);
             db_exec("DELETE FROM dispenser WHERE id_mat=? AND IDClasses=? AND val_annee=?",
                     [$id_mat, $id_cl_aff, $val_annee]);
             if (sec_periodes_dispo()) {
@@ -133,6 +138,28 @@ if ($onglet === 'par_classe') {
                         [$id_mat, $id_cl_aff, $val_annee]);
             }
             flash_set('succes', 'Matière retirée.');
+            rediriger("secondaire/commun/pages/matieres/liste.php?onglet=par_classe&niveau_aff=" . urlencode($niveau_aff) . "&classe_aff=$id_cl_aff");
+        }
+
+        // Classe mixte : matières réservées à certaines séries / LV2. Aucune
+        // case cochée = matière commune à toute la classe.
+        if ($action === 'save_series' && $id_cl_aff && $series_dispo) {
+            $ids_mats   = array_map('intval', array_column(db_all("SELECT DISTINCT id_mat FROM discipline WHERE IDClasses=?", [$id_cl_aff]), 'id_mat'));
+            $ids_series = array_map('intval', array_column(db_all("SELECT id FROM serie"), 'id'));
+            db_exec("DELETE FROM discipline_serie WHERE IDClasses=?", [$id_cl_aff]);
+            $n = 0;
+            foreach ((array) ($_POST['series'] ?? []) as $id_mat => $ids_s) {
+                if (!in_array((int) $id_mat, $ids_mats, true)) continue;
+                $ok = 0;
+                foreach ((array) $ids_s as $id_s) {
+                    if (!in_array((int) $id_s, $ids_series, true)) continue;
+                    db_exec("INSERT IGNORE INTO discipline_serie (IDClasses, id_mat, id_serie) VALUES (?,?,?)", [$id_cl_aff, (int) $id_mat, (int) $id_s]);
+                    $ok = 1;
+                }
+                $n += $ok;
+            }
+            flash_set('succes', $n ? "$n matière(s) réservée(s) à certaines séries ; les autres sont communes à toute la classe."
+                                    : 'Toutes les matières sont communes à toute la classe.');
             rediriger("secondaire/commun/pages/matieres/liste.php?onglet=par_classe&niveau_aff=" . urlencode($niveau_aff) . "&classe_aff=$id_cl_aff");
         }
 
@@ -186,6 +213,27 @@ if ($onglet === 'par_classe') {
         );
         $total_coeff  = array_sum(array_column($disciplines, 'coef'));
         $assigned_ids = array_column($disciplines, 'id_mat');
+
+        // Classe mixte : séries des élèves inscrits cette année (+ celles déjà
+        // liées à une matière, même sans élève pour l'instant).
+        if ($series_dispo) {
+            $series_mat = sec_series_matieres($id_cl_aff);
+            $nb_par_serie = [];
+            foreach (db_all("SELECT COALESCE(i.id_serie,0) AS id_serie, COUNT(*) AS nb FROM inscription i
+                             JOIN eleve e ON e.id=i.id_eleve AND e.statut='actif'
+                             WHERE i.id_classe=? AND i.id_annee=? GROUP BY COALESCE(i.id_serie,0)",
+                            [$id_cl_aff, (int) ($annee['id'] ?? 0)]) as $r) {
+                $nb_par_serie[(int) $r['id_serie']] = (int) $r['nb'];
+            }
+            $nb_sans_serie = $nb_par_serie[0] ?? 0;
+            $ids_liees = $series_mat ? array_merge(...array_values($series_mat)) : [];
+            foreach (db_all("SELECT id, libelle FROM serie ORDER BY libelle") as $sr) {
+                $sid = (int) $sr['id'];
+                if (!empty($nb_par_serie[$sid]) || in_array($sid, $ids_liees, true)) {
+                    $series_classe[$sid] = ['libelle' => $sr['libelle'], 'nb' => $nb_par_serie[$sid] ?? 0];
+                }
+            }
+        }
     }
 }
 
@@ -283,6 +331,7 @@ $historique_ens   = [];
 $nb_affectes      = 0;
 $total_coeff_ens  = 0;
 $enseignants      = [];
+$ens_classe       = [];
 
 if ($onglet === 'enseignants') {
     // Enseignants en service (+ en_service=0 pour ceux partis, gardés seulement
@@ -296,18 +345,32 @@ if ($onglet === 'enseignants') {
         csrf_verifier();
         $action = post('action');
 
-        if ($action === 'save_ens' && $id_cl_ens) {
-            $id_mat    = (int)post('id_mat');
-            $matricule = (int)post('matricule_ens');
-            $trim_deb  = (int)post('trim_debut') ?: $ordre_cour;
-            sec_affecter_enseignant($id_cl_ens, $id_mat, $val_annee, $matricule, $trim_deb);
-            header('Content-Type: application/json');
-            echo json_encode(['ok' => true]);
-            exit;
+        // Bouton « Enregistrer » : toutes les matières de la classe d'un coup,
+        // seules celles dont l'enseignant change sont réaffectées (l'historique
+        // par trimestre n'est pas touché pour les autres).
+        if ($action === 'save_ens_lot' && $id_cl_ens) {
+            $trim_deb = (int)post('trim_debut') ?: $ordre_cour;
+            $actuels  = array_column(db_all("SELECT id_mat, matricule_ens FROM dispenser WHERE IDClasses=? AND val_annee=?",
+                                            [$id_cl_ens, $val_annee]), 'matricule_ens', 'id_mat');
+            $n = 0;
+            foreach ((array)($_POST['ens'] ?? []) as $id_mat => $matricule) {
+                $id_mat = (int)$id_mat; $matricule = (int)$matricule;
+                if (!$id_mat || (int)($actuels[$id_mat] ?? 0) === $matricule) continue;
+                sec_affecter_enseignant($id_cl_ens, $id_mat, $val_annee, $matricule, $trim_deb);
+                $n++;
+            }
+            flash_set('succes', $n ? "$n affectation(s) enregistrée(s)." : 'Aucune modification à enregistrer.');
+            rediriger("secondaire/commun/pages/matieres/liste.php?onglet=enseignants&classe_ens=$id_cl_ens");
         }
 
         if ($action === 'set_pp' && $id_cl_ens) {
             $matricule = (int)post('matricule_ens');
+            // Le professeur principal doit enseigner dans la classe (dispenser).
+            if ($matricule && !db_val("SELECT 1 FROM dispenser WHERE matricule_ens=? AND IDClasses=? AND val_annee=? LIMIT 1",
+                                      [$matricule, $id_cl_ens, $val_annee])) {
+                flash_set('erreur', "Le professeur principal doit être l'un des enseignants de la classe.");
+                rediriger("secondaire/commun/pages/matieres/liste.php?onglet=enseignants&classe_ens=$id_cl_ens");
+            }
             db_exec("DELETE FROM enseignat_principal WHERE IDClasses=? AND val_annee=?",
                     [$id_cl_ens, $val_annee]);
             if ($matricule) {
@@ -347,6 +410,15 @@ if ($onglet === 'enseignants') {
              WHERE ep.IDClasses=? AND ep.val_annee=?",
             [$id_cl_ens, $val_annee]
         );
+        // Candidats au poste de professeur principal : les enseignants de la classe.
+        $ens_classe = [];
+        foreach ($disciplines_ens as $d) {
+            if ($d['matricule_ens_aff']) $ens_classe[(int) $d['matricule_ens_aff']] = $d['enseignant_nom'];
+        }
+        asort($ens_classe);
+        if ($pp && !isset($ens_classe[(int) $pp['matricule_ens']])) {
+            $ens_classe[(int) $pp['matricule_ens']] = trim($pp['nom_ens'].' '.($pp['prenom_ens']??'')) . " (n'enseigne plus dans la classe)";
+        }
     }
 }
 
@@ -818,6 +890,9 @@ function reinitForm() {
                 <td style="padding:5px 6px;font-size:.8rem;font-weight:600;color:#111827;max-width:184px;width:184px;border-right:1px solid #e5e7eb">
                   <div style="white-space:normal;word-break:break-word" title="<?= h($d['mat_libelle']) ?>">
                     <?= h($d['mat_libelle']) ?>
+                    <?php foreach ($series_mat[(int) $d['id_mat']] ?? [] as $sid): ?>
+                      <span class="badge" style="background:#fde68a;color:#78350f;font-size:.6rem" title="Réservée à cette série"><?= h($series_classe[$sid]['libelle'] ?? '?') ?></span>
+                    <?php endforeach; ?>
                   </div>
                 </td>
                 <td style="width:10px;padding:5px 2px;text-align:center;border-right:1px solid #e5e7eb">
@@ -864,6 +939,89 @@ function reinitForm() {
   </div>
 
 </div><!-- /row -->
+
+<?php if ($series_dispo && $disciplines): ?>
+<!-- ══ Classe mixte : matières par série / LV2 ══ -->
+<div class="card mt-3" style="border:1px solid #fde68a;overflow:hidden">
+  <div class="card-header py-2 px-3 d-flex align-items-center gap-2 flex-wrap"
+       style="background:linear-gradient(135deg,#fffbeb,#fef3c7);border-bottom:1px solid #fde68a">
+    <i class="bi bi-diagram-3-fill" style="color:#b45309;font-size:.95rem"></i>
+    <span class="fw-bold" style="font-size:.8rem;color:#78350f">Classe mixte — matières par série / LV2</span>
+    <?php foreach ($series_classe as $sr): ?>
+      <span class="badge" style="background:#fde68a;color:#78350f;font-size:.65rem"><?= h($sr['libelle']) ?> : <?= $sr['nb'] ?></span>
+    <?php endforeach; ?>
+    <?php if ($nb_sans_serie): ?>
+      <span class="badge bg-danger" style="font-size:.65rem">Sans série : <?= $nb_sans_serie ?></span>
+    <?php endif; ?>
+  </div>
+  <div class="card-body py-2 px-3">
+    <?php if (count($series_classe) < 2 && !$series_mat): ?>
+      <div class="text-muted" style="font-size:.78rem">
+        <i class="bi bi-info-circle me-1"></i>Une seule série (ou aucune) parmi les élèves de cette classe : toutes les matières
+        sont suivies par tous. Pour une classe qui regroupe plusieurs séries (ex. ALL / ESP / ITA), attribuez d'abord la série
+        de chaque élève depuis la <a href="<?= APP_URL ?>/secondaire/commun/pages/eleves/liste.php?classe=<?= $id_cl_aff ?>">liste des élèves</a>
+        (sélection → affecter une série).
+      </div>
+    <?php else: ?>
+      <p class="text-muted mb-2" style="font-size:.76rem">
+        Cochez la ou les séries qui suivent une matière (ex. <em>Espagnol → ESP</em>). <strong>Aucune case cochée = matière commune</strong>
+        à toute la classe. Un élève ne suit pas une matière réservée à une autre série : pas de ligne sur son bulletin, pas de zéro
+        automatique, et il n'apparaît pas à la saisie des notes de cette matière.
+      </p>
+      <?php if ($nb_sans_serie): ?>
+        <div class="alert alert-warning py-1 px-2 mb-2" style="font-size:.76rem">
+          <i class="bi bi-exclamation-triangle me-1"></i><?= $nb_sans_serie ?> élève(s) sans série dans cette classe : ils ne suivront
+          <strong>aucune</strong> matière réservée. Attribuez-leur une série depuis la
+          <a href="<?= APP_URL ?>/secondaire/commun/pages/eleves/liste.php?classe=<?= $id_cl_aff ?>">liste des élèves</a>.
+        </div>
+      <?php endif; ?>
+      <form method="post">
+        <?= csrf_champ() ?>
+        <input type="hidden" name="action" value="save_series">
+        <div class="table-responsive" style="max-height:420px;overflow-y:auto">
+          <table class="table table-sm table-hover align-middle mb-2" style="font-size:.78rem">
+            <thead style="position:sticky;top:0;background:#fffbeb;z-index:1">
+              <tr>
+                <th>Matière</th>
+                <?php foreach ($series_classe as $sr): ?>
+                  <th class="text-center" style="width:90px"><?= h($sr['libelle']) ?></th>
+                <?php endforeach; ?>
+                <th class="text-center" style="width:110px">Suivie par</th>
+              </tr>
+            </thead>
+            <tbody>
+              <?php foreach ($disciplines as $d):
+                $liees = $series_mat[(int) $d['id_mat']] ?? []; ?>
+                <tr>
+                  <td class="fw-semibold"><?= h($d['mat_libelle']) ?></td>
+                  <?php foreach ($series_classe as $sid => $sr): ?>
+                    <td class="text-center">
+                      <input type="checkbox" class="form-check-input" style="margin:0"
+                             name="series[<?= (int) $d['id_mat'] ?>][]" value="<?= $sid ?>" <?= in_array($sid, $liees, true) ? 'checked' : '' ?>>
+                    </td>
+                  <?php endforeach; ?>
+                  <td class="text-center">
+                    <?php if ($liees): ?>
+                      <span class="badge" style="background:#fde68a;color:#78350f">
+                        <?= h(implode(', ', array_map(fn($x) => $series_classe[$x]['libelle'] ?? '?', $liees))) ?>
+                      </span>
+                    <?php else: ?>
+                      <span class="badge bg-light text-secondary border">Commune</span>
+                    <?php endif; ?>
+                  </td>
+                </tr>
+              <?php endforeach; ?>
+            </tbody>
+          </table>
+        </div>
+        <button type="submit" class="btn btn-warning btn-sm px-3">
+          <i class="bi bi-save me-1"></i>Enregistrer les séries
+        </button>
+      </form>
+    <?php endif; ?>
+  </div>
+</div>
+<?php endif; ?>
 
 <!-- Formulaire caché supprimer (via JS) -->
 <form method="post" id="form-del" style="display:none">
@@ -1162,7 +1320,8 @@ function reinitCompForm() {
       <input type="hidden" name="onglet" value="enseignants">
       <div class="col-md-5">
         <label class="form-label fw-semibold">Classe :</label>
-        <select name="classe_ens" class="form-select" onchange="ajaxSelectReload(this,'enseignants-dynamic')">
+        <select name="classe_ens" class="form-select" data-avant="<?= $id_cl_ens ?: '' ?>"
+                onchange="if (ensMajModifs() && !confirm('Des affectations ne sont pas enregistrées. Changer de classe quand même ?')) { this.value = this.dataset.avant; return; } this.dataset.avant = this.value; ajaxSelectReload(this,'enseignants-dynamic')">
           <option value="">— Choisir une classe —</option>
           <?php foreach ($classes as $c): ?>
             <option value="<?= $c['id'] ?>" <?= $id_cl_ens==$c['id']?'selected':''?>>
@@ -1211,18 +1370,28 @@ function reinitCompForm() {
             <div style="font-size:.7rem;color:#6b7280;font-weight:600;text-transform:uppercase;letter-spacing:.05em">
               Professeur Principal
             </div>
-            <div class="fw-bold" style="font-size:.88rem;color:#111827;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">
-              <?php if ($pp): ?>
-                <?= h(trim($pp['nom_ens'].' '.($pp['prenom_ens']??''))) ?>
-              <?php else: ?>
-                <span class="text-muted" style="font-weight:400">Non défini</span>
-              <?php endif; ?>
+            <?php if ($ens_classe): ?>
+            <!-- Choix limité aux enseignants qui ont un cours dans la classe -->
+            <form method="post" class="d-flex gap-1 mt-1">
+              <?= csrf_champ() ?>
+              <input type="hidden" name="action" value="set_pp">
+              <select name="matricule_ens" class="form-select form-select-sm" style="font-size:.78rem;min-width:0">
+                <option value="">— Non défini —</option>
+                <?php foreach ($ens_classe as $mat_e => $nom_e): ?>
+                  <option value="<?= (int) $mat_e ?>" <?= ($pp && (int) $pp['matricule_ens'] === (int) $mat_e) ? 'selected' : '' ?>><?= h($nom_e) ?></option>
+                <?php endforeach; ?>
+              </select>
+              <button class="btn btn-primary btn-sm text-nowrap" style="font-size:.75rem">
+                <i class="bi bi-save me-1"></i>Enregistrer
+              </button>
+            </form>
+            <?php else: ?>
+            <div class="fw-bold" style="font-size:.88rem;color:#111827">
+              <?= $pp ? h(trim($pp['nom_ens'].' '.($pp['prenom_ens']??''))) : '<span class="text-muted" style="font-weight:400">Non défini</span>' ?>
             </div>
+            <div class="text-muted" style="font-size:.7rem">Affectez d'abord les enseignants des matières ci-dessous.</div>
+            <?php endif; ?>
           </div>
-          <button class="btn btn-outline-primary btn-sm" style="flex-shrink:0;font-size:.75rem"
-                  data-bs-toggle="modal" data-bs-target="#modalPP">
-            <i class="bi bi-pencil"></i>
-          </button>
         </div>
       </div>
     </div>
@@ -1269,6 +1438,11 @@ function reinitCompForm() {
 
 </div>
 
+<!-- Affectations : enregistrées d'un coup par le bouton « Enregistrer » -->
+<form method="post" id="form-ens">
+<?= csrf_champ() ?>
+<input type="hidden" name="action" value="save_ens_lot">
+
 <!-- Barre de recherche enseignant (réutilisée dans chaque select) -->
 <div class="card mb-3">
   <div class="card-body py-2 d-flex align-items-center gap-2">
@@ -1280,16 +1454,19 @@ function reinitCompForm() {
            title="Remplacement en cours d'année : les bulletins des trimestres précédents gardent l'ancien enseignant. Choisir le 1er trimestre corrige une erreur d'affectation.">
       <i class="bi bi-arrow-left-right me-1 text-primary"></i>Changement valable à partir du
     </label>
-    <select id="trim-debut-ens" class="form-select form-select-sm" style="width:auto;font-size:.78rem">
+    <select id="trim-debut-ens" name="trim_debut" class="form-select form-select-sm" style="width:auto;font-size:.78rem">
       <?php foreach ($trims_ens as $t): ?>
         <option value="<?= (int) $t['ordre'] ?>" <?= (int) $t['ordre'] === $ordre_cour ? 'selected' : '' ?>><?= h($t['libelle']) ?></option>
       <?php endforeach; ?>
     </select>
     <?php endif; ?>
-    <span class="text-muted ms-auto" style="font-size:.75rem">
-      Les modifications sont sauvegardées automatiquement
-      <i class="bi bi-lightning-charge-fill text-warning ms-1"></i>
+    <span class="text-muted ms-auto" style="font-size:.75rem"
+          title="Ces affectations servent aux notes et bulletins. L'emploi du temps est facultatif : s'il est construit, il peut aussi les mettre à jour.">
+      Affectation directe, sans emploi du temps
     </span>
+    <button type="submit" class="btn btn-primary btn-sm btn-save-ens text-nowrap">
+      <i class="bi bi-save me-1"></i>Enregistrer<span class="nb-modif-ens"></span>
+    </button>
   </div>
 </div>
 
@@ -1354,9 +1531,9 @@ function reinitCompForm() {
                          border-radius:10px;font-weight:700"><?= $d['coef'] ?></span>
           </td>
           <td style="padding:4px 10px">
-            <select class="form-select form-select-sm ens-select"
+            <select class="form-select form-select-sm ens-select" name="ens[<?= (int) $d['id_mat'] ?>]"
                     style="max-width:320px;font-size:.78rem;border-color:<?= $assigned?'#86efac':'#fde68a' ?>"
-                    data-id-mat="<?= $d['id_mat'] ?>">
+                    data-initial="<?= h((string) $d['matricule_ens_aff']) ?>">
               <option value="">— Non affecté —</option>
               <?php foreach ($enseignants as $e):
                 $choisi = $d['matricule_ens_aff'] == $e['matricule_ens'];
@@ -1394,102 +1571,51 @@ function reinitCompForm() {
     </table>
   </div>
 </div>
-<?php endforeach; endif; ?>
-
-<input type="hidden" id="csrf_token" value="<?= csrf_generer() ?>">
-
-<!-- Modal Professeur Principal -->
-<div class="modal fade" id="modalPP" tabindex="-1">
-  <div class="modal-dialog">
-    <div class="modal-content">
-      <div class="modal-header py-2">
-        <h6 class="modal-title fw-bold">
-          <i class="bi bi-person-badge-fill me-1 text-primary"></i>Professeur Principal — <?= $nom_cl_ens ?>
-        </h6>
-        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-      </div>
-      <form method="post">
-        <?= csrf_champ() ?>
-        <input type="hidden" name="action" value="set_pp">
-        <div class="modal-body">
-          <?php if ($pp): ?>
-            <div class="alert alert-info py-2 mb-3" style="font-size:.82rem">
-              <i class="bi bi-person-check me-1"></i>
-              Actuellement : <strong><?= h(trim($pp['nom_ens'].' '.($pp['prenom_ens']??''))) ?></strong>
-            </div>
-          <?php endif; ?>
-          <label class="form-label fw-semibold">Choisir l'enseignant</label>
-          <input type="text" id="pp-search" class="form-control form-control-sm mb-2"
-                 placeholder="Rechercher un enseignant...">
-          <select name="matricule_ens" id="pp-select" class="form-select" size="8"
-                  style="font-size:.82rem">
-            <option value="">— Aucun —</option>
-            <?php foreach ($enseignants as $e):
-              if (!$e['en_service'] && !($pp && $pp['matricule_ens'] == $e['matricule_ens'])) continue;   // parti / muté
-              $nom_e = trim($e['nom_ens'].' '.($e['prenom_ens']??''));
-            ?>
-              <option value="<?= $e['matricule_ens'] ?>"
-                      data-nom="<?= strtolower(h($nom_e)) ?>"
-                      <?= ($pp && $pp['matricule_ens']==$e['matricule_ens'])?'selected':'' ?>>
-                <?= h($nom_e) ?>
-                <?php if ($e['id_fonction'] && $e['id_fonction']!='ENSEIGNANT'): ?>
-                  (<?= h($e['id_fonction']) ?>)
-                <?php endif; ?>
-              </option>
-            <?php endforeach; ?>
-          </select>
-        </div>
-        <div class="modal-footer py-2">
-          <button class="btn btn-primary btn-sm">
-            <i class="bi bi-check-lg me-1"></i>Enregistrer
-          </button>
-          <button type="button" class="btn btn-light btn-sm" data-bs-dismiss="modal">Annuler</button>
-        </div>
-      </form>
-    </div>
-  </div>
+<?php endforeach; ?>
+<div class="d-flex justify-content-end align-items-center gap-2 mb-3">
+  <span class="text-muted" style="font-size:.75rem">Les lignes modifiées sont surlignées en orange.</span>
+  <button type="submit" class="btn btn-primary btn-save-ens">
+    <i class="bi bi-save me-1"></i>Enregistrer les affectations<span class="nb-modif-ens"></span>
+  </button>
 </div>
+<?php endif; ?>
+</form><!-- /#form-ens -->
+
+<?php endif; // id_cl_ens ?>
+</div><!-- /#enseignants-dynamic -->
 
 <script>
 // Délégation sur document : #enseignants-dynamic est reconstruit à chaque
 // changement de classe via ajaxSelectReload() (innerHTML, les <script> ne
 // se ré-exécutent pas) — la délégation survit à ces remplacements, contrairement
-// à des listeners attachés directement aux éléments d'origine.
-
-// AJAX save enseignant
+// à des listeners attachés directement aux éléments d'origine. Ce script est
+// donc HORS du conteneur, émis même sans classe choisie.
+//
+// Enregistrement par le bouton « Enregistrer » (formulaire #form-ens) : un
+// changement ne fait que surligner la ligne et compter les modifications.
+function ensMajModifs() {
+    var n = 0;
+    document.querySelectorAll('.ens-select').forEach(function(sel){
+        var modif = sel.value !== (sel.dataset.initial || '');
+        var row = sel.closest('tr');
+        if (row) row.style.background = modif ? '#ffedd5' : '';
+        sel.style.borderColor = modif ? '#f97316' : (sel.value ? '#86efac' : '#fde68a');
+        if (modif) n++;
+    });
+    document.querySelectorAll('.nb-modif-ens').forEach(function(s){ s.textContent = n ? ' (' + n + ')' : ''; });
+    return n;
+}
 document.addEventListener('change', function(e) {
-    var sel = e.target;
-    if (!sel.classList || !sel.classList.contains('ens-select')) return;
-    var fd = new FormData();
-    fd.append('action', 'save_ens');
-    fd.append('id_mat', sel.dataset.idMat);
-    fd.append('matricule_ens', sel.value);
-    var trimDeb = document.getElementById('trim-debut-ens');
-    if (trimDeb) fd.append('trim_debut', trimDeb.value);
-    fd.append('csrf', document.getElementById('csrf_token').value);
-    var row  = sel.closest('tr');
-    var icon = row.querySelector('td:last-child i');
-    fetch('', {method:'POST', body: fd})
-        .then(function(r){ return r.json(); })
-        .then(function(data){
-            if (data.ok) {
-                // Mise à jour icône statut
-                var assigned = sel.value !== '';
-                if (icon) {
-                    icon.className = assigned
-                        ? 'bi bi-check-circle-fill text-success'
-                        : 'bi bi-circle text-warning';
-                    icon.style.fontSize = '.9rem';
-                    icon.title = assigned ? sel.options[sel.selectedIndex].text : 'Non affecté';
-                }
-                sel.style.borderColor = assigned ? '#86efac' : '#fde68a';
-                row.classList.toggle('table-warning', !assigned);
-                // Flash vert
-                row.style.transition = 'background .25s';
-                row.style.background = '#d1fae5';
-                setTimeout(function(){ row.style.background = ''; }, 1200);
-            }
-        });
+    if (e.target.classList && e.target.classList.contains('ens-select')) ensMajModifs();
+});
+var ensEnvoi = false;
+document.addEventListener('submit', function(e) {
+    if (e.target.id === 'form-ens') ensEnvoi = true;
+});
+// Quitter la page avec des affectations non enregistrées : prévenir (changement
+// de classe : confirmation sur la liste des classes, rechargée en AJAX).
+window.addEventListener('beforeunload', function(e) {
+    if (!ensEnvoi && document.getElementById('form-ens') && ensMajModifs() > 0) { e.preventDefault(); e.returnValue = ''; }
 });
 
 // Filtre enseignants dans les selects
@@ -1502,19 +1628,7 @@ document.addEventListener('input', function(e) {
     });
 });
 
-// Recherche dans le modal PP
-document.addEventListener('input', function(e) {
-    if (e.target.id !== 'pp-search') return;
-    var q = e.target.value.toLowerCase();
-    document.querySelectorAll('#pp-select option').forEach(function(opt){
-        if (!opt.value) return;
-        opt.hidden = !(opt.dataset.nom || '').includes(q);
-    });
-});
 </script>
-
-<?php endif; // id_cl_ens ?>
-</div><!-- /#enseignants-dynamic -->
 
 <?php endif; // onglets ?>
 

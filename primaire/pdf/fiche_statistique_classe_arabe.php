@@ -139,9 +139,7 @@ $pdf->Ln(8);
 if ($pdf->GetY() > $ph - 28) { $pdf->AddPage(); pdf_filigrane($pdf, $etab, $pw, $ph); }
 $w_sign = $uw * 0.4;
 $x_sign = $pw - 10 - $w_sign;
-$pdf->SetFont('Arial', '', 9);
-$pdf->SetXY($x_sign, $pdf->GetY());
-$pdf->Cell($w_sign, 5, pdf_u('Fait à ' . (($etab['lieu'] ?: $etab['ville']) ?: '') . ', le ' . date('d/m/Y')), 0, 1, 'R');
+pdf_fait_a_bilingue($pdf, $x_sign, $w_sign, (($etab['lieu'] ?: $etab['ville']) ?: ''), 'R', 9);
 $pdf->SetFont('Arial', 'B', 9);
 $pdf->SetX($x_sign);
 $pdf->Cell($w_sign, 5, pdf_u(mb_strtoupper($etab['chef_etablissement'] ?: 'LE DIRECTEUR') . ','), 0, 1, 'R');

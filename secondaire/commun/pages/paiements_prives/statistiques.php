@@ -109,7 +109,7 @@ foreach (finances_modes_paiement() as $code => $m) { $par_mode[$code] ??= ['tota
 $par_agent = db_all(
     "SELECT p.id_utilisateur, u.nom, u.prenom, SUM(p.montant_paiement) AS total, COUNT(*) AS nb
      FROM paiement_prive p
-     LEFT JOIN utilisateur u ON u.id = p.id_utilisateur
+     LEFT JOIN utilisateur u ON u.id = p.id_utilisateur" . sec_sql_compte_affichable('u') . "
      WHERE p.id_annee=? GROUP BY p.id_utilisateur, u.nom, u.prenom ORDER BY total DESC",
     [$id_annee]
 );

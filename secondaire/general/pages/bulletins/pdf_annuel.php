@@ -10,6 +10,8 @@ require_once __DIR__ . '/../../../../config/config.php';
 require_once __DIR__ . '/../../../../noyau/connexion.php';
 require_once __DIR__ . '/../../../../noyau/fonctions.php';
 aiguiller_page_technique('secondaire/technique/pages/bulletins/pdf_annuel.php');   // école technique : notes par séquence
+// Modèle de bulletin du cycle (Paramètres, migration v28) : APC ↔ « Matières ».
+sec_aiguiller_modele((int) db_val("SELECT id_classe FROM inscription WHERE id_eleve=? AND id_annee=?", [(int) ($_GET['eleve'] ?? 0), (int) ($_GET['annee'] ?? 0)]), 'secondaire/general/pages/bulletins_matieres/pdf_annuel.php', 'secondaire/general/pages/bulletins/pdf_annuel.php', false);
 require_once __DIR__ . '/../../../commun/pdf/verif_lib.php';
 
 // Accès public via le QR code du bulletin (jeton "vh") — voir pdf.php pour
@@ -422,6 +424,10 @@ foreach ($disciplines as $d) {
     }
 }
 
+// Classe mixte : le bulletin n'affiche que les matières que l'élève suit
+// (communes + celles de sa série) — les calculs de classe ci-dessus sont faits.
+$disciplines = array_values(array_filter($disciplines, fn($d) => !sec_hors_serie($id_eleve, (int)$d['id_mat'])));
+
 // Heures d'absence par trimestre ET cumulées sur l'année (fonctions.php::
 // eleve_absence_trimestre()) — nécessaires au récapitulatif (colonnes
 // T1/T2/T3/Annuel, section 5) et aux mentions automatiques ci-dessous.
@@ -545,21 +551,24 @@ $pdf->SetX($ml);
 $pdf->Cell($uw, 4, u('IMMATRICULATION : ' . ($etab['immatriculation'] ?? '')), 0, 1, 'C');
 
 // ── 2. Titre (bandeau en pilule, comme le modèle) ──────────────────
-// Titre FR + traduction EN en italique en dessous (demande explicite),
-// même principe bilingue que le reste du bulletin — bandeau agrandi (8→9.5)
-// pour accueillir les 2 lignes sans les tasser.
+// Titre FR / EN sur une seule ligne (voir ci-dessous).
 $y_titre = $pdf->GetY();
-$h_titre = 9.5;
-$pdf->SetFillColor(219, 228, 245); // bleu très clair
-$pdf->SetDrawColor(26, 60, 107);   // bleu marine (couleur de marque)
+// Une seule ligne FR / EN dans un cadre réduit (30/10/2026), comme le bulletin trimestriel.
+$h_titre = 6.5;
+$pdf->SetFillColor(219, 228, 245);
+$pdf->SetDrawColor(26, 60, 107);
 $pdf->SetLineWidth(0.3);
 $pdf->RoundedRect($ml, $y_titre, $uw, $h_titre, $h_titre / 2, 'FD');
-$pdf->SetXY($ml, $y_titre + 0.3);
-$pdf->SetFont('Arial', 'BI', 17.5);
 $pdf->SetTextColor(26, 60, 107);
-$pdf->Cell($uw, $h_titre * 0.6, u('BULLETIN DE NOTES ANNUEL'), 0, 2, 'C');
-$pdf->SetFont('Arial', 'I', 11);
-$pdf->Cell($uw, $h_titre * 0.38, u('Annual Report Card'), 0, 1, 'C');
+$pdf->SetFont('Arial', 'BI', 13);
+$w_tfr = $pdf->GetStringWidth(u('BULLETIN DE NOTES ANNUEL / '));
+$pdf->SetFont('Arial', 'I', 10.5);
+$w_ten = $pdf->GetStringWidth(u('Annual Report Card'));
+$pdf->SetXY($ml + ($uw - $w_tfr - $w_ten) / 2, $y_titre);
+$pdf->SetFont('Arial', 'BI', 13);
+$pdf->Cell($w_tfr, $h_titre, u('BULLETIN DE NOTES ANNUEL / '), 0, 0, 'L');
+$pdf->SetFont('Arial', 'I', 10.5);
+$pdf->Cell($w_ten, $h_titre, u('Annual Report Card'), 0, 1, 'L');
 $pdf->SetTextColor(0, 0, 0);
 $pdf->SetLineWidth(0.2);
 // "Année scolaire" (accent rétabli, demande explicite) en gras.
@@ -1265,7 +1274,7 @@ $pdf->MultiCell($w_obs, $h_obs_box, '', 'T', 'L');
 // ── 7. Date et signature (à l'intérieur du cadre Observations) ────
 $pdf->SetFont('Arial', '', 8.5);
 $pdf->SetXY($x_obs, $y_dec2 + 6);
-$pdf->Cell($w_obs, 5.5, u((get_etablissement()['ville'] ?? '') . ', le ' . date('d-m-Y') . '.'), 0, 1, 'C');
+$pdf->Cell($w_obs, 5.5, u(lieu_edition_documents() . ', le ' . date('d-m-Y') . '.'), 0, 1, 'C');
 $pdf->SetX($x_obs);
 $pdf->SetFont('Arial', 'I', 7.5);
 $pdf->Cell($w_obs, 4.5, 'On', 0, 1, 'C');

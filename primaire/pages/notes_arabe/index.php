@@ -356,6 +356,9 @@ $non_saisis = [];
 if ($onglet === 'non_saisis' && $seq_active) {
     $id_seq_ns  = (int) $seq_active['id_seq'];
     $where_cl_a = $id_cl_ns ? "AND c.IDClasses = " . (int) $id_cl_ns : '';
+    // Enseignant(e) : seulement ses classes (31/10/2026).
+    $ids_vis_ns = classes_ids_visibles($val_annee, 'ar');
+    if ($ids_vis_ns !== null) $where_cl_a .= $ids_vis_ns ? ' AND c.IDClasses IN (' . implode(',', array_map('intval', $ids_vis_ns)) . ')' : ' AND 1=0';
     $non_saisis = db_all(
         "SELECT c.IDClasses AS id_classe, c.DesignationClasses AS classe,
                 m.matiere_fr, m.matiere_ar,

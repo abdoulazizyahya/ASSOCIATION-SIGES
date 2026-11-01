@@ -14,6 +14,8 @@ require_once __DIR__ . '/../../../../config/config.php';
 require_once __DIR__ . '/../../../../noyau/connexion.php';
 require_once __DIR__ . '/../../../../noyau/fonctions.php';
 aiguiller_page_technique('secondaire/technique/pages/notes/index.php');   // école technique : notes par séquence
+// Modèle de bulletin du cycle (Paramètres, migration v28) : APC ↔ « Matières ».
+sec_aiguiller_modele((int) ($_GET['classe_c'] ?? $_GET['classe_e'] ?? $_GET['classe_cop'] ?? $_GET['classe_rv'] ?? 0), 'secondaire/general/pages/notes_matieres/index.php', 'secondaire/general/pages/notes/index.php', false);
 // exiger_role() (au lieu du seul exiger_connexion() côté LAM_ABZ) : ferme un
 // accès direct par URL pour SG/SECRETAIRE/INTENDANT — jamais proposés dans
 // noyau/layout/menu_secondaire.php mais pas bloqués par exiger_connexion() seule
@@ -100,6 +102,7 @@ $eleves_c  = [];
 $mats_c    = [];
 $comps_c   = [];
 $series_c  = [];
+$reserv_c  = [];   // classe mixte : [id_mat => [id_serie, …]] (discipline_serie)
 $classe_c_info = $id_cl_c ? db_one("SELECT * FROM classe WHERE id=?", [$id_cl_c]) : null;
 
 if ($onglet === 'classe') {
@@ -133,6 +136,14 @@ if ($onglet === 'classe') {
                  WHERE d.IDClasses=? ORDER BY d.ordre, m.libelle",
                 [$id_cl_c]
             );
+        }
+        // Classe mixte : une série choisie (ex. Allemand) ne propose pas les
+        // matières réservées aux autres séries (Espagnol, Arabe…) — leurs
+        // compétences disparaissent de la liste.
+        $reserv_c = sec_series_matieres($id_cl_c);
+        if ($id_serie_c && $reserv_c) {
+            $mats_c = array_values(array_filter($mats_c, fn($m) =>
+                !isset($reserv_c[(int) $m['id']]) || in_array($id_serie_c, $reserv_c[(int) $m['id']], true)));
         }
     }
     // Compétences du trimestre pour TOUTES les matières de la classe (déjà
@@ -169,11 +180,13 @@ if ($onglet === 'classe') {
              LEFT JOIN serie s ON s.id=i.id_serie
              LEFT JOIN note n ON n.id_eleve=e.id AND n.id_matiere=? AND n.id_competence=?
              WHERE e.statut='actif'" . ($id_serie_c ? ' AND i.id_serie=?' : '') . "
-             ORDER BY e.nom, e.prenom",
+             ORDER BY s.libelle IS NULL, s.libelle, e.nom, e.prenom",   // classe mixte : regroupés par série
             $id_serie_c
                 ? [$id_annee, $id_cl_c, $id_mat_c, $id_comp_c, $id_serie_c]
                 : [$id_annee, $id_cl_c, $id_mat_c, $id_comp_c]
         );
+        // Classe mixte : seuls les élèves qui suivent cette matière (série).
+        $eleves_c = sec_filtrer_eleves_matiere($eleves_c, $id_cl_c, $id_annee, $id_mat_c);
     }
 
     if ($_SERVER['REQUEST_METHOD'] === 'POST' && post('action') === 'save_classe') {
@@ -255,9 +268,10 @@ $mats_e   = [];
 if ($onglet === 'eleve') {
     if ($id_cl_e) {
         $eleves_e = db_all(
-            "SELECT e.* FROM eleve e
+            "SELECT e.*, s.libelle AS serie FROM eleve e
              JOIN inscription i ON i.id_eleve=e.id AND i.id_annee=? AND i.id_classe=?
-             WHERE e.statut='actif' ORDER BY e.nom, e.prenom",
+             LEFT JOIN serie s ON s.id=i.id_serie
+             WHERE e.statut='actif' ORDER BY s.libelle IS NULL, s.libelle, e.nom, e.prenom",   // classe mixte : regroupés par série
             [$id_annee, $id_cl_e]
         );
     }
@@ -287,6 +301,8 @@ if ($onglet === 'eleve') {
                 [$id_eleve, $id_seq_e, $id_cl_e]
             );
         }
+        // Classe mixte : pas les matières réservées à une autre série.
+        $mats_e = sec_filtrer_matieres_eleve($mats_e, $id_cl_e, $id_annee, $id_eleve);
     }
 
     if ($_SERVER['REQUEST_METHOD'] === 'POST' && post('action') === 'save_eleve') {
@@ -449,8 +465,8 @@ if ($is_ens && $mat_ens) {
 }
 
 // ══════════════════════════════════════════════════════════════
-//  Relevé de notes vierge ou rempli (25/10/2026) — même PDF que le technique
-//  (secondaire/technique/pages/notes/pdf_releve_vierge.php : tables communes).
+//  Relevé de notes vierge ou rempli (25/10/2026) — copie générale du PDF du technique
+//  (secondaire/general/pages/notes_matieres/pdf_releve_vierge.php ; fiche anonyme + Sexe le 01/11/2026).
 // ══════════════════════════════════════════════════════════════
 $va_rv = (string) ($annee_act['libelle'] ?? $val_annee);
 $id_cl_rv    = (int)($_GET['classe_rv'] ?? 0);
@@ -709,7 +725,8 @@ async function ajaxSelectReload(selectEl, containerId) {
             $comps_m = $comps_par_mat[(int) $m['id']] ?? [];
             if (!$comps_m) continue;
             $num_groupe++; ?>
-            <optgroup label="<?= h($num_groupe . '. ' . mb_strtoupper($m['libelle']) . ' — coef ' . $m['coef']) ?>">
+            <optgroup label="<?= h($num_groupe . '. ' . mb_strtoupper($m['libelle']) . ' — coef ' . $m['coef']
+                . (isset($reserv_c[(int) $m['id']]) ? ' — ' . implode(' / ', array_intersect_key(array_column($series_c, 'libelle', 'id'), array_flip($reserv_c[(int) $m['id']]))) : '')) ?>">
               <?php foreach ($comps_m as $i => $c):
                 $lib = (string) $c['libelle'];
                 $court = mb_strlen($lib) > 95 ? rtrim(mb_substr($lib, 0, 92)) . '…' : $lib; ?>
@@ -761,7 +778,7 @@ async function ajaxSelectReload(selectEl, containerId) {
       <input type="hidden" name="id_comp" value="<?= $id_comp_c ?>">
       <input type="hidden" name="id_mat" value="<?= $id_mat_c ?>">
       <input type="hidden" name="id_cl"  value="<?= $id_cl_c ?>">
-      <table class="table table-abz table-hover mb-0" id="tbl-notes">
+      <table class="table table-abz table-hover mb-0 table-triable" id="tbl-notes">   <!-- tri par en-tête (31/10/2026) -->
         <thead>
           <tr>
             <th style="width:40px">N°</th>
@@ -770,7 +787,7 @@ async function ajaxSelectReload(selectEl, containerId) {
             <?php if ($series_c): ?><th style="width:100px">Série</th><?php endif; ?>
             <th style="width:120px" class="text-center">Note /20</th>
             <th style="width:60px" class="text-center">Cote</th>
-            <th style="width:50px" class="text-center">
+            <th style="width:50px" class="text-center" data-sans-tri>
               <button type="button" class="btn btn-link btn-sm p-0" onclick="viderTout()" title="Vider tout">
                 <i class="bi bi-eraser" style="font-size:.8rem"></i>
               </button>
@@ -781,6 +798,7 @@ async function ajaxSelectReload(selectEl, containerId) {
           <?php foreach ($eleves_c as $i => $el):
             $appr = appreciation($el['note']);
           ?>
+          <?= sec_ligne_serie($eleves_c, $i, 6 + ($series_c ? 1 : 0)) ?>
           <tr>
             <td class="text-muted"><?= $i+1 ?></td>
             <td class="fw-semibold"><?= h(strtoupper($el['nom']).' '.($el['prenom']??'')) ?></td>
@@ -951,11 +969,7 @@ document.addEventListener('submit', function(e){
         <label class="form-label fw-semibold">Élève</label>
         <select name="eleve_e" class="form-select" onchange="ajaxSelectReload(this,'saisie-eleve-dynamic')">
           <option value="">— Choisir —</option>
-          <?php foreach ($eleves_e as $el): ?>
-            <option value="<?= $el['id'] ?>" <?= $id_eleve==$el['id']?'selected':''?>>
-              <?= h(strtoupper($el['nom']).' '.($el['prenom']??'')) ?>
-            </option>
-          <?php endforeach; ?>
+          <?= sec_options_eleves_par_serie($eleves_e, (int) $id_eleve) /* classe mixte : groupés par série */ ?>
         </select>
       </div>
       <?php endif; ?>
@@ -1589,8 +1603,13 @@ document.addEventListener('submit', function(e){
      ONGLET 5 — Relevé de notes : vierge ou rempli (24/10/2026)
 ══════════════════════════════════════════════════ -->
 <?php
-  $q_rv   = 'classe=' . $id_cl_rv . '&mode=' . $mode_rv . ($id_mat_rv ? '&mat=' . $id_mat_rv : '');
-  $url_rv = APP_URL . '/secondaire/technique/pages/notes/pdf_releve_vierge.php?' . $q_rv;
+  // Fiche anonyme (sans classe, noms ni sexe) et lignes vides en plus (01/11/2026)
+  $anon_rv  = ($_GET['anonyme_rv'] ?? '') === '1';
+  $vides_rv = ($_GET['vides_rv'] ?? '') === '' ? null : max(0, min(40, (int) $_GET['vides_rv']));   // null = par défaut (10 si anonyme)
+  $q_rv   = $anon_rv
+      ? 'anonyme=1' . ($vides_rv !== null ? '&vides=' . $vides_rv : '')
+      : 'classe=' . $id_cl_rv . '&mode=' . $mode_rv . ($id_mat_rv ? '&mat=' . $id_mat_rv : '') . ($vides_rv ? '&vides=' . $vides_rv : '');
+  $url_rv = APP_URL . '/secondaire/general/pages/notes_matieres/pdf_releve_vierge.php?' . $q_rv;   // copie du général (01/11/2026) : fiche anonyme, colonne Sexe
   $classe_rv_lbl = 'Toutes les classes';
   if ($id_cl_rv) {
       $classe_rv_lbl = '';
@@ -1598,7 +1617,7 @@ document.addEventListener('submit', function(e){
   }
   $mat_rv_lbl = '';
   foreach ($matieres_rv as $m) { if ((int) $m['id'] === $id_mat_rv) { $mat_rv_lbl = $m['libelle']; break; } }
-  $titre_rv = 'Relevé de notes ' . $mode_rv . ' — ' . $classe_rv_lbl . ($mat_rv_lbl ? ' — ' . $mat_rv_lbl : '');
+  $titre_rv = $anon_rv ? 'Relevé de notes vierge — fiche anonyme' : 'Relevé de notes ' . $mode_rv . ' — ' . $classe_rv_lbl . ($mat_rv_lbl ? ' — ' . $mat_rv_lbl : '');
 ?>
 <div class="card mb-3">
   <div class="card-body">
@@ -1627,7 +1646,20 @@ document.addEventListener('submit', function(e){
         <label class="form-label fw-semibold">Type de relevé</label>
         <select name="mode_rv" class="form-select" onchange="this.form.submit()">
           <option value="vierge" <?= $mode_rv === 'vierge' ? 'selected' : '' ?>>Vierge (à remplir à la main)</option>
-          <option value="rempli" <?= $mode_rv === 'rempli' ? 'selected' : '' ?> <?= $id_mat_rv ? '' : 'disabled' ?>>Rempli (notes saisies)<?= $id_mat_rv ? '' : ' — choisir une matière' ?></option>
+          <option value="rempli" <?= $mode_rv === 'rempli' ? 'selected' : '' ?> <?= $id_mat_rv && !$anon_rv ? '' : 'disabled' ?>>Rempli (notes saisies)<?= $id_mat_rv ? '' : ' — choisir une matière' ?></option>
+        </select>
+      </div>
+      <div class="col-md-5 d-flex align-items-center">
+        <div class="form-check m-0">
+          <input class="form-check-input" type="checkbox" name="anonyme_rv" value="1" id="chkAnonRv" <?= $anon_rv ? 'checked' : '' ?> onchange="this.form.submit()">
+          <label class="form-check-label" for="chkAnonRv">Fiche anonyme (sans classe, noms ni sexe)</label>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <label class="form-label fw-semibold">Lignes vides en plus</label>
+        <select name="vides_rv" class="form-select" onchange="this.form.submit()">
+          <option value="" <?= $vides_rv === null ? 'selected' : '' ?>>Par défaut (<?= $anon_rv ? '10' : '0' ?>)</option>
+          <?php foreach ([0, 5, 10, 15, 20, 30] as $v): ?><option value="<?= $v ?>" <?= $vides_rv === $v ? 'selected' : '' ?>><?= $v ?></option><?php endforeach; ?>
         </select>
       </div>
     </form>
@@ -1646,7 +1678,10 @@ document.addEventListener('submit', function(e){
       </a>
       <?php endif; ?>
     </div>
-    <?php if ($mode_rv === 'rempli'): ?>
+    <?php if ($anon_rv): ?>
+      <div class="text-muted mt-2" style="font-size:.78rem"><i class="bi bi-info-circle me-1"></i>Fiche anonyme : autant de lignes que la plus grande classe, plus <?= $vides_rv ?? 10 ?> ligne(s) vide(s) ; classe, matière, enseignant, sexe et effectifs à compléter à la main.</div>
+    <?php endif; ?>
+    <?php if ($mode_rv === 'rempli' && !$anon_rv): ?>
       <div class="text-muted mt-2" style="font-size:.78rem"><i class="bi bi-info-circle me-1"></i>Une colonne par évaluation (séquence) de l'année, avec les notes saisies en <?= h($mat_rv_lbl) ?> ; case vide = note non saisie.</div>
     <?php endif; ?>
   </div>

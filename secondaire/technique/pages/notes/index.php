@@ -98,15 +98,18 @@ if ($onglet === 'classe') {
     }
     if ($id_cl_c && $id_mat_c && $id_seq_c) {
         $eleves_c = db_all(
-            "SELECT e.id, e.nom, e.prenom, e.matricule, e.niu,
+            "SELECT e.id, e.nom, e.prenom, e.matricule, e.niu, s.libelle AS serie,
                     n.valeur AS note, n.id AS id_note
              FROM eleve e
              JOIN inscription i ON i.id_eleve=e.id AND i.id_annee=? AND i.id_classe=?
+             LEFT JOIN serie s ON s.id=i.id_serie
              LEFT JOIN note n ON n.id_eleve=e.id AND n.id_matiere=? AND n.id_seq=?
              WHERE e.statut='actif'
-             ORDER BY e.nom, e.prenom",
+             ORDER BY s.libelle IS NULL, s.libelle, e.nom, e.prenom",   // classe mixte : regroupés par série
             [$id_annee, $id_cl_c, $id_mat_c, $id_seq_c]
         );
+        // Classe mixte : seuls les élèves qui suivent cette matière (série).
+        $eleves_c = sec_filtrer_eleves_matiere($eleves_c, $id_cl_c, $id_annee, $id_mat_c);
     }
 
     if ($_SERVER['REQUEST_METHOD'] === 'POST' && post('action') === 'save_classe') {
@@ -163,9 +166,10 @@ $mats_e   = [];
 if ($onglet === 'eleve') {
     if ($id_cl_e) {
         $eleves_e = db_all(
-            "SELECT e.* FROM eleve e
+            "SELECT e.*, s.libelle AS serie FROM eleve e
              JOIN inscription i ON i.id_eleve=e.id AND i.id_annee=? AND i.id_classe=?
-             WHERE e.statut='actif' ORDER BY e.nom, e.prenom",
+             LEFT JOIN serie s ON s.id=i.id_serie
+             WHERE e.statut='actif' ORDER BY s.libelle IS NULL, s.libelle, e.nom, e.prenom",   // classe mixte : regroupés par série
             [$id_annee, $id_cl_e]
         );
     }
@@ -195,6 +199,8 @@ if ($onglet === 'eleve') {
                 [$id_eleve, $id_seq_e, $id_cl_e]
             );
         }
+        // Classe mixte : pas les matières réservées à une autre série.
+        $mats_e = sec_filtrer_matieres_eleve($mats_e, $id_cl_e, $id_annee, $id_eleve);
     }
 
     if ($_SERVER['REQUEST_METHOD'] === 'POST' && post('action') === 'save_eleve') {
@@ -621,6 +627,7 @@ if (!$es_partiel) {
           <?php foreach ($eleves_c as $i => $el):
             $appr = appreciation($el['note']);
           ?>
+          <?= sec_ligne_serie($eleves_c, $i, 6) ?>
           <tr>
             <td class="text-muted"><?= $i+1 ?></td>
             <td class="fw-semibold"><?= h(strtoupper($el['nom']).' '.($el['prenom']??'')) ?></td>
@@ -742,11 +749,7 @@ document.addEventListener('DOMContentLoaded', function(){
         <label class="form-label fw-semibold">Élève</label>
         <select name="eleve_e" class="form-select" data-ajax-nav-auto>
           <option value="">— Choisir —</option>
-          <?php foreach ($eleves_e as $el): ?>
-            <option value="<?= $el['id'] ?>" <?= $id_eleve==$el['id']?'selected':''?>>
-              <?= h(strtoupper($el['nom']).' '.($el['prenom']??'')) ?>
-            </option>
-          <?php endforeach; ?>
+          <?= sec_options_eleves_par_serie($eleves_e, (int) $id_eleve) /* classe mixte : groupés par série */ ?>
         </select>
       </div>
       <?php endif; ?>
@@ -1333,7 +1336,12 @@ document.addEventListener('DOMContentLoaded', function(){
      ONGLET 5 — Relevé de notes : vierge ou rempli (24/10/2026)
 ══════════════════════════════════════════════════ -->
 <?php
-  $q_rv   = 'classe=' . $id_cl_rv . '&mode=' . $mode_rv . ($id_mat_rv ? '&mat=' . $id_mat_rv : '');
+  // Fiche anonyme (sans classe, noms ni sexe) et lignes vides en plus (01/11/2026)
+  $anon_rv  = ($_GET['anonyme_rv'] ?? '') === '1';
+  $vides_rv = ($_GET['vides_rv'] ?? '') === '' ? null : max(0, min(40, (int) $_GET['vides_rv']));   // null = par défaut (10 si anonyme)
+  $q_rv   = $anon_rv
+      ? 'anonyme=1' . ($vides_rv !== null ? '&vides=' . $vides_rv : '')
+      : 'classe=' . $id_cl_rv . '&mode=' . $mode_rv . ($id_mat_rv ? '&mat=' . $id_mat_rv : '') . ($vides_rv ? '&vides=' . $vides_rv : '');
   $url_rv = APP_URL . '/secondaire/technique/pages/notes/pdf_releve_vierge.php?' . $q_rv;
   $classe_rv_lbl = 'Toutes les classes';
   if ($id_cl_rv) {
@@ -1342,7 +1350,7 @@ document.addEventListener('DOMContentLoaded', function(){
   }
   $mat_rv_lbl = '';
   foreach ($matieres_rv as $m) { if ((int) $m['id'] === $id_mat_rv) { $mat_rv_lbl = $m['libelle']; break; } }
-  $titre_rv = 'Relevé de notes ' . $mode_rv . ' — ' . $classe_rv_lbl . ($mat_rv_lbl ? ' — ' . $mat_rv_lbl : '');
+  $titre_rv = $anon_rv ? 'Relevé de notes vierge — fiche anonyme' : 'Relevé de notes ' . $mode_rv . ' — ' . $classe_rv_lbl . ($mat_rv_lbl ? ' — ' . $mat_rv_lbl : '');
 ?>
 <div class="card mb-3">
   <div class="card-body">
@@ -1371,7 +1379,20 @@ document.addEventListener('DOMContentLoaded', function(){
         <label class="form-label fw-semibold">Type de relevé</label>
         <select name="mode_rv" class="form-select" data-ajax-nav-auto>
           <option value="vierge" <?= $mode_rv === 'vierge' ? 'selected' : '' ?>>Vierge (à remplir à la main)</option>
-          <option value="rempli" <?= $mode_rv === 'rempli' ? 'selected' : '' ?> <?= $id_mat_rv ? '' : 'disabled' ?>>Rempli (notes saisies)<?= $id_mat_rv ? '' : ' — choisir une matière' ?></option>
+          <option value="rempli" <?= $mode_rv === 'rempli' ? 'selected' : '' ?> <?= $id_mat_rv && !$anon_rv ? '' : 'disabled' ?>>Rempli (notes saisies)<?= $id_mat_rv ? '' : ' — choisir une matière' ?></option>
+        </select>
+      </div>
+      <div class="col-md-5 d-flex align-items-center">
+        <div class="form-check m-0">
+          <input class="form-check-input" type="checkbox" name="anonyme_rv" value="1" id="chkAnonRv" <?= $anon_rv ? 'checked' : '' ?> data-ajax-nav-auto>
+          <label class="form-check-label" for="chkAnonRv">Fiche anonyme (sans classe, noms ni sexe)</label>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <label class="form-label fw-semibold">Lignes vides en plus</label>
+        <select name="vides_rv" class="form-select" data-ajax-nav-auto>
+          <option value="" <?= $vides_rv === null ? 'selected' : '' ?>>Par défaut (<?= $anon_rv ? '10' : '0' ?>)</option>
+          <?php foreach ([0, 5, 10, 15, 20, 30] as $v): ?><option value="<?= $v ?>" <?= $vides_rv === $v ? 'selected' : '' ?>><?= $v ?></option><?php endforeach; ?>
         </select>
       </div>
     </form>
@@ -1390,7 +1411,10 @@ document.addEventListener('DOMContentLoaded', function(){
       </a>
       <?php endif; ?>
     </div>
-    <?php if ($mode_rv === 'rempli'): ?>
+    <?php if ($anon_rv): ?>
+      <div class="text-muted mt-2" style="font-size:.78rem"><i class="bi bi-info-circle me-1"></i>Fiche anonyme : autant de lignes que la plus grande classe, plus <?= $vides_rv ?? 10 ?> ligne(s) vide(s) ; classe, matière, enseignant, sexe et effectifs à compléter à la main.</div>
+    <?php endif; ?>
+    <?php if ($mode_rv === 'rempli' && !$anon_rv): ?>
       <div class="text-muted mt-2" style="font-size:.78rem"><i class="bi bi-info-circle me-1"></i>Une colonne par évaluation (séquence) de l'année, avec les notes saisies en <?= h($mat_rv_lbl) ?> ; case vide = note non saisie.</div>
     <?php endif; ?>
   </div>

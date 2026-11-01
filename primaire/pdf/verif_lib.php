@@ -211,7 +211,9 @@ function bulletin_qr_fichier_temp(array $eleve, string $vue, int $id_periode, st
         // (cause réelle d'échec de scan : le téléphone visait une IP qui
         // n'existait plus sur le réseau). Change automatiquement le fichier de
         // cache dès que l'adresse du serveur change — aucune purge manuelle.
-        . '_' . hash('crc32b', bulletin_verif_base_url())
+        . '_' . hash('crc32b', bulletin_verif_base_url() . '/verif/bulletin.php')
+        // + chemin de la page de vérification (31/10/2026) : les QR mis en cache avant
+        // la réorganisation du 12/10 encodaient /verif_X.php — régénérés d'office.
         . '_' . ($photo_path !== '' && is_file($photo_path) ? hash_file('crc32b', $photo_path) : 'none')
         // Inclut les données offline (moyenne/rang...) : un bulletin régénéré
         // après correction de note doit régénérer son QR, sinon la signature

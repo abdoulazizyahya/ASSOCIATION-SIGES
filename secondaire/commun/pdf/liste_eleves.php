@@ -8,24 +8,46 @@ exiger_connexion();
 require_once __DIR__ . '/fpdf.php';
 require_once __DIR__ . '/header_pdf.php';
 
-$id_annee  = (int)($_GET['annee']  ?? 0);
+$id_annee  = (int)($_GET['annee']  ?? 0) ?: (int) (get_annee_active()['id'] ?? 0);
 $id_classe = (int)($_GET['classe'] ?? 0);
+$id_serie  = (int)($_GET['serie']  ?? 0);
 exiger_acces_classe_secondaire($id_classe);   // enseignant / SG : seulement leurs classes
 $cols      = explode(',', $_GET['cols'] ?? 'no,nom,date,lieu,sexe,matricule');
 $aligns    = explode(',', $_GET['align'] ?? ''); // même ordre/longueur que $cols ; 'L'/'C'/'R' par colonne
 $dl        = ($_GET['dl'] ?? '0') === '1';
 
-$where    = ["e.statut='actif'"];
-$params   = [];
+// Ordre de tri choisi à l'impression (liste blanche — jamais de SQL venu de l'URL).
+$o    = ($_GET['ordre'] ?? 'asc') === 'desc' ? 'DESC' : 'ASC';
+$TRIS = [
+    'nom'       => "e.nom $o, e.prenom $o",
+    'matricule' => "e.matricule $o, e.nom, e.prenom",
+    'classe'    => "c.ordre $o, c.designation $o, e.nom, e.prenom",
+    'sexe'      => "e.sexe $o, e.nom, e.prenom",
+    'date'      => "e.date_naiss $o, e.nom, e.prenom",
+    'lieu'      => "e.lieu_naiss $o, e.nom, e.prenom",
+    'niu'       => "e.niu $o, e.nom, e.prenom",
+    'statut'    => "i.statut $o, e.nom, e.prenom",
+];
+$order_by = $TRIS[$_GET['tri'] ?? 'nom'] ?? $TRIS['nom'];
+
+$where    = ["e.statut='actif'", 'i.id IS NOT NULL'];
+$params   = [$id_annee];
 if ($id_classe) { $where[] = "i.id_classe=?"; $params[] = $id_classe; }
+if ($id_serie)  { $where[] = "i.id_serie=?";  $params[] = $id_serie; }
+// Toutes les classes : un enseignant / SG ne voit que les siennes (comme la liste).
+$ids_classes_vis = sec_classes_ids_visibles();
+if (!$id_classe && $ids_classes_vis !== null) {
+    $where[] = $ids_classes_vis ? 'i.id_classe IN (' . implode(',', array_map('intval', $ids_classes_vis)) . ')' : '1=0';
+}
 $sql_where = 'WHERE ' . implode(' AND ', $where);
 
 $eleves = db_all(
-    "SELECT e.*, c.designation AS classe
+    "SELECT e.*, c.designation AS classe, s.libelle AS serie, i.statut AS redoublant
      FROM eleve e
-     LEFT JOIN inscription i ON i.id_eleve=e.id AND i.id_annee=$id_annee
+     LEFT JOIN inscription i ON i.id_eleve=e.id AND i.id_annee=?
      LEFT JOIN classe c ON c.id=i.id_classe
-     $sql_where ORDER BY e.nom, e.prenom", $params);
+     LEFT JOIN serie s ON s.id=i.id_serie
+     $sql_where ORDER BY $order_by", $params);
 
 $etab   = get_etablissement();
 $annee  = db_one("SELECT * FROM annee_scolaire WHERE id=?", [$id_annee]) ?? ['libelle'=>'—'];
@@ -43,8 +65,11 @@ $def_cols = [
     'date'      => ['Date naiss./DOB',       24, 'date_naiss'],
     'lieu'      => ['Lieu naiss./Birthplace',34, 'lieu_naiss'],
     'sexe'      => ['Sexe/Sex',              12, 'sexe'],
-    'matricule' => ['NIU',                   25, 'matricule'],
+    'matricule' => ['Matricule/ID No.',      25, 'matricule'],
+    'niu'       => ['NIU',                   25, 'niu'],
     'classe'    => ['Classe/Class',          26, 'classe'],
+    'serie'     => ['Série-LV2/Series',      22, 'serie'],
+    'statut'    => ['Statut/Status',         18, 'redoublant'],
     'telephone' => ['Téléphone/Phone',       26, 'telephone'],
 ];
 // $sel[$k] = [libellé, largeur, champ, alignement 'L'/'C'/'R']
@@ -90,17 +115,19 @@ $pdf->Cell(0, 5, pdf_u("Année scolaire/Academic year : " . $annee['libelle'] . 
 $pdf->SetFont('Arial', '', 7.5);
 $pdf->Cell(0, 4.5, pdf_u("Total : $total élève(s)/students   Garçons/Boys : $nb_m   Filles/Girls : $nb_f"), 0, 1, 'L');
 
-// Effectif tableau (NV/RED/TOTAL)
+// Effectif tableau (NV/RED/TOTAL) — inscription.statut = « Oui » pour un
+// redoublant (« Oui » ou « Redoublant », voir est_redoublant()), calculé sur les élèves listés.
 if ($id_classe) {
-    $nv = (int)db_val("SELECT COUNT(*) FROM inscription WHERE id_classe=? AND id_annee=? AND statut='Nouveau'",[$id_classe,$id_annee]);
-    $rd = (int)db_val("SELECT COUNT(*) FROM inscription WHERE id_classe=? AND id_annee=? AND statut='Redoublant'",[$id_classe,$id_annee]);
+    $eff = ['NV' => ['M' => 0, 'F' => 0], 'RED' => ['M' => 0, 'F' => 0]];
+    foreach ($eleves as $el) $eff[est_redoublant($el['redoublant']) ? 'RED' : 'NV'][$el['sexe'] === 'F' ? 'F' : 'M']++;
     $pdf->SetXY($pw - 60, $pdf->GetY() - 9);
     $pdf->SetFont('Arial','B',7); $pdf->SetFillColor(214,234,248);
     $pdf->Cell(12,4,'',0,0,'C'); $pdf->Cell(12,4,'M',1,0,'C',true); $pdf->Cell(12,4,'F',1,0,'C',true); $pdf->Cell(12,4,'T',1,1,'C',true);
-    $pdf->SetX($pw-60); $pdf->SetFont('Arial','',7);
-    $pdf->Cell(12,4,'NV',1,0,'C'); $pdf->Cell(12,4,(string)(int)db_val("SELECT SUM(e.sexe='M') FROM inscription i JOIN eleve e ON e.id=i.id_eleve WHERE i.id_classe=$id_classe AND i.id_annee=$id_annee AND i.statut='Nouveau'"),1,0,'C'); $pdf->Cell(12,4,(string)(int)db_val("SELECT SUM(e.sexe='F') FROM inscription i JOIN eleve e ON e.id=i.id_eleve WHERE i.id_classe=$id_classe AND i.id_annee=$id_annee AND i.statut='Nouveau'"),1,0,'C'); $pdf->Cell(12,4,(string)$nv,1,1,'C');
-    $pdf->SetX($pw-60);
-    $pdf->Cell(12,4,'RED',1,0,'C'); $pdf->Cell(12,4,(string)(int)db_val("SELECT SUM(e.sexe='M') FROM inscription i JOIN eleve e ON e.id=i.id_eleve WHERE i.id_classe=$id_classe AND i.id_annee=$id_annee AND i.statut='Redoublant'"),1,0,'C'); $pdf->Cell(12,4,(string)(int)db_val("SELECT SUM(e.sexe='F') FROM inscription i JOIN eleve e ON e.id=i.id_eleve WHERE i.id_classe=$id_classe AND i.id_annee=$id_annee AND i.statut='Redoublant'"),1,0,'C'); $pdf->Cell(12,4,(string)$rd,1,1,'C');
+    $pdf->SetFont('Arial','',7);
+    foreach ($eff as $lib => $n) {
+        $pdf->SetX($pw-60);
+        $pdf->Cell(12,4,$lib,1,0,'C'); $pdf->Cell(12,4,(string)$n['M'],1,0,'C'); $pdf->Cell(12,4,(string)$n['F'],1,0,'C'); $pdf->Cell(12,4,(string)($n['M']+$n['F']),1,1,'C');
+    }
     $pdf->SetX($pw-60);
     $pdf->SetFont('Arial','B',7);
     $pdf->Cell(12,4,'TOTAL',1,0,'C'); $pdf->Cell(12,4,(string)$nb_m,1,0,'C'); $pdf->Cell(12,4,(string)$nb_f,1,0,'C'); $pdf->Cell(12,4,(string)$total,1,1,'C');
@@ -129,8 +156,10 @@ foreach ($eleves as $el) {
             $val = strtoupper($el['nom']) . ' ' . ($el['prenom'] ?? '');
         } elseif ($k === 'date') {
             $val = $el['date_naiss'] ? date('d/m/Y', strtotime($el['date_naiss'])) : '—';
-        } elseif ($k === 'matricule') {
-            $val = niu_eleve($el);
+        } elseif ($k === 'niu') {
+            $val = niu_eleve($el) ?: '—';
+        } elseif ($k === 'statut') {
+            $val = libelle_statut_insc($el['redoublant']);
         } else {
             $val = $el[$col[2]] ?? '—';
         }
@@ -144,9 +173,7 @@ $pdf->Ln(10);
 if ($pdf->GetY() > $pdf->GetPageHeight() - 30) $pdf->AddPage();
 $w_sign = $uw_tbl * 0.4;
 $x_sign = $pw - 25 - $w_sign; // décalé du bord droit (pas collé à la marge)
-$pdf->SetFont('Arial', '', 9);
-$pdf->SetX($x_sign);
-$pdf->Cell($w_sign, 5, pdf_u('Fait à/Done at ' . ($etab['ville'] ?? '') . ', le/on ' . date('d/m/Y')), 0, 1, 'R');
+pdf_fait_a_bilingue($pdf, $x_sign, $w_sign, lieu_edition_documents($etab), 'R', 9);
 $pdf->SetFont('Arial', 'B', 9);
 $pdf->SetX($x_sign);
 $pdf->Cell($w_sign, 5, pdf_u(strtoupper($etab['chef_etablissement'] ?? 'LE PROVISEUR')), 0, 1, 'R');

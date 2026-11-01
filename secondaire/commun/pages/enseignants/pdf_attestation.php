@@ -208,8 +208,7 @@ $pdf->MultiCell($uw,5.5,ud("En foi de quoi la presente attestation de presence e
 
 $pdf->Ln(6);
 $y_sig_block = $pdf->GetY();
-$pdf->SetX($ml+$uw*0.6);$pdf->SetFont('Arial','',9);
-$pdf->Cell($uw*0.35,5,ud((get_etablissement()['ville'] ?? '').", le/on ".date('d/m/Y').'.'),0,1,'R');
+pdf_fait_a_bilingue($pdf, $ml+$uw*0.6, $uw*0.35, lieu_edition_documents(), 'R', 9, 'ud');
 $pdf->SetX($ml+$uw*0.6);$pdf->SetFont('Arial','B',9);
 $pdf->Cell($uw*0.35,5,'Le Proviseur / The Principal',0,1,'C');
 // Signature numérique (uniquement si demandée à l'impression — jamais

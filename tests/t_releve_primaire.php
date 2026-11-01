@@ -56,6 +56,18 @@ foreach (assoc_all("SELECT code FROM etablissement WHERE actif=1 AND type_enseig
     $t = releve_texte(['piste' => 'fr', 'classe' => $cl, 'vides' => 5]);
     ok(str_contains($t, '| ' . ($n_cl + 5) . ' |') && !str_contains($t, '| ' . ($n_cl + 6) . ' |') && str_contains($t, pdf_u(mb_strtoupper($premier))), "fiche nominative + 5 lignes vides : " . ($n_cl + 5) . ' lignes');
 
+    // Tableau statistique des effectifs (01/11/2026) : totaux garçons / filles / total
+    $eff = db_one("SELECT SUM(e.Sexe_elv LIKE 'F%') f, COUNT(*) t FROM eleve e JOIN inscrire i ON i.id_eleve=e.id_eleve WHERE i.IDClasses=? AND i.val_annee=?", [$cl, $va]);
+    $t = releve_texte(['piste' => 'fr', 'classe' => $cl]);
+    ok(str_contains($t, 'Redoublants') && str_contains($t, '| Total | ' . ($eff['t'] - $eff['f']) . ' | ' . (int) $eff['f'] . ' | ' . $eff['t'] . ' |'),
+       'tableau des effectifs : total G ' . ($eff['t'] - $eff['f']) . ' / F ' . (int) $eff['f'] . ' / ' . $eff['t']);
+    // Toutes les classes : une fiche par classe ayant des inscrits
+    $nb_cl = (int) db_val("SELECT COUNT(DISTINCT IDClasses) FROM inscrire WHERE val_annee=?", [$va]);
+    $t = releve_texte(['piste' => 'fr', 'classe' => 'toutes']);
+    egal($nb_cl, substr_count($t, 'RELEV'), "toutes les classes (vierge) : $nb_cl fiches");
+    $t = releve_texte(['piste' => 'ar', 'classe' => 'toutes', 'seq' => 'annee']);
+    egal($nb_cl, substr_count($t, 'RELEV'), "toutes les classes (arabe, année vierge) : $nb_cl fiches");
+
     test_transaction(function () use ($cl, $seq, $comp, $mat, $els, $va) {
         // élève 1 : notes = barème complet ; élève 2 : moitié (cote NA)
         foreach ($els as $k => $id) {
@@ -88,6 +100,9 @@ foreach (assoc_all("SELECT code FROM etablissement WHERE actif=1 AND type_enseig
 
         $t = releve_texte(['piste' => 'fr', 'classe' => $cl, 'item' => -1, 'seq' => $seq, 'mode' => 'rempli']);
         egal(count(competences_classe($cl, $va)), substr_count($t, 'RELEV'), 'rempli « toutes » : une page par compétence');
+        $t = releve_texte(['piste' => 'fr', 'classe' => 'toutes', 'item' => -1, 'seq' => $seq, 'mode' => 'rempli']);
+        $tot = rtrim(rtrim(number_format((float) $comp['total_points'], 2, ',', ''), '0'), ',');
+        ok(str_contains($t, "| $tot | A+") && substr_count($t, 'RELEV') >= count(competences_classe($cl, $va)), 'rempli, toutes les classes et compétences : notes saisies présentes');
     });
     return;   // une école suffit
 }

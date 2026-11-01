@@ -9,6 +9,8 @@ require_once __DIR__ . '/../../../../config/config.php';
 require_once __DIR__ . '/../../../../noyau/connexion.php';
 require_once __DIR__ . '/../../../../noyau/fonctions.php';
 aiguiller_page_technique('secondaire/technique/pages/bulletins/pdf_annuel_classe.php');   // école technique : notes par séquence
+// Modèle de bulletin du cycle (Paramètres, migration v28) : APC ↔ « Matières ».
+sec_aiguiller_modele((int) ($_GET['classe'] ?? 0), 'secondaire/general/pages/bulletins_matieres/pdf_annuel_classe.php', 'secondaire/general/pages/bulletins/pdf_annuel_classe.php', false);
 exiger_connexion();
 
 function uc(string $s): string {
@@ -551,6 +553,8 @@ $col3 = $uw / 3;
 
 foreach ($eleves as $el) {
     $id_eleve = (int)$el['id'];
+    // Classe mixte : seules les matières que l'élève suit (communes + sa série).
+    $disciplines_el = array_values(array_filter($disciplines, fn($d) => !sec_hors_serie($id_eleve, (int)$d['id_mat'])));
     $eleve    = db_one("SELECT * FROM eleve WHERE id=?", [$id_eleve]);
     if (!$eleve) continue;
     $insc = db_one(
@@ -608,7 +612,7 @@ foreach ($eleves as $el) {
 
     // Matières où la moyenne annuelle est insuffisante (<10).
     $matieres_faibles_c = [];
-    foreach ($disciplines as $d) {
+    foreach ($disciplines_el as $d) {
         $avg_an_d_c = mat_avg_trim_annuel_c($id_eleve, (int)$d['id_mat'], $dcomp_par_trim);
         $avg_an_d_c = end($avg_an_d_c);
         if ($avg_an_d_c !== null && $avg_an_d_c < 10) $matieres_faibles_c[] = $d['matiere'];
@@ -688,20 +692,24 @@ foreach ($eleves as $el) {
     $pdf->SetX($ml);
     $pdf->Cell($uw, 4, uc('IMMATRICULATION : ' . ($etab['immatriculation'] ?? '')), 0, 1, 'C');
 
-    // Titre FR + traduction EN en italique en dessous (demande explicite) —
-    // voir secondaire/general/pages/bulletins/pdf_annuel.php pour le jumeau (même logique).
+    // Titre FR / EN sur une seule ligne — jumeau de pdf_annuel.php.
     $y_titre = $pdf->GetY();
-    $h_titre = 9.5;
+    // Une seule ligne FR / EN dans un cadre réduit (30/10/2026), comme le bulletin trimestriel.
+    $h_titre = 6.5;
     $pdf->SetFillColor(219, 228, 245);
     $pdf->SetDrawColor(26, 60, 107);
     $pdf->SetLineWidth(0.3);
     $pdf->RoundedRect($ml, $y_titre, $uw, $h_titre, $h_titre / 2, 'FD');
-    $pdf->SetXY($ml, $y_titre + 0.3);
-    $pdf->SetFont('Arial', 'BI', 17.5);
     $pdf->SetTextColor(26, 60, 107);
-    $pdf->Cell($uw, $h_titre * 0.6, uc('BULLETIN DE NOTES ANNUEL'), 0, 2, 'C');
-    $pdf->SetFont('Arial', 'I', 11);
-    $pdf->Cell($uw, $h_titre * 0.38, uc('Annual Report Card'), 0, 1, 'C');
+    $pdf->SetFont('Arial', 'BI', 13);
+    $w_tfr = $pdf->GetStringWidth(uc('BULLETIN DE NOTES ANNUEL / '));
+    $pdf->SetFont('Arial', 'I', 10.5);
+    $w_ten = $pdf->GetStringWidth(uc('Annual Report Card'));
+    $pdf->SetXY($ml + ($uw - $w_tfr - $w_ten) / 2, $y_titre);
+    $pdf->SetFont('Arial', 'BI', 13);
+    $pdf->Cell($w_tfr, $h_titre, uc('BULLETIN DE NOTES ANNUEL / '), 0, 0, 'L');
+    $pdf->SetFont('Arial', 'I', 10.5);
+    $pdf->Cell($w_ten, $h_titre, uc('Annual Report Card'), 0, 1, 'L');
     $pdf->SetTextColor(0, 0, 0);
     $pdf->SetLineWidth(0.2);
     $pdf->SetFont('Arial', 'B', 9);
@@ -825,7 +833,7 @@ foreach ($eleves as $el) {
     $n_lignes_appr_c = texte_nb_lignes_c($pdf, $appreciation_annuelle_c ?: '-', $uw * 0.55, '', 7.5);
     $h_appreciation_c = 2 + $n_lignes_appr_c * 4;
     $footer_fixe_c  = 1 + 9 * $h_ligne + 1 + $h_bas + $h_appreciation_c + 9 * $h_dec;
-    $n_lignes_tab_c = count($disciplines);
+    $n_lignes_tab_c = count($disciplines_el);
     $row_h = $n_lignes_tab_c > 0
         ? max(3.2, min(4.5, ($bas_dispo_c - $y_table0 - 5.5 - $footer_fixe_c) / $n_lignes_tab_c))
         : 4.5;
@@ -853,7 +861,7 @@ foreach ($eleves as $el) {
     // Une ligne par matière — chantier APC : plus de regroupement par
     // groupe_lib ni de ligne TOTAL par groupe (harmonisé avec pdf.php/
     // pdf_classe.php/pdf_annuel.php).
-    foreach ($disciplines as $d) {
+    foreach ($disciplines_el as $d) {
         $id_mat = (int)$d['id_mat'];
         // $avg_t = [avg_t1, avg_t2, avg_t3] (moyennes trimestrielles de
         // cette matière), $avg = moyenne annuelle (moyenne des 3).
@@ -1160,7 +1168,7 @@ foreach ($eleves as $el) {
     // Signature
     $pdf->SetFont('Arial', '', 8.5);
     $pdf->SetXY($ml + $wDec, $yd2 + 6);
-    $pdf->Cell($wObs, 5.5, uc((get_etablissement()['ville'] ?? '') . ', le ' . date('d-m-Y') . '.'), 0, 1, 'C');
+    $pdf->Cell($wObs, 5.5, uc(lieu_edition_documents() . ', le ' . date('d-m-Y') . '.'), 0, 1, 'C');
     $pdf->SetX($ml + $wDec);
     $pdf->SetFont('Arial', 'I', 7.5);
     $pdf->Cell($wObs, 4.5, 'On', 0, 1, 'C');

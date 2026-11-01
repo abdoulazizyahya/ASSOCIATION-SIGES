@@ -68,7 +68,6 @@ $menu = [
     'Pédagogie' => [
         ['Saisie des notes',       'primaire/pages/notes/index.php',       'pencil-square', ['DIRECTEUR','ENSEIGNANT','SECRETAIRE']],
         ['Notes justifiées',       'primaire/pages/notes/absence_justifiee.php', 'person-x', ['DIRECTEUR','ENSEIGNANT','SECRETAIRE']],
-        ['Relevé de notes',        'primaire/pages/notes/releve.php?piste=fr', 'file-earmark-spreadsheet', ['DIRECTEUR','ENSEIGNANT','SECRETAIRE']],   // vierge ou rempli (26/10/2026)
         ['Annulation d\'évaluation','primaire/pages/notes/annulation_evaluation.php', 'calendar-x', ['SECRETAIRE']],
         ['Bulletins',              'primaire/pages/bulletins/index.php',   'file-earmark-text', ['DIRECTEUR','ENSEIGNANT','SECRETAIRE']],
         ['Statistiques',           'primaire/pages/statistiques/index.php','bar-chart-line', ['DIRECTEUR','ENSEIGNANT','SECRETAIRE']],
@@ -80,7 +79,6 @@ $menu = [
         ['--', 'Arabe'],
         ['Saisie des notes',    'primaire/pages/notes_arabe/index.php',            'pencil-square',     ['DIRECTEUR','ENSEIGNANT','SECRETAIRE']],
         ['Notes justifiées',    'primaire/pages/notes_arabe/absence_justifiee.php','person-x',          ['DIRECTEUR','ENSEIGNANT','SECRETAIRE']],
-        ['Relevé de notes',        'primaire/pages/notes/releve.php?piste=ar', 'file-earmark-spreadsheet', ['DIRECTEUR','ENSEIGNANT','SECRETAIRE']],   // vierge ou rempli (26/10/2026)
         ['Bulletins',           'primaire/pages/bulletins_arabe/index.php',        'file-earmark-text', ['DIRECTEUR','ENSEIGNANT','SECRETAIRE']],
         ['Statistiques',        'primaire/pages/statistiques_arabe/index.php',     'bar-chart-line',    ['DIRECTEUR','ENSEIGNANT','SECRETAIRE']],
         ['Documents de classe', 'primaire/pages/statistiques_arabe/documents.php', 'files',             ['DIRECTEUR','ENSEIGNANT','SECRETAIRE']],
@@ -143,6 +141,26 @@ $menu = [
 // l'État — aucune entrée de paie dans Ressources humaines (pas de fondateur non plus).
 // $GLOBALS['statut_ecole_menu'] : imposé quand le menu d'une autre école est construit
 // hors de celle-ci (portail Privilèges), comme noyau/layout/menu_secondaire.php.
+// Enseignant(e) (31/10/2026) : jamais d'entrée qui mène à un refus. Pas de
+// classe en piste française cette année → pas d'entrées de la piste française
+// (notes, bulletins, conseil, documents…), idem pour la piste arabe ; aucune
+// classe du tout → pas d'Absences. Pas appliqué quand le menu d'une autre
+// école est construit hors de celle-ci (portail Privilèges).
+if (!isset($GLOBALS['statut_ecole_menu']) && function_exists('role_connecte') && role_connecte() === 'ENSEIGNANT'
+    && function_exists('classes_ids_visibles') && function_exists('get_annee_active')) {
+    $va_menu = get_annee_active()['val_annee'] ?? '';
+    $sans_fr = classes_ids_visibles($va_menu, 'fr') === [];
+    $sans_ar = classes_ids_visibles($va_menu, 'ar') === [];
+    $garde = []; $piste_ar = false;
+    foreach ($menu['Pédagogie'] as $e) {
+        if (($e[0] ?? '') === '--') { $piste_ar = true; if (!$sans_ar) $garde[] = $e; continue; }
+        if ($piste_ar ? $sans_ar : $sans_fr) continue;
+        $garde[] = $e;
+    }
+    $menu['Pédagogie'] = $garde;
+    if ($sans_fr && $sans_ar) $menu['Discipline'] = [];
+}
+
 $statut_ecole = $GLOBALS['statut_ecole_menu']
     ?? (function_exists('get_etablissement') ? (get_etablissement()['statut'] ?? 'prive') : 'prive');
 if ($statut_ecole === 'public') {

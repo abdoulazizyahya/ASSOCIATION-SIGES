@@ -20,6 +20,9 @@ $role      = role_connecte();
 // Pédagogie ne s'affichent à un Agent financier que s'il est EN MÊME TEMPS
 // enseignant). N'affecte que l'affichage du menu — les pages elles-mêmes
 // gardent leurs propres exiger_role()/exiger_connexion().
+// Localisation obligatoire après connexion (31/10/2026) — voir audit_gps_exiger().
+audit_gps_exiger(APP_URL . '/compte/logout.php');
+
 $roles_effectifs = [$role];
 if ($role !== 'ENSEIGNANT' && agent_est_aussi_enseignant()) {
     $roles_effectifs[] = 'ENSEIGNANT';

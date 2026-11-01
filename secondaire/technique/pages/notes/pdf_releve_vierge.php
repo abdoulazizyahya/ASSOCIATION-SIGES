@@ -7,6 +7,9 @@
  * automatiquement à partir des notes saisies, une colonne par matière) :
  * ce document ne lit AUCUNE note en base, c'est un formulaire à imprimer.
  * GET : classe (0 = toutes les classes), dl (0|1),
+ *       anonyme=1 (01/11/2026) : fiche sans classe, noms ni sexe — autant de lignes
+ *       que la plus grande classe accessible, plus « vides » lignes (10 par défaut) ;
+ *       vides : lignes vides ajoutées sous la liste (aussi sur une fiche nominative),
  *       vh+va = accès public via le QR de vérification (voir plus bas).
  */
 require_once __DIR__ . '/../../../../config/config.php';
@@ -79,6 +82,17 @@ $dl = ($_GET['dl'] ?? '0') === '1';
 // matière, si elle est donnée, pré-remplit seulement l'en-tête.
 $mode_rv  = ($_GET['mode'] ?? '') === 'rempli' ? 'rempli' : 'vierge';
 $id_mat   = (int) ($_GET['mat'] ?? 0);
+// Fiche ANONYME et lignes vides en plus (01/11/2026, comme au primaire)
+$anonyme = !$acces_public && ($_GET['anonyme'] ?? '') === '1';
+$vides   = $acces_public ? 0 : max(0, min(40, (int) ($_GET['vides'] ?? ($anonyme ? 10 : 0))));
+$lignes_anonymes = 0;
+if ($anonyme) {
+    $ids_acc = array_map('intval', array_column($classes, 'id'));
+    $lignes_anonymes = (int) db_val("SELECT MAX(n) FROM (SELECT COUNT(*) n FROM inscription i JOIN eleve e ON e.id=i.id_eleve
+                                     WHERE i.id_annee=? AND e.statut='actif' AND i.id_classe IN (" . implode(',', $ids_acc) . ") GROUP BY i.id_classe) t", [$id_annee]);
+    $classes_a_generer = [['id' => 0, 'designation' => '']];
+    $id_classe_demande = 0; $id_mat = 0; $mode_rv = 'vierge';
+}
 $matiere_rv = null; $enseignant_rv = null; $seqs_rv = []; $notes_rv = [];
 if ($id_mat > 0 && !$acces_public && count($classes_a_generer) === 1) {
     $cl = (int) $classes_a_generer[0]['id'];
@@ -134,12 +148,13 @@ $ph = $pdf->GetPageHeight();
 $ml = 10;
 $uw = $pw - 2 * $ml;
 
-$w_no = 10; $w_nom = 70; $nb_eval = $mode_rv === 'rempli' ? count($seqs_rv) : 6;
-$w_eval = ($uw - $w_no - $w_nom) / $nb_eval;
+$w_no = 10; $w_nom = 70; $w_sexe = 11;   // colonne Sexe (01/11/2026)
+$nb_eval = $mode_rv === 'rempli' ? count($seqs_rv) : 6;
+$w_eval = ($uw - $w_no - $w_nom - $w_sexe) / $nb_eval;
 $h_hdr = 8; $h_row = 6;
 $titres_rv = array_column($seqs_rv, 'libelle');   // mode rempli : libellé des évaluations
 
-function dessiner_entete_releve_vierge(FPDF $pdf, array $etab, array $classe, string $val_annee, float $ml, float $uw, float $pw, ?array $stats = null,
+if (!function_exists('dessiner_entete_releve_vierge')) { function dessiner_entete_releve_vierge(FPDF $pdf, array $etab, array $classe, string $val_annee, float $ml, float $uw, float $pw, ?array $stats = null,
                                        ?string $matiere = null, ?string $enseignant = null): void {
     pdf_entete($pdf, $etab, $pw, $ml);
 
@@ -168,7 +183,13 @@ function dessiner_entete_releve_vierge(FPDF $pdf, array $etab, array $classe, st
     $pdf->SetFont('Arial', 'B', 9);
     $pdf->SetX($ml);
     $pdf->Cell($uw / 2, 5, pdf_u('Annee scolaire: ' . $val_annee), 0, 0, 'L');
-    $pdf->Cell($uw / 2, 5, pdf_u('Classe : ' . ($classe['designation'] ?? '')), 0, 1, 'R');
+    if (($classe['designation'] ?? '') !== '') $pdf->Cell($uw / 2, 5, pdf_u('Classe : ' . $classe['designation']), 0, 1, 'R');
+    else {   // fiche anonyme : classe à écrire à la main
+        $lc = pdf_u('Classe : ');
+        $pdf->Cell($uw / 2 - 45, 5, $lc, 0, 0, 'R');
+        pdf_ligne_pointillee($pdf, $pdf->GetX(), $pdf->GetY() + 4, $ml + $uw, $pdf->GetY() + 4);
+        $pdf->Ln(5);
+    }
     $pdf->Ln(1.5);
 
     // Double filet horizontal (séparateur, comme le modèle fourni)
@@ -193,9 +214,9 @@ function dessiner_entete_releve_vierge(FPDF $pdf, array $etab, array $classe, st
     if ($enseignant) $pdf->Cell(0, 5, pdf_u($enseignant), 0, 0, 'L');
     else pdf_ligne_pointillee($pdf, $pdf->GetX(), $pdf->GetY() + 4, $ml + $uw, $pdf->GetY() + 4);
     $pdf->Ln(7);
-}
+} }
 
-function dessiner_entete_tableau_rv(FPDF $pdf, float $ml, float $w_no, float $w_nom, float $w_eval, int $nb_eval, float $h_hdr, array $titres = []): void {
+if (!function_exists('dessiner_entete_tableau_rv')) { function dessiner_entete_tableau_rv(FPDF $pdf, float $ml, float $w_no, float $w_nom, float $w_sexe, float $w_eval, int $nb_eval, float $h_hdr, array $titres = []): void {
     $y = $pdf->GetY();
     $pdf->SetFillColor(65, 145, 225);
     $pdf->SetTextColor(255, 255, 255);
@@ -204,6 +225,7 @@ function dessiner_entete_tableau_rv(FPDF $pdf, float $ml, float $w_no, float $w_
     $pdf->SetFont('Arial', 'B', 8);
     $pdf->SetXY($x, $y); $pdf->Cell($w_no, $h_hdr, pdf_u('N°'), 1, 0, 'C', true); $x += $w_no;
     $pdf->SetXY($x, $y); $pdf->Cell($w_nom, $h_hdr, pdf_u('NOM ET PRENOMS'), 1, 0, 'L', true); $x += $w_nom;
+    $pdf->SetXY($x, $y); $pdf->Cell($w_sexe, $h_hdr, 'SEXE', 1, 0, 'C', true); $x += $w_sexe;
     for ($i = 1; $i <= $nb_eval; $i++) {
         $pdf->SetXY($x, $y);
         $pdf->Cell($w_eval, $h_hdr, isset($titres[$i - 1]) ? pdf_u($titres[$i - 1]) : 'EVAL ' . $i, 1, 0, 'C', true);
@@ -211,7 +233,7 @@ function dessiner_entete_tableau_rv(FPDF $pdf, float $ml, float $w_no, float $w_
     }
     $pdf->SetTextColor(0, 0, 0);
     $pdf->SetXY($ml, $y + $h_hdr);
-}
+} }   // gardes : fichier inclus plusieurs fois par les tests
 
 foreach ($classes_a_generer as $classe) {
     $eleves = db_all(
@@ -220,12 +242,15 @@ foreach ($classes_a_generer as $classe) {
          WHERE e.statut='actif' ORDER BY e.nom, e.prenom",
         [$classe['id'], $id_annee]
     );
+    // Effectifs des élèves réels ; fiche anonyme : tableau vide, à remplir à la main
+    $stats = $anonyme ? array_fill_keys(['nouveau', 'redoublant', 'total'], ['M' => '', 'F' => '', 'T' => '']) : pdf_effectifs_classe($eleves);
+    for ($i = 0; $i < $lignes_anonymes + $vides; $i++) $eleves[] = ['id' => 0, 'nom' => '', 'prenom' => '', 'sexe' => '', 'statut_insc' => ''];
 
     $pdf->nouvelleClasse();
     $pdf->AddPage();
     pdf_filigrane($pdf, $etab, $pw, $ph);
-    dessiner_entete_releve_vierge($pdf, $etab, $classe, $val_annee, $ml, $uw, $pw, pdf_effectifs_classe($eleves), $matiere_rv, $enseignant_rv);
-    dessiner_entete_tableau_rv($pdf, $ml, $w_no, $w_nom, $w_eval, $nb_eval, $h_hdr, $titres_rv);
+    dessiner_entete_releve_vierge($pdf, $etab, $classe, $val_annee, $ml, $uw, $pw, $stats, $matiere_rv, $enseignant_rv);
+    dessiner_entete_tableau_rv($pdf, $ml, $w_no, $w_nom, $w_sexe, $w_eval, $nb_eval, $h_hdr, $titres_rv);
 
     $n = 1;
     foreach ($eleves as $el) {
@@ -235,13 +260,14 @@ foreach ($classes_a_generer as $classe) {
             $pdf->AddPage();
             pdf_filigrane($pdf, $etab, $pw, $ph);
             $pdf->SetY($ml);
-            dessiner_entete_tableau_rv($pdf, $ml, $w_no, $w_nom, $w_eval, $nb_eval, $h_hdr, $titres_rv);
+            dessiner_entete_tableau_rv($pdf, $ml, $w_no, $w_nom, $w_sexe, $w_eval, $nb_eval, $h_hdr, $titres_rv);
         }
         $y = $pdf->GetY();
         $x = $ml;
         $pdf->SetFont('Arial', '', 8);
         $pdf->SetXY($x, $y); $pdf->Cell($w_no, $h_row, (string)$n, 1, 0, 'C'); $x += $w_no;
-        pdf_cellule_nom($pdf, $x, $y, $w_nom, $h_row, pdf_u(strtoupper($el['nom']) . ' ' . ($el['prenom'] ?? '')), pdf_est_redoublant($el)); $x += $w_nom;
+        pdf_cellule_nom($pdf, $x, $y, $w_nom, $h_row, pdf_u(trim(strtoupper($el['nom']) . ' ' . ($el['prenom'] ?? ''))), pdf_est_redoublant($el)); $x += $w_nom;
+        $pdf->SetXY($x, $y); $pdf->Cell($w_sexe, $h_row, strtoupper(substr((string) $el['sexe'], 0, 1)), 1, 0, 'C'); $x += $w_sexe;
         for ($i = 0; $i < $nb_eval; $i++) {
             $pdf->SetXY($x, $y);
             $note = $mode_rv === 'rempli' ? ($notes_rv[(int) $el['id']][(int) $seqs_rv[$i]['id']] ?? null) : null;
@@ -270,5 +296,5 @@ foreach ($classes_a_generer as $classe) {
 }
 
 $mode   = $dl ? 'D' : 'I';
-$suffix = $id_classe_demande ? preg_replace('/\W+/', '_', $classes_a_generer[0]['designation'] ?? 'classe') : 'toutes_classes';
+$suffix = $anonyme ? 'anonyme' : ($id_classe_demande ? preg_replace('/\W+/', '_', $classes_a_generer[0]['designation'] ?? 'classe') : 'toutes_classes');
 $pdf->Output($mode, 'releve_' . $mode_rv . '_' . $suffix . ($matiere_rv ? '_' . preg_replace('/\W+/', '_', $matiere_rv) : '') . '.pdf');

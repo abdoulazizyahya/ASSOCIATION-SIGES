@@ -179,7 +179,11 @@ function rv_analyser_ecole(array $e): array {
     mysqli_close($l);
 
     // Version réelle : on avance tant que les migrations vérifiables sont appliquées.
-    foreach ($etat as $v => $s) { if ($s === 'non' || $s === 'partiel') break; $r['reelle'] = $v; }
+    // Une migration invérifiable ('?' : données seulement, sans table ni
+    // colonne) ne compte que si une migration VÉRIFIÉE plus récente est
+    // présente — sinon une migration de données toute neuve (ex. secondaire
+    // v25) était déclarée appliquée sans avoir été jouée (30/10/2026).
+    foreach ($etat as $v => $s) { if ($s === 'non' || $s === 'partiel') break; if ($s === 'ok') $r['reelle'] = $v; }
     $r['partielles']  = array_keys(array_filter($etat, fn($s) => $s === 'partiel'));
     $r['trous']       = array_keys(array_filter($etat, fn($s, $v) => $v > $r['reelle'] && $s === 'ok', ARRAY_FILTER_USE_BOTH));
     $r['a_appliquer'] = array_values(array_filter(array_keys($etat), fn($v) => $v > $r['reelle']));
