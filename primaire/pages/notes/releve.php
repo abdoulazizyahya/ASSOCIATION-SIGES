@@ -48,8 +48,10 @@ if ($item === -1 && !$rel_items && !$toutes) $item = 0;
 if ($mode === 'rempli' && ((!$id_seq && !$annuel) || $item === 0)) $mode = 'vierge';   // rempli : une évaluation et une compétence / matière (ou toutes)
 
 if ($anonyme) $mode = 'vierge';
+// Piste arabe (01/11/2026) : noms des élèves en arabe, en français, ou les deux
+$noms = in_array($_GET['noms'] ?? 'deux', ['deux', 'ar', 'fr'], true) ? ($_GET['noms'] ?? 'deux') : 'deux';
 $q = http_build_query(['piste' => $piste, 'classe' => $toutes ? 'toutes' : $id_classe, 'item' => $item, 'seq' => $annuel ? 'annee' : $id_seq, 'mode' => $mode]
-    + ($anonyme ? ['anonyme' => 1] : []) + ($vides || $anonyme ? ['vides' => $vides] : []));
+    + ($anonyme ? ['anonyme' => 1] : []) + ($vides || $anonyme ? ['vides' => $vides] : []) + ($piste === 'ar' && !$anonyme ? ['noms' => $noms] : []));
 $url = APP_URL . '/primaire/pdf/releve_notes_evaluation.php?' . $q;
 $lib = fn(array $l, $id, $k) => array_values(array_filter($l, fn($x) => (int) $x[$k] === (int) $id))[0] ?? null;
 $titre = 'Relevé de notes ' . $mode . ' — ' . ($anonyme ? 'fiche anonyme' : ($toutes ? 'toutes les classes' : ($lib($classes, $id_classe, 'IDClasses')['DesignationClasses'] ?? '')))
@@ -93,6 +95,11 @@ require_once __DIR__ . '/../../../noyau/layout/header.php';
         <label class="form-check-label small" for="chkAnon">Fiche anonyme (sans classe, noms ni sexe)</label></div></div>
     <div class="col-md-2"><label class="form-label fw-semibold small">Lignes vides en plus</label>
       <select name="vides" class="form-select form-select-sm" onchange="this.form.submit()"><?php foreach ([0, 5, 10, 15, 20, 30] as $v): ?><option value="<?= $v ?>" <?= $v === $vides ? 'selected' : '' ?>><?= $v ?></option><?php endforeach; ?></select></div>
+    <?php if ($piste === 'ar'): ?>
+    <div class="col-md-3"><label class="form-label fw-semibold small">Noms des élèves</label>
+      <select name="noms" class="form-select form-select-sm" onchange="this.form.submit()" <?= $anonyme ? 'disabled' : '' ?>>
+        <?php foreach (['deux' => 'Arabe et français', 'ar' => 'Arabe', 'fr' => 'Français'] as $v => $l): ?><option value="<?= $v ?>" <?= $v === $noms ? 'selected' : '' ?>><?= $l ?></option><?php endforeach; ?></select></div>
+    <?php endif; ?>
   </form>
   <?php if ($id_classe || $toutes || $anonyme): ?>
   <div class="mt-3 d-flex flex-wrap gap-2 align-items-center">

@@ -319,6 +319,59 @@ function pdf_ligne_pointillee(FPDF $pdf, float $x1, float $y1, float $x2, float 
     }
 }
 
+// Texte ARABE dans un PDF FPDF (01/11/2026) — FPDF n'écrit ni l'arabe ni de
+// droite à gauche : le texte est mis en forme (lettres liées, ordre visuel) par
+// le moteur bidi de TCPDF, puis dessiné en PNG transparent (police Amiri Bold
+// de TCPDF, extraite une fois) et posé avec Image(), aligné à droite dans la
+// boîte ($x, $y, $w, $h) et centré verticalement. Taille en points, comme
+// SetFont ; réduite si le texte est plus large que la boîte. Retourne false
+// si l'image n'a pas pu être produite (rien n'est dessiné).
+function pdf_texte_arabe(FPDF $pdf, string $texte, float $x, float $y, float $w, float $h, float $taille, string $align = 'R'): bool {
+    $texte = trim($texte);
+    if ($texte === '' || !function_exists('imagettftext')) return false;
+    $dossier = sys_get_temp_dir() . '/siges_arabe';
+    if (!is_dir($dossier) && !@mkdir($dossier, 0775, true)) return false;
+    $ttf = $dossier . '/amiri_bold.ttf';
+    if (!is_file($ttf)) {
+        $z = @file_get_contents(__DIR__ . '/tcpdf/fonts/amirib.z');
+        if ($z === false || @file_put_contents($ttf, gzuncompress($z)) === false) return false;
+    }
+    $png = $dossier . '/v5_' . md5($texte) . '.png';
+    if (!is_file($png)) {
+        static $police = null;
+        if ($police === null) {
+            require_once __DIR__ . '/tcpdf/include/tcpdf_static.php';
+            require_once __DIR__ . '/tcpdf/include/tcpdf_font_data.php';
+            require_once __DIR__ . '/tcpdf/include/tcpdf_fonts.php';
+            $cw = []; include __DIR__ . '/tcpdf/fonts/amirib.php';
+            $police = ['cw' => $cw, 'type' => 'TrueTypeUnicode', 'subset' => false, 'subsetchars' => []];
+        }
+        $cf = $police;
+        $ta = TCPDF_FONTS::UTF8StringToArray($texte, true, $cf);
+        $visuel = implode('', array_map('mb_chr', TCPDF_FONTS::utf8Bidi($ta, $texte, true, true, $cf)));
+        $px = 96;   // hauteur de rendu : net à l'impression
+        $b = imagettfbbox($px, 0, $ttf, $visuel);
+        // hauteur commune à tous les noms (lettres hautes avec hamza, jambages) : même corps quelles que soient les lettres
+        $ref = imagettfbbox($px, 0, $ttf, 'ألجم');
+        $haut_l = min($b[7], $ref[7]); $bas_l = max($b[1], $ref[1]);
+        $l = max(1, $b[2] - $b[0] + 8); $haut = max(1, $bas_l - $haut_l + 6);
+        $img = imagecreatetruecolor($l, $haut);
+        imagesavealpha($img, true); imagealphablending($img, false);
+        imagefill($img, 0, 0, imagecolorallocatealpha($img, 255, 255, 255, 127));
+        imagealphablending($img, true);
+        imagettftext($img, $px, 0, 4 - $b[0], 3 - $haut_l, imagecolorallocate($img, 0, 0, 0), $ttf, $visuel);
+        if (!@imagepng($img, $png)) { imagedestroy($img); return false; }
+        imagedestroy($img);
+    }
+    [$lpx, $hpx] = getimagesize($png);
+    // 96 px rendus = corps de la police : hauteur de l'image en mm pour $taille points, sans déborder de la boîte
+    $hi = min($taille * 0.3528 * $hpx / 96, $h - 0.3); $wi = $hi * $lpx / $hpx;
+    if ($wi > $w - 1) { $wi = $w - 1; $hi = $wi * $hpx / $lpx; }
+    $xi = $align === 'L' ? $x + 0.8 : ($align === 'C' ? $x + ($w - $wi) / 2 : $x + $w - $wi - 0.8);
+    $pdf->Image($png, $xi, $y + ($h - $hi) / 2, $wi, $hi);
+    return true;
+}
+
 // Fond dégradé diagonal (jaune pâle → rose pâle → vert pâle par défaut,
 // réglable par l'utilisateur — voir get_reglage_paiement() et le formulaire
 // de primaire/pages/paiements/obligations.php) — visuel des documents MANWI repris à

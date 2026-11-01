@@ -60,7 +60,7 @@ asso_haut('Établissements de l\'association');
           }
         ?>
         <div class="ecole-filigrane <?= $e['actif'] ? 'ecole-filigrane--reserve' : '' ?>" aria-hidden="true">
-          <?= $e['type_enseignement'] === 'secondaire' ? ($technique ? 'TECHNIQUE' : 'SECONDAIRE') : 'PRIMAIRE' ?>
+          <?= $e['type_enseignement'] === 'secondaire' ? ($technique ? 'TECHNIQUE' : 'GÉNÉRAL') : 'PRIMAIRE' ?>
         </div>
         <div class="d-flex align-items-start gap-2">
           <div class="flex-grow-1">
