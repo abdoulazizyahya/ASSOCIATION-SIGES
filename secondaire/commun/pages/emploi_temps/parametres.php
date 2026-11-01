@@ -56,6 +56,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $ecrire) {
         edt_param_set($a, 'samedi_texte', trim(post('samedi_texte')));
         edt_param_set($a, 'pdf_nb', trim($_POST['pdf_nb'] ?? ''));
         edt_param_set($a, 'pdf_ville', trim(post('pdf_ville')));
+        edt_param_set($a, 'pdf_modele', post('pdf_modele') === 'periodes' ? 'periodes' : 'heures');
         flash_set('succes', 'Grille horaire enregistrée' . ($supp ? ' (' . count($supp) . ' période(s) supprimée(s) avec leurs séances)' : '') . '.');
         $retour('grille');
     }
@@ -189,11 +190,16 @@ echo edt_css();
         <div class="form-check form-check-inline"><input class="form-check-input" type="checkbox" name="jours[]" value="<?= $j ?>" id="j<?= $j ?>" <?= in_array($j, $jours, true) ? 'checked' : '' ?>><label class="form-check-label" for="j<?= $j ?>"><?= $lib ?></label></div>
       <?php endforeach; ?>
       <h6 class="fw-bold mt-4">Fiche imprimée (PDF)</h6>
-      <label class="form-label small mb-1">Ligne du samedi (laisser vide pour ne pas l'afficher)</label>
+      <label class="form-label small mb-1">Modèle de fiche</label>
+      <select class="form-select form-select-sm mb-2" name="pdf_modele">
+        <option value="heures" <?= edt_param($a, 'pdf_modele', 'heures') !== 'periodes' ? 'selected' : '' ?>>Heures en lignes, jours en colonnes (pauses en bandes grises)</option>
+        <option value="periodes" <?= edt_param($a, 'pdf_modele', 'heures') === 'periodes' ? 'selected' : '' ?>>Jours en lignes, périodes en colonnes (ancienne fiche, ligne du samedi et NB)</option>
+      </select>
+      <label class="form-label small mb-1">Ligne du samedi (ancienne fiche ; laisser vide pour ne pas l'afficher)</label>
       <input class="form-control form-control-sm mb-2" name="samedi_texte" value="<?= h(edt_param($a, 'samedi_texte', 'RATTRAPAGE ET DEVOIRS SURVEILLÉS')) ?>">
       <label class="form-label small mb-1">Lieu de signature (« … , le »)</label>
       <input class="form-control form-control-sm mb-2" name="pdf_ville" value="<?= h(edt_param($a, 'pdf_ville', lieu_edition_documents($etab))) ?>">
-      <label class="form-label small mb-1">Notes de bas de page (une par ligne)</label>
+      <label class="form-label small mb-1">Notes de bas de page, une par ligne (ancienne fiche)</label>
       <textarea class="form-control form-control-sm" rows="4" name="pdf_nb"><?= h(edt_param($a, 'pdf_nb', "Cet emploi de temps est essentiellement provisoire.\nTout changement opéré dans cet emploi de temps ne sera valide que s'il est confirmé par le Censeur.\nTous les enseignants qui ont cours à 07h30 min les lundi et vendredi sont tenus d'assister au rassemblement de 07h10 min.")) ?></textarea>
     </div>
   </div>

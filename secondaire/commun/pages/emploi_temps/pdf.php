@@ -6,6 +6,9 @@
 // notes (NB) et signatures du Censeur et du Proviseur.
 //   ?vue=enseignant&id=<matricule>   ?vue=classe&id=<classe>   &tous=1 : un document par page
 //   &couleur=0 : noir et blanc
+//   &modele=heures|periodes : modèle de fiche (par défaut : réglage « pdf_modele » de Préparation)
+//   Modèle « heures » (01/11/2026, défaut) : lignes = périodes, colonnes = jours — voir
+//   _pdf_modele_heures.php. Modèle « periodes » : l'ancienne fiche LTM ci-dessous.
 require_once __DIR__ . '/../../../../config/config.php';
 require_once __DIR__ . '/../../../../noyau/connexion.php';
 require_once __DIR__ . '/../../../../noyau/fonctions.php';
@@ -24,6 +27,7 @@ if (!$gestion) {                                   // un enseignant n'imprime qu
     if (!edt_publie($a) || !$id) { http_response_code(403); exit('Emploi du temps non disponible.'); }
 }
 $couleur = ($_GET['couleur'] ?? '1') !== '0';
+$modele = in_array($_GET['modele'] ?? '', ['heures', 'periodes'], true) ? $_GET['modele'] : (string) edt_param(edt_annee_id(), 'pdf_modele', 'heures');
 
 $mod = new EdtModele($a);
 $etab = edt_etablissement_pdf();   // primaire : colonnes ramenées au format du secondaire
@@ -62,6 +66,7 @@ foreach ($cibles as $cid) {
     $blocs = $mod->blocs($filtre);
     if ($vue === 'enseignant') $blocs = $mod->blocsSansDoublonCommun($blocs);   // cours commun : un seul bloc, toutes ses classes
     if ($tous && !$blocs && $vue === 'classe') continue;
+    if ($modele !== 'periodes') { require __DIR__ . '/_pdf_modele_heures.php'; continue; }   // modèle « heures × jours »
     $pdf->AddPage();
     pdf_filigrane($pdf, $etab, $pw, $ph);
     pdf_entete($pdf, $etab, $pw, 8, 6, 0.82);

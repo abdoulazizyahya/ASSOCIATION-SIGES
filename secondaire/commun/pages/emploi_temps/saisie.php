@@ -52,7 +52,7 @@ $base = APP_URL . '/secondaire/commun/pages/emploi_temps/';
   <?php endif; ?></form>
   <?php $qv = $vue_ens ? 'vue=enseignant&id=' . $id_ens : 'vue=classe&id=' . $id_classe; ?>
   <a class="btn btn-sm btn-outline-primary" href="consulter.php?<?= $qv ?>"><i class="bi bi-eye"></i> Consulter</a>
-  <a class="btn btn-sm btn-outline-primary" target="_blank" href="pdf.php?<?= $qv ?>"><i class="bi bi-file-earmark-pdf"></i> PDF</a>
+  <button type="button" class="btn btn-sm btn-outline-primary" onclick="afficherApercu(<?= h(json_encode(APP_URL . '/secondaire/commun/pages/emploi_temps/pdf.php?' . $qv)) ?>, 'Emploi du temps', null, 'landscape')"><i class="bi bi-file-earmark-pdf"></i> PDF</button>
   <?php $pile = $ecrire ? edt_annuler_pile($a) : []; if ($pile): $der = end($pile); ?>
   <button type="button" class="btn btn-sm btn-outline-secondary" onclick="annulerDerniere()" title="<?= h('Dernière action (' . $der['quand'] . ') : ' . $der['lib'] . ' — ' . count($pile) . ' action(s) annulable(s)') ?>"><i class="bi bi-arrow-counterclockwise"></i> Annuler : <?= h(mb_strimwidth($der['lib'], 0, 38, '…')) ?></button>
   <?php endif; ?>

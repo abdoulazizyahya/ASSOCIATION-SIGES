@@ -1107,7 +1107,7 @@ function edt_fiche_enseignant_html(int $mat): string {
        . '<div class="section-titre d-flex align-items-center flex-wrap gap-2"><span><i class="bi bi-calendar3-week me-1"></i>Emploi du temps ' . h($annee) . '</span>'
        . (edt_publie($a) ? '<span class="badge bg-success">publié</span>' : '<span class="badge bg-secondary">en préparation</span>')
        . '<span class="ms-auto d-flex gap-1"><a class="btn btn-sm btn-outline-primary" href="' . $base . 'consulter.php?vue=enseignant&id=' . $mat . '"><i class="bi bi-eye"></i> Consulter</a>'
-       . '<a class="btn btn-sm btn-primary" target="_blank" href="' . $base . 'pdf.php?vue=enseignant&id=' . $mat . '"><i class="bi bi-file-earmark-pdf"></i> PDF</a></span></div>';
+       . '<button type="button" class="btn btn-sm btn-primary" onclick="afficherApercu(' . h(json_encode($base . 'pdf.php?vue=enseignant&id=' . $mat)) . ', &#39;Emploi du temps&#39;, null, &#39;landscape&#39;)"><i class="bi bi-file-earmark-pdf"></i> PDF</button></span></div>';   // aperçu avant impression
     if (!$svc && !$faites) return $h . '<p class="text-muted small mb-0">Aucun cours dans l\'emploi du temps de cette année.</p></div></div>';
     $h .= '<div class="row g-2 mb-2" style="font-size:.85rem">';
     foreach ([['Discipline', $d['discipline'] ?? '—'], ['Grade (emploi du temps)', $d['grade'] ?? '—'], ['Heures dues', $dues !== null ? $fmt($dues) . ' h' : '—'],

@@ -79,10 +79,11 @@ $pdf = APP_URL . '/secondaire/commun/pages/emploi_temps/pdf.php';
   </form>
   <?php endif; ?>
   <?php if ($id && $vue !== 'salle'): ?>
-  <a class="btn btn-sm btn-primary" target="_blank" href="<?= $pdf ?>?vue=<?= $vue ?>&id=<?= $id ?>"><i class="bi bi-file-earmark-pdf"></i> Imprimer (PDF)</a>
+  <?php // aperçu dans la page d'abord (01/11/2026), impression ou téléchargement depuis l'aperçu ?>
+  <button type="button" class="btn btn-sm btn-primary" onclick="afficherApercu(<?= h(json_encode($pdf . '?vue=' . $vue . '&id=' . $id)) ?>, 'Emploi du temps', null, 'landscape')"><i class="bi bi-eye"></i> Afficher / imprimer</button>
   <?php endif; ?>
   <?php if ($gestion && $vue !== 'salle'): ?>
-  <a class="btn btn-sm btn-outline-primary" target="_blank" href="<?= $pdf ?>?vue=<?= $vue ?>&tous=1"><i class="bi bi-files"></i> <?= $vue === 'classe' ? 'Toutes les classes' : 'Tous les enseignants' ?> (PDF)</a>
+  <button type="button" class="btn btn-sm btn-outline-primary" onclick="afficherApercu(<?= h(json_encode($pdf . '?vue=' . $vue . '&tous=1')) ?>, <?= h(json_encode($vue === 'classe' ? 'Emplois du temps — toutes les classes' : 'Emplois du temps — tous les enseignants')) ?>, null, 'landscape')"><i class="bi bi-files"></i> <?= $vue === 'classe' ? 'Toutes les classes' : 'Tous les enseignants' ?></button>
   <?php if ($vue === 'classe' && edt_peut_ecrire()): ?><a class="btn btn-sm btn-outline-secondary" href="saisie.php?classe=<?= $id ?>"><i class="bi bi-pencil-square"></i> Modifier</a><?php endif; ?>
   <?php endif; ?>
 </div></div>
