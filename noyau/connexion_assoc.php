@@ -2170,6 +2170,49 @@ function assoc_migrations_en_retard(): array {
  * d'abord (sauf $backup=false). S'arrête à la première migration en échec.
  * Retour : ['ok'=>bool, 'message'=>string, 'appliquees'=>int[], 'backup'=>?string].
  */
+/**
+ * Réparation (02/11/2026) : colonnes du schéma de référence absentes de la
+ * base d'une école ancienne (créée avant leur ajout au schéma, ex.
+ * inscription.id_serie à CDA), qu'AUCUNE migration ne crée — sans quoi une
+ * migration qui les utilise s'arrête (« Unknown column »). Seules ces
+ * colonnes-là sont ajoutées (jamais une colonne qu'une migration crée,
+ * renomme ou modifie : la migration s'en charge, avec ses données). Ni
+ * table, ni clé, ni contrainte. $simuler : rien n'est écrit.
+ * Retourne ['table.colonne', …] (ajoutées, ou à ajouter en simulation).
+ */
+function assoc_reparer_colonnes_ref(mysqli $l, string $type, bool $simuler = false): array {
+    $ref = @file_get_contents(__DIR__ . '/../bd/assoc/' . ($type === 'secondaire' ? 'schema_ref_ecole_secondaire.sql' : 'schema_ref_ecole.sql'));
+    if (!$ref) return [];
+    // Colonnes dont une migration de la série s'occupe (ADD/CHANGE/MODIFY/RENAME).
+    $geres = [];
+    foreach (assoc_migrations_disponibles($type) as $f) {
+        $sql = (string) @file_get_contents($f);
+        if (preg_match_all('/\b(?:ADD|MODIFY|CHANGE|RENAME)\s+(?:COLUMN\s+)?`(\w+)`(?:\s+(?:TO\s+)?`(\w+)`)?/i', $sql, $m, PREG_SET_ORDER)) {
+            foreach ($m as $x) { $geres[strtolower($x[1])] = true; if (!empty($x[2])) $geres[strtolower($x[2])] = true; }
+        }
+    }
+    $faites = [];
+    preg_match_all('/CREATE TABLE `(\w+)` \((.*?)\n\) ENGINE/s', $ref, $tables, PREG_SET_ORDER);
+    foreach ($tables as [, $table, $corps]) {
+        try { $r = mysqli_query($l, "SHOW COLUMNS FROM `" . $table . "`"); }
+        catch (\Throwable $e) { continue; }   // table absente de cette base : rien à faire
+        if (!$r) continue;
+        $presentes = array_map('strtolower', array_column(mysqli_fetch_all($r), 0));
+        foreach (explode("\n", $corps) as $ligne) {
+            if (!preg_match('/^\s*`(\w+)`\s+(.+?),?\s*$/', $ligne, $c)) continue;
+            [$col, $def] = [$c[1], rtrim($c[2], ',')];
+            if (in_array(strtolower($col), $presentes, true) || isset($geres[strtolower($col)])) continue;
+            if (stripos($def, 'AUTO_INCREMENT') !== false || stripos($def, 'GENERATED') !== false) continue;
+            if (!$simuler) {
+                try { mysqli_query($l, "ALTER TABLE `$table` ADD COLUMN `$col` $def"); }
+                catch (\Throwable $e) { continue; }
+            }
+            $faites[] = "$table.$col";
+        }
+    }
+    return $faites;
+}
+
 function assoc_migrer_ecole(int $id, bool $backup = true): array {
     $e = assoc_one("SELECT * FROM etablissement WHERE id=?", [$id]);
     if (!$e) return ['ok' => false, 'message' => "École introuvable.", 'appliquees' => [], 'backup' => null];
@@ -2213,6 +2256,10 @@ function assoc_migrer_ecole(int $id, bool $backup = true): array {
 
     $l = connecter_base_ecole($e['db_name']);
     mysqli_set_charset($l, 'utf8mb4');
+    // Base ancienne : colonnes du schéma de référence qu'aucune migration ne crée.
+    $reparees = [];
+    try { $reparees = assoc_reparer_colonnes_ref($l, $type_ecole); } catch (\Throwable $ex) { /* réparation impossible : on migre quand même */ }
+    $note_rep = $reparees ? ' Colonnes réparées : ' . implode(', ', $reparees) . '.' : '';
     $ok = []; $echec = null;
     foreach ($a_faire as $v) {
         $sql = file_get_contents($dispo[$v]);
@@ -2248,10 +2295,10 @@ function assoc_migrer_ecole(int $id, bool $backup = true): array {
         return ['ok' => false, 'appliquees' => $ok, 'backup' => $chemin_backup,
                 'message' => "Migrations appliquées : " . ($ok ? implode(', ', array_map(fn($v) => "v$v", $ok)) : 'aucune')
                            . ". ARRÊT sur $echec. "
-                           . ($chemin_backup ? "Sauvegarde : " . basename($chemin_backup) : '')];
+                           . ($chemin_backup ? "Sauvegarde : " . basename($chemin_backup) : '') . $note_rep];
     }
     return ['ok' => true, 'appliquees' => $ok, 'backup' => $chemin_backup,
-            'message' => "École à jour : " . implode(', ', array_map(fn($v) => "v$v", $ok)) . " appliquée(s)."];
+            'message' => "École à jour : " . implode(', ', array_map(fn($v) => "v$v", $ok)) . " appliquée(s)." . $note_rep];
 }
 
 // =====================================================================

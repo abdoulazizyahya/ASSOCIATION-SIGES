@@ -20,6 +20,13 @@
 -- =====================================================================
 
 -- 1. Niveaux fusionnés (seulement si l'école a des niveaux par LV2)
+-- Réparation (02/11/2026) : bases créées avant que ces colonnes n'entrent
+-- dans le schéma de référence (ex. CDA) — sautées si déjà présentes.
+ALTER TABLE `classe` ADD COLUMN `id_serie` int unsigned DEFAULT NULL;
+ALTER TABLE `classe` ADD KEY `id_serie` (`id_serie`);
+ALTER TABLE `inscription` ADD COLUMN `id_serie` int unsigned DEFAULT NULL;
+ALTER TABLE `inscription` ADD KEY `idx_insc_serie` (`id_serie`);
+
 INSERT IGNORE INTO `niveau` (`code_niveau`, `libelle_niv`, `id_cycle`, `ordre_niveau`)
 SELECT v.`code`, v.`lib`, '1er Cycle', v.`ordre`
 FROM (SELECT '4 eme' AS `code`, '4ème' AS `lib`, '3' AS `ordre` UNION ALL SELECT '3 eme', '3ème', '4') v

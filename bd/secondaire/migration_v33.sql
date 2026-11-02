@@ -10,8 +10,13 @@
 --  classes « An » sont marquées bilingues.
 -- =====================================================================
 
+-- Réparation (02/11/2026) : ordre_enseignement (v13) absente de certaines
+-- bases anciennes (ex. MHJ2) — sautée si déjà présente.
 ALTER TABLE `etablissement`
-  ADD COLUMN `langue_enseignement` enum('francophone','anglophone','bilingue') NOT NULL DEFAULT 'francophone' AFTER `ordre_enseignement`;
+  ADD COLUMN `ordre_enseignement` enum('general','technique') NOT NULL DEFAULT 'general';
+
+ALTER TABLE `etablissement`
+  ADD COLUMN `langue_enseignement` enum('francophone','anglophone','bilingue') NOT NULL DEFAULT 'francophone';
 
 UPDATE `etablissement` SET `langue_enseignement` = 'bilingue'
  WHERE EXISTS (SELECT 1 FROM `classe` c JOIN `inscription` i ON i.`id_classe` = c.`id` WHERE c.`libelle_section` = 'An');
