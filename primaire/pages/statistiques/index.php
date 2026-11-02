@@ -32,7 +32,7 @@ $seq_act   = get_sequence_active();
 $onglet = $_GET['onglet'] ?? 'eleves';
 // Onglet « Par compétence » (agrégé école entière) retiré, remplacé par
 // « Non évalué » (demande du 18/08/2026) — voir stats_non_evalues_par_competence().
-$allowed_onglets = ['eleves', 'competences', 'effectifs', 'niveau', 'non_evalue', 'enseignants'];
+$allowed_onglets = ['eleves', 'competences', 'effectifs', 'niveau', 'section', 'non_evalue', 'enseignants'];
 if (!in_array($onglet, $allowed_onglets, true)) $onglet = 'eleves';
 if ($onglet === 'enseignants' && !$is_admin) $onglet = 'eleves';
 
@@ -243,6 +243,13 @@ $q = fn(string $o) => "?onglet=$o&vue=$vue&classe=$id_classe&niveau=" . rawurlen
       <i class="bi bi-bar-chart-steps me-1"></i>Par niveau
     </a>
   </li>
+  <?php if (langue_enseignement_courante() === 'bilingue'): ?>
+  <li class="nav-item">
+    <a class="nav-link <?= $onglet === 'section' ? 'active' : '' ?>" data-ajax-nav href="<?= h($q('section')) ?>">
+      <i class="bi bi-translate me-1"></i>Par section
+    </a>
+  </li>
+  <?php endif; ?>
   <li class="nav-item">
     <a class="nav-link <?= $onglet === 'non_evalue' ? 'active' : '' ?>" data-ajax-nav href="<?= h($q('non_evalue')) ?>">
       <i class="bi bi-journal-x me-1"></i>Non évalué
@@ -614,6 +621,22 @@ foreach ($par_niveau as $niveau => $classes_niveau) {
         $lignes[] = ['classe' => $c['DesignationClasses'], 'bilan' => bilan_classe_genre((int) $c['IDClasses'], $val_annee, $vue, $id_trim, $seqs_override)];
     }
     render_tableau_bilan_genre('Niveau ' . $niveau, $lignes, $bilan_cols_niveau);
+}
+?>
+
+<?php elseif ($onglet === 'section'): ?>
+<!-- ══ ONGLET : PAR SECTION (francophone / anglophone, 01/11/2026) ══ -->
+<?php
+$seqs_override = ($vue === 'trim' && $mode_eval === 'seq' && $id_seq_stat) ? [$id_seq_stat] : null;
+$par_section = ['Fr' => [], 'An' => []];
+foreach ($classes as $c) { $par_section[section_classe((int) $c['IDClasses']) === 'An' ? 'An' : 'Fr'][] = $c; }
+foreach ($par_section as $sec => $classes_section) {
+    if (!$classes_section) continue;
+    $lignes = [];
+    foreach ($classes_section as $c) {
+        $lignes[] = ['classe' => $c['DesignationClasses'], 'bilan' => bilan_classe_genre((int) $c['IDClasses'], $val_annee, $vue, $id_trim, $seqs_override)];
+    }
+    render_tableau_bilan_genre('Section ' . ($sec === 'An' ? 'anglophone' : 'francophone'), $lignes, $bilan_cols_niveau);
 }
 ?>
 

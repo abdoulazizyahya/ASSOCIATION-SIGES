@@ -402,6 +402,7 @@ CREATE TABLE `etablissement` (
   `chef_etablissement_en` varchar(150) DEFAULT 'The Principal',
   `statut` enum('public','prive') NOT NULL DEFAULT 'public',
   `ordre_enseignement` enum('general','technique') NOT NULL DEFAULT 'general',
+  `langue_enseignement` enum('francophone','anglophone','bilingue') NOT NULL DEFAULT 'francophone',
   `mode_documents_enseignant` enum('validation','autonome') NOT NULL DEFAULT 'validation',
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;

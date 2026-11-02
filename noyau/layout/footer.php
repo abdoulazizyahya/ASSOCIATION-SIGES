@@ -2,7 +2,9 @@
 
     <footer class="abz-footer">
       © <?= date('Y') ?> <?= h(get_etablissement()['Nom_Etab_Fr'] ?? APP_NOM) ?> — v2.0
+      <?php require_once __DIR__ . '/../pwa.php'; if (pwa_mode_app()): // seulement dans l'application installée ?> · <a href="<?= APP_URL ?>/compte/a_propos.php" style="color:inherit">À propos</a><?php endif; ?>
     </footer>
+    <?php require_once __DIR__ . '/../pwa.php'; echo pwa_bandeau_apk(), pwa_nouveautes();   // application : nouvelle version, nouveautés ?>
 
   </div><!-- /.abz-main -->
 </div><!-- /.abz-shell -->

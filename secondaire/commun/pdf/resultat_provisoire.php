@@ -36,13 +36,14 @@ if ($is_ens && $mat_ens) {
 
 $etab         = get_etablissement();
 $annee        = db_one("SELECT * FROM annee_scolaire WHERE id=?", [$id_annee]) ?? ['libelle' => '—'];
+bulletin_fixer_langue($id_classe_cible);   // section anglophone : document en anglais
 $classe_cible = db_one("SELECT * FROM classe WHERE id=?", [$id_classe_cible]);
 if (!$classe_cible) die('Classe introuvable.');
 $annee_suivante_lib = libelle_annee_suivante((string)$annee['libelle']);
 
 $rows = calc_liste_provisoire_comp($id_annee, $id_classe_cible);
 
-$short_labels = ['no' => 'N°', 'niu' => 'NIU', 'nom' => 'Nom et Prénoms', 'date' => 'Date naiss.', 'lieu' => 'Lieu naiss.', 'sexe' => 'Sexe', 'statut' => 'Statut'];
+$short_labels = ['no' => 'N°', 'niu' => 'NIU', 'nom' => bt('Nom et Prénoms', 'Names'), 'date' => bt('Date naiss.', 'Date of birth'), 'lieu' => bt('Lieu naiss.', 'Place of birth'), 'sexe' => bt('Sexe', 'Sex'), 'statut' => bt('Statut', 'Status')];
 $largeurs     = ['no' => 10, 'niu' => 28, 'nom' => 55, 'date' => 24, 'lieu' => 32, 'sexe' => 14, 'statut' => 18];
 $def_cols = colonnes_liste_provisoire();
 $sel = [];
@@ -70,9 +71,9 @@ $nb_red = count(array_filter($rows, fn($r) => $r['statut'] === 'RED'));
 $nb_nv  = count(array_filter($rows, fn($r) => $r['statut'] === 'NV'));
 
 $pdf->SetFont('Arial', 'B', 9);
-$pdf->Cell(0, 5, pdf_u('Classe : ' . $classe_cible['designation'] . ' — Année ' . $annee_suivante_lib), 0, 1, 'L');
+$pdf->Cell(0, 5, pdf_u(bt('Classe : ', 'Class: ') . $classe_cible['designation'] . bt(' — Année ', ' — Year ') . $annee_suivante_lib), 0, 1, 'L');
 $pdf->SetFont('Arial', '', 8);
-$pdf->Cell(0, 4.5, pdf_u("Redoublants (RED) : $nb_red    Nouveaux (NV) : $nb_nv    Total : " . count($rows)), 0, 1, 'L');
+$pdf->Cell(0, 4.5, pdf_u(bulletin_en() ? "Repeaters (RED): $nb_red    New (NV): $nb_nv    Total: " . count($rows) : "Redoublants (RED) : $nb_red    Nouveaux (NV) : $nb_nv    Total : " . count($rows)), 0, 1, 'L');
 $pdf->Ln(1);
 
 $total_naturel = array_sum(array_map(fn($c) => $c[1], $sel));
@@ -112,6 +113,6 @@ $pdf->Ln(6);
 if ($pdf->GetY() > $pdf->GetPageHeight() - 30) $pdf->AddPage();
 pdf_fait_a_bilingue($pdf, 10, $pdf->GetPageWidth() - 20, lieu_edition_documents($etab), 'R', 9);   // marges de 10 mm
 $pdf->SetFont('Arial', 'B', 9);
-$pdf->Cell(0, 5, pdf_u(strtoupper($etab['chef_etablissement'] ?? 'LE PROVISEUR')), 0, 1, 'R');
+$pdf->Cell(0, 5, pdf_u(strtoupper(bt($etab['chef_etablissement'] ?? 'LE PROVISEUR', $etab['chef_etablissement_en'] ?? 'THE PRINCIPAL'))), 0, 1, 'R');
 
 $pdf->Output($dl ? 'D' : 'I', 'liste_provisoire_' . preg_replace('/\W+/', '_', $classe_cible['designation']) . '_' . date('Ymd') . '.pdf');

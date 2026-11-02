@@ -81,6 +81,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
              post('departement_fr'),post('division_en'),post('arrondissement_fr'),
              post('subdivision_en'),post('chef_etablissement'),post('chef_etablissement_en'),$logo,$etab['id']]
         );
+        // Langue d'enseignement (migration v33) : bulletins de la section anglophone.
+        if (db_colonne_existe('etablissement', 'langue_enseignement') && in_array(post('langue_enseignement'), ['francophone', 'anglophone', 'bilingue'], true)) {
+            db_exec("UPDATE etablissement SET langue_enseignement=? WHERE id=?", [post('langue_enseignement'), $etab['id']]);
+        }
 
         // Signature numérique du chef d'établissement (même principe que le
         // logo) : jamais appliquée automatiquement sur un document, l'admin
@@ -545,6 +549,17 @@ require_once __DIR__ . '/../../../../noyau/layout/header.php';
           <input type="text" name="chef_etablissement_en" class="form-control" value="<?= h($etab['chef_etablissement_en']??'') ?>">
           <div class="form-text" style="font-size:.72rem">Nom affiché sous « The Principal » sur les documents en anglais.</div>
         </div>
+        <?php if (array_key_exists('langue_enseignement', $etab)): ?>
+        <div class="col-md-6">
+          <label class="form-label">Langue d'enseignement</label>
+          <select name="langue_enseignement" class="form-select">
+            <?php foreach (['francophone' => 'Francophone', 'anglophone' => 'Anglophone', 'bilingue' => 'Bilingue (sections francophone et anglophone)'] as $lv => $ll): ?>
+              <option value="<?= $lv ?>" <?= ($etab['langue_enseignement'] ?? '') === $lv ? 'selected' : '' ?>><?= h($ll) ?></option>
+            <?php endforeach; ?>
+          </select>
+          <div class="form-text" style="font-size:.72rem">Bilingue : les bulletins des classes de la section « An » sont en anglais, traduits en français.</div>
+        </div>
+        <?php endif; ?>
         <div class="col-md-6">
           <label class="form-label">Logo</label>
           <?php if (!empty($etab['logo'])): ?>

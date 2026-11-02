@@ -28,6 +28,7 @@ $insc = db_one(
     [$id_eleve, $id_annee]
 );
 if (!$insc) die('Inscription introuvable.');
+bulletin_fixer_langue((int) $insc['id_classe']);   // section anglophone : anglais / traduction française
 
 // ── Trimestre à afficher ────────────────────────────────────────────
 // Chantier APC (voir prompt_continuite_ABZ_MBE_1.md) : le bulletin est
@@ -63,7 +64,7 @@ $contacts_parents = $tuteur
 
 // ── Disciplines ───────────────────────────────────────────────────
 $disciplines = db_all(
-    "SELECT d.id_mat, d.coef, d.ordre, m.libelle AS matiere,
+    "SELECT d.id_mat, d.coef, d.ordre, m.libelle AS matiere, m.libelle_en AS matiere_en,
             g.libelle_groupe_comp AS groupe_lib, d.id_groupe,
             TRIM(CONCAT(e.nom_ens,' ',COALESCE(e.prenom_ens,''))) AS enseignant
      FROM discipline d
@@ -97,6 +98,14 @@ foreach ($disciplines as $d) {
         "SELECT * FROM competence WHERE id_matiere=? AND code_niveau=? AND id_trim=? ORDER BY ordre",
         [$d['id_mat'], $code_niveau, $id_trim]
     );
+    // Section anglophone : intitulé anglais de la compétence s'il est saisi
+    // (Matières → Compétences), sinon l'intitulé saisi.
+    if (bulletin_en()) {
+        foreach ($competences_par_mat[$d['id_mat']] as &$c_en) {
+            if (trim((string) ($c_en['libelle_en'] ?? '')) !== '') $c_en['libelle'] = $c_en['libelle_en'];
+        }
+        unset($c_en);
+    }
 }
 $all_comp_ids = [];
 foreach ($competences_par_mat as $comps) { foreach ($comps as $c) { $all_comp_ids[] = (int)$c['id']; } }
@@ -284,17 +293,14 @@ if ($lisible) {
 $col3 = $uw / 3;
 $y0   = 8;
 
-$pdf->SetXY($ml, $y0);
-$pdf->SetFont('Arial', '', 6.5);
-$pdf->MultiCell($col3, 3.0, u(
-    "REPUBLIQUE DU CAMEROUN\nPaix - Travail - Patrie\n***************\n" .
+// Section anglophone : bloc anglais à gauche, bloc français à droite.
+$entete_fr = "REPUBLIQUE DU CAMEROUN\nPaix - Travail - Patrie\n***************\n" .
     ($etab['region_fr'] ?? "VOTRE REGION ICI") . "\n" .
     ($etab['departement_fr'] ?? 'DEPARTEMENT ') . "\n" .
     ($etab['arrondissement_fr'] ?? 'ARRONDISSEMENT') . "\n" .
     strtoupper($etab['nom_fr'] ?? 'NOM ECOLE ') . "\n" .
     "B.P. " . ($etab['boite_postale'] ?? 'XX') . " ville Tel.: " . ($etab['telephone'] ?? '') . "\n" .
-    ($etab['email'] ?? 'adresse email')
-), 0, 'C');
+    ($etab['email'] ?? 'adresse email');
 
 // Logo agrandi et centré horizontalement ET verticalement dans la bande du
 // milieu (demande explicite, était calé en haut) — hauteur réelle déduite du
@@ -317,19 +323,21 @@ if ($logo_path && is_file($logo_path)) {
     $pdf->Cell($logo_w, 16, u($etab['sigle'] ?? ''), 1, 0, 'C');
 }
 
-$xr = $ml + $col3 * 2;
-$pdf->SetXY($xr, $y0);
-$pdf->SetFont('Arial', '', 6.5);
-$pdf->MultiCell($col3, 3.0, u(
-    "REPUBLIC OF CAMEROON\nPeace - Work - Fatherland\n***************\n" .
+$entete_en = "REPUBLIC OF CAMEROON\nPeace - Work - Fatherland\n***************\n" .
     ($etab['region_en'] ?? '') . "\n" .
     ($etab['division_en'] ?? '') . "\n" .
     ($etab['subdivision_en'] ?? '') . "\n" .
     strtoupper($etab['nom_en'] ?? '') . "\n" .
     "P.O. BOX. " . ($etab['boite_postale'] ?? '') . " " . ($etab['ville'] ?? '') . "  Phone: " . ($etab['telephone'] ?? '') . "\n" .
-    ($etab['email'] ?? '')
-),
-0, 'C');
+    ($etab['email'] ?? '');
+[$entete_g, $entete_d] = bulletin_en() ? [$entete_en, $entete_fr] : [$entete_fr, $entete_en];
+$pdf->SetXY($ml, $y0);
+$pdf->SetFont('Arial', '', 6.5);
+$pdf->MultiCell($col3, 3.0, u($entete_g), 0, 'C');
+$xr = $ml + $col3 * 2;
+$pdf->SetXY($xr, $y0);
+$pdf->SetFont('Arial', '', 6.5);
+$pdf->MultiCell($col3, 3.0, u($entete_d), 0, 'C');
 
 $pdf->SetY(max($pdf->GetY(), 29));
 // Logo ajusté automatiquement dans l'espace libre entre le haut de l'en-tête
@@ -358,6 +366,7 @@ $pdf->RoundedRect($ml, $y_titre, $uw, $h_titre, $h_titre / 2, 'FD');
 // (« BULLETIN SCOLAIRE DU TRIMESTRE 1 / First Term Report Card », 30/10/2026).
 $titre_fr = 'BULLETIN SCOLAIRE DU ' . $titre_bull;
 $titre_en = ([1 => 'First', 2 => 'Second', 3 => 'Third'][(int) ($trim_info['ordre'] ?? 0)] ?? '') . ' Term Report Card';
+[$titre_fr, $titre_en] = bl($titre_fr, $titre_en);
 $t_fr = 13; $t_en = 10.5;
 do {   // réduit ensemble si la ligne dépasse le bandeau
     $pdf->SetFont('Arial', 'BI', $t_fr); $w_fr = $pdf->GetStringWidth(u($titre_fr . ' / '));
@@ -376,7 +385,7 @@ $pdf->SetTextColor(0, 0, 0);
 $pdf->SetLineWidth(0.2);
 $pdf->SetFont('Arial', 'B', 8.5);
 $pdf->SetX($ml);
-$pdf->Cell($uw, 3.8, u('Année scolaire : ' . $val_annee), 0, 1, 'C');
+$pdf->Cell($uw, 3.8, u(bt('Année scolaire : ', 'School year: ') . $val_annee), 0, 1, 'C');
 
 // ── 3. Infos élève ───────────────────────────────────────────────
 $pdf->Ln(0.3);
@@ -484,7 +493,7 @@ $pdf->SetFont('Arial', 'I', $f_val);
 $dnaiss = $eleve['date_naiss'] ? date('d/m/Y', strtotime($eleve['date_naiss'])) : '';
 $pdf->Cell(22, $h_id, $dnaiss, 1, 0, 'C');
 $pdf->SetFont('Arial', 'B', $f_val);
-$pdf->Cell(10, $h_id, 'A/at', 1, 0, 'C', true);
+$pdf->Cell(10, $h_id, u(bt('A/at', 'At/à')), 1, 0, 'C', true);
 $pdf->SetFont('Arial', 'I', $f_val);
 $pdf->Cell(64, $h_id, u($eleve['lieu_naiss'] ?? ''), 1, 0, 'L');
 cell2l($pdf, 26, $h_id, 'REDOUBLANT :', 'Repeater', 'L', true, $f_lbl, $f_en, $gris, true);
@@ -495,10 +504,10 @@ $pdf->Cell(28, $h_id, '', 1, 1, 'L');
 $pdf->SetFont('Arial', 'I', $f_val);
 $dy3 = ($h_id - 3) / 2;
 $pdf->SetXY($x_row3 + 1, $y_row3 + $dy3);
-$pdf->Cell(7, 3, 'Oui', 0, 0, 'L');
+$pdf->Cell(7, 3, bt('Oui', 'Yes'), 0, 0, 'L');
 checkbox_ltm($pdf, $x_row3 + 8, $y_row3 + $dy3, $is_redoub);
 $pdf->SetXY($x_row3 + 15, $y_row3 + $dy3);
-$pdf->Cell(7, 3, 'Non', 0, 0, 'L');
+$pdf->Cell(7, 3, bt('Non', 'No'), 0, 0, 'L');
 checkbox_ltm($pdf, $x_row3 + 23, $y_row3 + $dy3, !$is_redoub);
 
 //$pdf->ln(20);
@@ -697,8 +706,8 @@ $entete_tableau = function () use ($pdf, $ml, $hdr_h, $cD, $cN, $cM, $cCF, $cMXC
     $pdf->SetTextColor(255, 255, 255);
     $pdf->SetX($ml);
     $cols = [
-        [$cD, "COMPÉTENCES ÉVALUÉES / NOM DE L'ENSEIGNANT"], [$cN, 'N/20'], [$cM, 'M/20'], [$cCF, 'Coef'],
-        [$cMXC, 'MxC'], [$cCOTE, 'Cote'], [$cMINMAX, '[Min-Max]'], [$cAPPR, "Appréciations et visa de l'enseignant"],
+        [$cD, bt("COMPÉTENCES ÉVALUÉES / NOM DE L'ENSEIGNANT", "COMPETENCES ASSESSED / TEACHER'S NAME")], [$cN, 'N/20'], [$cM, 'M/20'], [$cCF, 'Coef'],
+        [$cMXC, 'MxC'], [$cCOTE, bt('Cote', 'Grade')], [$cMINMAX, '[Min-Max]'], [$cAPPR, bt("Appréciations et visa de l'enseignant", "Remarks and teacher's signature")],
     ];
     foreach ($cols as $i => [$larg, $txt]) {
         // Chaque intitulé s'ajuste à sa colonne (jamais de débordement).
@@ -743,7 +752,7 @@ foreach ($disciplines as $d) {
     $pdf->SetXY($ml, $y_hdr);
     pdf_fill($pdf, 'bandeau_section');
     // Taille mesurée en GRAS (style réellement utilisé) : le titre ne déborde plus dans la colonne voisine.
-    $lib_mat = 'COMPETENCE ' . $num_mat . ': ' . mb_strtoupper($d['matiere']);
+    $lib_mat = 'COMPETENCE ' . $num_mat . ': ' . mb_strtoupper(bulletin_en() && trim((string) ($d['matiere_en'] ?? '')) !== '' ? $d['matiere_en'] : $d['matiere']);
     $t_mat   = cell2l_taille_ajustee($pdf, $lib_mat, 'B', $cD + $cN - 1.6, $lisible ? 9.5 : 7.5, 5);
     $pdf->SetFont('Arial', 'B', $t_mat);
     $pdf->Cell($cD + $cN, $h_mat, u($lib_mat), 1, 0, 'L', true);
@@ -771,7 +780,7 @@ foreach ($disciplines as $d) {
             $pdf->Rect($x0, $y0, $cD, $h_row_reel, 'DF');
             $pdf->SetFont('Arial', $comp ? '' : 'I', $taille_comp);
             $pdf->SetXY($x0, $y0 + $pad_l / 2);
-            $pdf->MultiCell($cD, $h_txt_l, u($comp ? ($comp['libelle'] ?? '') : 'Aucune compétence définie pour ce trimestre.'), 0, 'L', false);
+            $pdf->MultiCell($cD, $h_txt_l, u($comp ? ($comp['libelle'] ?? '') : bt('Aucune compétence définie pour ce trimestre.', 'No competence defined for this term.')), 0, 'L', false);
             $pdf->SetXY($x0 + $cD, $y0);
             $v = $comp ? note_eff_comp($id_eleve, $id_comp, $notes_idx, $notes_count, $nb_inscrits) : null;
             $pdf->SetFont('Arial', 'B', 9);
@@ -784,7 +793,7 @@ foreach ($disciplines as $d) {
     } elseif (empty($comps)) {
         $pdf->SetX($ml);
         $pdf->SetFillColor(...$bg);
-        $pdf->Cell($cD, $h_unit + $pad_c, u('Aucune compétence définie pour ce trimestre.'), 1, 0, 'L', true);
+        $pdf->Cell($cD, $h_unit + $pad_c, u(bt('Aucune compétence définie pour ce trimestre.', 'No competence defined for this term.')), 1, 0, 'L', true);
         $pdf->Cell($cN, $h_unit + $pad_c, '', 1, 1, 'C', true);
         $h_grp = $h_unit + $pad_c;
     } else {
@@ -854,6 +863,10 @@ foreach ($disciplines as $d) {
     // pour ne jamais déborder d'un groupe à une seule compétence courte.
     $x_appr = $x_fus + $cM + $cCF + $cMXC + $cCOTE + $cMINMAX;
     if ($appr['COTE'] !== '') {
+        if (bulletin_en()) {   // section anglophone : l'anglais à la place du français
+            [$appr['APPR1_FR'], $appr['APPR1_EN']] = [$appr['APPR1_EN'], $appr['APPR1_FR']];
+            [$appr['APPR2_FR'], $appr['APPR2_EN']] = [$appr['APPR2_EN'], $appr['APPR2_FR']];
+        }
         if ($h_grp >= 5) {
             $h2 = min($lisible ? 4.2 : 3.4, $h_grp / 2);
             $y_txt = $centrer_y($h2 * 2);
@@ -942,8 +955,8 @@ $left_rows = [
     ['Absences Jus.', 'Justified Abs.', (string)$heur_jus, "Tableau d'honneur", 'Roll of honor', $tab_honneur, null, true],
     ['Absences NJ.',  'Unjustified Abs', (string)$heur_nj,  'Encouragement',     'Encouragement', $encourag,    null, true],
     ['Exclusion(jrs)', 'Exclu.', '---',                       'Félicitations',     'Congratulation', $felicit, null, false],
-    ['Avert. conduite', 'Warning Behavior', null,             'Avert. Travail',   'Worning Work',   $avert_trav, $avert_cond, false],
-    ['Blâme conduite',  'Blame Behavior',   null,             'Blâme Travail',    'Blame Behavior',  $blame_trav, $blame_cond, false],
+    ['Avert. conduite', 'Warning Behavior', null,             'Avert. Travail',   'Warning Work',   $avert_trav, $avert_cond, false],
+    ['Blâme conduite',  'Blame Behavior',   null,             'Blâme Travail',    'Blame Work'    ,  $blame_trav, $blame_cond, false],
 ];
 $prof_rows = [
     ['Moy. de la classe', 'Class Average',     $moy_classe  !== null ? fmt_note_b($moy_classe)  : '-'],
@@ -997,7 +1010,7 @@ $rang_str    = $rang_general !== null ? $rang_general . 'e / ' . $nb_classes : '
 $mention_str = $moy_generale !== null ? mention_gen_b($moy_generale) : '';
 
 $res_rows2 = [
-    ['GENERAL TOTAL', 'Total général', $total_general !== null ? fmt_note_b($total_general) : '-', false],
+    ['TOTAL GENERAL', 'General total', $total_general !== null ? fmt_note_b($total_general) : '-', false],
     ['COEFFICIENT',   'Coefficient',   $total_coef_eleve > 0 ? (string)$total_coef_eleve : '-', false],
 ];
 $pdf->SetXY($xR, $y_res0);
@@ -1063,6 +1076,7 @@ foreach ($decisions as $i => $dec) {
     checkbox_ltm($pdf, $x_dec + 1.2, $y_row + $h_dec / 2 - ($lisible ? 1.25 : 1), $checked, $lisible ? 2.5 : 2);
     $pdf->SetXY($x_dec + 5.5, $y_row);
     $pdf->SetFont('Arial', 'B', $lisible ? 8 : 7.5);
+    $dec = bl($dec[0], $dec[1]);
     $txt_fr = u($dec[0] . ' / ');
     $w_fr   = $pdf->GetStringWidth($txt_fr);
     $pdf->Cell($w_fr, $h_dec, $txt_fr, 0, 0, 'L');
@@ -1094,17 +1108,17 @@ $pdf->MultiCell($w_obs, $h_obs_box, '', 1, 'L');
 // libérée en dessous sert à la signature (cadre de 30 mm en mode 1 page).
 $pdf->SetFont('Arial', '', 8.5);
 $pdf->SetXY($x_obs, $y_dec2 + 1.2);
-$pdf->Cell($w_obs, 4.2, u(lieu_edition_documents() . ', le ' . date('d-m-Y') . '.'), 0, 1, 'C');
+$pdf->Cell($w_obs, 4.2, u(lieu_edition_documents() . bt(', le ', ', on ') . date('d-m-Y') . '.'), 0, 1, 'C');
 $pdf->SetX($x_obs);
 $pdf->SetFont('Arial', 'I', 7.5);
-$pdf->Cell($w_obs, 3.2, 'On', 0, 1, 'C');
+$pdf->Cell($w_obs, 3.2, bt('On', 'Le'), 0, 1, 'C');
 $pdf->Ln(0.8);
 $pdf->SetX($x_obs);
 $pdf->SetFont('Arial', 'B', 8.5);
-$pdf->Cell($w_obs, 4.2, u(strtoupper($etab['chef_etablissement'] ?? 'LE PROVISEUR') . ','), 0, 1, 'C');
+$pdf->Cell($w_obs, 4.2, u(strtoupper(bt($etab['chef_etablissement'] ?? 'LE PROVISEUR', $etab['chef_etablissement_en'] ?? 'The Principal')) . ','), 0, 1, 'C');
 $pdf->SetX($x_obs);
 $pdf->SetFont('Arial', 'I', 7.5);
-$pdf->Cell($w_obs, 3.4, u($etab['chef_etablissement_en'] ?? 'The Principal'), 0, 1, 'C');
+$pdf->Cell($w_obs, 3.4, u(bt($etab['chef_etablissement_en'] ?? 'The Principal', $etab['chef_etablissement'] ?? 'Le Proviseur')), 0, 1, 'C');
 
 // Signature numérique (uniquement si demandée à l'impression — jamais
 // automatique — et si l'admin en a configuré une dans les paramètres).

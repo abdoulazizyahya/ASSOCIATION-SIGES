@@ -127,6 +127,10 @@ $classes = db_all(
      ORDER BY n.OrdreNiveau, c.DesignationClasses",
     [$val_annee]
 );
+// Filtre de section (école bilingue, 01/11/2026) : francophone / anglophone.
+$f_section = in_array($_GET['section'] ?? '', ['Fr', 'An'], true) ? $_GET['section'] : '';
+$avec_sections = count(array_unique(array_map(fn($c) => ($c['Section'] ?? 'Fr') === 'An' ? 'An' : 'Fr', $classes))) > 1;
+if ($f_section !== '') $classes = array_values(array_filter($classes, fn($c) => (($c['Section'] ?? 'Fr') === 'An' ? 'An' : 'Fr') === $f_section));
 
 $es_partiel = isset($_GET['partiel']);
 if (!$es_partiel) {
@@ -168,6 +172,14 @@ if (!$es_partiel) {
 <!-- ══════════════════════════════════════════════
      ONGLET 1 — Classes
 ══════════════════════════════════════════════ -->
+<?php if ($avec_sections || $f_section !== ''): ?>
+<div class="d-flex gap-1 mb-2">
+  <?php foreach (['' => 'Toutes', 'Fr' => 'Francophone', 'An' => 'Anglophone'] as $sv => $sl): ?>
+    <a data-ajax-nav href="<?= APP_URL ?>/primaire/pages/classes/liste.php?onglet=classes<?= $sv !== '' ? '&section=' . $sv : '' ?>"
+       class="btn btn-sm <?= $f_section === $sv ? 'btn-primary' : 'btn-outline-primary' ?>"><?= $sl ?></a>
+  <?php endforeach; ?>
+</div>
+<?php endif; ?>
 <div class="card">
   <div class="table-responsive">
     <table class="table table-abz table-hover align-middle mb-0">

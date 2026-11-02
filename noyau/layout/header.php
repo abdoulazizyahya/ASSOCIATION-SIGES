@@ -7,6 +7,7 @@
 // Proviseur/Censeur/SG/Intendant) et sans le bloc notifications/signatures
 // numériques (tables non présentes dans ce schéma — pas encore nécessaire
 // tant que le module Bulletins/PDF n'est pas construit).
+require_once __DIR__ . '/../langue.php';   // langue de l'interface (menu FR/EN, 02/11/2026)
 $etab      = get_etablissement();
 $annee_act = get_annee_active();
 $seq_act   = get_sequence_active();
@@ -161,6 +162,7 @@ function lien_actif(string $url): string {
   <link rel="stylesheet" href="<?= APP_URL ?>/assets/vendor/bootstrap/css/bootstrap.min.css">
   <link rel="stylesheet" href="<?= APP_URL ?>/assets/vendor/bootstrap-icons/bootstrap-icons.min.css">
   <link rel="stylesheet" href="<?= APP_URL ?>/assets/vendor/inter/inter.css">
+  <?php require_once __DIR__ . '/../pwa.php'; echo pwa_balises();   // application installable / APK ?>
   <?php
   // Cache-buster automatique (mtime du fichier) : sans lui, le navigateur
   // peut servir indéfiniment une VERSION EN CACHE de style.css même après
@@ -203,7 +205,7 @@ function lien_actif(string $url): string {
       <?php endif; ?>
       <div>
         <div class="brand-name"><?= h($etab['Nom_Etab_Fr'] ?? APP_NOM) ?></div>
-        <div class="brand-sub">Gestion scolaire</div>
+        <div class="brand-sub"><?= h(tm('Gestion scolaire')) ?></div>
       </div>
     </div>
 
@@ -236,17 +238,17 @@ function lien_actif(string $url): string {
              data-annee-requise="<?= in_array($groupe, $groupes_annee_requise, true) ? '1' : '0' ?>">
           <div class="nav-groupe" onclick="toggleNavSection(this)">
             <span class="nav-groupe-icone"><i class="bi bi-<?= $icone_grp ?>"></i></span>
-            <span class="nav-groupe-label"><?= h($groupe) ?></span>
+            <span class="nav-groupe-label"><?= h(tm($groupe)) ?></span>
             <i class="bi bi-chevron-down nav-groupe-chevron"></i>
           </div>
           <div class="nav-sousmenu">
             <?php foreach ($visibles as $it): ?>
               <?php if ($it[0] === '--'): ?>
-                <div class="nav-separateur"><span><?= h($it[1]) ?></span></div>
+                <div class="nav-separateur"><span><?= h(tm($it[1])) ?></span></div>
               <?php else: ?>
                 <a href="<?= APP_URL . '/' . $it[1] ?>" class="nav-lien <?= lien_actif($it[1]) ?>">
                   <i class="bi bi-<?= $it[2] ?>"></i>
-                  <span><?= h($it[0]) ?></span>
+                  <span><?= h(tm($it[0])) ?></span>
                 </a>
               <?php endif; ?>
             <?php endforeach; ?>
@@ -257,7 +259,7 @@ function lien_actif(string $url): string {
 
     <div class="abz-sidebar-footer">
       <a href="<?= APP_URL ?>/compte/logout.php" class="nav-lien text-danger-light">
-        <i class="bi bi-box-arrow-right"></i><span>Déconnexion</span>
+        <i class="bi bi-box-arrow-right"></i><span><?= h(tm('Déconnexion')) ?></span>
       </a>
     </div>
   </aside>
@@ -321,7 +323,7 @@ function lien_actif(string $url): string {
         <a href="<?= APP_URL ?>/association/entrer_ecole.php?id=<?= $ec_id ?>&amp;mode=lecture"
            class="btn btn-sm btn-light border py-0 px-2" style="font-size:.78rem"
            title="Consulter sans risque de modification">
-          <i class="bi bi-eye me-1"></i>Lecture seule
+          <i class="bi bi-eye me-1"></i><?= h(tm('Lecture seule')) ?>
         </a>
       <?php elseif ($ec_id && $lecture_seule && $peut_ecrire_visite): ?>
         <a href="<?= APP_URL ?>/association/entrer_ecole.php?id=<?= $ec_id ?>"
@@ -366,7 +368,7 @@ function lien_actif(string $url): string {
          style="background:#fff8e6;border-bottom:1px solid #f0dca0;font-size:.8rem;color:#7a5b00">
       <span>
         <i class="bi bi-eye me-1"></i>
-        <strong>Lecture seule<?= $label_rubrique ? ' — ' . h($label_rubrique) : '' ?></strong>
+        <strong><?= h(tm('Lecture seule')) ?><?= $label_rubrique ? ' — ' . h(tm($label_rubrique)) : '' ?></strong>
         — vous pouvez consulter cette page, mais pas y enregistrer.
       </span>
     </div>
@@ -465,6 +467,8 @@ function lien_actif(string $url): string {
           </span>
         <?php endif; ?>
 
+        <?= selecteur_langue_html() ?>
+
         <div class="dropdown">
           <button class="btn btn-light btn-sm dropdown-toggle d-flex align-items-center gap-2 py-1" data-bs-toggle="dropdown">
             <span class="avatar-mini"><?= h(mb_strtoupper(mb_substr($user['nom'] ?? '?', 0, 1))) ?></span>
@@ -475,12 +479,23 @@ function lien_actif(string $url): string {
           <ul class="dropdown-menu dropdown-menu-end">
             <li>
               <span class="dropdown-item-text text-muted" style="font-size:.75rem">
-                <?= h($est_proprio_ecole ? 'Propriétaire' : libelle_role($user['role'] ?? '')) ?>
+                <?= h(tm($est_proprio_ecole ? 'Propriétaire' : libelle_role($user['role'] ?? ''))) ?>
               </span>
             </li>
             <li><hr class="dropdown-divider my-1"></li>
+            <?php /* Langue de l'interface (noyau/langue.php) — pour l'instant le menu seul. */ ?>
+            <li><span class="dropdown-item-text text-muted" style="font-size:.72rem"><i class="bi bi-translate me-1"></i><?= h(tm('Langue')) ?></span></li>
+            <?php foreach (LANGUES_INTERFACE as $code_l => $nom_l): ?>
+            <li><a class="dropdown-item py-1<?= langue_interface() === $code_l ? ' active' : '' ?>" style="font-size:.82rem"
+                   href="<?= APP_URL ?>/compte/langue.php?l=<?= $code_l ?>&amp;retour=<?= urlencode($_SERVER['REQUEST_URI'] ?? '') ?>">
+              <?= strtoupper($code_l) ?> — <?= h($nom_l) ?></a></li>
+            <?php endforeach; ?>
+            <li><hr class="dropdown-divider my-1"></li>
+            <?php if (pwa_mode_app()): // seulement dans l'application installée ?>
+            <li><a class="dropdown-item py-1" style="font-size:.82rem" href="<?= APP_URL ?>/compte/a_propos.php"><i class="bi bi-info-circle me-2"></i>À propos</a></li>
+            <?php endif; ?>
             <li><a class="dropdown-item text-danger" href="<?= APP_URL ?>/compte/logout.php">
-              <i class="bi bi-box-arrow-right me-2"></i>Déconnexion
+              <i class="bi bi-box-arrow-right me-2"></i><?= h(tm('Déconnexion')) ?>
             </a></li>
           </ul>
         </div>

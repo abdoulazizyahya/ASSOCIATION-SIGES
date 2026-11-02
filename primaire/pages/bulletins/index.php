@@ -48,6 +48,13 @@ $id_eleve  = (int) ($_GET['eleve'] ?? 0);
 exiger_acces_eleve($id_eleve, 'fr');   // enseignant restreint : élève hors de ses classes -> refus
 $ordre     = in_array($_GET['ordre'] ?? '', ['alpha', 'merite'], true) ? $_GET['ordre'] : 'alpha';
 $voir_tous = isset($_GET['voir_tous']);
+// Langue du bulletin (école bilingue/anglophone, 01/11/2026) : français
+// traduit en anglais, ou anglais traduit en français (bulletin_*_anglais.php).
+// Par défaut selon la langue de l'école et la section de la classe ; choix
+// mémorisé par classe.
+$choix_langue = langue_enseignement_courante() !== 'francophone';
+if ($id_classe && in_array($_GET['langue'] ?? '', ['fr', 'en'], true)) $_SESSION['bull_pri_langue'][$id_classe] = $_GET['langue'];
+$langue_bull = $id_classe ? ($_SESSION['bull_pri_langue'][$id_classe] ?? primaire_langue_classe($id_classe)) : 'fr';
 // Trimestre choisissable (contrairement à ABZ_MBE qui impose la séquence
 // active) — la piste française jaynitaare a déjà une page Classement qui
 // permet ce choix, cohérence conservée ici.
@@ -99,9 +106,10 @@ $peut_configurer_sig = signature_politique()['bulletin'];   // signature décid�
 // $id_classe : nécessaire pour choisir le bon fichier PDF — primaire/pdf/
 // bulletin_{trimestriel,annuel}_anglais.php (demande du 26/08/2026) pour
 // une classe de niveau anglophone (section_classe(), fonctions.php), sinon
-// les fichiers français inchangés.
+// les fichiers français inchangés — ou selon le choix « Langue du bulletin »
+// ($langue_bull, école bilingue/anglophone, 01/11/2026).
 function pdf_url_bull(int $id_eleve, int $id_classe, string $vue, int $id_trim, bool $dl = false): string {
-    $anglais = section_classe($id_classe) === 'An';
+    $anglais = ($GLOBALS['langue_bull'] ?? primaire_langue_classe($id_classe)) === 'en';
     $base = $vue === 'annee'
         ? APP_URL . '/primaire/pdf/bulletin_annuel' . ($anglais ? '_anglais' : '') . '.php?id=' . $id_eleve
         : APP_URL . '/primaire/pdf/bulletin_trimestriel' . ($anglais ? '_anglais' : '') . '.php?id=' . $id_eleve . '&trim=' . $id_trim;
@@ -109,7 +117,7 @@ function pdf_url_bull(int $id_eleve, int $id_classe, string $vue, int $id_trim, 
     return $base;
 }
 function url_classe_bull(int $id_classe, string $vue, int $id_trim, string $ordre, bool $dl = false): string {
-    $anglais = section_classe($id_classe) === 'An';
+    $anglais = ($GLOBALS['langue_bull'] ?? primaire_langue_classe($id_classe)) === 'en';
     $base = $vue === 'annee'
         ? APP_URL . '/primaire/pdf/bulletin_annuel' . ($anglais ? '_anglais' : '') . '.php?classe=' . $id_classe
         : APP_URL . '/primaire/pdf/bulletin_trimestriel' . ($anglais ? '_anglais' : '') . '.php?classe=' . $id_classe . '&trim=' . $id_trim;
@@ -220,6 +228,19 @@ if (!$es_partiel) {
           </a>
         </div>
       </div>
+      <?php if ($choix_langue):
+        $base_langue = '?vue=' . $vue . '&classe=' . $id_classe . '&trim=' . $id_trim . '&ordre=' . $ordre . ($id_eleve ? '&eleve=' . $id_eleve : ''); ?>
+      <!-- Langue du bulletin (section anglophone : anglais traduit en français) -->
+      <div class="col-auto">
+        <label class="form-label mb-1" style="font-size:.78rem;font-weight:600;color:#1a3c6b">Langue du bulletin</label>
+        <div class="d-flex gap-1">
+          <a href="<?= h($base_langue . '&langue=fr') ?>" data-ajax-nav class="ordre-btn <?= $langue_bull === 'fr' ? 'active' : '' ?>"
+             title="Section francophone : français, traduction anglaise en dessous">Français / English</a>
+          <a href="<?= h($base_langue . '&langue=en') ?>" data-ajax-nav class="ordre-btn <?= $langue_bull === 'en' ? 'active' : '' ?>"
+             title="Section anglophone : anglais, traduction française en dessous">English / Français</a>
+        </div>
+      </div>
+      <?php endif; ?>
       <?php endif; ?>
     </form>
   </div>

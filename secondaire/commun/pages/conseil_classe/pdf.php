@@ -157,6 +157,7 @@ function pvpdf_u(string $s): string {
 }
 
 $etab = get_etablissement();
+bulletin_fixer_langue($id_classe);   // section anglophone : anglais d'abord
 
 class FPDF_PV extends FPDF {
     public array $etabRef = [];
@@ -189,12 +190,12 @@ $page_w = $pdf->GetPageWidth();
 $marge  = 10;
 $w      = $page_w - 2 * $marge;
 
-$periode = $type === 'annee' ? "Conseil de fin d'année/Year-end council" : ('Conseil du/Council of ' . ($trim_info['libelle'] ?? ''));
+$periode = $type === 'annee' ? bl_barre("Conseil de fin d'année/Year-end council") : (bl_barre('Conseil du/Council of') . ' ' . ($trim_info['libelle'] ?? ''));
 $pdf->SetFont('Arial', 'B', 10);
 $pdf->SetTextColor(20, 40, 90);
 $pdf->SetX($marge);
-$pdf->Cell($w, 6, pvpdf_u('Classe/Class : ' . $classe_info['designation'] . ($classe_info['niveau_lib'] ? ' (' . $classe_info['niveau_lib'] . ')' : '') .
-    '   |   Année scolaire/Academic year : ' . $val_annee . '   |   ' . $periode), 0, 1, 'C');
+$pdf->Cell($w, 6, pvpdf_u(bl_barre('Classe/Class') . ' : ' . $classe_info['designation'] . ($classe_info['niveau_lib'] ? ' (' . $classe_info['niveau_lib'] . ')' : '') .
+    '   |   ' . bl_barre('Année scolaire/Academic year') . ' : ' . $val_annee . '   |   ' . $periode), 0, 1, 'C');
 $pdf->SetTextColor(0);
 $pdf->Ln(1);
 
@@ -216,7 +217,7 @@ $pdf->SetFont('Arial', 'B', 8);
 $pdf->SetFillColor(20, 40, 90);
 $pdf->SetTextColor(255);
 $pdf->SetX($marge);
-foreach ($cols as $c) $pdf->Cell($c[1], 7, pvpdf_u($c[0]), 1, 0, 'C', true);
+foreach ($cols as $c) $pdf->Cell($c[1], 7, pvpdf_u(bl_barre($c[0])), 1, 0, 'C', true);
 $pdf->Ln();
 $pdf->SetTextColor(0);
 $pdf->SetFont('Arial', '', 7.5);
@@ -232,8 +233,8 @@ foreach ($eleves_raw as $e) {
         ? ($dest_noms[$e['next_classe']] ?? ($e['next_classe'] ? '#'.$e['next_classe'] : '-'))
         : '-';
     $vals = [$n, niu_eleve($e), $e['nom'].' '.$e['prenom'], $moyFmt, $e['rang'], $e['abs_jus'].'h', $e['abs_nj'].'h', $e['excl_j'].'j'];
-    if ($type === 'annee') { $vals[] = $e['decision'] ?: '-'; $vals[] = $dest; $vals[] = $e['observation']; }
-    else { $vals[] = $e['decision'] ?: 'RAS'; $vals[] = $e['observation']; }
+    if ($type === 'annee') { $vals[] = $e['decision'] ? decision_affichee($e['decision']) : '-'; $vals[] = $dest; $vals[] = $e['observation']; }
+    else { $vals[] = $e['decision'] ? decision_affichee($e['decision']) : bt('RAS', 'Nothing to report'); $vals[] = $e['observation']; }
     foreach ($cols as $i => $c) {
         $pdf->Cell($c[1], 6, pvpdf_u((string)$vals[$i]), 1, 0, $c[2], $fill);
     }
@@ -242,7 +243,7 @@ foreach ($eleves_raw as $e) {
 }
 if (empty($eleves_raw)) {
     $pdf->SetX($marge);
-    $pdf->Cell($w, 8, pvpdf_u('Aucun élève inscrit. / No student enrolled.'), 1, 1, 'C');
+    $pdf->Cell($w, 8, pvpdf_u(bl_barre('Aucun élève inscrit. / No student enrolled.')), 1, 1, 'C');
 }
 
 // ── Zone de signatures ────────────────────────────────────────────
@@ -258,11 +259,11 @@ $sigCols = [
 ];
 $pdf->SetFont('Arial', 'B', 8.5);
 $pdf->SetX($marge);
-foreach ($sigCols as $lib_fr => [$lib_en, $cw]) $pdf->Cell($cw, 5, pvpdf_u($lib_fr), 0, 0, 'C');
+foreach ($sigCols as $lib_fr => [$lib_en, $cw]) $pdf->Cell($cw, 5, pvpdf_u(bt($lib_fr, $lib_en)), 0, 0, 'C');
 $pdf->Ln();
 $pdf->SetFont('Arial', 'I', 7.5);
 $pdf->SetX($marge);
-foreach ($sigCols as $lib_fr => [$lib_en, $cw]) $pdf->Cell($cw, 4, pvpdf_u($lib_en), 0, 0, 'C');
+foreach ($sigCols as $lib_fr => [$lib_en, $cw]) $pdf->Cell($cw, 4, pvpdf_u(bt($lib_en, $lib_fr)), 0, 0, 'C');
 // Signatures numériques des 3 colonnes (sur demande uniquement, jamais
 // automatique) : Professeur Principal (chemin direct — un enseignant par
 // classe, pas un rôle fixe unique), Censeur et Proviseur (catalogue
@@ -290,7 +291,7 @@ if (($_GET['signature'] ?? '0') === '1') {
 $pdf->Ln(18);
 $pdf->SetFont('Arial', 'I', 7);
 $pdf->SetX($marge);
-foreach ($sigCols as $lib_fr => [$lib_en, $cw]) $pdf->Cell($cw, 5, pvpdf_u('(Nom, signature) / (Name, signature)'), 0, 0, 'C');
+foreach ($sigCols as $lib_fr => [$lib_en, $cw]) $pdf->Cell($cw, 5, pvpdf_u(bl_barre('(Nom, signature) / (Name, signature)')), 0, 0, 'C');
 $pdf->Ln();
 
 $suffixe = pvpdf_u(str_replace(' ', '_', $classe_info['designation']) . '_' . $type . ($type==='trimestre' ? '_' . ($trim_info['libelle'] ?? '') : ''));

@@ -103,7 +103,7 @@ require_once __DIR__ . '/../../../../noyau/layout/header.php';
           <option value="">— Toutes —</option>
           <?php foreach ($sections as $s): ?>
             <option value="<?= h($s['libelle_section']) ?>" <?= $f_section === $s['libelle_section'] ? 'selected' : '' ?>>
-              <?= h($s['libelle_section']) ?>
+              <?= h($s['libelle_section']) ?><?= section_langue_libelle($s['libelle_section']) !== '' ? ' — ' . section_langue_libelle($s['libelle_section']) : '' ?>
             </option>
           <?php endforeach; ?>
         </select>
@@ -140,7 +140,7 @@ foreach ($classes as $c) {
 <?php foreach ($par_section as $sec => $items): ?>
 <div class="mb-3">
   <div class="section-titre mb-1">
-    <i class="bi bi-collection me-1"></i>Section <?= h($sec) ?>
+    <i class="bi bi-collection me-1"></i><?= section_langue_libelle((string) $sec) !== '' ? 'Section ' . mb_strtolower(section_langue_libelle((string) $sec)) . ' (' . h($sec) . ')' : 'Section ' . h($sec) ?>
     <span class="text-muted" style="font-weight:400;font-size:.75rem"> — <?= count($items) ?> classe(s)</span>
   </div>
   <div class="card">

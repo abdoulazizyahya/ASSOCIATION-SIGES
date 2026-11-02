@@ -1678,6 +1678,148 @@ function est_technique(): bool {
     return ordre_enseignement_courant() === 'technique';
 }
 
+// Langue d'enseignement de l'école, primaire ou secondaire (migrations v70
+// primaire et v33 secondaire) : 'francophone', 'anglophone' ou 'bilingue'
+// (sections Fr et An). Choisie à la création de l'école, modifiable dans
+// Paramètres → Établissement.
+function langue_enseignement_courante(): string {
+    $l = get_etablissement()['langue_enseignement'] ?? 'francophone';
+    return in_array($l, ['anglophone', 'bilingue'], true) ? $l : 'francophone';
+}
+
+// Primaire : langue proposée pour le bulletin d'une classe — 'en' (bulletin
+// anglais, primaire/pdf/bulletin_*_anglais.php) ou 'fr'. École bilingue :
+// d'après la section du niveau de la classe (section_classe()).
+function primaire_langue_classe(int $id_classe): string {
+    $l = langue_enseignement_courante();
+    if ($l !== 'bilingue') return $l === 'anglophone' ? 'en' : 'fr';
+    return section_classe($id_classe) === 'An' ? 'en' : 'fr';
+}
+
+// Libellé de langue d'une section (« Fr » → Francophone, « An » → Anglophone),
+// vide pour une section qui n'est pas une langue (technique : COMMERCIALE…).
+function section_langue_libelle(string $s): string {
+    if (preg_match('/^\s*(an|en)/i', $s)) return 'Anglophone';
+    if (preg_match('/^\s*fr/i', $s)) return 'Francophone';
+    return '';
+}
+
+// Langue d'une classe : 'en' (section anglophone) ou 'fr'. École bilingue :
+// d'après la section de la classe (« An », « Anglophone », « EN »…).
+function sec_langue_classe(int $id_classe): string {
+    $l = langue_enseignement_courante();
+    if ($l !== 'bilingue') return $l === 'anglophone' ? 'en' : 'fr';
+    $s = (string) db_val("SELECT libelle_section FROM classe WHERE id=?", [$id_classe]);
+    return preg_match('/^\s*(an|en)/i', $s) ? 'en' : 'fr';
+}
+
+// Bulletin de la section anglophone (01/11/2026) : l'anglais prend la place
+// du français (même police, taille, style) et le français celle de la
+// traduction anglaise — comme le bulletin arabe/français du primaire.
+// ?langue=fr|en (choix à l'impression), sinon la langue de la classe.
+// Sert aussi aux autres documents d'une classe (relevés, certificats, cartes,
+// résultats, reçus), au primaire comme au secondaire.
+function bulletin_fixer_langue(int $id_classe): void {
+    $l = $_GET['langue'] ?? '';
+    if (in_array($l, ['fr', 'en'], true)) { $GLOBALS['_bulletin_en'] = $l === 'en'; return; }
+    $primaire = function_exists('type_enseignement_courant') && type_enseignement_courant() === 'primaire';
+    $GLOBALS['_bulletin_en'] = ($primaire ? primaire_langue_classe($id_classe) : sec_langue_classe($id_classe)) === 'en';
+}
+
+function bulletin_en(): bool {
+    return !empty($GLOBALS['_bulletin_en']);
+}
+
+// Paire bilingue dans l'ordre d'affichage : [principal, traduction]. Un
+// libellé français en MAJUSCULES (« CLASSE : » / « Class ») garde sa forme
+// à sa place : « CLASS : » / « Classe ».
+function bl(string $fr, string $en): array {
+    if (!bulletin_en() || $en === '') return [$fr, $en];
+    if (preg_match('/\p{Lu}/u', $fr) && mb_strtoupper($fr) === $fr && mb_strtoupper($en) !== $en) {
+        $suffixe = preg_match('/\s*:\s*$/', $fr, $m) ? $m[0] : '';
+        $f = rtrim($fr, ' :');
+        $f = mb_strtoupper(mb_substr($f, 0, 1)) . mb_strtolower(mb_substr($f, 1));
+        $f = preg_replace_callback('/\([^)]*\)/u', fn($m) => mb_strtoupper($m[0]), $f);   // (NIU)
+        return [mb_strtoupper(rtrim($en, ' :')) . $suffixe, $f];
+    }
+    return [$en, $fr];
+}
+
+// Suffixe ordinal d'un rang : « e » (2e), « st/nd/rd/th » en anglais (2nd).
+function rang_suffixe(int $rang): string {
+    if (!bulletin_en()) return 'e';
+    if (in_array($rang % 100, [11, 12, 13], true)) return 'th';
+    return [1 => 'st', 2 => 'nd', 3 => 'rd'][$rang % 10] ?? 'th';
+}
+
+// Mention générale en anglais (Excellent, Tres bien… du bulletin français).
+function mention_gen_en(float $a): string {
+    if ($a >= 16) return 'Excellent'; if ($a >= 14) return 'Very good';
+    if ($a >= 12) return 'Good'; if ($a >= 10) return 'Fairly good';
+    if ($a >= 8)  return 'Average'; return 'Insufficient';
+}
+
+// Mention d'une matière en anglais, sur 2 lignes (« Compétences\nacquises »).
+function mention_mat_en(float $a): string {
+    if ($a >= 14) return "Competences very\nwell acquired";
+    if ($a >= 12) return "Competences\nwell acquired";
+    if ($a >= 10) return "Competences\nacquired";
+    return "Competences\nnot acquired";
+}
+
+// Décision du conseil (Admis, Redoublement…) telle qu'affichée : en anglais
+// sur un document de la section anglophone.
+function decision_affichee(string $d): string {
+    if (!bulletin_en()) return $d;
+    return ['Admis' => 'Promoted', 'Admise' => 'Promoted', 'Redoublement' => 'Repeats', 'Redouble' => 'Repeats',
+            'Exclu' => 'Excluded', 'Exclue' => 'Excluded', 'Abandon' => 'Dropped out'][$d] ?? $d;
+}
+
+// Libellé déjà bilingue « français/anglais » (« N°/No », « Aucun élève. /
+// No student. ») : ordre inversé sur un document de la section anglophone.
+function bl_barre(string $s): string {
+    if (!bulletin_en()) return $s;
+    if (str_contains($s, ' / ')) { [$a, $b] = explode(' / ', $s, 2); return "$b / $a"; }
+    if (preg_match('#^([^/]+)/([^/]+)$#u', $s, $m)) return $m[2] . '/' . $m[1];
+    return $s;
+}
+
+// Ligne bilingue d'une carte d'élève (« Né(e) le: 01/01/2010 » / « Born on ») :
+// section anglophone → « Born on: 01/01/2010 » / « Né(e) le ».
+function carte_paire(string $fr, string $en): array {
+    if (!bulletin_en() || !str_contains($fr, ':')) return [$fr, $en];
+    [$lib, $val] = explode(':', $fr, 2);
+    return [trim($en) . ': ' . trim($val), trim($lib)];
+}
+
+// Montant en toutes lettres, en anglais (reçus de la section anglophone) :
+// 125 500 → « one hundred twenty-five thousand five hundred ».
+function nombre_en_lettres_anglais(float $montant): string {
+    $n = (int) round($montant);
+    if ($n === 0) return 'zero';
+    $u = ['', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten', 'eleven', 'twelve',
+          'thirteen', 'fourteen', 'fifteen', 'sixteen', 'seventeen', 'eighteen', 'nineteen'];
+    $d = ['', '', 'twenty', 'thirty', 'forty', 'fifty', 'sixty', 'seventy', 'eighty', 'ninety'];
+    $cent = function (int $x) use ($u, $d): string {
+        $m = [];
+        if ($x >= 100) { $m[] = $u[intdiv($x, 100)] . ' hundred'; $x %= 100; }
+        if ($x >= 20)  { $m[] = $d[intdiv($x, 10)] . ($x % 10 ? '-' . $u[$x % 10] : ''); }
+        elseif ($x > 0) { $m[] = $u[$x]; }
+        return implode(' ', $m);
+    };
+    $m = [];
+    foreach ([1000000000 => 'billion', 1000000 => 'million', 1000 => 'thousand', 1 => ''] as $p => $nom) {
+        if (abs($n) >= $p) { $m[] = trim($cent(intdiv(abs($n), $p) % 1000) . ' ' . $nom); }
+        if ($p > 1) $n = $n < 0 ? -(abs($n) % $p) : $n % $p;
+    }
+    return implode(' ', array_filter($m));
+}
+
+// Libellé unilingue : l'anglais sur le bulletin de la section anglophone.
+function bt(string $fr, string $en): string {
+    return bulletin_en() ? $en : $fr;
+}
+
 // Aiguillage vers la version TECHNIQUE d'une page (secondaire/technique/
 // primaire/pages/…, notes par séquence) quand l'école courante est technique. Appelé
 // tout en haut des pages du secondaire général qui ont une version dédiée
@@ -1793,7 +1935,15 @@ function couleur_pdf(string $cle): array {
             // repli sur blanc ci-dessous pour chaque clé demandée.
         }
     }
-    return $cache[$cle] ?? [255, 255, 255];
+    if (isset($cache[$cle])) return $cache[$cle];
+    // Clé absente de la table de l'école (02/11/2026) : couleur PAR DÉFAUT du rôle,
+    // pas du blanc — un en-tête de tableau blanc sous un texte blanc rendait les
+    // titres de colonnes (DISCIPLINES, COEF, NXC…) des bulletins invisibles.
+    // « entete_tableau_classe » (bulletins de classe, technique) n'existe dans aucune
+    // table : même couleur que l'en-tête du bulletin individuel.
+    if ($cle === 'entete_tableau_classe') return couleur_pdf('entete_tableau_individuel');
+    $d = (function_exists('type_enseignement_courant') && type_enseignement_courant() === 'secondaire' ? pdf_couleurs_defaut_secondaire() : [])[$cle] ?? null;
+    return $d ? [(int) $d['r'], (int) $d['g'], (int) $d['b']] : [255, 255, 255];
 }
 
 // Applique une couleur de fond nommée sur un objet PDF (FPDF ou TCPDF —
@@ -3097,8 +3247,9 @@ function niu_eleve(array $eleve): string {
  */
 function pdf_fait_a_bilingue($pdf, float $x, float $w, string $lieu, string $align = 'R', float $taille = 9, ?callable $u = null): void {
     $u = $u ?? 'pdf_u';
-    $debut = $u('Fait à ' . $lieu . ', ');
-    $le    = $u('le ' . date('d/m/Y'));
+    // Document de la section anglophone : « Done at …, on … », français en dessous.
+    $debut = $u(bt('Fait à ', 'Done at ') . $lieu . ', ');
+    $le    = $u(bt('le ', 'on ') . date('d/m/Y'));
     $pdf->SetFont('Arial', '', $taille);
     $l_fr  = $pdf->GetStringWidth($debut . $le);
     // Cellules de largeur = texte + 2 mm (marge interne FPDF de 1 mm de chaque côté)
@@ -3109,9 +3260,9 @@ function pdf_fait_a_bilingue($pdf, float $x, float $w, string $lieu, string $ali
     $pdf->Cell($l_fr, 4.2, $debut . $le, 0, 0, 'L');
     $pdf->SetFont('Arial', 'I', max(6, $taille - 2.5));
     $pdf->SetXY($x0, $y + 3.8);
-    $pdf->Cell($x_le - $x0, 3, 'Done at', 0, 0, 'L');
+    $pdf->Cell($x_le - $x0, 3, $u(bt('Done at', 'Fait à')), 0, 0, 'L');
     $pdf->SetXY($x_le, $y + 3.8);
-    $pdf->Cell($pdf->GetStringWidth('on') + 1, 3, 'on', 0, 0, 'L');
+    $pdf->Cell($pdf->GetStringWidth(bt('on', 'le')) + 1, 3, bt('on', 'le'), 0, 0, 'L');
     $pdf->SetFont('Arial', '', $taille);
     $pdf->SetY($y + 7.2);
 }
@@ -4252,6 +4403,7 @@ function hex_vers_rgb(string $hex): array {
 // ==== nombre_en_lettres_fcfa ====
 // dizaines irrégulières (soixante-dix, quatre-vingt(s), quatre-vingt-dix).
 function nombre_en_lettres_fcfa(float $montant): string {
+    if (function_exists('bulletin_en') && bulletin_en()) return nombre_en_lettres_anglais($montant);   // reçu de la section anglophone
     $n = (int) round($montant);
     if ($n === 0) return 'zéro';
     $negatif = $n < 0;
@@ -4958,11 +5110,14 @@ function secondaire_auto_matieres_2nd_cycle(int $id_classe, string $code_niveau)
  */
 function sec_sql_matiere_bilingue(string $m = 'm'): string {
     // Nom français long (> 24 caractères) : son code court s'il existe (« ECM », « EPS »).
-    return "CASE WHEN COALESCE($m.libelle_en,'') <> '' THEN CONCAT(CASE WHEN CHAR_LENGTH($m.libelle) > 24 AND COALESCE($m.code,'') <> '' THEN $m.code ELSE $m.libelle END,' / ',$m.libelle_en) ELSE $m.libelle END";
+    $fr = "CASE WHEN CHAR_LENGTH($m.libelle) > 24 AND COALESCE($m.code,'') <> '' THEN $m.code ELSE $m.libelle END";
+    // Bulletin de la section anglophone : « EN / FR ».
+    $paire = bulletin_en() ? "$m.libelle_en,' / ',$fr" : "$fr,' / ',$m.libelle_en";
+    return "CASE WHEN COALESCE($m.libelle_en,'') <> '' THEN CONCAT($paire) ELSE $m.libelle END";
 }
 function sec_sql_groupe_bilingue(string $g = 'g'): string {
     return db_colonne_existe('groupe', 'libelle_en')
-        ? "CASE WHEN COALESCE($g.libelle_en,'') <> '' THEN CONCAT($g.libelle_groupe_comp,' / ',$g.libelle_en) ELSE $g.libelle_groupe_comp END"
+        ? "CASE WHEN COALESCE($g.libelle_en,'') <> '' THEN CONCAT(" . (bulletin_en() ? "$g.libelle_en,' / ',$g.libelle_groupe_comp" : "$g.libelle_groupe_comp,' / ',$g.libelle_en") . ") ELSE $g.libelle_groupe_comp END"
         : "$g.libelle_groupe_comp";
 }
 
@@ -5795,8 +5950,8 @@ function valeur_colonne_resultat(string $col, array $row, int $no): string {
         case 't3':          return libelle_moy_trim($row, 2);
         case 'abs':         return $row['abs_non_just'] !== null ? number_format($row['abs_non_just'], 1) : '—';
         case 'moy_an':      return $row['moy_annuelle'] !== null ? number_format($row['moy_annuelle'], 2) : '—';
-        case 'rang':        return $row['rang'] !== null ? ($row['rang'] . 'e') : '—';
-        case 'decision':    return $row['decision'] ?: '—';
+        case 'rang':        return $row['rang'] !== null ? ($row['rang'] . rang_suffixe((int) $row['rang'])) : '—';
+        case 'decision':    return $row['decision'] ? decision_affichee($row['decision']) : '—';
         case 'classe_suiv': return $row['classe_suivante_designation'] ?? '—';
         case 'obs':         return $row['observation'] ?: '';
         default:            return '—';

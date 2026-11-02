@@ -456,12 +456,13 @@ function charger_schema_ecole(mysqli &$l, array $seed, string $type = 'primaire'
         $statut = in_array($seed['statut'] ?? '', ['public', 'prive'], true) ? $seed['statut'] : 'public';
         $chef_fr = $statut === 'prive' ? 'Le Principal' : 'Le Proviseur';
         $ordre   = ($seed['ordre_enseignement'] ?? '') === 'technique' ? 'technique' : 'general';
+        $langue  = in_array($seed['langue_enseignement'] ?? '', ['anglophone', 'bilingue'], true) ? $seed['langue_enseignement'] : 'francophone';
         $st = mysqli_prepare($l,
-            "INSERT INTO etablissement (id, nom_fr, nom_en, sigle, ville, chef_etablissement, statut, ordre_enseignement)
-             VALUES (1, ?, ?, ?, ?, ?, ?, ?)
+            "INSERT INTO etablissement (id, nom_fr, nom_en, sigle, ville, chef_etablissement, statut, ordre_enseignement, langue_enseignement)
+             VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?)
              ON DUPLICATE KEY UPDATE nom_fr=VALUES(nom_fr), nom_en=VALUES(nom_en),
                                      sigle=VALUES(sigle), ville=VALUES(ville)");
-        mysqli_stmt_bind_param($st, 'sssssss', $seed['nom'], $seed['nom_en'], $seed['sigle'], $seed['ville'], $chef_fr, $statut, $ordre);
+        mysqli_stmt_bind_param($st, 'ssssssss', $seed['nom'], $seed['nom_en'], $seed['sigle'], $seed['ville'], $chef_fr, $statut, $ordre, $langue);
         mysqli_stmt_execute($st);
         mysqli_stmt_close($st);
 
@@ -491,6 +492,10 @@ function charger_schema_ecole(mysqli &$l, array $seed, string $type = 'primaire'
     $statut_p = ($seed['statut'] ?? '') === 'public' ? 'public' : 'prive';
     $col = mysqli_query($l, "SHOW COLUMNS FROM etablissement LIKE 'statut'");
     if ($col && mysqli_num_rows($col)) mysqli_query($l, "UPDATE etablissement SET statut='$statut_p' WHERE IDEtablissement=1");
+    // Langue d'enseignement (migration v70) : francophone, anglophone ou bilingue.
+    $langue_p = in_array($seed['langue_enseignement'] ?? '', ['anglophone', 'bilingue'], true) ? $seed['langue_enseignement'] : 'francophone';
+    $col = mysqli_query($l, "SHOW COLUMNS FROM etablissement LIKE 'langue_enseignement'");
+    if ($col && mysqli_num_rows($col)) mysqli_query($l, "UPDATE etablissement SET langue_enseignement='$langue_p' WHERE IDEtablissement=1");
 
     // Provisionnement « école neuve » : classes standard + année scolaire
     // active + barème de travail dérivé du gabarit. Best-effort — un échec
@@ -917,7 +922,7 @@ function creer_etablissement(array $in): array {
     }
 
     $seed = ['nom' => $nom, 'nom_en' => $nomEn, 'sigle' => $sigle, 'ville' => $ville, 'statut' => $statut,
-             'ordre_enseignement' => $ordre];
+             'ordre_enseignement' => $ordre, 'langue_enseignement' => (string) ($in['langue_enseignement'] ?? 'francophone')];
     $comptes = [];
 
     // Base fournie : test de connexion AVANT tout, avec un message clair

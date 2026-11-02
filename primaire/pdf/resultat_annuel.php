@@ -33,6 +33,7 @@ $val_annee = $annee['val_annee'] ?? '';
 $etab_brut = get_etablissement();
 $etab      = etab_pour_pdf($etab_brut);
 
+bulletin_fixer_langue($scope === 'classe' ? $id_classe : 0);   // section anglophone : document en anglais
 if ($scope === 'classe') {
     $classe = db_one("SELECT DesignationClasses FROM classe WHERE IDClasses=?", [$id_classe]);
     if (!$classe) die('Classe introuvable.');
@@ -65,11 +66,11 @@ $pdf->Cell($uw, 4.5, pdf_u($sous_titre . '   —   Année scolaire : ' . $val_an
 $pdf->Ln(2);
 
 $avec_classe = $scope === 'etablissement';
-$cols = [['N°', 8], ['Matricule', 20], ['Nom et prénoms', $avec_classe ? 44 : 54]];
+$cols = [['N°', 8], [bt('Matricule', 'Reg. No'), 20], [bt('Nom et prénoms', 'Names'), $avec_classe ? 44 : 54]];
 if ($avec_classe) $cols[] = ['Classe', 24];
 $cols = array_merge($cols, [
-    ['Sexe', 10], ['Moy.T1', 14], ['Moy.T2', 14], ['Moy.T3', 14], ['Abs.', 12],
-    ['Moy. an.', 16], ['Rang', 16], ['Décision', 24],
+    [bt('Sexe', 'Sex'), 10], [bt('Moy.T1', 'Avg.T1'), 14], [bt('Moy.T2', 'Avg.T2'), 14], [bt('Moy.T3', 'Avg.T3'), 14], ['Abs.', 12],
+    [bt('Moy. an.', 'Ann. avg'), 16], [bt('Rang', 'Rank'), 16], [bt('Décision', 'Decision'), 24],
 ]);
 $fixed = array_sum(array_column($cols, 1));
 $last = count($cols) - 1;
@@ -99,8 +100,8 @@ foreach ($lignes as $l) {
         $l['moy_t'][2] !== null ? number_format($l['moy_t'][2], 2) : '—',
         (string) $l['abs_nj'],
         $l['moy_annuelle'] !== null ? number_format($l['moy_annuelle'], 2) : '—',
-        $l['rang'] !== null ? $l['rang'] . 'e/' . $l['nb_classes'] : '—',
-        $l['decision'],
+        $l['rang'] !== null ? $l['rang'] . rang_suffixe((int) $l['rang']) . '/' . $l['nb_classes'] : '—',
+        decision_affichee((string) $l['decision']),
     ]);
     foreach ($cols as $i => $c) { $pdf->Cell($c[1], 6, pdf_u((string) $vals[$i]), 1, 0, 'C', $fill); }
     $pdf->Ln();
@@ -108,7 +109,7 @@ foreach ($lignes as $l) {
 }
 if (empty($lignes)) {
     $pdf->SetX(8);
-    $pdf->Cell($uw, 8, pdf_u('Aucun élève.'), 1, 1, 'C');
+    $pdf->Cell($uw, 8, pdf_u(bt('Aucun élève.', 'No student.')), 1, 1, 'C');
 }
 
 $pdf->Ln(6);
@@ -117,7 +118,7 @@ $w_sign = $uw * 0.3; $x_sign = $pw - 8 - $w_sign;
 pdf_fait_a_bilingue($pdf, $x_sign, $w_sign, (($etab['lieu'] ?: $etab['ville']) ?: ''), 'R', 8);
 $pdf->SetFont('Arial', 'B', 8);
 $pdf->SetX($x_sign);
-$pdf->Cell($w_sign, 5, pdf_u(mb_strtoupper($etab['chef_etablissement'] ?: 'LE DIRECTEUR') . ','), 0, 1, 'R');
+$pdf->Cell($w_sign, 5, pdf_u(mb_strtoupper(bt($etab['chef_etablissement'] ?: 'LE DIRECTEUR', $etab['chef_etablissement_en'] ?: 'THE DIRECTOR')) . ','), 0, 1, 'R');
 
 if ($avec_sig) {
     pdf_signature_appliquer_jn($pdf, 'resultat_annuel_' . $scope, 0, 0, $pw, $ph, [

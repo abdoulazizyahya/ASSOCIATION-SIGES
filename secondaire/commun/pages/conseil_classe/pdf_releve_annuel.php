@@ -42,6 +42,7 @@ if ($is_ens && $mat_ens) {
 }
 
 $classe = db_one("SELECT * FROM classe WHERE id=?", [$id_classe]);
+bulletin_fixer_langue($id_classe);   // section anglophone : document en anglais
 if (!$classe) die('Classe introuvable.');
 
 $etab = get_etablissement();
@@ -156,7 +157,8 @@ function cell_rang_releve(FPDF $pdf, float $w, float $h, ?int $rang, string $suf
     $w1 = $pdf->GetStringWidth($part1);
     $w2 = $pdf->GetStringWidth(u($suffixe));
     $pdf->SetFont('Arial', '', $taille_e);
-    $we = $pdf->GetStringWidth('e');
+    $ord = rang_suffixe((int) $rang);
+    $we = $pdf->GetStringWidth($ord);
     $total = $w1 + $we + $w2;
     $x0 = $x + ($w - $total) / 2;
 
@@ -166,7 +168,7 @@ function cell_rang_releve(FPDF $pdf, float $w, float $h, ?int $rang, string $suf
     $raise = $taille * 0.12;
     $pdf->SetXY($x0 + $w1, $y - $raise);
     $pdf->SetFont('Arial', '', $taille_e);
-    $pdf->Cell($we, $h, 'e', 0, 0, 'L');
+    $pdf->Cell($we, $h, $ord, 0, 0, 'L');
     $pdf->SetXY($x0 + $w1 + $we, $y);
     $pdf->SetFont('Arial', '', $taille);
     $pdf->Cell($w2, $h, u($suffixe), 0, 0, 'L');
@@ -190,17 +192,19 @@ pdf_filigrane($pdf, $etab, $pw, $pdf->GetPageHeight());
 function entete_releve(FPDF $pdf, array $etab, float $ml, float $uw): void {
     $col3 = $uw / 3;
     $y0   = $pdf->GetY();
-    $texte_etab =
-        ($etab['region_fr'] ?? '') . "\n" .
+    $texte_etab = bulletin_en()
+        ? ($etab['region_en'] ?? '') . "\n" . ($etab['division_en'] ?? '') . "\n" . ($etab['subdivision_en'] ?? '') . "\n***********\n"
+        : ($etab['region_fr'] ?? '') . "\n" .
         ($etab['departement_fr'] ?? '') . "\n" .
         ($etab['arrondissement_fr'] ?? '') . "\n" .
         "***********\n";
+    $nom_etab = strtoupper(bulletin_en() && !empty($etab['nom_en']) ? $etab['nom_en'] : ($etab['nom_fr'] ?? ''));
     $pdf->SetXY($ml, $y0);
     $pdf->SetFont('Arial', '', 8);
     $pdf->MultiCell($col3, 4, u($texte_etab), 0, 'C');
     $pdf->SetFont('Arial', 'B', 10);
     $pdf->SetX($ml);
-    $pdf->MultiCell($col3, 5, u(strtoupper($etab['nom_fr'] ?? '')), 0, 'C');
+    $pdf->MultiCell($col3, 5, u($nom_etab), 0, 'C');
 
     $xr = $ml + $col3 * 2;
     $pdf->SetXY($xr, $y0);
@@ -208,7 +212,7 @@ function entete_releve(FPDF $pdf, array $etab, float $ml, float $uw): void {
     $pdf->MultiCell($col3, 4, u($texte_etab), 0, 'C');
     $pdf->SetFont('Arial', 'B', 10);
     $pdf->SetX($xr);
-    $pdf->MultiCell($col3, 5, u(strtoupper($etab['nom_fr'] ?? '')), 0, 'C');
+    $pdf->MultiCell($col3, 5, u($nom_etab), 0, 'C');
 
     $logo_path = !empty($etab['logo']) ? __DIR__ . '/../../../../assets/uploads/' . $etab['logo'] : '';
     $logo_w = 18;
@@ -224,13 +228,13 @@ entete_releve($pdf, $etab, $ml, $uw);
 $pdf->Ln(1);
 
 $pdf->SetFont('Arial', 'B', 15);
-$pdf->Cell($uw, 8, u('RELEVE DE NOTES DES EVALUATIONS'), 0, 1, 'C');
+$pdf->Cell($uw, 8, u(bt('RELEVE DE NOTES DES EVALUATIONS', 'TRANSCRIPT OF ASSESSMENT MARKS')), 0, 1, 'C');
 $pdf->SetFont('Arial', 'B', 10);
-$pdf->Cell($uw, 5.5, u('ANNUELLE'), 0, 1, 'C');
+$pdf->Cell($uw, 5.5, u(bt('ANNUELLE', 'ANNUAL')), 0, 1, 'C');
 $pdf->Ln(1);
 $pdf->SetFont('Arial', 'B', 9);
-$pdf->Cell($uw / 2, 5, u('CLASSE : ' . $classe['designation']), 0, 0, 'L');
-$pdf->Cell($uw / 2, 5, u('ANNEE SCOLAIRE : ' . $val_annee), 0, 1, 'R');
+$pdf->Cell($uw / 2, 5, u(bt('CLASSE : ', 'CLASS: ') . $classe['designation']), 0, 0, 'L');
+$pdf->Cell($uw / 2, 5, u(bt('ANNEE SCOLAIRE : ', 'SCHOOL YEAR: ') . $val_annee), 0, 1, 'R');
 $pdf->Ln(1);
 
 $w_no = 8; $w_mat_id = 20; $w_nom = 45; $w_moy = 11; $w_rang = 13; $w_obs = 26;
@@ -245,7 +249,7 @@ function dessiner_entete_tableau(FPDF $pdf, array $disciplines, float $ml, float
     $pdf->SetTextColor(255, 255, 255);
     $pdf->SetDrawColor(0, 0, 0);
     $x = $ml;
-    foreach ([['N°', $w_no], ['MATRICULE', $w_mat_id], ['NOM ET PRENOMS', $w_nom]] as [$lbl, $w]) {
+    foreach ([['N°', $w_no], [bt('MATRICULE', 'REG. NO'), $w_mat_id], [bt('NOM ET PRENOMS', 'NAMES'), $w_nom]] as [$lbl, $w]) {
         $pdf->SetXY($x, $y_hdr);
         $pdf->SetFont('Arial', 'B', 7.5);
         $pdf->Cell($w, $h_hdr, u($lbl), 1, 0, 'C', true);
@@ -265,7 +269,7 @@ function dessiner_entete_tableau(FPDF $pdf, array $disciplines, float $ml, float
         $pdf->Cell($w_sub, $h_hdr2, (string)$d['coef'], 1, 0, 'C', true);
         $x += $w_sub;
     }
-    foreach ([['MOY /20', $w_moy], ['RANG', $w_rang], ['OBSERVATIONS', $w_obs]] as [$lbl, $w]) {
+    foreach ([[bt('MOY /20', 'AVG /20'), $w_moy], [bt('RANG', 'RANK'), $w_rang], [bt('OBSERVATIONS', 'REMARKS'), $w_obs]] as [$lbl, $w]) {
         $pdf->SetXY($x, $y_hdr);
         $pdf->SetFont('Arial', 'B', 7.5);
         $pdf->Cell($w, $h_hdr, u($lbl), 1, 0, 'C', true);
@@ -305,14 +309,14 @@ foreach ($eleves as $el) {
     if ($fill) { $pdf->SetFillColor(240, 240, 246); }
     cell_rang_releve($pdf, $w_rang, $h_row, $rang, $suffixe, 1, 7);
     $deja = $decisions_idx[$eid] ?? null;
-    $obs = $deja ? trim((string)($deja['decision'] ?? '') . (!empty($deja['observation']) ? ' - ' . $deja['observation'] : '')) : '';
+    $obs = $deja ? trim(decision_affichee((string)($deja['decision'] ?? '')) . (!empty($deja['observation']) ? ' - ' . $deja['observation'] : '')) : '';
     $pdf->SetFont('Arial', '', 6.5);
     $pdf->Cell($w_obs, $h_row, u($obs), 1, 1, 'L', $fill);
     $n++;
 }
 if (empty($eleves)) {
     $pdf->SetX($ml);
-    $pdf->Cell($uw, 8, u('Aucun eleve inscrit.'), 1, 1, 'C');
+    $pdf->Cell($uw, 8, u(bt('Aucun eleve inscrit.', 'No student enrolled.')), 1, 1, 'C');
 }
 
 // ── Lieu, date et signature du chef d'établissement (bas de page) ──────
@@ -324,7 +328,7 @@ $x_sign = $pw - 8 - $w_sign;
 pdf_fait_a_bilingue($pdf, $x_sign, $w_sign, lieu_edition_documents($etab), 'R', 8.5, 'u');
 $pdf->SetFont('Arial', 'B', 8.5);
 $pdf->SetX($x_sign);
-$pdf->Cell($w_sign, 5, u(strtoupper($etab['chef_etablissement'] ?? 'LE PROVISEUR') . ','), 0, 1, 'R');
+$pdf->Cell($w_sign, 5, u(strtoupper(bt($etab['chef_etablissement'] ?? 'LE PROVISEUR', $etab['chef_etablissement_en'] ?? 'THE PRINCIPAL')) . ','), 0, 1, 'R');
 
 // Signature numérique (sur demande uniquement, jamais automatique).
 if (($_GET['signature'] ?? '0') === '1') {

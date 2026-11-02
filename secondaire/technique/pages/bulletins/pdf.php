@@ -160,6 +160,7 @@ $insc = db_one(
     [$id_eleve, $id_annee]
 );
 if (!$insc) die('Inscription introuvable.');
+bulletin_fixer_langue((int) $insc['id_classe']);   // section anglophone : anglais / traduction française
 
 // ── Séquences à afficher ──────────────────────────────────────────
 $is_seq = ($id_seq_u > 0);
@@ -206,7 +207,7 @@ $contacts_parents = $tuteur
 
 // ── Disciplines ───────────────────────────────────────────────────
 $disciplines = db_all(
-    "SELECT d.id_mat, d.coef, d.ordre, m.libelle AS matiere,
+    "SELECT d.id_mat, d.coef, d.ordre, m.libelle AS matiere, m.libelle_en AS matiere_en,
             g.libelle_groupe_comp AS groupe_lib, d.id_groupe,
             TRIM(CONCAT(e.nom_ens,' ',COALESCE(e.prenom_ens,''))) AS enseignant
      FROM discipline d
@@ -299,6 +300,7 @@ function fmt_note_b(?float $v): string {
     return $dec !== null ? "$int.$dec" : $int;
 }
 function mention_mat_b(float $a): string {
+    if (bulletin_en()) return mention_mat_en($a);
     if ($a >= 14) return "Compétences TB\nacquises";
     if ($a >= 12) return "Compétences\nbien acquises";
     if ($a >= 10) return "Compétences\nacquises";
@@ -309,6 +311,7 @@ function lettre_groupe_b(float $a): string {
     if ($a >= 10) return 'C'; if ($a >= 8)  return 'D'; return 'E';
 }
 function mention_gen_b(float $a): string {
+    if (bulletin_en()) return mention_gen_en($a);
     if ($a >= 16) return 'Excellent'; if ($a >= 14) return 'Tres bien';
     if ($a >= 12) return 'Bien'; if ($a >= 10) return 'Assez bien';
     if ($a >= 8)  return 'Passable'; return 'Insuffisant';
@@ -454,7 +457,7 @@ $pdf->SetLineWidth(0.2);
 $col3 = $uw / 3;
 $y0   = 8;
 
-$pdf->SetXY($ml, $y0);
+$pdf->SetXY(bulletin_en() ? $ml + $col3 * 2 : $ml, $y0);   // section anglophone : français à droite
 $pdf->SetFont('Arial', '', 6.5);
 $pdf->MultiCell($col3, 3.5, u(
     "REPUBLIQUE DU CAMEROUN\nPaix - Travail - Patrie\n***************\n" .
@@ -488,7 +491,7 @@ if ($logo_path && is_file($logo_path)) {
 }
 
 $xr = $ml + $col3 * 2;
-$pdf->SetXY($xr, $y0);
+$pdf->SetXY(bulletin_en() ? $ml : $xr, $y0);
 $pdf->SetFont('Arial', '', 6.5);
 $pdf->MultiCell($col3, 3.5, u(
     "REPUBLIC OF CAMEROON\nPeace - Work - Fatherland\n***************\n" .
@@ -516,15 +519,17 @@ $pdf->RoundedRect($ml, $y_titre, $uw, $h_titre, $h_titre / 2, 'FD');
 $pdf->SetXY($ml, $y_titre-1);
 $pdf->SetFont('Arial', 'BI', 16);
 $pdf->SetTextColor(26, 60, 107);
-$pdf->Cell($uw, $h_titre, u('BULLETIN SCOLAIRE DU ' . $titre_bull), 0, 1, 'C');
+// Section anglophone : titre anglais en grand, français en dessous.
+[$titre_l1, $titre_l2] = bl('BULLETIN SCOLAIRE DU ' . $titre_bull, (([1 => 'First ', 2 => 'Second ', 3 => 'Third '][(int) ($trim_info['ordre'] ?? 0)] ?? '') . 'Term Report'));
+$pdf->Cell($uw, $h_titre, u($titre_l1), 0, 1, 'C');
 $pdf->SetFont('Arial', 'I', 11);
 $pdf->ln(-1.7);
-$pdf->Cell($uw, $h_titre * 0.35, u('Term Report '), 2, 1, 'C');
+$pdf->Cell($uw, $h_titre * 0.35, u(bulletin_en() ? $titre_l2 : 'Term Report '), 2, 1, 'C');
 $pdf->SetTextColor(0, 0, 0);
 $pdf->SetLineWidth(0.2);
 $pdf->SetFont('Arial', 'B', 9);
 $pdf->SetX($ml);
-$pdf->Cell($uw, 5, u('Année scolaire : ' . $val_annee), 0, 1, 'C');
+$pdf->Cell($uw, 5, u(bt('Année scolaire : ', 'School year: ') . $val_annee), 0, 1, 'C');
 
 // ── 3. Infos élève ───────────────────────────────────────────────
 $pdf->Ln(0.5);
@@ -569,7 +574,8 @@ function cell_rang(FPDF $pdf, float $w, float $h, ?int $rang, string $suffixe, i
     $w1 = $pdf->GetStringWidth($part1);
     $w2 = $pdf->GetStringWidth(u($suffixe));
     $pdf->SetFont('Arial', $style, $taille_e);
-    $we = $pdf->GetStringWidth('e');
+    $ord = rang_suffixe((int) $rang);
+    $we = $pdf->GetStringWidth($ord);
     $total = $w1 + $we + $w2;
     if ($align === 'C')     { $x0 = $x + ($w - $total) / 2; }
     elseif ($align === 'R') { $x0 = $x + $w - $total - 1.2; }
@@ -582,7 +588,7 @@ function cell_rang(FPDF $pdf, float $w, float $h, ?int $rang, string $suffixe, i
     $raise = $taille * 0.12; // décalage vertical approximatif (mm)
     $pdf->SetXY($x0 + $w1, $y - $raise);
     $pdf->SetFont('Arial', $style, $taille_e);
-    $pdf->Cell($we, $h, 'e', 0, 0, 'L');
+    $pdf->Cell($we, $h, $ord, 0, 0, 'L');
 
     $pdf->SetXY($x0 + $w1 + $we, $y);
     $pdf->SetFont('Arial', $style, $taille);
@@ -617,6 +623,7 @@ function cell2l_taille_ajustee(FPDF $pdf, string $texte, string $style, float $l
 // grandes mais sans jamais déborder du cadre) — réduits automatiquement si
 // besoin par cell2l_taille_ajustee(), avec un plancher de lisibilité minimal.
 function cell2l(FPDF $pdf, float $w, float $h, string $fr, string $en, string $align = 'L', bool $fill = false, float $taille_fr = 6, float $taille_en = 4.3, ?array $fill_color = null, bool $tight = false): void {
+    [$fr, $en] = bl($fr, $en);   // section anglophone : l'anglais à la place du français
     $fill_color ??= couleur_pdf('bandeau_section');
     $x = $pdf->GetX(); $y = $pdf->GetY();
     if ($fill) { $pdf->SetFillColor($fill_color[0], $fill_color[1], $fill_color[2]); $pdf->Rect($x, $y, $w, $h, 'F'); }
@@ -660,7 +667,7 @@ function cell2l(FPDF $pdf, float $w, float $h, string $fr, string $en, string $a
 function libelle_seq_court(?array $s): string {
     if (!$s) return '';
     $mot = (stripos($s['libelle'] ?? '', 'valuation') !== false) ? 'EVAL' : 'SEQ';
-    return (int)$s['ordre'] . 'e ' . $mot;
+    return bulletin_en() ? $mot . ' ' . (int)$s['ordre'] : (int)$s['ordre'] . 'e ' . $mot;   // 1e SEQ / SEQ 1
 }
 
 $photo_w = 26;
@@ -704,7 +711,7 @@ $pdf->Cell(20, 5.5, niu_eleve($eleve), 1, 1, 'C');
 $pdf->ln(0.5);
 $pdf->SetX($x_info);
 //$pdf->SetFont('Arial', 'B', 17);
-cell2l($pdf, 30, 5.5, 'NOM ET PRENOMS :', 'ID No.', 'L', true, 8, 7.5, $gris, true);
+cell2l($pdf, 30, 5.5, 'NOM ET PRENOMS :', 'Name', 'L', true, 8, 7.5, $gris, true);
 //	cell2l($pdf, 26, 5.5, 'NOM ET PRENOMS :', 'Name', 'L', true, 28, 7.5, $gris, true);
 $pdf->SetFont('Arial', 'BI', 9);
 $pdf->Cell(110, 5.5, u(strtoupper($eleve['nom']) . ' ' . ($eleve['prenom'] ?? '')), 1, 0, 'L');
@@ -719,7 +726,7 @@ $pdf->SetFont('Arial', 'I', 8);
 $dnaiss = $eleve['date_naiss'] ? date('d/m/Y', strtotime($eleve['date_naiss'])) : '';
 $pdf->Cell(22, 5.5, $dnaiss, 1, 0, 'C');
 $pdf->SetFont('Arial', 'B', 8);
-$pdf->Cell(10, 5.5, 'A/at', 1, 0, 'C', true);
+$pdf->Cell(10, 5.5, bt('A/at', 'At/' . chr(224)), 1, 0, 'C', true);
 $pdf->SetFont('Arial', 'I', 8);
 $pdf->Cell(64, 5.5, u($eleve['lieu_naiss'] ?? ''), 1, 0, 'L');
 cell2l($pdf, 26, 5.5, 'REDOUBLANT :', 'Repeater', 'L', true, 8, 7.5, $gris, true);
@@ -729,10 +736,10 @@ $x_row3 = $pdf->GetX();
 $pdf->Cell(28, 5.5, '', 1, 1, 'L');
 $pdf->SetFont('Arial', 'I', 8);
 $pdf->SetXY($x_row3 + 1, $y_row3 + 1);
-$pdf->Cell(7, 3, 'Oui', 0, 0, 'L');
+$pdf->Cell(7, 3, bt('Oui', 'Yes'), 0, 0, 'L');
 checkbox_ltm($pdf, $x_row3 + 8, $y_row3 + 1, $is_redoub);
 $pdf->SetXY($x_row3 + 15, $y_row3 + 1);
-$pdf->Cell(7, 3, 'Non', 0, 0, 'L');
+$pdf->Cell(7, 3, bt('Non', 'No'), 0, 0, 'L');
 checkbox_ltm($pdf, $x_row3 + 23, $y_row3 + 1, !$is_redoub);
 
 //$pdf->ln(20);
@@ -852,7 +859,7 @@ $pdf->SetFont('Arial', 'B', 6.5);
 pdf_fill($pdf, 'entete_tableau_individuel');
 $pdf->SetTextColor(255, 255, 255);
 $pdf->SetX($ml);
-$pdf->Cell($cD, $hdr_h, 'DISCIPLINES', 1, 0, 'C', true);
+$pdf->Cell($cD, $hdr_h, bt('DISCIPLINES', 'SUBJECTS'), 1, 0, 'C', true);
 if ($is_seq) {
     $slib = $seqs_trim[0]['libelle'] ?? 'Eval';
     $pdf->Cell($cNOT, $hdr_h, u($slib), 1, 0, 'C', true);
@@ -860,16 +867,16 @@ if ($is_seq) {
     foreach ($seqs_trim as $i => $s) {
         $pdf->Cell($cEval, $hdr_h, u(libelle_seq_court($s)), 1, 0, 'C', true);
     }
-    $pdf->Cell($cTR, $hdr_h, 'TRIM', 1, 0, 'C', true);
+    $pdf->Cell($cTR, $hdr_h, bt('TRIM', 'TERM'), 1, 0, 'C', true);
 }
 $pdf->Cell($cCF,  $hdr_h, 'COEF',    1, 0, 'C', true);
 $pdf->Cell($cNXC, $hdr_h, '(NXC)',   1, 0, 'C', true);
-$pdf->Cell($cRG,  $hdr_h, 'RANG',    1, 0, 'C', true);
-$pdf->Cell($cMEN, $hdr_h, 'MENTIONS',1, 0, 'C', true);
+$pdf->Cell($cRG,  $hdr_h, bt('RANG', 'RANK'),    1, 0, 'C', true);
+$pdf->Cell($cMEN, $hdr_h, bt('MENTIONS', 'REMARKS'),1, 0, 'C', true);
 $pdf->Cell($cMIN, $hdr_h, 'MIN',     1, 0, 'C', true);
-$pdf->Cell($cMOY, $hdr_h, 'MOY',     1, 0, 'C', true);
+$pdf->Cell($cMOY, $hdr_h, bt('MOY', 'AVG'),     1, 0, 'C', true);
 $pdf->Cell($cMAX, $hdr_h, 'MAX',     1, 0, 'C', true);
-$pdf->Cell($cENS, $hdr_h, u('ENSEIGNANTS'), 1, 1, 'C', true);
+$pdf->Cell($cENS, $hdr_h, u(bt('ENSEIGNANTS', 'TEACHERS')), 1, 1, 'C', true);
 $pdf->SetTextColor(0, 0, 0);
 $pdf->SetFillColor(255, 255, 255);
 
@@ -891,7 +898,7 @@ foreach ($groupes_tries as $groupe_lib => $mats) {
         // Nom de la matière/compétence : taille agrandie par défaut (8pt) pour
         // les noms courts, réduite automatiquement (jusqu'à 5.5pt) pour les
         // noms longs afin de ne jamais déborder sur une 2e ligne (demande explicite).
-        [, $mat_lib] = fpdf_texte_ajuste($pdf, $d['matiere'], $cD, 8.0, 5.5);
+        [, $mat_lib] = fpdf_texte_ajuste($pdf, (bulletin_en() && ($d['matiere_en'] ?? '') !== '' ? $d['matiere_en'] : $d['matiere']), $cD, 8.0, 5.5);
         $pdf->SetX($ml);
         $pdf->Cell($cD, $row_h, u($mat_lib), 1, 0, 'L', true);
         $pdf->SetFont('Arial', '', 6.5);
@@ -1104,7 +1111,7 @@ $w_reval = $is_seq ? ($w_rap - $w_rlbl) : ($w_rap - $w_rlbl) / 2;
 
 $y_res0 = $y_bas + $h_ligne; // sous le bandeau d'en-tête déjà tracé plus haut (hauteur harmonisée)
 $pdf->SetXY($xR, $y_res0);
-cell2l($pdf, $w_rlbl, $h_ligne, 'Rappel', 'Rappel', 'C', false, 9, 7);
+cell2l($pdf, $w_rlbl, $h_ligne, 'Rappel', 'Recall', 'C', false, 9, 7);
 // Même libellé abrégé que l'en-tête du tableau de notes ci-dessus (demande
 // explicite d'harmonisation) — $seq1/$seq2 sont les 2 mêmes séquences.
 $pdf->SetFont('Arial', 'B', 7);
@@ -1158,7 +1165,7 @@ $xM = $xR + $w_rap;
 $hM1 = $h_ligne; $hM2 = $h_ligne; $hM3 = $h_ligne; $hM4 = $h_ligne; $hM5 = $h_ligne;
 
 $pdf->SetXY($xM, $y_res0);
-cell2l($pdf, $w_moy, $hM1, 'MOYENNE', '', 'C', true, 10, 4);
+cell2l($pdf, $w_moy, $hM1, bt('MOYENNE', 'AVERAGE'), '', 'C', true, 10, 4);
 $pdf->Ln($hM1); $pdf->SetX($xM);
 // Valeur MOYENNE agrandie mais auto-ajustée (demande explicite : ne doit
 // jamais déborder la cellule, quelle que soit la longueur du texte).
@@ -1169,7 +1176,7 @@ $pdf->Cell($w_moy, $hM2, u($moy_str), 1, 1, 'C');
 $pdf->SetTextColor(0, 0, 0);
 
 $pdf->SetX($xM);
-cell2l($pdf, $w_moy, $hM3, 'RANG', '', 'C', true, 10, 4);
+cell2l($pdf, $w_moy, $hM3, bt('RANG', 'RANK'), '', 'C', true, 10, 4);
 $pdf->Ln($hM3); $pdf->SetX($xM);
 $taille_rang = cell2l_taille_ajustee($pdf, $rang_str, 'B', $w_moy - 2.4, 12, 7);
 cell_rang($pdf, $w_moy, $hM4, $rang_general, ' / ' . $nb_classes, 1, 'C', $taille_rang);
@@ -1215,6 +1222,7 @@ foreach ($decisions as $i => $dec) {
     checkbox_ltm($pdf, $x_dec + 1.2, $y_row + $h_dec / 2 - 1, $checked, 2);
     $pdf->SetXY($x_dec + 5.5, $y_row);
     $pdf->SetFont('Arial', 'B', 7.5);
+    $dec = bl($dec[0], $dec[1]);
     $txt_fr = u($dec[0] . ' / ');
     $w_fr   = $pdf->GetStringWidth($txt_fr);
     $pdf->Cell($w_fr, $h_dec, $txt_fr, 0, 0, 'L');
@@ -1281,17 +1289,17 @@ $pdf->MultiCell($w_obs, $h_obs_box, '', 1, 'L');
 // hauteur réelle. Police agrandie (demande explicite).
 $pdf->SetFont('Arial', '', 8.5);
 $pdf->SetXY($x_obs, $y_dec2 + 6);
-$pdf->Cell($w_obs, 5.5, u((get_etablissement()['ville'] ?? '') . ', le ' . date('d-m-Y') . '.'), 0, 1, 'C');
+$pdf->Cell($w_obs, 5.5, u((get_etablissement()['ville'] ?? '') . bt(', le ', ', on ') . date('d-m-Y') . '.'), 0, 1, 'C');
 $pdf->SetX($x_obs);
 $pdf->SetFont('Arial', 'I', 7.5);
-$pdf->Cell($w_obs, 4.5, 'On', 0, 1, 'C');
+$pdf->Cell($w_obs, 4.5, bt('On', 'Le'), 0, 1, 'C');
 $pdf->Ln(2.5);
 $pdf->SetX($x_obs);
 $pdf->SetFont('Arial', 'B', 8.5);
-$pdf->Cell($w_obs, 5.5, 'LE PROVISEUR,', 0, 1, 'C');
+$pdf->Cell($w_obs, 5.5, bt('LE PROVISEUR,', 'THE PRINCIPAL,'), 0, 1, 'C');
 $pdf->SetX($x_obs);
 $pdf->SetFont('Arial', 'I', 7.5);
-$pdf->Cell($w_obs, 4.5, 'The Principal', 0, 1, 'C');
+$pdf->Cell($w_obs, 4.5, bt('The Principal', 'Le Proviseur'), 0, 1, 'C');
 
 // Signature numérique (uniquement si demandée à l'impression — jamais
 // automatique — et si l'admin en a configuré une dans les paramètres).

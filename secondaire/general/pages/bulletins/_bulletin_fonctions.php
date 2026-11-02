@@ -34,6 +34,11 @@ function fmt_note_b(?float $v): string {
 }
 
 function mention_gen_b(float $a): string {
+    if (bulletin_en()) {
+        if ($a >= 16) return 'Excellent'; if ($a >= 14) return 'Very good';
+        if ($a >= 12) return 'Good'; if ($a >= 10) return 'Fairly good';
+        if ($a >= 8)  return 'Average'; return 'Insufficient';
+    }
     if ($a >= 16) return 'Excellent'; if ($a >= 14) return 'Tres bien';
     if ($a >= 12) return 'Bien'; if ($a >= 10) return 'Assez bien';
     if ($a >= 8)  return 'Passable'; return 'Insuffisant';
@@ -80,12 +85,13 @@ function cell_rang(FPDF $pdf, float $w, float $h, ?int $rang, string $suffixe, i
     }
 
     $part1 = (string)$rang;
+    $ord = rang_suffixe($rang);   // « e », ou « st/nd/rd/th » (section anglophone)
     $taille_e = round($taille * 0.62, 2);
     $pdf->SetFont('Arial', $style, $taille);
     $w1 = $pdf->GetStringWidth($part1);
     $w2 = $pdf->GetStringWidth(u($suffixe));
     $pdf->SetFont('Arial', $style, $taille_e);
-    $we = $pdf->GetStringWidth('e');
+    $we = $pdf->GetStringWidth($ord);
     $total = $w1 + $we + $w2;
     if ($align === 'C')     { $x0 = $x + ($w - $total) / 2; }
     elseif ($align === 'R') { $x0 = $x + $w - $total - 1.2; }
@@ -98,7 +104,7 @@ function cell_rang(FPDF $pdf, float $w, float $h, ?int $rang, string $suffixe, i
     $raise = $taille * 0.12; // décalage vertical approximatif (mm)
     $pdf->SetXY($x0 + $w1, $y - $raise);
     $pdf->SetFont('Arial', $style, $taille_e);
-    $pdf->Cell($we, $h, 'e', 0, 0, 'L');
+    $pdf->Cell($we, $h, $ord, 0, 0, 'L');
 
     $pdf->SetXY($x0 + $w1 + $we, $y);
     $pdf->SetFont('Arial', $style, $taille);
@@ -118,6 +124,7 @@ function cell2l_taille_ajustee(FPDF $pdf, string $texte, string $style, float $l
 }
 
 function cell2l(FPDF $pdf, float $w, float $h, string $fr, string $en, string $align = 'L', bool $fill = false, float $taille_fr = 6, float $taille_en = 4.3, ?array $fill_color = null, bool $tight = false): void {
+    [$fr, $en] = bl($fr, $en);   // section anglophone : l'anglais à la place du français
     $x = $pdf->GetX(); $y = $pdf->GetY();
     if ($fill) { $fill_color = $fill_color ?? couleur_pdf('bandeau_section'); $pdf->SetFillColor($fill_color[0], $fill_color[1], $fill_color[2]); $pdf->Rect($x, $y, $w, $h, 'F'); }
     $pdf->Rect($x, $y, $w, $h);

@@ -28,6 +28,7 @@ if (!$paiement) {
     die('<div style="font-family:sans-serif;padding:2rem;color:#b91c1c">
          Aucun versement APEE enregistré pour cet élève cette année — impossible de générer le reçu APEE.</div>');
 }
+bulletin_fixer_langue((int) $paiement['id_classe']);   // section anglophone : reçu en anglais d'abord
 
 $etab         = get_etablissement();
 $annee        = db_one("SELECT libelle FROM annee_scolaire WHERE id = ?", [$id_annee]);
@@ -81,7 +82,7 @@ foreach ($frames as [$x0, $y0]) {
     $cy = $pdf->GetY() + 1;
 
     // Titre chevron "REÇU A.P.E.E" (gauche) + case "B.P.F. CFA" (droite)
-    pdf_titre_chevron($pdf, 'REÇU A.P.E.E', $xi, $cy, $wi * 0.42, 7);
+    pdf_titre_chevron($pdf, bt('REÇU A.P.E.E', 'P.T.A. RECEIPT'), $xi, $cy, $wi * 0.42, 7);
     $pdf->SetFont('Arial', 'B', 7.5);
     $pdf->SetXY($xi + $wi * 0.55, $cy);
     $pdf->Cell($wi * 0.14, 4, pdf_u('B.P.F. CFA'), 0, 0, 'L');
@@ -91,16 +92,17 @@ foreach ($frames as [$x0, $y0]) {
     $pdf->Cell($wi * 0.30, 4, number_format((float)$paiement['montant'], 0, ',', ' '), 0, 0, 'C');
     $pdf->SetFont('Arial', '', 7);
     $pdf->SetXY($xi + $wi * 0.55, $cy + 4.3);
-    $pdf->Cell($wi * 0.45, 3.2, pdf_u('Année scolaire: ' . $annee_libelle), 0, 1, 'L');
+    $pdf->Cell($wi * 0.45, 3.2, pdf_u(bt('Année scolaire: ', 'School Year: ') . $annee_libelle), 0, 1, 'L');
     $pdf->SetFont('Arial', 'I', 5.2);
     $pdf->SetX($xi + $wi * 0.55);
-    $pdf->Cell($wi * 0.45, 2.2, 'School Year', 0, 1, 'L');
+    $pdf->Cell($wi * 0.45, 2.2, pdf_u(bt('School Year', 'Année scolaire')), 0, 1, 'L');
     $cy += 10;
 
-    pdf_pilule($pdf, "ASSOCIATION DES PARENTS D'ELEVES ET ENSEIGNANTS", $xi, $cy, $wi, 5.5);
+    pdf_pilule($pdf, bt("ASSOCIATION DES PARENTS D'ELEVES ET ENSEIGNANTS", 'PARENT-TEACHER ASSOCIATION'), $xi, $cy, $wi, 5.5);
     $cy += 7.5;
 
     $ligne = function (float $yy, string $fr, string $en) use ($pdf, $xi, $wi): void {
+        if (bulletin_en()) [$fr, $en] = carte_paire($fr, $en);   // section anglophone : anglais d'abord
         $pdf->SetFont('Arial', '', 8);
         $pdf->SetXY($xi, $yy);
         $pdf->Cell($wi, 3.4, pdf_u($fr), 0, 1);
@@ -115,7 +117,7 @@ foreach ($frames as [$x0, $y0]) {
     $cy += 6.6;
     $somme_lettres = nombre_en_lettres_fcfa((float)$paiement['montant']);
     $ligne($cy,
-        'Classe : ' . $paiement['classe'] . '          La somme de : ' . number_format((float)$paiement['montant'], 0, ',', ' ') . ' Fcfa ( ' . $somme_lettres . ' Francs CFA )',
+        'Classe : ' . $paiement['classe'] . bt('          La somme de : ', '          The sum of: ') . number_format((float)$paiement['montant'], 0, ',', ' ') . ' Fcfa ( ' . $somme_lettres . bt(' Francs CFA )', ' CFA francs )'),
         'Class'
     );
     $cy += 6.6;
@@ -123,15 +125,15 @@ foreach ($frames as [$x0, $y0]) {
     $cy += 6.6;
     $pdf->SetFont('Arial', '', 8);
     $pdf->SetXY($xi, $cy);
-    $pdf->Cell($wi * 0.62, 3.4, pdf_u('Adresse du Parent ou Contact Téléphonique : '), 0, 0);
+    $pdf->Cell($wi * 0.62, 3.4, pdf_u(bt('Adresse du Parent ou Contact Téléphonique : ', "Parent's address or phone number: ")), 0, 0);
     $pdf->SetFont('Arial', 'B', 8);
-    $pdf->Cell($wi * 0.38, 3.4, pdf_u(mb_strtoupper(lieu_edition_documents($etab) ?: 'MBÉ', 'UTF-8') . ', le ' . date('d/m/Y')), 0, 1, 'R');
+    $pdf->Cell($wi * 0.38, 3.4, pdf_u(mb_strtoupper(lieu_edition_documents($etab) ?: 'MBÉ', 'UTF-8') . bt(', le ', ', on ') . date('d/m/Y')), 0, 1, 'R');
     $pdf->SetFont('Arial', 'I', 5.2);
     $pdf->SetTextColor(110);
     $pdf->SetX($xi);
-    $pdf->Cell($wi * 0.62, 2.2, "Parent's address or phone number", 0, 0);
+    $pdf->Cell($wi * 0.62, 2.2, pdf_u(bt("Parent's address or phone number", 'Adresse du parent ou contact téléphonique')), 0, 0);
     $pdf->SetFont('Arial', 'I', 5.2);
-    $pdf->Cell($wi * 0.38, 2.2, 'On', 0, 1, 'R');
+    $pdf->Cell($wi * 0.38, 2.2, bt('On', 'Le'), 0, 1, 'R');
     $pdf->SetTextColor(0);
 
     // Signatures — jamais appliquées automatiquement, seulement si demandé
@@ -139,9 +141,9 @@ foreach ($frames as [$x0, $y0]) {
     $y_sig_ligne = $y0 + $h0 - 20;
     $pdf->SetFont('Arial', 'BI', 8);
     $pdf->SetXY($xi, $y_sig_ligne);
-    $pdf->Cell($wi * 0.45, 5, pdf_u('LE PRESIDENT'), 0, 0, 'C');
+    $pdf->Cell($wi * 0.45, 5, pdf_u(bt('LE PRESIDENT', 'THE PRESIDENT')), 0, 0, 'C');
     $pdf->Cell($wi * 0.1, 5, '', 0, 0);
-    $pdf->Cell($wi * 0.45, 5, pdf_u("LE TRESORIER DE L'APEE"), 0, 1, 'C');
+    $pdf->Cell($wi * 0.45, 5, pdf_u(bt("LE TRESORIER DE L'APEE", 'THE P.T.A. TREASURER')), 0, 1, 'C');
 
     if ($avec_sig_president) {
         pdf_signature_appliquer($pdf, 'recu_apee', 'president_apee', $x0, $y0, $w0, $h0, [

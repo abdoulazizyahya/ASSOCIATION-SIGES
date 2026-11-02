@@ -45,6 +45,7 @@ if (!$id_classe) die('Paramètre classe manquant.');
 if ($vue === 'trim' && !$id_trim) die('Paramètre trim manquant.');
 
 $classe = db_one("SELECT * FROM classe WHERE IDClasses=?", [$id_classe]);
+bulletin_fixer_langue($id_classe);   // section anglophone : certificat en anglais
 if (!$classe) die('Classe introuvable.');
 $trimestre = null;
 if ($vue === 'trim') {
@@ -131,10 +132,10 @@ foreach ($qualifies as $q) {
 
         $pdf->SetFont('Arial', 'B', 11);
         $pdf->SetXY(14, 38.5);
-        $pdf->Cell(60, 5, pdf_u('Année scolaire: ' . $val_annee), 0, 0);
+        $pdf->Cell(60, 5, pdf_u(bt('Année scolaire: ', 'School Year: ') . $val_annee), 0, 0);
         $pdf->SetFont('Arial', 'I', 10);
         $pdf->SetXY(14, 43.5);
-        $pdf->Cell(60, 4, 'School Year', 0, 1);
+        $pdf->Cell(60, 4, pdf_u(bt('School Year', 'Année scolaire')), 0, 1);
 
         // Bannière-pilule "TABLEAU D'HONNEUR" — pilule vectorielle (couleur
         // exacte 0.416/0.710/1.000 → RGB 106/181/255 du PDF fourni) + image
@@ -143,7 +144,13 @@ foreach ($qualifies as $q) {
         $pdf->SetFillColor(106, 181, 255);
         $pdf->SetDrawColor(30, 79, 179);
         $pdf->RoundedRect(70, 48, 153.7, 18, 9, 'DF');
+        if (bulletin_en()) {   // section anglophone : titre anglais à la place de l'image « TABLEAU D'HONNEUR »
+            $pdf->SetFont('Arial', 'B', 30); $pdf->SetTextColor(255, 255, 255);
+            $pdf->SetXY(70, 48); $pdf->Cell(153.7, 18, 'ROLL OF HONOUR', 0, 0, 'C');
+            $pdf->SetTextColor(0);
+        } else {
         $pdf->Image(__DIR__ . '/../../assets/img/pdf/tableau_honneur/titre_arc_en_ciel.jpg', 83, 48.5, 127, 17);
+        }
         $pdf->SetDrawColor(0);
 
         // Photo de l'élève — cadre 40×40mm à x=235 (y décalé avec la bannière).
@@ -168,13 +175,13 @@ foreach ($qualifies as $q) {
         $pdf->Text(40, 74.5, pdf_u('ENCOURAGEMENT'));
         pdf_case($pdf, (bool) $m['felicitations'], 150, 67.5, 9);
         $pdf->SetTextColor(235, 0, 0);
-        $pdf->Text(160, 74.5, pdf_u('FELICITATIONS'));
+        $pdf->Text(160, 74.5, pdf_u(bt('FELICITATIONS', 'CONGRATULATIONS')));
         $pdf->SetTextColor(0);
 
         // Sous-titre italique gras vert (0/132/0) souligné.
         $pdf->SetFont('Arial', 'BI', 15);
         $pdf->SetTextColor(0, 132, 0);
-        $pdf->Text(40, 88.0, pdf_u('POUR SON TRAVAIL TRES SATISFAISANT ET SA CONDUITE EXEMPLAIRE'));
+        $pdf->Text(40, 88.0, pdf_u(bt('POUR SON TRAVAIL TRES SATISFAISANT ET SA CONDUITE EXEMPLAIRE', 'FOR VERY SATISFACTORY WORK AND EXEMPLARY CONDUCT')));
         $pdf->SetFillColor(0, 132, 0);
         $pdf->Rect(40, 88.5, 190.2, 0.26, 'F');
         $pdf->SetTextColor(0);
@@ -188,22 +195,24 @@ foreach ($qualifies as $q) {
         $pdf->SetFont('Arial', '', 15);
         $pdf->SetXY($marge_para, 93.0);
         $pdf->MultiCell($largeur_para, 8.0, pdf_u(
-            "L'élève " . $nom_complet . ' de la classe de ' . $classe['DesignationClasses']
+            bulletin_en()
+            ? 'The student ' . $nom_complet . ' of class ' . $classe['DesignationClasses'] . ' is placed, by decision of the class council, on the ROLL OF HONOUR for ' . $periode_en . '.'
+            : "L'élève " . $nom_complet . ' de la classe de ' . $classe['DesignationClasses']
             . " est inscrit(e) sur décision du conseil de classe au TABLEAU D'HONNEUR pour le compte "
             . $periode_m2 . '.'
         ), 0, 'J');
         $pdf->SetX($marge_para);
-        $pdf->MultiCell($largeur_para, 8.0, pdf_u('Cette reconnaissance prestigieuse de son MERITE est aussi et surtout un appel à l\'EXCELLENCE.'), 0, 'J');
+        $pdf->MultiCell($largeur_para, 8.0, pdf_u(bt('Cette reconnaissance prestigieuse de son MERITE est aussi et surtout un appel à l\'EXCELLENCE.', 'This prestigious recognition of MERIT is above all a call to EXCELLENCE.')), 0, 'J');
 
         // Encadrés Moyenne/Rang — même bleu que la bannière (106/181/255).
         $y_res = max($pdf->GetY() + 4, 125.0);
-        $lbl_moy = $vue === 'annee' ? 'MOYENNE ANNUELLE' : 'MOYENNE';
+        $lbl_moy = $vue === 'annee' ? bt('MOYENNE ANNUELLE', 'ANNUAL AVERAGE') : bt('MOYENNE', 'AVERAGE');
         $pdf->SetFont('Arial', 'B', 15);
         $pdf->SetTextColor(0);
         $pdf->Text(24, $y_res, pdf_u($lbl_moy));
-        $pdf->Text(120, $y_res, pdf_u('RANG'));
+        $pdf->Text(120, $y_res, pdf_u(bt('RANG', 'RANK')));
         $pdf->SetFont('Arial', '', 15);
-        $pdf->Text(172, $y_res, pdf_u('Fait à ' . (($etab['lieu'] ?: $etab['ville']) ?: '') . ', le ' . date('d-m-Y') . '.'));
+        $pdf->Text(172, $y_res, pdf_u(bt('Fait à ', 'Done at ') . (($etab['lieu'] ?: $etab['ville']) ?: '') . bt(', le ', ', on ') . date('d-m-Y') . '.'));
 
         $pdf->SetFillColor(106, 181, 255);
         $pdf->SetFont('Arial', 'B', 20);
@@ -217,9 +226,9 @@ foreach ($qualifies as $q) {
         $y_sign = $y_res + 17;
         $pdf->SetFont('Arial', 'B', 15);
         $pdf->SetTextColor(0, 115, 170);
-        $pdf->Text(47, $y_sign, pdf_u("L'ENSEIGNANT(E),"));
+        $pdf->Text(47, $y_sign, pdf_u(bt("L'ENSEIGNANT(E),", 'THE TEACHER,')));
         $pdf->SetTextColor(235, 0, 0);
-        $pdf->Text(200, $y_sign, pdf_u(mb_strtoupper($etab['chef_etablissement'] ?: 'LE DIRECTEUR') . ','));
+        $pdf->Text(200, $y_sign, pdf_u(mb_strtoupper(bt($etab['chef_etablissement'] ?: 'LE DIRECTEUR', $etab['chef_etablissement_en'] ?: 'THE DIRECTOR')) . ','));
         $pdf->SetTextColor(0);
 
         if (($_GET['signature'] ?? '0') === '1') {
@@ -268,11 +277,11 @@ foreach ($qualifies as $q) {
     $pdf->SetXY(0, $y_titre);
     $pdf->SetFont('Arial', 'B', 26);
     $pdf->SetTextColor(20, 40, 120);
-    $pdf->Cell($pw, 12, pdf_u('CERTIFICAT DE TABLEAU D\'HONNEUR'), 0, 1, 'C');
+    $pdf->Cell($pw, 12, pdf_u(bt('CERTIFICAT DE TABLEAU D\'HONNEUR', 'ROLL OF HONOUR CERTIFICATE')), 0, 1, 'C');
     $pdf->SetFont('Arial', 'I', 11);
     $pdf->SetTextColor(120);
     $pdf->SetX(0);
-    $pdf->Cell($pw, 6, 'HONOR ROLL CERTIFICATE', 0, 1, 'C');
+    $pdf->Cell($pw, 6, pdf_u(bt('HONOR ROLL CERTIFICATE', 'CERTIFICAT DE TABLEAU D\'HONNEUR')), 0, 1, 'C');
     $pdf->SetTextColor(0);
     $pdf->Ln(6);
 
@@ -286,7 +295,7 @@ foreach ($qualifies as $q) {
     $nom_complet = mb_strtoupper($l['Nom_elv']) . ' ' . ($l['Prenom_elv'] ?? '');
     $pdf->SetFont('Arial', '', 11);
     $pdf->SetX($ml);
-    $pdf->Cell($uw, 6, pdf_u("L'établissement " . ($etab['nom_fr'] ?: APP_NOM) . ' certifie que'), 0, 1, 'C');
+    $pdf->Cell($uw, 6, pdf_u(bulletin_en() ? ($etab['nom_en'] ?: ($etab['nom_fr'] ?: APP_NOM)) . ' certifies that' : "L'établissement " . ($etab['nom_fr'] ?: APP_NOM) . ' certifie que'), 0, 1, 'C');
 
     $pdf->SetFont('Arial', 'B', 16);
     $pdf->SetX($ml);
@@ -294,33 +303,33 @@ foreach ($qualifies as $q) {
 
     $pdf->SetFont('Arial', '', 11);
     $pdf->SetX($ml);
-    $pdf->Cell($uw, 6, pdf_u('de la classe de ' . $classe['DesignationClasses'] . ", s'est distingué(e) par son mérite et"), 0, 1, 'C');
+    $pdf->Cell($uw, 6, pdf_u(bulletin_en() ? 'of class ' . $classe['DesignationClasses'] . ', has distinguished himself/herself by merit and' : 'de la classe de ' . $classe['DesignationClasses'] . ", s'est distingué(e) par son mérite et"), 0, 1, 'C');
     $pdf->SetX($ml);
-    $pdf->Cell($uw, 6, pdf_u('est inscrit(e) au TABLEAU D\'HONNEUR pour ' . $periode_fr . '.'), 0, 1, 'C');
+    $pdf->Cell($uw, 6, pdf_u(bulletin_en() ? 'is placed on the ROLL OF HONOUR for ' . $periode_en . '.' : 'est inscrit(e) au TABLEAU D\'HONNEUR pour ' . $periode_fr . '.'), 0, 1, 'C');
     $pdf->SetFont('Arial', 'I', 8.5);
     $pdf->SetTextColor(120);
     $pdf->SetX($ml);
-    $pdf->Cell($uw, 5, pdf_u('Certifies that the above-named student, class ' . $classe['DesignationClasses'] . ', is honored on the school\'s HONOR ROLL for ' . $periode_en . '.'), 0, 1, 'C');
+    $pdf->Cell($uw, 5, pdf_u(bulletin_en() ? "Certifie que l'élève ci-dessus, classe " . $classe['DesignationClasses'] . ", est inscrit(e) au tableau d'honneur pour " . $periode_fr . '.' : 'Certifies that the above-named student, class ' . $classe['DesignationClasses'] . ', is honored on the school\'s HONOR ROLL for ' . $periode_en . '.'), 0, 1, 'C');
     $pdf->SetTextColor(0);
     $pdf->Ln(4);
 
-    $mention_lbl = $m['felicitations'] ? 'FÉLICITATIONS' : ($m['encouragement'] ? 'ENCOURAGEMENT' : "TABLEAU D'HONNEUR");
+    $mention_lbl = $m['felicitations'] ? bt('FÉLICITATIONS', 'CONGRATULATIONS') : ($m['encouragement'] ? 'ENCOURAGEMENT' : bt("TABLEAU D'HONNEUR", 'ROLL OF HONOUR'));
     $pdf->SetFont('Arial', 'B', 13);
     $pdf->SetTextColor(214, 175, 55);
     $pdf->SetX($ml);
-    $pdf->Cell($uw, 8, pdf_u('Mention : ' . $mention_lbl), 0, 1, 'C');
+    $pdf->Cell($uw, 8, pdf_u(bt('Mention : ', 'Distinction: ') . $mention_lbl), 0, 1, 'C');
     $pdf->SetTextColor(0);
 
     $pdf->SetFont('Arial', '', 10);
     $pdf->SetX($ml);
-    $pdf->Cell($uw, 6, pdf_u('Moyenne : ' . number_format((float) $l['moy'], 2) . '/20   —   Rang : ' . $l['rang'] . ' / ' . $classement['nb_classes']), 0, 1, 'C');
+    $pdf->Cell($uw, 6, pdf_u(bt('Moyenne : ', 'Average: ') . number_format((float) $l['moy'], 2) . bt('/20   —   Rang : ', '/20   —   Rank: ') . $l['rang'] . ' / ' . $classement['nb_classes']), 0, 1, 'C');
     $pdf->Ln(8);
 
     $w_sign = 70; $x_sign = $pw / 2 - $w_sign / 2;
     pdf_fait_a_bilingue($pdf, $x_sign, $w_sign, (($etab['lieu'] ?: $etab['ville']) ?: ''), 'C', 9);
     $pdf->SetFont('Arial', 'B', 9);
     $pdf->SetX($x_sign);
-    $pdf->Cell($w_sign, 5, pdf_u(mb_strtoupper($etab['chef_etablissement'] ?: 'LE DIRECTEUR') . ','), 0, 1, 'C');
+    $pdf->Cell($w_sign, 5, pdf_u(mb_strtoupper(bt($etab['chef_etablissement'] ?: 'LE DIRECTEUR', $etab['chef_etablissement_en'] ?: 'THE DIRECTOR')) . ','), 0, 1, 'C');
 
     if (($_GET['signature'] ?? '0') === '1') {
         pdf_signature_appliquer_jn($pdf, 'certificat_tableau_honneur', 0, 0, $pw, $ph, [

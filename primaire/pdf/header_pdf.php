@@ -233,9 +233,12 @@ function pdf_entete(FPDF $pdf, array $etab, float $page_w, float $marge = 10, ?f
     $y0  = $y ?? $marge;
     $lh1 = 3.8 * $echelle; $lh2 = 4.5 * $echelle; $lh3 = 3.5 * $echelle;
     $taille_logo = 22 * $echelle;
+    // Document de la section anglophone (bulletin_en()) : anglais à gauche, français à droite.
+    $x_fr = bulletin_en() ? $marge + $col * 2 : $marge;
+    $x_en = bulletin_en() ? $marge : $marge + $col * 2;
 
     // ── Gauche (français) ────────────────────────────────
-    $pdf->SetXY($marge, $y0);
+    $pdf->SetXY($x_fr, $y0);
     $pdf->SetFont('Arial', '', 7 * $echelle);
     $pdf->SetTextColor(0, 0, 0);
     $pdf->MultiCell($col, $lh1, pdf_u(
@@ -245,9 +248,9 @@ function pdf_entete(FPDF $pdf, array $etab, float $page_w, float $marge = 10, ?f
         ($etab['arrondissement_fr'] ?? 'ARRONDISSEMENT DE MBÉ')
     ), 0, 'C');
     // Nom long : 2 lignes max, police réduite si besoin (pdf_texte_ajuste()).
-    pdf_texte_ajuste($pdf, $marge, $pdf->GetY(), $col, mb_strtoupper($etab['nom_fr'] ?? 'LYCÉE TECHNIQUE DE MBÉ'), 8.5 * $echelle, 6 * $echelle, 2);
+    pdf_texte_ajuste($pdf, $x_fr, $pdf->GetY(), $col, mb_strtoupper($etab['nom_fr'] ?? 'LYCÉE TECHNIQUE DE MBÉ'), 8.5 * $echelle, 6 * $echelle, 2);
     $pdf->SetFont('Arial', '', 6.5 * $echelle);
-    $pdf->SetX($marge);
+    $pdf->SetX($x_fr);
     $pdf->MultiCell($col, $lh3, pdf_u(
         'B.P. ' . ($etab['boite_postale'] ?? '') . '  Tél.: ' . ($etab['telephone'] ?? '') . "\n" .
         ($etab['email'] ?? '')
@@ -277,7 +280,7 @@ function pdf_entete(FPDF $pdf, array $etab, float $page_w, float $marge = 10, ?f
 
     // ── Droite (anglais) ──────────────────────────────────
     $xr = $marge + $col * 2;
-    $pdf->SetXY($xr, $y0);
+    $pdf->SetXY($x_en, $y0);
     $pdf->SetFont('Arial', '', 7 * $echelle);
     $pdf->SetTextColor(0, 0, 0);
     $pdf->MultiCell($col, $lh1, pdf_u(
@@ -286,9 +289,9 @@ function pdf_entete(FPDF $pdf, array $etab, float $page_w, float $marge = 10, ?f
         ($etab['division_en']    ?? 'VINA DIVISION') . "\n" .
         ($etab['subdivision_en'] ?? 'MBE SUBDIVISION')
     ), 0, 'C');
-    pdf_texte_ajuste($pdf, $xr, $pdf->GetY(), $col, mb_strtoupper($etab['nom_en'] ?? 'GTHS OF MBE'), 8.5 * $echelle, 6 * $echelle, 2);
+    pdf_texte_ajuste($pdf, $x_en, $pdf->GetY(), $col, mb_strtoupper($etab['nom_en'] ?? 'GTHS OF MBE'), 8.5 * $echelle, 6 * $echelle, 2);
     $pdf->SetFont('Arial', '', 6.5 * $echelle);
-    $pdf->SetX($xr);
+    $pdf->SetX($x_en);
     $pdf->MultiCell($col, $lh3, pdf_u(
         'P.O.BOX. ' . ($etab['boite_postale'] ?? '') . '  Phone: ' . ($etab['telephone'] ?? '') . "\n" .
         ($etab['email'] ?? '')
@@ -514,6 +517,7 @@ function pdf_ruban_chevron(FPDF $pdf, float $x_gauche, float $x_droite, float $y
 function pdf_bandeau(FPDF $pdf, string $titre_fr, string $titre_en, float $page_w, float $marge = 10): void
 {
     $w = $page_w - 2 * $marge;
+    [$titre_fr, $titre_en] = bl($titre_fr, $titre_en);   // section anglophone : anglais en premier
     $pdf->SetFont('Arial', 'B', 13);
     $pdf->SetFillColor(214, 234, 248);
     $pdf->SetDrawColor(30, 79, 216);

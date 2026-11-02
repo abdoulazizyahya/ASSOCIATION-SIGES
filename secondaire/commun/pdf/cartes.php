@@ -47,7 +47,7 @@ if ($id_classe) { $where[] = "i.id_classe=?"; $params[] = $id_classe; }
 $sql_where = 'WHERE ' . implode(' AND ', $where);
 
 $eleves = db_all(
-    "SELECT e.*, c.designation AS classe
+    "SELECT e.*, c.designation AS classe, i.id_classe AS id_classe_insc
      FROM eleve e
      LEFT JOIN inscription i ON i.id_eleve=e.id AND i.id_annee=$id_annee
      LEFT JOIN classe c ON c.id=i.id_classe
@@ -104,6 +104,7 @@ foreach ($lots as $lot) {
         $lig = (int)($pos / $nb_col);
         $x   = $marge + $col * ($cW + $ecart);
         $y   = $marge + $lig * ($cH + $ecart);
+        bulletin_fixer_langue((int) ($el['id_classe_insc'] ?? 0));   // section anglophone : carte en anglais d'abord
         $fn_recto($pdf, $el, $etab, $annee, $x, $y, $cW, $cH);
     }
 
@@ -117,6 +118,7 @@ foreach ($lots as $lot) {
             else                  { $lig = $nb_lig - 1 - $lig; } // retournement bord court : miroir vertical
             $x = $marge + $col * ($cW + $ecart);
             $y = $marge + $lig * ($cH + $ecart);
+            bulletin_fixer_langue((int) ($el['id_classe_insc'] ?? 0));
             dessiner_carte_verso($pdf, $el, $etab, $tuteurs_idx[$el['id']] ?? null, $x, $y, $cW, $cH);
         }
     }
@@ -157,6 +159,7 @@ function dessiner_carte_1(FPDF $pdf, array $el, array $etab, array $annee,
     $logoW = $cW * 0.15;
     $colW  = ($cW - $flagW - $logoW) / 2;
     $xFr = $x + $flagW; $xLogo = $xFr + $colW; $xEn = $xLogo + $logoW;
+    if (bulletin_en()) [$xFr, $xEn] = [$xEn, $xFr];   // section anglophone : anglais à gauche
     $fsHead = max(2.4, min(3.6, $cW / 28));
 
     $pdf->SetTextColor(0);
@@ -193,7 +196,7 @@ function dessiner_carte_1(FPDF $pdf, array $el, array $etab, array $annee,
     $fsTitre = max(5, min(8, $cW / 10));
     $pdf->SetFont('Arial', 'B', $fsTitre);
     $pdf->SetXY($x + 1.5, $yTitre);
-    $pdf->Cell($cW - 3, $hTitre, pdf_u($etab['nom_fr'] ?? APP_NOM), 0, 0, 'L');
+    $pdf->Cell($cW - 3, $hTitre, pdf_u((bulletin_en() && !empty($etab['nom_en']) ? $etab['nom_en'] : ($etab['nom_fr'] ?? APP_NOM))), 0, 0, 'L');
 
     // ── Barre noire arrondie décorative ────────────────────────────────
     $yBar = $yTitre + $hTitre + 0.3;
@@ -226,6 +229,7 @@ function dessiner_carte_1(FPDF $pdf, array $el, array $etab, array $annee,
     ];
     $yr = $yBody;
     foreach ($champs as [$fr, $en]) {
+        [$fr, $en] = carte_paire($fr, $en);
         $pdf->SetFont('Arial', 'B', $fsLbl);
         $pdf->SetXY($xi, $yr);
         $pdf->Cell($wi, 2.6, pdf_u($fr), 0, 1, 'L');
@@ -249,10 +253,10 @@ function dessiner_carte_1(FPDF $pdf, array $el, array $etab, array $annee,
     $yFoot = $y + $cH - 5;
     $pdf->SetFont('Arial', 'B', max(3.8, $fsLbl - 0.5));
     $pdf->SetXY($x + 1.5, $yFoot);
-    $pdf->Cell($cW - 3, 2.6, pdf_u(strtoupper($etab['chef_etablissement'] ?? 'LE PROVISEUR') . ','), 0, 1, 'L');
+    $pdf->Cell($cW - 3, 2.6, pdf_u(strtoupper(bt($etab['chef_etablissement'] ?? 'LE PROVISEUR', $etab['chef_etablissement_en'] ?? 'THE PRINCIPAL')) . ','), 0, 1, 'L');
     $pdf->SetFont('Arial', 'I', max(3.2, $fsLbl - 1.3));
     $pdf->SetX($x + 1.5);
-    $pdf->Cell($cW - 3, 2.2, pdf_u($etab['chef_etablissement_en'] ?? 'The Principal'), 0, 0, 'L');
+    $pdf->Cell($cW - 3, 2.2, pdf_u(bt($etab['chef_etablissement_en'] ?? 'The Principal', $etab['chef_etablissement'] ?? 'Le Proviseur')), 0, 0, 'L');
 
     // Signature numérique (uniquement si demandée à l'impression — jamais
     // automatique), discrète dans le coin bas-droit du pied de carte.
@@ -422,6 +426,7 @@ function dessiner_carte_2(FPDF $pdf, array $el, array $etab, array $annee,
 
     $colW = ($cW - $flagW - 2) / 2;
     $xFr = $x + $flagW; $xEn = $xFr + $colW + 2;
+    if (bulletin_en()) [$xFr, $xEn] = [$xEn, $xFr];   // section anglophone : anglais à gauche
     $fsHead = max(2.4, min(3.4, $cW / 30));
     $pdf->SetTextColor(0);
     $pdf->SetFont('Arial', 'B', $fsHead);
@@ -445,7 +450,7 @@ function dessiner_carte_2(FPDF $pdf, array $el, array $etab, array $annee,
     $fsTitre = max(6, min(9, $cW / 9));
     $pdf->SetFont('Arial', 'B', $fsTitre);
     $pdf->SetTextColor(30, 79, 216);
-    $titre = "CARTE D'IDENTITÉ SCOLAIRE";
+    $titre = bt("CARTE D'IDENTITÉ SCOLAIRE", 'SCHOOL IDENTITY CARD');
     $tw = min($cW - 4, $pdf->GetStringWidth(pdf_u($titre)) + 6);
     $th = $fsTitre * 0.55;
     $tx = $x + ($cW - $tw) / 2;
@@ -466,7 +471,7 @@ function dessiner_carte_2(FPDF $pdf, array $el, array $etab, array $annee,
     $pdf->SetFont('Arial', 'I', max(3.5, $fsTitre - 3));
     $pdf->SetTextColor(190, 20, 20);
     $pdf->SetXY($x + 1, $ySub);
-    $pdf->Cell($cW - 2, 2.6, pdf_u('SCHOOL IDENTITY CARD'), 0, 0, 'C');
+    $pdf->Cell($cW - 2, 2.6, pdf_u(bt('SCHOOL IDENTITY CARD', "CARTE D'IDENTITÉ SCOLAIRE")), 0, 0, 'C');
 
     // ── Corps : photo (+ signature superposée) à gauche, champs à droite ──
     $pdf->SetTextColor(0);
@@ -476,7 +481,7 @@ function dessiner_carte_2(FPDF $pdf, array $el, array $etab, array $annee,
     carte_photo_box($pdf, $el, $x + 1.5, $yBody, $photoW, max(8, $photoH));
     $pdf->SetFont('Arial', 'I', max(2.8, $cW / 30));
     $pdf->SetXY($x + 1.5, $yBody + max(8, $photoH) + 0.3);
-    $pdf->MultiCell($photoW, 1.7, pdf_u(strtoupper($etab['chef_etablissement'] ?? 'LE PROVISEUR') . "\nLe Proviseur"), 0, 'C');
+    $pdf->MultiCell($photoW, 1.7, pdf_u(strtoupper(bt($etab['chef_etablissement'] ?? 'LE PROVISEUR', $etab['chef_etablissement_en'] ?? 'THE PRINCIPAL')) . "\n" . bt('Le Proviseur', 'The Principal')), 0, 'C');
     if (($_GET['signature'] ?? '0') === '1') {
         $sig_w = min(14, $photoW);
         $sig_h = 5;
@@ -501,24 +506,24 @@ function dessiner_carte_2(FPDF $pdf, array $el, array $etab, array $annee,
         $pdf->Cell($wi * (1 - $lblRatio), 3, pdf_u($val), 0, 1);
     };
     $pdf->SetXY($xi, $yBody);
-    $ligne('Nom :', strtoupper($el['nom']));
+    $ligne(bt('Nom :', 'Surname:'), strtoupper($el['nom']));
     $pdf->SetX($xi);
-    $ligne('Prénom :', $el['prenom'] ?? '—');
+    $ligne(bt('Prénom :', 'First name:'), $el['prenom'] ?? '—');
 
     $pdf->SetX($xi);
     $pdf->SetFont('Arial', 'B', $fs2); $pdf->SetTextColor(30, 79, 216);
-    $pdf->Cell($wi * 0.32, 3, pdf_u('Né(e) le :'), 0, 0);
+    $pdf->Cell($wi * 0.32, 3, pdf_u(bt('Né(e) le :', 'Born on:')), 0, 0);
     $pdf->SetTextColor(0);
     $pdf->Cell($wi * 0.36, 3, pdf_u($el['date_naiss'] ? date('d/m/Y', strtotime($el['date_naiss'])) : '—'), 0, 0);
     $pdf->SetTextColor(30, 79, 216);
-    $pdf->Cell($wi * 0.14, 3, pdf_u('Sexe :'), 0, 0);
+    $pdf->Cell($wi * 0.14, 3, pdf_u(bt('Sexe :', 'Sex:')), 0, 0);
     $pdf->SetTextColor(0);
     $pdf->Cell($wi * 0.18, 3, pdf_u($el['sexe'] === 'M' ? 'M' : 'F'), 0, 1);
 
     $pdf->SetX($xi);
-    $ligne('À :', mb_strimwidth($el['lieu_naiss'] ?? '—', 0, 16, '…'));
+    $ligne(bt('À :', 'At:'), mb_strimwidth($el['lieu_naiss'] ?? '—', 0, 16, '…'));
     $pdf->SetX($xi);
-    $ligne('Classe :', mb_strimwidth($el['classe'] ?? '—', 0, 16, '…'));
+    $ligne(bt('Classe :', 'Class:'), mb_strimwidth($el['classe'] ?? '—', 0, 16, '…'));
     $pdf->SetX($xi);
     $ligne('NIU :', niu_eleve($el));
 
@@ -568,7 +573,7 @@ function dessiner_carte_3(FPDF $pdf, array $el, array $etab, array $annee,
     $fsNom = max(5, min(8, $mainW / 12));
     $pdf->SetFont('Arial', 'B', $fsNom);
     $pdf->SetXY($x + 1, $y + 0.5);
-    $pdf->Cell($mainW - 2, $fsNom * 0.5, pdf_u($etab['nom_fr'] ?? APP_NOM), 0, 1, 'C');
+    $pdf->Cell($mainW - 2, $fsNom * 0.5, pdf_u((bulletin_en() && !empty($etab['nom_en']) ? $etab['nom_en'] : ($etab['nom_fr'] ?? APP_NOM))), 0, 1, 'C');
     $pdf->SetTextColor(0);
     $pdf->SetFont('Arial', 'B', max(4.5, $fsNom - 1));
     $pdf->SetX($x + 1);
@@ -582,10 +587,10 @@ function dessiner_carte_3(FPDF $pdf, array $el, array $etab, array $annee,
     $pdf->SetTextColor(255, 255, 255);
     $pdf->SetFont('Arial', 'B', max(3.6, $mainW / 24));
     $pdf->SetXY($x + 1, $yGris + $hGris * 0.08);
-    $pdf->Cell($mainW - 2, $hGris * 0.42, pdf_u("CARTE D'IDENTITÉ SCOLAIRE"), 0, 1, 'C');
+    $pdf->Cell($mainW - 2, $hGris * 0.42, pdf_u(bt("CARTE D'IDENTITÉ SCOLAIRE", 'SCHOOL IDENTITY CARD')), 0, 1, 'C');
     $pdf->SetFont('Arial', '', max(3.2, $mainW / 28));
     $pdf->SetX($x + 1);
-    $pdf->Cell($mainW - 2, $hGris * 0.38, pdf_u('SCHOOL IDENTITY CARD'), 0, 0, 'C');
+    $pdf->Cell($mainW - 2, $hGris * 0.38, pdf_u(bt('SCHOOL IDENTITY CARD', "CARTE D'IDENTITÉ SCOLAIRE")), 0, 0, 'C');
 
     $yBleu = $yGris + $hGris + 0.3;
     $hBleu = max(0.8, $cH * 0.015);
@@ -605,6 +610,7 @@ function dessiner_carte_3(FPDF $pdf, array $el, array $etab, array $annee,
     ];
     $yr = $yBody;
     foreach ($champs as [$fr, $en]) {
+        [$fr, $en] = carte_paire($fr, $en);
         $pdf->SetFont('Arial', 'B', $fsLbl);
         $pdf->SetXY($x + 1.5, $yr);
         $pdf->Cell($mainW - 3, 2.6, pdf_u($fr), 0, 1, 'L');
@@ -617,7 +623,7 @@ function dessiner_carte_3(FPDF $pdf, array $el, array $etab, array $annee,
     $pdf->SetTextColor(200, 20, 20);
     $pdf->SetFont('Arial', 'B', max(4, $fsLbl));
     $pdf->SetXY($x + 1.5, $yr + 0.5);
-    $pdf->Cell($mainW - 3, 3, pdf_u('Classe : ' . mb_strimwidth($el['classe'] ?? '—', 0, 18, '…')), 0, 1, 'L');
+    $pdf->Cell($mainW - 3, 3, pdf_u(bt('Classe : ', 'Class: ') . mb_strimwidth($el['classe'] ?? '—', 0, 18, '…')), 0, 1, 'L');
     $pdf->SetX($x + 1.5);
     $pdf->Cell($mainW - 3, 3, pdf_u('NIU : ' . niu_eleve($el)), 0, 1, 'L');
     $pdf->SetTextColor(0);
@@ -659,7 +665,7 @@ function dessiner_carte_3(FPDF $pdf, array $el, array $etab, array $annee,
     $pdf->SetFont('Arial', 'I', max(2.8, $sealR * 0.32));
     $pdf->SetTextColor(150, 20, 20);
     $pdf->SetXY($sealCx - $sigW / 2, $sealCy + $sealR + 0.8);
-    $pdf->MultiCell($sigW, 2, pdf_u(strtoupper($etab['chef_etablissement'] ?? 'LE PROVISEUR')), 0, 'C');
+    $pdf->MultiCell($sigW, 2, pdf_u(strtoupper(bt($etab['chef_etablissement'] ?? 'LE PROVISEUR', $etab['chef_etablissement_en'] ?? 'THE PRINCIPAL'))), 0, 'C');
     $pdf->SetTextColor(0);
 }
 
@@ -690,10 +696,10 @@ function dessiner_carte_4(FPDF $pdf, array $el, array $etab, array $annee,
     $pdf->SetTextColor(60, 60, 65);
     $pdf->SetFont('Arial', 'B', $fsEtab);
     $pdf->SetXY($x + $pad, $yCur);
-    $pdf->Cell($cW - 2 * $pad, $cH * 0.05, pdf_u(mb_strtoupper($etab['sigle'] ?? '') . ' — ' . ($etab['nom_fr'] ?? '')), 0, 1, 'C');
+    $pdf->Cell($cW - 2 * $pad, $cH * 0.05, pdf_u(mb_strtoupper($etab['sigle'] ?? '') . ' — ' . (bulletin_en() && !empty($etab['nom_en']) ? $etab['nom_en'] : ($etab['nom_fr'] ?? ''))), 0, 1, 'C');
     $pdf->SetFont('Arial', 'I', max(3.5, $fsEtab - 1));
     $pdf->SetX($x + $pad);
-    $pdf->Cell($cW - 2 * $pad, $cH * 0.04, pdf_u("Carte d'identité scolaire"), 0, 0, 'C');
+    $pdf->Cell($cW - 2 * $pad, $cH * 0.04, pdf_u(bt("Carte d'identité scolaire", 'School identity card')), 0, 0, 'C');
     $yCur += $cH * 0.14;
 
     // Photo carrée centrée.
@@ -727,7 +733,7 @@ function dessiner_carte_4(FPDF $pdf, array $el, array $etab, array $annee,
     $pdf->SetFont('Arial', '', $fs2);
     foreach ($infos4 as $lbl => $val) {
         $pdf->SetXY($x + $pad, $yCur);
-        $pdf->Cell($cW - 2 * $pad, $hLigne, pdf_u($lbl . ' : ' . $val), 0, 1, 'C');
+        $pdf->Cell($cW - 2 * $pad, $hLigne, pdf_u(bl_barre($lbl) . ' : ' . $val), 0, 1, 'C');
         $yCur += $hLigne;
     }
     $yCur += $cH * 0.02;
@@ -743,7 +749,7 @@ function dessiner_carte_4(FPDF $pdf, array $el, array $etab, array $annee,
     $yCur += $qrSize + $cH * 0.01;
     $pdf->SetFont('Arial', 'I', max(3.2, $fs2 - 0.5));
     $pdf->SetXY($x + $pad, $yCur);
-    $pdf->Cell($cW - 2 * $pad, $cH * 0.04, pdf_u(strtoupper($etab['chef_etablissement'] ?? 'LE PROVISEUR') . ' — The Principal'), 0, 0, 'C');
+    $pdf->Cell($cW - 2 * $pad, $cH * 0.04, pdf_u(strtoupper(bt($etab['chef_etablissement'] ?? 'LE PROVISEUR', $etab['chef_etablissement_en'] ?? 'THE PRINCIPAL')) . bt(' — The Principal', ' — Le Proviseur')), 0, 0, 'C');
 
     // Signature numérique (uniquement si demandée à l'impression — jamais
     // automatique), centrée sous la légende, dans la marge basse restante.
@@ -784,10 +790,10 @@ function dessiner_carte_5(FPDF $pdf, array $el, array $etab, array $annee,
     $pdf->SetTextColor(0);
     $pdf->SetFont('Arial', 'B', $fsH);
     $pdf->SetXY($x + $pad + $chip + 1, $y + 0.8);
-    $pdf->Cell($cW - 2 * $pad - $chip - 1, $hHead * 0.5, pdf_u(mb_strtoupper($etab['sigle'] ?? '') . ' — ' . ($etab['nom_fr'] ?? '')), 0, 1, 'L');
+    $pdf->Cell($cW - 2 * $pad - $chip - 1, $hHead * 0.5, pdf_u(mb_strtoupper($etab['sigle'] ?? '') . ' — ' . (bulletin_en() && !empty($etab['nom_en']) ? $etab['nom_en'] : ($etab['nom_fr'] ?? ''))), 0, 1, 'L');
     $pdf->SetFont('Arial', 'I', max(4, $fsH - 1.5));
     $pdf->SetX($x + $pad);
-    $pdf->Cell($cW - 2 * $pad, $hHead * 0.4, pdf_u("Carte d'identité scolaire / School identity card"), 0, 0, 'L');
+    $pdf->Cell($cW - 2 * $pad, $hHead * 0.4, pdf_u(bl_barre("Carte d'identité scolaire / School identity card")), 0, 0, 'L');
 
     $pdf->SetDrawColor(120, 120, 120);
     $pdf->SetLineWidth(0.2);
@@ -820,7 +826,7 @@ function dessiner_carte_5(FPDF $pdf, array $el, array $etab, array $annee,
     ];
     foreach ($infos5 as $lbl => $val) {
         $pdf->SetFont('Arial', 'B', max(4, $fs2 - 1.5)); $pdf->SetX($xi);
-        $pdf->Cell($wi * 0.36, 3, pdf_u($lbl . ':'), 0, 0);
+        $pdf->Cell($wi * 0.36, 3, pdf_u(bl_barre($lbl) . ':'), 0, 0);
         $pdf->SetFont('Arial', '', max(4, $fs2 - 1.5));
         $pdf->Cell($wi * 0.64, 3, pdf_u((string)$val), 0, 1);
     }
@@ -841,10 +847,10 @@ function dessiner_carte_5(FPDF $pdf, array $el, array $etab, array $annee,
     $pdf->SetDrawColor(0, 0, 0);
     $pdf->SetFont('Arial', 'B', 4);
     $pdf->SetXY($x + 1, $yFoot + 0.8);
-    $pdf->Cell($cW - 2, 2.4, pdf_u(strtoupper($etab['chef_etablissement'] ?? 'LE PROVISEUR')), 0, 1, 'C');
+    $pdf->Cell($cW - 2, 2.4, pdf_u(strtoupper(bt($etab['chef_etablissement'] ?? 'LE PROVISEUR', $etab['chef_etablissement_en'] ?? 'THE PRINCIPAL'))), 0, 1, 'C');
     $pdf->SetFont('Arial', 'I', 3.5);
     $pdf->SetX($x + 1);
-    $pdf->Cell($cW - 2, 2, pdf_u('Le Proviseur / The Principal'), 0, 0, 'C');
+    $pdf->Cell($cW - 2, 2, pdf_u(bl_barre('Le Proviseur / The Principal')), 0, 0, 'C');
 
     // Signature numérique (sur demande uniquement, jamais automatique) :
     // placée sous la photo, seul espace libre disponible sur ce modèle épuré.
@@ -885,7 +891,7 @@ function dessiner_carte_verso(FPDF $pdf, array $el, array $etab, ?array $tuteur,
     $fs = max(4, min(6, $cW / 14));
     $pdf->SetFont('Arial', 'B', $fs);
     $pdf->SetXY($x + 1, $y + $hHead / 2 - $fs / 4.5);
-    $pdf->Cell($cW - 2, 3, pdf_u('EN CAS DE PERTE, RETOURNER À / IF FOUND, RETURN TO :'), 0, 0, 'C');
+    $pdf->Cell($cW - 2, 3, pdf_u(bl_barre('EN CAS DE PERTE, RETOURNER À / IF FOUND, RETURN TO') . ' :'), 0, 0, 'C');
 
     $pdf->SetTextColor(0);
     $yb  = $y + $hHead + 1.5;
@@ -896,7 +902,7 @@ function dessiner_carte_verso(FPDF $pdf, array $el, array $etab, ?array $tuteur,
     // ── Coordonnées de l'établissement ────────────────────────────
     $pdf->SetXY($x + $pad, $yb);
     $pdf->SetFont('Arial', 'B', $fsB);
-    $pdf->MultiCell($wb, 3, pdf_u(strtoupper($etab['nom_fr'] ?? APP_NOM)), 0, 'C');
+    $pdf->MultiCell($wb, 3, pdf_u(strtoupper((bulletin_en() && !empty($etab['nom_en']) ? $etab['nom_en'] : ($etab['nom_fr'] ?? APP_NOM)))), 0, 'C');
     $pdf->SetFont('Arial', '', max(3.8, $fsB - 1));
     $pdf->SetX($x + $pad);
     $coord = trim(($etab['ville'] ?? '') . ($etab['telephone'] ? ' · Tél./Phone ' . $etab['telephone'] : ''));
@@ -930,7 +936,7 @@ function dessiner_carte_verso(FPDF $pdf, array $el, array $etab, ?array $tuteur,
     $pdf->Cell($wb, 3, pdf_u('Signature / Cachet — Stamp'), 0, 1, 'C');
     $pdf->SetFont('Arial', 'B', max(3.8, $fsB - 1));
     $pdf->SetX($x + $pad);
-    $pdf->Cell($wb, 4, pdf_u(strtoupper($etab['chef_etablissement'] ?? 'LE PROVISEUR')), 0, 0, 'C');
+    $pdf->Cell($wb, 4, pdf_u(strtoupper(bt($etab['chef_etablissement'] ?? 'LE PROVISEUR', $etab['chef_etablissement_en'] ?? 'THE PRINCIPAL'))), 0, 0, 'C');
 
     // Signature numérique (sur demande uniquement, jamais automatique).
     if (($_GET['signature'] ?? '0') === '1') {

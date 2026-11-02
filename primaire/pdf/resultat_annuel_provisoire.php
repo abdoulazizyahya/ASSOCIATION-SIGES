@@ -21,6 +21,7 @@ $etab_brut = get_etablissement();
 $etab      = etab_pour_pdf($etab_brut);
 
 $classe = db_one("SELECT DesignationClasses FROM classe WHERE IDClasses=?", [$id_classe]);
+bulletin_fixer_langue($id_classe);   // section anglophone : document en anglais
 if (!$classe) die('Classe introuvable.');
 $val_annee_suivante = resultat_annuel_libelle_annee_suivante($val_annee);
 $lignes = resultat_annuel_provisoire_classe($id_classe, $val_annee, $ordre);
@@ -41,10 +42,10 @@ pdf_bandeau($pdf, 'LISTE PROVISOIRE — ' . mb_strtoupper($classe['DesignationCl
 
 $pdf->SetFont('Arial', 'B', 9);
 $pdf->SetX(10);
-$pdf->Cell($uw, 5, pdf_u("Effectif prévisionnel $val_annee_suivante — redoublants + admis d'autres classes"), 0, 1, 'C');
+$pdf->Cell($uw, 5, pdf_u(bulletin_en() ? "Expected enrolment $val_annee_suivante — repeaters + promoted from other classes" : "Effectif prévisionnel $val_annee_suivante — redoublants + admis d'autres classes"), 0, 1, 'C');
 $pdf->Ln(2);
 
-$cols = [['N°', 10], ['Matricule', 26], ['Nom et prénoms', 0], ['Date naiss.', 24], ['Lieu naiss.', 36], ['Sexe', 14], ['Statut', 20]];
+$cols = [['N°', 10], [bt('Matricule', 'Reg. No'), 26], [bt('Nom et prénoms', 'Names'), 0], [bt('Date naiss.', 'Date of birth'), 24], [bt('Lieu naiss.', 'Place of birth'), 36], [bt('Sexe', 'Sex'), 14], [bt('Statut', 'Status'), 20]];
 $fixed = array_sum(array_column($cols, 1));
 $cols[2][1] = $uw - $fixed;
 
@@ -72,7 +73,7 @@ foreach ($lignes as $l) {
 }
 if (empty($lignes)) {
     $pdf->SetX(10);
-    $pdf->Cell($uw, 8, pdf_u('Aucun élève — aucune décision du Conseil de Classe enregistrée pour cette classe.'), 1, 1, 'C');
+    $pdf->Cell($uw, 8, pdf_u(bt('Aucun élève — aucune décision du Conseil de Classe enregistrée pour cette classe.', 'No student — no class council decision recorded for this class.')), 1, 1, 'C');
 }
 
 // Copyright standard du système (primaire/pdf/header_pdf.php) — texte unique sur

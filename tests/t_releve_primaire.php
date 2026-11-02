@@ -67,6 +67,28 @@ foreach (assoc_all("SELECT code FROM etablissement WHERE actif=1 AND type_enseig
     egal($nb_cl, substr_count($t, 'RELEV'), "toutes les classes (vierge) : $nb_cl fiches");
     $t = releve_texte(['piste' => 'ar', 'classe' => 'toutes', 'seq' => 'annee']);
     egal($nb_cl, substr_count($t, 'RELEV'), "toutes les classes (arabe, année vierge) : $nb_cl fiches");
+    // Barème commun de la classe aussi en « toutes les classes » (02/11/2026)
+    $bars = array_filter(array_map(fn($m) => $m['bareme'], matieres_classe_arabe_avec_bareme($cl, $va)));
+    $sig = fn($b) => implode('|', [(float) $b['orale'], (float) $b['ecrite'], (float) $b['pratique']]);
+    if ($bars && count(array_unique(array_map($sig, $bars))) === 1) {
+        $b0 = reset($bars);
+        $attendu = '/ ' . rtrim(rtrim(number_format((float) $b0['orale'], 2, ',', ''), '0'), ',');
+        $un = releve_texte(['piste' => 'ar', 'classe' => $cl]);
+        $tt = releve_texte(['piste' => 'ar', 'classe' => 'toutes']);
+        ok(str_contains($un, "| $attendu |") && str_contains($tt, "| $attendu |"), "arabe, toutes les classes : barème commun appliqué ({$attendu}…)");
+    }
+    // Signatures juste sous le tableau (plus repoussées en bas de page) : fiche de 3 lignes
+    $_GET = ['piste' => 'fr', 'classe' => $cl];
+    $pdf_brut = (function () { ob_start(); $_SERVER['SCRIPT_NAME'] = '/SIGES/primaire/pdf/releve_notes_evaluation.php'; include __DIR__ . '/../primaire/pdf/releve_notes_evaluation.php'; $_SERVER['SCRIPT_NAME'] = '/SIGES/association/tests.php'; return (string) ob_get_clean(); })();
+    preg_match_all('/stream\r?\n(.*?)\r?\nendstream/s', $pdf_brut, $m);
+    $flux = '';   // page des signatures seulement
+    foreach ($m[1] as $s) { $u = (string) @gzuncompress($s); if (str_contains($u, "L'enseignant")) $flux = $u; }
+    $y_sig = preg_match("/BT ([\\d.]+) ([\\d.]+) Td \\(L'enseignant/", $flux, $ys) ? (float) $ys[2] : null;
+    $y_der = null;   // bas du tableau = plus petite ordonnée PDF d'un rectangle de cellule (« re ») de cette page
+    $avant = $y_sig !== null ? substr($flux, 0, strpos($flux, "L'enseignant")) : '';
+    if (preg_match_all('/([\d.]+) ([\d.]+) ([\d.]+) (-?[\d.]+) re/', $avant, $r)) $y_der = min(array_map(fn($y, $h) => (float) $y + (float) $h, $r[2], $r[4]));
+    ok($y_sig !== null && $y_der !== null && $y_der - $y_sig < 25 * 72 / 25.4, 'signatures à environ 2 lignes sous le tableau'
+       . ($y_sig !== null && $y_der !== null ? ' (écart ' . round(($y_der - $y_sig) * 25.4 / 72) . ' mm)' : ' — position introuvable'));
 
     test_transaction(function () use ($cl, $seq, $comp, $mat, $els, $va) {
         // élève 1 : notes = barème complet ; élève 2 : moitié (cote NA)

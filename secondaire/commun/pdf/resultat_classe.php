@@ -40,10 +40,12 @@ $etab   = get_etablissement();
 $annee  = db_one("SELECT * FROM annee_scolaire WHERE id=?", [$id_annee]) ?? ['libelle' => '—'];
 $classe = db_one("SELECT * FROM classe WHERE id=?", [$id_classe]);
 if (!$classe) die('Classe introuvable.');
+bulletin_fixer_langue($id_classe);   // section anglophone : document en anglais
 
 $filtre_map      = ['admis' => 'Admis', 'redoublement' => 'Redoublement', 'exclu' => 'Exclu'];
 $filtre_decision = $filtre_map[$filtre] ?? null;
 $filtre_titre    = ['admis' => 'LISTE DES ADMIS', 'redoublement' => 'LISTE DES REDOUBLANTS', 'exclu' => 'LISTE DES EXCLUS', 'tous' => 'RESULTAT DE LA CLASSE'][$filtre];
+$filtre_titre_en = ['admis' => 'LIST OF PROMOTED STUDENTS', 'redoublement' => 'LIST OF REPEATERS', 'exclu' => 'LIST OF EXCLUDED STUDENTS', 'tous' => 'CLASS RESULTS'][$filtre];
 
 $rows = calc_resultat_annuel_comp($id_annee, $id_classe);
 if ($filtre_decision) {
@@ -55,10 +57,10 @@ if ($filtre_decision) {
 // sélecteur/Excel débordent sur la colonne voisine, FPDF::Cell() ne
 // tronquant pas le texte qui dépasse).
 $short_labels = [
-    'no' => 'N°', 'niu' => 'NIU', 'nom' => 'Nom et Prénoms', 'date' => 'Date naiss.',
-    'lieu' => 'Lieu naiss.', 'sexe' => 'Sexe', 'classe' => 'Classe',
-    't1' => 'T1', 't2' => 'T2', 't3' => 'T3', 'abs' => 'Abs.NJ(h)', 'moy_an' => 'Moy.Ann.',
-    'rang' => 'Rang', 'decision' => 'Décision', 'classe_suiv' => 'Cl. suivante', 'obs' => 'Notes',
+    'no' => 'N°', 'niu' => 'NIU', 'nom' => bt('Nom et Prénoms', 'Names'), 'date' => bt('Date naiss.', 'Date of birth'),
+    'lieu' => bt('Lieu naiss.', 'Place of birth'), 'sexe' => bt('Sexe', 'Sex'), 'classe' => bt('Classe', 'Class'),
+    't1' => 'T1', 't2' => 'T2', 't3' => 'T3', 'abs' => bt('Abs.NJ(h)', 'Unj.Abs(h)'), 'moy_an' => bt('Moy.Ann.', 'Ann.Avg'),
+    'rang' => bt('Rang', 'Rank'), 'decision' => bt('Décision', 'Decision'), 'classe_suiv' => bt('Cl. suivante', 'Next class'), 'obs' => bt('Notes', 'Remarks'),
 ];
 $largeurs = [
     'no' => 8, 'niu' => 24, 'nom' => 40, 'date' => 20, 'lieu' => 24, 'sexe' => 10,
@@ -86,16 +88,16 @@ $uw_tbl = $pw - 20;
 
 pdf_filigrane($pdf, $etab, $pw, $pdf->GetPageHeight());
 pdf_entete($pdf, $etab, $pw);
-pdf_bandeau($pdf, $filtre_titre, $filtre_titre, $pw);
+pdf_bandeau($pdf, $filtre_titre, $filtre_titre_en, $pw);
 
 $total = count($rows);
 $nb_m  = count(array_filter($rows, fn($r) => $r['sexe'] === 'M'));
 $nb_f  = $total - $nb_m;
 
 $pdf->SetFont('Arial', 'B', 9);
-$pdf->Cell(0, 5, pdf_u("Année scolaire : " . $annee['libelle'] . "    Classe : " . $classe['designation']), 0, 1, 'L');
+$pdf->Cell(0, 5, pdf_u(bt('Année scolaire : ', 'School year: ') . $annee['libelle'] . bt('    Classe : ', '    Class: ') . $classe['designation']), 0, 1, 'L');
 $pdf->SetFont('Arial', '', 8);
-$pdf->Cell(0, 4.5, pdf_u("Total : $total élève(s)   Garçons : $nb_m   Filles : $nb_f"), 0, 1, 'L');
+$pdf->Cell(0, 4.5, pdf_u(bulletin_en() ? "Total: $total student(s)   Boys: $nb_m   Girls: $nb_f" : "Total : $total élève(s)   Garçons : $nb_m   Filles : $nb_f"), 0, 1, 'L');
 $pdf->Ln(1);
 
 $total_naturel = array_sum(array_map(fn($c) => $c[1], $sel));
@@ -131,7 +133,7 @@ $x_sign = $pw - 25 - $w_sign;
 pdf_fait_a_bilingue($pdf, $x_sign, $w_sign, lieu_edition_documents($etab), 'R', 9);
 $pdf->SetFont('Arial', 'B', 9);
 $pdf->SetX($x_sign);
-$pdf->Cell($w_sign, 5, pdf_u(strtoupper($etab['chef_etablissement'] ?? 'LE PROVISEUR')), 0, 1, 'R');
+$pdf->Cell($w_sign, 5, pdf_u(strtoupper(bt($etab['chef_etablissement'] ?? 'LE PROVISEUR', $etab['chef_etablissement_en'] ?? 'THE PRINCIPAL'))), 0, 1, 'R');
 
 if (($_GET['signature'] ?? '0') === '1') {
     $sig_w = 24;

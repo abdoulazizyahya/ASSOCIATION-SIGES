@@ -29,6 +29,7 @@ function recu_paiement_dessiner_copie(
     bool $avec_sig_intendant = false, bool $avec_sig_proviseur = false, float $echelle = 0.66,
     ?array $couleurs_fond = null
 ): void {
+    bulletin_fixer_langue((int) ($classe['id'] ?? 0));   // section anglophone : reçu en anglais d'abord
     $mi = 2; // marge interne au cadre
     $xi = $x0 + $mi;
     $wi = $w0 - 2 * $mi;
@@ -46,7 +47,7 @@ function recu_paiement_dessiner_copie(
     // Bandeau titre + case numéro
     $h_titre = 5 + 2 * $echelle;
     $w_pilule = $wi * 0.62;
-    pdf_pilule($pdf, 'REÇU DE PAIEMENT DES FRAIS', $xi, $cy, $w_pilule, $h_titre);
+    pdf_pilule($pdf, bt('REÇU DE PAIEMENT DES FRAIS', 'RECEIPT FOR PAYMENT OF FEES'), $xi, $cy, $w_pilule, $h_titre);
     $x_num = $xi + $w_pilule + 3;
     $pdf->SetFont('Arial', 'B', 7.5);
     $pdf->SetXY($x_num, $cy);
@@ -58,7 +59,7 @@ function recu_paiement_dessiner_copie(
 
     // ── Identité de l'élève (ligne FR + sous-ligne EN italique petite) ──
     $cy += $h_titre + 1.5;
-    $sexe_libelle = ($eleve['sexe'] ?? 'M') === 'F' ? 'Féminin' : 'Masculin';
+    $sexe_libelle = ($eleve['sexe'] ?? 'M') === 'F' ? bt('Féminin', 'Female') : bt('Masculin', 'Male');
     $date_naiss   = !empty($eleve['date_naiss']) ? date('Y-m-d', strtotime($eleve['date_naiss'])) : '';
 
     $ligne = function (float $yy, string $fr, string $en) use ($pdf, $xi, $wi): void {
@@ -71,15 +72,15 @@ function recu_paiement_dessiner_copie(
         $pdf->Cell($wi, 2.2, pdf_u($en), 0, 1);
         $pdf->SetTextColor(0);
     };
-    $ligne($cy, 'Année scolaire: ' . $annee_libelle, 'School Year');
+    $ligne($cy, bt('Année scolaire: ', 'School Year: ') . $annee_libelle, bt('School Year', 'Année scolaire'));
     $cy += $lh;
-    $ligne($cy, 'Nom et Prénoms: ' . strtoupper($eleve['nom']) . ' ' . ($eleve['prenom'] ?? '') . '   —   Matricule : ' . ($eleve['matricule'] ?? ''), 'Surname and given Names — Registration No');
+    $ligne($cy, bt('Nom et Prénoms: ', 'Surname and given names: ') . strtoupper($eleve['nom']) . ' ' . ($eleve['prenom'] ?? '') . bt('   —   Matricule : ', '   —   Registration No: ') . ($eleve['matricule'] ?? ''), bt('Surname and given Names — Registration No', 'Nom et prénoms — Matricule'));
     $cy += $lh;
-    $ligne($cy, 'Date et lieu de naissance: ' . $date_naiss . ' A ' . strtoupper((string)($eleve['lieu_naiss'] ?? '')), 'Date and place of birth');
+    $ligne($cy, bt('Date et lieu de naissance: ', 'Date and place of birth: ') . $date_naiss . bt(' A ', ' at ') . strtoupper((string)($eleve['lieu_naiss'] ?? '')), bt('Date and place of birth', 'Date et lieu de naissance'));
     $cy += $lh;
-    $ligne($cy, 'Classe: ' . ($classe['designation'] ?? '') . '   —   Sexe: ' . $sexe_libelle, 'Class — Sex');
+    $ligne($cy, bt('Classe: ', 'Class: ') . ($classe['designation'] ?? '') . bt('   —   Sexe: ', '   —   Sex: ') . $sexe_libelle, bt('Class — Sex', 'Classe — Sexe'));
     $cy += $lh;
-    $ligne($cy, 'Contact téléphonique du Parent/Tuteur: ' . ($eleve['telephone'] ?? ''), "Parent/ Tutor phone number");
+    $ligne($cy, bt('Contact téléphonique du Parent/Tuteur: ', 'Parent/Tutor phone number: ') . ($eleve['telephone'] ?? ''), bt('Parent/ Tutor phone number', 'Contact téléphonique du parent/tuteur'));
     $cy += $lh + 0.5;
 
     // ── Tableau MOTIF (Frais / Montant) ─────────────────────────────
@@ -89,8 +90,8 @@ function recu_paiement_dessiner_copie(
     $pdf->SetFont('Arial', 'B', 7.5);
     $pdf->SetFillColor(120, 180, 235);
     $pdf->SetXY($xi, $cy);
-    $pdf->Cell($w_frais, $h_ligne, pdf_u('FRAIS'), 1, 0, 'C', true);
-    $pdf->Cell($w_mont, $h_ligne, pdf_u('MONTANT'), 1, 1, 'C', true);
+    $pdf->Cell($w_frais, $h_ligne, pdf_u(bt('FRAIS', 'FEES')), 1, 0, 'C', true);
+    $pdf->Cell($w_mont, $h_ligne, pdf_u(bt('MONTANT', 'AMOUNT')), 1, 1, 'C', true);
     $pdf->SetFont('Arial', '', 7.5);
     $total = 0.0;
     foreach ($versements as $v) {
@@ -112,9 +113,9 @@ function recu_paiement_dessiner_copie(
     $y_signature_ligne = $cy + 1;
     $pdf->SetFont('Arial', 'BI', 7.5);
     $pdf->SetXY($xi, $y_signature_ligne);
-    $pdf->Cell($wi * 0.4, 4.5, pdf_u("L'INTENDANT"), 0, 0, 'C');
+    $pdf->Cell($wi * 0.4, 4.5, pdf_u(bt("L'INTENDANT", 'THE BURSAR')), 0, 0, 'C');
     $pdf->Cell($wi * 0.2, 4.5, '', 0, 0);
-    $pdf->Cell($wi * 0.4, 4.5, pdf_u(strtoupper($etab['chef_etablissement'] ?? 'LE PROVISEUR')), 0, 1, 'C');
+    $pdf->Cell($wi * 0.4, 4.5, pdf_u(strtoupper(bt($etab['chef_etablissement'] ?? 'LE PROVISEUR', $etab['chef_etablissement_en'] ?? 'THE PRINCIPAL'))), 0, 1, 'C');
 
     // Signatures positionnées en % du cadre COMPLET ($x0/$y0/$w0/$h0), pas du
     // curseur courant — mémorisation stable indépendante du nombre de lignes
@@ -142,7 +143,7 @@ function recu_paiement_dessiner_copie(
         $pdf->Image($qr_tmp, $qr_x, $qr_y, $qr_taille, $qr_taille, 'PNG');
         $pdf->SetFont('Arial', '', 6.5);
         $pdf->SetXY($x0 + $w0 / 2 - 25, $qr_y + $qr_taille + 0.3);
-        $pdf->Cell(50, 3, pdf_u(mb_strtoupper(lieu_edition_documents($etab) ?: 'MBÉ', 'UTF-8') . ', le ' . date('d/m/Y')), 0, 1, 'C');
+        $pdf->Cell(50, 3, pdf_u(mb_strtoupper(lieu_edition_documents($etab) ?: 'MBÉ', 'UTF-8') . bt(', le ', ', on ') . date('d/m/Y')), 0, 1, 'C');
         $pdf->SetFont('Arial', 'I', 5.5);
         $pdf->SetX($x0 + $w0 / 2 - 25);
         $pdf->Cell(50, 2.4, 'On', 0, 0, 'C');

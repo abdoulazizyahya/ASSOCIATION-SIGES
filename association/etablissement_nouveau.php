@@ -8,7 +8,7 @@ require_once __DIR__ . '/_layout.php';
 exiger_superadmin_association();
 
 $msg = ''; $err = ''; $ok = false; $comptes = [];
-$val = ['code' => '', 'nom' => '', 'nom_en' => '', 'sigle' => '', 'ville' => '', 'sous_domaine' => '', 'type_enseignement' => 'primaire', 'statut' => 'public', 'ordre_enseignement' => 'general', 'db_existante' => '', 'db_user' => ''];
+$val = ['code' => '', 'nom' => '', 'nom_en' => '', 'sigle' => '', 'ville' => '', 'sous_domaine' => '', 'type_enseignement' => 'primaire', 'statut' => 'public', 'ordre_enseignement' => 'general', 'langue_enseignement' => 'francophone', 'db_existante' => '', 'db_user' => ''];
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     csrf_verifier();
@@ -18,6 +18,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!in_array($val['type_enseignement'], ['primaire', 'secondaire'], true)) $val['type_enseignement'] = 'primaire';
     if (!in_array($val['statut'], ['public', 'prive'], true)) $val['statut'] = 'public';
     if ($val['ordre_enseignement'] !== 'technique') $val['ordre_enseignement'] = 'general';
+    if (!in_array($val['langue_enseignement'], ['anglophone', 'bilingue'], true)) $val['langue_enseignement'] = 'francophone';
 
     // Mot de passe MySQL : jamais réaffiché dans le formulaire.
     $r = creer_etablissement($val + ['db_pass' => (string) ($_POST['db_pass'] ?? ''), 'par' => membre_connecte()['login'] ?? '?']);
@@ -26,7 +27,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $ok = true;
         $msg = $r['message'];
         $comptes = $r['comptes'] ?? [];
-        $val = ['code' => '', 'nom' => '', 'nom_en' => '', 'sigle' => '', 'ville' => '', 'sous_domaine' => '', 'type_enseignement' => 'primaire', 'statut' => 'public', 'ordre_enseignement' => 'general', 'db_existante' => '', 'db_user' => ''];
+        $val = ['code' => '', 'nom' => '', 'nom_en' => '', 'sigle' => '', 'ville' => '', 'sous_domaine' => '', 'type_enseignement' => 'primaire', 'statut' => 'public', 'ordre_enseignement' => 'general', 'langue_enseignement' => 'francophone', 'db_existante' => '', 'db_user' => ''];
     } else {
         $err = $r['message'];
     }
@@ -107,6 +108,21 @@ asso_haut('Nouvel établissement');
         Général : programme APC, notes par compétence. Technique : notes par séquence, matières
         groupées en enseignement professionnel / général, filières commerciales et industrielles.
         Figé définitivement après création.
+      </div>
+    </div>
+
+    <div class="col-12" id="bloc_langue">
+      <label class="form-label small d-block">Langue d'enseignement *</label>
+      <div class="btn-group w-100" role="group">
+        <?php foreach (['francophone' => 'Francophone', 'anglophone' => 'Anglophone', 'bilingue' => 'Bilingue'] as $lv => $ll): ?>
+        <input type="radio" class="btn-check" name="langue_enseignement" id="langue_<?= $lv ?>" value="<?= $lv ?>"
+               <?= $val['langue_enseignement'] === $lv ? 'checked' : '' ?>>
+        <label class="btn btn-outline-primary btn-sm" for="langue_<?= $lv ?>"><?= $ll ?></label>
+        <?php endforeach; ?>
+      </div>
+      <div class="form-text small text-muted2">
+        Primaire comme secondaire. Bilingue : sections francophone et anglophone ; le bulletin d'une
+        classe de la section anglophone est en anglais avec la traduction en français. Modifiable ensuite dans Paramètres.
       </div>
     </div>
 

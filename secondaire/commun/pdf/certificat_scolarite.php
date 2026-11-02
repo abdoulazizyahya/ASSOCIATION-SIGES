@@ -48,6 +48,7 @@ $insc = db_one(
     [$id_eleve, (int)($annee_act['id'] ?? 0)]
 );
 if (!$insc) die("Aucune inscription active pour cet eleve sur l'annee en cours.");
+bulletin_fixer_langue((int) $insc['id_classe']);   // section anglophone : anglais d'abord
 
 // Père / mère (via la table tuteur, "lien" en texte libre) — vide si non
 // renseigné, comme sur le modèle de référence (others/scolarite.pdf).
@@ -89,8 +90,10 @@ $division_en_nom = trim((string) preg_replace('/\s+DIVISION$/iu', '', $etab['div
 $col3 = $uw / 3;
 $y0   = 15;
 
+$x_fr = bulletin_en() ? $ml + 2 * $col3 : $ml;   // section anglophone : français à droite
+$x_en = bulletin_en() ? $ml : $ml + 2 * $col3;
 $pdf->SetFont('Arial', 'B', 7);
-$pdf->SetXY($ml, $y0);
+$pdf->SetXY($x_fr, $y0);
 $pdf->MultiCell($col3, 3.1, u(
     "REPUBLIQUE DU CAMEROUN\nMINISTERE DES ENSEIGNEMENTS SECONDAIRES\n" .
     "DELEGATION REGIONALE DU " . mb_strtoupper($region_fr_nom) . "\n" .
@@ -108,7 +111,7 @@ if ($logo_path && is_file($logo_path)) {
     $pdf->Cell(20, 16, u($etab['sigle'] ?? ''), 1, 0, 'C');
 }
 
-$pdf->SetXY($ml + 2 * $col3, $y0);
+$pdf->SetXY($x_en, $y0);
 $pdf->SetFont('Arial', 'B', 7);
 $pdf->MultiCell($col3, 3.1, u(
     "REPUBLIC OF CAMEROON\nMINISTRY OF SECONDARY EDUCATION\n" .
@@ -120,18 +123,18 @@ $y_en_fin = $pdf->GetY();
 $y_nom = max($y_fr_fin, $y_en_fin) + 1;
 // Nom de l'établissement : 2 lignes max, police réduite si besoin — un nom
 // très long débordait sur le logo et la colonne anglaise (pdf_texte_ajuste()).
-pdf_texte_ajuste($pdf, $ml, $y_nom, $col3, mb_strtoupper($etab['nom_fr'] ?? APP_NOM), 9, 6, 2);
+pdf_texte_ajuste($pdf, $x_fr, $y_nom, $col3, mb_strtoupper($etab['nom_fr'] ?? APP_NOM), 9, 6, 2);
 $pdf->SetFont('Arial', '', 6.5);
-$pdf->SetX($ml);
+$pdf->SetX($x_fr);
 $pdf->MultiCell($col3, 3, u(
     "B.P. " . ($etab['boite_postale'] ?? '') . " " . ($etab['ville'] ?? '') . "  Tel: " . ($etab['telephone'] ?? '') . "\n" .
     ($etab['email'] ?? '')
 ), 0, 'C');
 $y_left_fin = $pdf->GetY();
 
-pdf_texte_ajuste($pdf, $ml + 2 * $col3, $y_nom, $col3, mb_strtoupper($etab['nom_en'] ?? ''), 9, 6, 2);
+pdf_texte_ajuste($pdf, $x_en, $y_nom, $col3, mb_strtoupper($etab['nom_en'] ?? ''), 9, 6, 2);
 $pdf->SetFont('Arial', '', 6.5);
-$pdf->SetX($ml + 2 * $col3);
+$pdf->SetX($x_en);
 $pdf->MultiCell($col3, 3, u(
     "P.O. BOX. " . ($etab['boite_postale'] ?? '') . " " . ($etab['ville'] ?? '') . "  Phone: " . ($etab['telephone'] ?? '') . "\n" .
     ($etab['email'] ?? '')
@@ -143,10 +146,10 @@ $pdf->SetY(max($y_left_fin, $y_right_fin, $y0 + 20) + 3);
 // ── Année scolaire (haut gauche) ────────────────────────────────────
 $pdf->SetFont('Arial', 'B', 9);
 $pdf->SetX($ml);
-$pdf->Cell($uw / 2, 4, u('Annee scolaire: ' . $val_annee), 0, 1, 'L');
+$pdf->Cell($uw / 2, 4, u(bt('Annee scolaire: ', 'School Year: ') . $val_annee), 0, 1, 'L');
 $pdf->SetFont('Arial', 'I', 8);
 $pdf->SetX($ml);
-$pdf->Cell($uw / 2, 4, 'School Year', 0, 1, 'L');
+$pdf->Cell($uw / 2, 4, bt('School Year', 'Annee scolaire'), 0, 1, 'L');
 $pdf->Ln(2);
 
 // ── Titre en bandeau pilule bleu clair ───────────────────────────────
@@ -165,10 +168,10 @@ $pdf->SetLineWidth(0.2); $pdf->SetDrawColor(0);
 $pdf->SetTextColor(20, 40, 120);
 $pdf->SetFont('Arial', 'B', 14);
 $pdf->SetXY($titre_x, $titre_y + 1.5);
-$pdf->Cell($titre_w, 7, u('CERTIFICAT DE SCOLARITE'), 0, 1, 'C');
+$pdf->Cell($titre_w, 7, u(bt('CERTIFICAT DE SCOLARITE', 'SCHOOL CERTIFICATE')), 0, 1, 'C');
 $pdf->SetFont('Arial', '', 9);
 $pdf->SetX($titre_x);
-$pdf->Cell($titre_w, 5, 'SCHOOL CERTIFICATE', 0, 0, 'C');
+$pdf->Cell($titre_w, 5, u(bt('SCHOOL CERTIFICATE', 'CERTIFICAT DE SCOLARITE')), 0, 0, 'C');
 $pdf->SetTextColor(0);
 $pdf->Ln(14);
 
@@ -196,7 +199,7 @@ $pdf->SetX($ml);
 // le 01/10/2026. Pris dans Ressources humaines (fonctions.php::
 // nom_chef_etablissement()) ; aucun vrai nom -> « Je soussigné(e), » seule.
 $nom_chef = mb_strtoupper(nom_chef_etablissement());
-$t_sous = u('Je soussigné(e), ');
+$t_sous = u(bt('Je soussigné(e), ', 'I, the undersigned, '));
 $w_sous = $pdf->GetStringWidth($t_sous) + 1;
 $pdf->Cell($w_sous, 4.6, $t_sous, 0, $nom_chef !== '' ? 0 : 1, 'L');
 if ($nom_chef !== '') {
@@ -205,18 +208,19 @@ if ($nom_chef !== '') {
 }
 $pdf->SetX($ml);
 $pdf->SetFont('Arial', 'I', 9.5);
-$pdf->Cell($uw, 3.3, u('I, the undersigned'), 0, 1, 'L');
+$pdf->Cell($uw, 3.3, u(bt('I, the undersigned', 'Je soussigné(e)')), 0, 1, 'L');
 
 $pdf->Ln(3.2);
 $pdf->SetFont('Arial', 'B', 11.5);
 $pdf->SetX($ml);
-$pdf->Cell($uw, 4.6, pdf_police_ajustee($pdf, u('PROVISEUR DU ' . strtoupper($etab['nom_fr'] ?? APP_NOM)), 'B', 11.5, $uw), 0, 1, 'C');
+$pdf->Cell($uw, 4.6, pdf_police_ajustee($pdf, u(bulletin_en() ? 'PRINCIPAL OF THE ' . strtoupper($etab['nom_en'] ?: ($etab['nom_fr'] ?? APP_NOM)) : 'PROVISEUR DU ' . strtoupper($etab['nom_fr'] ?? APP_NOM)), 'B', 11.5, $uw), 0, 1, 'C');
 $pdf->SetFont('Arial', 'I', 9.5);
 $pdf->SetX($ml);
-$pdf->Cell($uw, 3.3, pdf_police_ajustee($pdf, u('PRINCIPAL OF THE ' . strtoupper($etab['nom_en'] ?? '')), 'I', 9.5, $uw), 0, 1, 'C');
+$pdf->Cell($uw, 3.3, pdf_police_ajustee($pdf, u(bulletin_en() ? 'PROVISEUR DU ' . strtoupper($etab['nom_fr'] ?? '') : 'PRINCIPAL OF THE ' . strtoupper($etab['nom_en'] ?? '')), 'I', 9.5, $uw), 0, 1, 'C');
 
 $pdf->Ln(3);
 $champ = function (string $fr, string $val, string $en) use ($pdf, $ml, $uw): void {
+    if (bulletin_en()) [$fr, $en] = [$en, $fr];   // section anglophone : anglais d'abord
     // La valeur suit l'étiquette à ~3 mm (et non plus une colonne fixe, qui
     // laissait un grand vide après « Et de », « Fils/Fille de »…).
     $pdf->SetX($ml);
@@ -239,32 +243,32 @@ $pdf->SetFont('Arial', '', 11);
 $pdf->SetX($ml);
 // Chaque partie suit la précédente à ~3 mm ; « Born on » / « at » restent
 // alignés sous « Né(e) le » / « à ».
-$t = u($sexe[0] . '(e) le');
+$t = u(bt($sexe[0] . '(e) le', 'Born on'));
 $pdf->Cell($pdf->GetStringWidth($t) + 3, 4.6, $t, 0, 0, 'L');
 $pdf->SetFont('Arial', 'B', 11);
 $t = u($dnaiss);
 $pdf->Cell($pdf->GetStringWidth($t) + 4, 4.6, $t, 0, 0, 'L');
 $pdf->SetFont('Arial', '', 11);
 $x_a = $pdf->GetX();
-$t = u('à');
+$t = u(bt('à', 'at'));
 $pdf->Cell($pdf->GetStringWidth($t) + 3, 4.6, $t, 0, 0, 'L');
 $pdf->SetFont('Arial', 'B', 11);
 $pdf->Cell($ml + $uw - $pdf->GetX(), 4.6, u($eleve['lieu_naiss'] ?? '.....................'), 0, 1, 'L');
 $pdf->SetFont('Arial', 'I', 8.5);
 $pdf->SetX($ml);
-$pdf->Cell($x_a - $ml, 3.3, 'Born on', 0, 0, 'L');
+$pdf->Cell($x_a - $ml, 3.3, u(bt('Born on', $sexe[0] . '(e) le')), 0, 0, 'L');
 $pdf->SetX($x_a);
-$pdf->Cell(10, 3.3, 'at', 0, 1, 'L');
+$pdf->Cell(10, 3.3, u(bt('at', 'à')), 0, 1, 'L');
 
 $pdf->Ln(3.2);
 $pdf->SetFont('Arial', '', 11);
 $pdf->SetX($ml);
 $pdf->MultiCell($uw, 4.7, u(
-    'Est effectivement ' . $sexe[1] . '(e) dans mon établissement en classe de : ' . strtoupper($insc['classe'])
+    bt('Est effectivement ' . $sexe[1] . '(e) dans mon établissement en classe de : ', 'Is effectively part of my school in class: ') . strtoupper($insc['classe'])
 ), 0, 'L');
 $pdf->SetFont('Arial', 'I', 8.5);
 $pdf->SetX($ml);
-$pdf->Cell($uw, 3.3, 'Is effectively part of my school in class', 0, 1, 'L');
+$pdf->Cell($uw, 3.3, u(bt('Is effectively part of my school in class', 'Est effectivement ' . $sexe[1] . '(e) dans mon établissement en classe de')), 0, 1, 'L');
 
 $pdf->Ln(3.2);
 $champ('Pour le compte de l\'année scolaire :', $val_annee, 'On behalf of the school year');
@@ -273,29 +277,27 @@ $champ('Sous le matricule national :', niu_eleve($eleve), 'Under the national ma
 $pdf->Ln(2);   // + 2,2 mm déjà ajoutés après la dernière paire
 $pdf->SetFont('Arial', '', 10.5);
 $pdf->SetX($ml);
-$pdf->MultiCell($uw, 4.7, u(
-    "En foi de quoi le présent Certificat est établi et délivré pour servir et valoir ce que de droit./."
-), 0, 'L');
+$foi_fr = "En foi de quoi le présent Certificat est établi et délivré pour servir et valoir ce que de droit./.";
+$foi_en = 'In testimony whereof, the present attestation is issued for the purpose it deserves';
+$pdf->MultiCell($uw, 4.7, u(bt($foi_fr, $foi_en)), 0, 'L');
 $pdf->SetFont('Arial', 'I', 9);
 $pdf->SetX($ml);
-$pdf->MultiCell($uw, 3.5, u(
-    'In testimony whereof, the present attestation is issued for the purpose it deserves'
-), 0, 'L');
+$pdf->MultiCell($uw, 3.5, u(bt($foi_en, $foi_fr)), 0, 'L');
 
 $pdf->Ln(8);
 $pdf->SetFont('Arial', '', 11);
 $pdf->SetX($ml + $uw * 0.55);
-$pdf->Cell($uw * 0.45, 4.6, u(lieu_edition_documents($etab) . ', le ' . date('d/m/Y') . '.'), 0, 1, 'C');
+$pdf->Cell($uw * 0.45, 4.6, u(lieu_edition_documents($etab) . bt(', le ', ', on ') . date('d/m/Y') . '.'), 0, 1, 'C');
 $pdf->SetFont('Arial', 'I', 9);
 $pdf->SetX($ml + $uw * 0.55);
-$pdf->Cell($uw * 0.45, 3.3, 'On', 0, 1, 'C');
+$pdf->Cell($uw * 0.45, 3.3, bt('On', 'Le'), 0, 1, 'C');
 $pdf->Ln(3.2);
 $pdf->SetX($ml + $uw * 0.55);
 $pdf->SetFont('Arial', 'B', 11);
-$pdf->Cell($uw * 0.45, 4.6, u(strtoupper($etab['chef_etablissement'] ?? 'LE PROVISEUR') . ','), 0, 1, 'C');
+$pdf->Cell($uw * 0.45, 4.6, u(strtoupper(bt($etab['chef_etablissement'] ?? 'LE PROVISEUR', $etab['chef_etablissement_en'] ?? 'The Principal')) . ','), 0, 1, 'C');
 $pdf->SetFont('Arial', 'I', 9);
 $pdf->SetX($ml + $uw * 0.55);
-$pdf->Cell($uw * 0.45, 3.3, ($etab['chef_etablissement_en'] ?? 'The Principal'), 0, 0, 'C');
+$pdf->Cell($uw * 0.45, 3.3, u(bt($etab['chef_etablissement_en'] ?? 'The Principal', $etab['chef_etablissement'] ?? 'Le Proviseur')), 0, 0, 'C');
 
 // Signature numérique (uniquement si demandée à l'impression — jamais
 // automatique — et si l'admin en a configuré une dans les paramètres).

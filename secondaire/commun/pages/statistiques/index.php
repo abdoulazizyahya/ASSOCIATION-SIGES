@@ -532,7 +532,7 @@ $total_filles = array_sum(array_column(array_merge(...array_values($sections_dat
   <div class="col-4"><div class="stat-card"><div class="stat-num"><?= $total_eleves-$total_filles ?></div><div class="stat-lbl">Garçons</div></div></div>
 </div>
 <?php foreach ($sections_data as $section => $rows): ?>
-  <h6 class="fw-bold mt-3" style="color:#1a3c6b"><i class="bi bi-diagram-3 me-1"></i><?= h($section) ?></h6>
+  <h6 class="fw-bold mt-3" style="color:#1a3c6b"><i class="bi bi-diagram-3 me-1"></i><?= h($section) ?><?= section_langue_libelle((string) $section) !== '' ? ' — ' . section_langue_libelle((string) $section) : '' ?></h6>
   <div class="table-responsive mb-3">
   <table class="table tbl-stat table-hover mb-0">
     <thead><tr><th>Classe</th><th>Niveau</th><th>Effectif</th><th>Filles</th><th>Garçons</th><th>% Filles</th></tr></thead>
@@ -578,7 +578,7 @@ foreach ($par_section as $section => $classes_section) {
     foreach ($classes_section as $c) {
         $lignes[] = ['classe' => $c['designation'], 'bilan' => calc_bilan_classe_genre_comp((int)$c['id'], $id_annee, $val_annee, $vue, $id_trim_comp)];
     }
-    render_tableau_bilan_genre($section, $lignes, $bilan_cols);
+    render_tableau_bilan_genre($section . (section_langue_libelle((string) $section) !== '' ? ' — ' . section_langue_libelle((string) $section) : ''), $lignes, $bilan_cols);
 }
 ?>
 

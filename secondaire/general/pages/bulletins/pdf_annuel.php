@@ -159,6 +159,7 @@ $insc = db_one(
     [$id_eleve, $id_annee]
 );
 if (!$insc) die('Inscription introuvable.');
+bulletin_fixer_langue((int) $insc['id_classe']);   // section anglophone : anglais / traduction française
 
 // ── Trimestres de l'année (toujours 3 colonnes) ───────────────────
 // Complété à 3 emplacements même si un trimestre n'a pas encore été créé (ou
@@ -175,7 +176,7 @@ $trimestres = array_pad(array_slice($trimestres, 0, 3), 3, null);
 // Libellé court d'un trimestre par sa position (1er/2e/3e) — indépendant du
 // trimestre existant ou non en base, pour toujours nommer les 3 colonnes.
 function trimestre_court(int $position): string {
-    return $position . ($position === 1 ? 'er' : 'e') . ' Trim';
+    return bulletin_en() ? 'Term ' . $position : $position . ($position === 1 ? 'er' : 'e') . ' Trim';
 }
 
 $titre_bull = 'BILAN ANNUEL';
@@ -200,7 +201,7 @@ $contacts_parents = $tuteur
 
 // ── Disciplines ───────────────────────────────────────────────────
 $disciplines = db_all(
-    "SELECT d.id_mat, d.coef, d.ordre, m.libelle AS matiere,
+    "SELECT d.id_mat, d.coef, d.ordre, m.libelle AS matiere, m.libelle_en AS matiere_en,
             g.libelle_groupe_comp AS groupe_lib, d.id_groupe,
             TRIM(CONCAT(e.nom_ens,' ',COALESCE(e.prenom_ens,''))) AS enseignant
      FROM discipline d
@@ -279,20 +280,20 @@ function bulletin_mentions_periode(?float $moy, int $heur_nj): array {
 // nécessaires (moyenne annuelle < 10). Une ligne par appréciation.
 function bulletin_appreciation_annuelle(array $m, array $matieres_faibles): string {
     $lignes = [];
-    if ($m['blame_trav'])           $lignes[] = 'Blâme pour mauvais travail';
-    elseif ($m['avert_trav'])       $lignes[] = 'Avertissement pour mauvais travail';
-    elseif ($m['tab'] === 'oui')    $lignes[] = "Tableau d'honneur accordé pour bon travail";
-    elseif ($m['tab'] === 'refuse') $lignes[] = "Tableau d'honneur refusé pour trop d'absences";
+    if ($m['blame_trav'])           $lignes[] = bt('Blâme pour mauvais travail', 'Blame for poor work');
+    elseif ($m['avert_trav'])       $lignes[] = bt('Avertissement pour mauvais travail', 'Warning for poor work');
+    elseif ($m['tab'] === 'oui')    $lignes[] = bt('Tableau d\'honneur accordé pour bon travail', 'Roll of honour granted for good work');
+    elseif ($m['tab'] === 'refuse') $lignes[] = bt('Tableau d\'honneur refusé pour trop d\'absences', 'Roll of honour refused for too many absences');
 
-    if ($m['encourag']) $lignes[] = 'Encouragements pour résultats satisfaisants';
-    if ($m['felicit'])  $lignes[] = 'Félicitations pour excellent travail';
+    if ($m['encourag']) $lignes[] = bt('Encouragements pour résultats satisfaisants', 'Encouragement for satisfactory results');
+    if ($m['felicit'])  $lignes[] = bt('Félicitations pour excellent travail', 'Congratulations for excellent work');
 
-    if ($m['blame_cond'])     $lignes[] = 'Blâme pour mauvaise conduite';
-    elseif ($m['avert_cond']) $lignes[] = 'Avertissement pour mauvaise conduite';
-    else                      $lignes[] = 'Bonne conduite dans l\'ensemble';
+    if ($m['blame_cond'])     $lignes[] = bt('Blâme pour mauvaise conduite', 'Blame for bad conduct');
+    elseif ($m['avert_cond']) $lignes[] = bt('Avertissement pour mauvaise conduite', 'Warning for bad conduct');
+    else                      $lignes[] = bt('Bonne conduite dans l\'ensemble', 'Good conduct overall');
 
     if (!empty($matieres_faibles)) {
-        $lignes[] = "Des efforts s'imposent en : " . implode(', ', $matieres_faibles);
+        $lignes[] = bt('Des efforts s\'imposent en : ', 'Efforts needed in: ') . implode(', ', $matieres_faibles);
     }
     return implode("\n", $lignes);
 }
@@ -307,6 +308,7 @@ function fmt_note_b(?float $v): string {
     return $dec !== null ? "$int.$dec" : $int;
 }
 function mention_mat_b(float $a): string {
+    if (bulletin_en()) return mention_mat_en($a);
     if ($a >= 14) return "Compétences TB\nacquises";
     if ($a >= 12) return "Compétences\nbien acquises";
     if ($a >= 10) return "Compétences\nacquises";
@@ -317,6 +319,7 @@ function lettre_groupe_b(float $a): string {
     if ($a >= 10) return 'C'; if ($a >= 8)  return 'D'; return 'E';
 }
 function mention_gen_b(float $a): string {
+    if (bulletin_en()) return mention_gen_en($a);
     if ($a >= 16) return 'Excellent'; if ($a >= 14) return 'Tres bien';
     if ($a >= 12) return 'Bien'; if ($a >= 10) return 'Assez bien';
     if ($a >= 8)  return 'Passable'; return 'Insuffisant';
@@ -490,7 +493,7 @@ $pdf->SetLineWidth(0.2);
 $col3 = $uw / 3;
 $y0   = 8;
 
-$pdf->SetXY($ml, $y0);
+$pdf->SetXY(bulletin_en() ? $ml + $col3 * 2 : $ml, $y0);   // section anglophone : français à droite
 $pdf->SetFont('Arial', '', 6.5);
 $pdf->MultiCell($col3, 3.5, u(
     "REPUBLIQUE DU CAMEROUN\nPaix - Travail - Patrie\n***************\n" .
@@ -524,7 +527,7 @@ if ($logo_path && is_file($logo_path)) {
 }
 
 $xr = $ml + $col3 * 2;
-$pdf->SetXY($xr, $y0);
+$pdf->SetXY(bulletin_en() ? $ml : $xr, $y0);
 $pdf->SetFont('Arial', '', 6.5);
 $pdf->MultiCell($col3, 3.5, u(
     "REPUBLIC OF CAMEROON\nPeace - Work - Fatherland\n***************\n" .
@@ -561,20 +564,20 @@ $pdf->SetLineWidth(0.3);
 $pdf->RoundedRect($ml, $y_titre, $uw, $h_titre, $h_titre / 2, 'FD');
 $pdf->SetTextColor(26, 60, 107);
 $pdf->SetFont('Arial', 'BI', 13);
-$w_tfr = $pdf->GetStringWidth(u('BULLETIN DE NOTES ANNUEL / '));
+$w_tfr = $pdf->GetStringWidth(u(bl('BULLETIN DE NOTES ANNUEL', 'Annual Report Card')[0] . ' / '));
 $pdf->SetFont('Arial', 'I', 10.5);
-$w_ten = $pdf->GetStringWidth(u('Annual Report Card'));
+$w_ten = $pdf->GetStringWidth(u(bl('BULLETIN DE NOTES ANNUEL', 'Annual Report Card')[1]));
 $pdf->SetXY($ml + ($uw - $w_tfr - $w_ten) / 2, $y_titre);
 $pdf->SetFont('Arial', 'BI', 13);
-$pdf->Cell($w_tfr, $h_titre, u('BULLETIN DE NOTES ANNUEL / '), 0, 0, 'L');
+$pdf->Cell($w_tfr, $h_titre, u(bl('BULLETIN DE NOTES ANNUEL', 'Annual Report Card')[0] . ' / '), 0, 0, 'L');
 $pdf->SetFont('Arial', 'I', 10.5);
-$pdf->Cell($w_ten, $h_titre, u('Annual Report Card'), 0, 1, 'L');
+$pdf->Cell($w_ten, $h_titre, u(bl('BULLETIN DE NOTES ANNUEL', 'Annual Report Card')[1]), 0, 1, 'L');
 $pdf->SetTextColor(0, 0, 0);
 $pdf->SetLineWidth(0.2);
 // "Année scolaire" (accent rétabli, demande explicite) en gras.
 $pdf->SetFont('Arial', 'B', 9);
 $pdf->SetX($ml);
-$pdf->Cell($uw, 5, u('Année scolaire : ' . $val_annee), 0, 1, 'C');
+$pdf->Cell($uw, 5, u(bt('Année scolaire : ', 'School year: ') . $val_annee), 0, 1, 'C');
 
 // ── 3. Infos élève ───────────────────────────────────────────────
 $pdf->Ln(0.5);
@@ -641,7 +644,8 @@ function cell_rang(FPDF $pdf, float $w, float $h, ?int $rang, string $suffixe, i
     $w1 = $pdf->GetStringWidth($part1);
     $w2 = $pdf->GetStringWidth(u($suffixe));
     $pdf->SetFont('Arial', $style, $taille_e);
-    $we = $pdf->GetStringWidth('e');
+    $ord = rang_suffixe((int) $rang);
+    $we = $pdf->GetStringWidth($ord);
     $total = $w1 + $we + $w2;
     if ($align === 'C')     { $x0 = $x + ($w - $total) / 2; }
     elseif ($align === 'R') { $x0 = $x + $w - $total - 1.2; }
@@ -654,7 +658,7 @@ function cell_rang(FPDF $pdf, float $w, float $h, ?int $rang, string $suffixe, i
     $raise = $taille * 0.12;
     $pdf->SetXY($x0 + $w1, $y - $raise);
     $pdf->SetFont('Arial', $style, $taille_e);
-    $pdf->Cell($we, $h, 'e', 0, 0, 'L');
+    $pdf->Cell($we, $h, $ord, 0, 0, 'L');
 
     $pdf->SetXY($x0 + $w1 + $we, $y);
     $pdf->SetFont('Arial', $style, $taille);
@@ -689,6 +693,7 @@ function cell2l_taille_ajustee(FPDF $pdf, string $texte, string $style, float $l
 // grandes mais sans jamais déborder du cadre) — réduits automatiquement si
 // besoin par cell2l_taille_ajustee(), avec un plancher de lisibilité minimal.
 function cell2l(FPDF $pdf, float $w, float $h, string $fr, string $en, string $align = 'L', bool $fill = false, float $taille_fr = 6, float $taille_en = 4.3, array $fill_color = [216, 210, 248], bool $tight = false): void {
+    [$fr, $en] = bl($fr, $en);   // section anglophone : l'anglais à la place du français
     $x = $pdf->GetX(); $y = $pdf->GetY();
     if ($fill) { $pdf->SetFillColor($fill_color[0], $fill_color[1], $fill_color[2]); $pdf->Rect($x, $y, $w, $h, 'F'); }
     $pdf->Rect($x, $y, $w, $h);
@@ -767,7 +772,7 @@ $pdf->Cell(20, 5.5, niu_eleve($eleve), 1, 1, 'C');
 $pdf->ln(0.5);
 $pdf->SetX($x_info);
 //$pdf->SetFont('Arial', 'B', 17);
-cell2l($pdf, 30, 5.5, 'NOM ET PRENOMS :', 'ID No.', 'L', true, 8, 7.5, $gris, true);
+cell2l($pdf, 30, 5.5, 'NOM ET PRENOMS :', 'Name', 'L', true, 8, 7.5, $gris, true);
 //	cell2l($pdf, 26, 5.5, 'NOM ET PRENOMS :', 'Name', 'L', true, 28, 7.5, $gris, true);
 $pdf->SetFont('Arial', 'BI', 9);
 $pdf->Cell(110, 5.5, u(strtoupper($eleve['nom']) . ' ' . ($eleve['prenom'] ?? '')), 1, 0, 'L');
@@ -782,7 +787,7 @@ $pdf->SetFont('Arial', 'I', 8);
 $dnaiss = $eleve['date_naiss'] ? date('d/m/Y', strtotime($eleve['date_naiss'])) : '';
 $pdf->Cell(22, 5.5, $dnaiss, 1, 0, 'C');
 $pdf->SetFont('Arial', 'B', 8);
-$pdf->Cell(10, 5.5, 'A/at', 1, 0, 'C', true);
+$pdf->Cell(10, 5.5, bt('A/at', 'At/' . chr(224)), 1, 0, 'C', true);
 $pdf->SetFont('Arial', 'I', 8);
 $pdf->Cell(64, 5.5, u($eleve['lieu_naiss'] ?? ''), 1, 0, 'L');
 cell2l($pdf, 26, 5.5, 'REDOUBLANT :', 'Repeater', 'L', true, 8, 7.5, $gris, true);
@@ -792,10 +797,10 @@ $x_row3 = $pdf->GetX();
 $pdf->Cell(28, 5.5, '', 1, 1, 'L');
 $pdf->SetFont('Arial', 'I', 8);
 $pdf->SetXY($x_row3 + 1, $y_row3 + 1);
-$pdf->Cell(7, 3, 'Oui', 0, 0, 'L');
+$pdf->Cell(7, 3, bt('Oui', 'Yes'), 0, 0, 'L');
 checkbox_ltm($pdf, $x_row3 + 8, $y_row3 + 1, $is_redoub);
 $pdf->SetXY($x_row3 + 15, $y_row3 + 1);
-$pdf->Cell(7, 3, 'Non', 0, 0, 'L');
+$pdf->Cell(7, 3, bt('Non', 'No'), 0, 0, 'L');
 checkbox_ltm($pdf, $x_row3 + 23, $y_row3 + 1, !$is_redoub);
 
 //$pdf->ln(20);
@@ -900,19 +905,19 @@ $pdf->SetFont('Arial', 'B', 6.5);
 $pdf->SetFillColor(26, 60, 107);
 $pdf->SetTextColor(255, 255, 255);
 $pdf->SetX($ml);
-$pdf->Cell($cD, $hdr_h, 'DISCIPLINES', 1, 0, 'C', true);
+$pdf->Cell($cD, $hdr_h, bt('DISCIPLINES', 'SUBJECTS'), 1, 0, 'C', true);
 foreach ([1, 2, 3] as $pos) {
     $pdf->Cell($cEval, $hdr_h, u(trimestre_court($pos)), 1, 0, 'C', true);
 }
-$pdf->Cell($cTR, $hdr_h, u('MOY AN.'), 1, 0, 'C', true);
+$pdf->Cell($cTR, $hdr_h, u(bt('MOY AN.', 'ANN. AVG')), 1, 0, 'C', true);
 $pdf->Cell($cCF,  $hdr_h, 'COEF',    1, 0, 'C', true);
 $pdf->Cell($cNXC, $hdr_h, '(NXC)',   1, 0, 'C', true);
-$pdf->Cell($cRG,  $hdr_h, 'RANG',    1, 0, 'C', true);
-$pdf->Cell($cMEN, $hdr_h, 'MENTIONS',1, 0, 'C', true);
+$pdf->Cell($cRG,  $hdr_h, bt('RANG', 'RANK'),    1, 0, 'C', true);
+$pdf->Cell($cMEN, $hdr_h, bt('MENTIONS', 'REMARKS'),1, 0, 'C', true);
 $pdf->Cell($cMIN, $hdr_h, 'MIN',     1, 0, 'C', true);
-$pdf->Cell($cMOY, $hdr_h, 'MOY',     1, 0, 'C', true);
+$pdf->Cell($cMOY, $hdr_h, bt('MOY', 'AVG'),     1, 0, 'C', true);
 $pdf->Cell($cMAX, $hdr_h, 'MAX',     1, 0, 'C', true);
-$pdf->Cell($cENS, $hdr_h, u('ENSEIGNANTS'), 1, 1, 'C', true);
+$pdf->Cell($cENS, $hdr_h, u(bt('ENSEIGNANTS', 'TEACHERS')), 1, 1, 'C', true);
 $pdf->SetTextColor(0, 0, 0);
 $pdf->SetFillColor(255, 255, 255);
 
@@ -933,7 +938,7 @@ foreach ($disciplines as $d) {
     // Nom de la matière/compétence : taille agrandie par défaut (8pt) pour
     // les noms courts, réduite automatiquement (jusqu'à 5.5pt) pour les
     // noms longs afin de ne jamais déborder sur une 2e ligne (demande explicite).
-    [, $mat_lib] = fpdf_texte_ajuste($pdf, $d['matiere'], $cD, 8.0, 5.5);
+    [, $mat_lib] = fpdf_texte_ajuste($pdf, (bulletin_en() && ($d['matiere_en'] ?? '') !== '' ? $d['matiere_en'] : $d['matiere']), $cD, 8.0, 5.5);
     $pdf->SetX($ml);
     $pdf->Cell($cD, $row_h, u($mat_lib), 1, 0, 'L', true);
     $pdf->SetFont('Arial', '', 6.5);
@@ -1055,11 +1060,11 @@ $pdf->SetXY($ml, $y_bas + $h_ligne);
 $pdf->Cell($w_rec_lbl, $h_ligne, '', 1, 0, 'C');
 $pdf->SetFont('Arial', 'B', 10);
 foreach ([1, 2, 3] as $pos) { cell2l($pdf, $w_rec_val, $h_ligne, trimestre_court($pos), '', 'C', false, 8, 4); }
-cell2l($pdf, $w_rec_val, $h_ligne, 'Annuel', '', 'C', false, 8, 4);
+cell2l($pdf, $w_rec_val, $h_ligne, bt('Annuel', 'Annual'), '', 'C', false, 8, 4);
 $pdf->SetXY($ml + $wRecap, $y_bas + $h_ligne);
 $pdf->Cell($w_res_lbl, $h_ligne, '', 1, 0, 'C');
 foreach ([1, 2, 3] as $pos) { cell2l($pdf, $w_res_val, $h_ligne, trimestre_court($pos), '', 'C', false, 8.5, 4); }
-cell2l($pdf, $w_res_val, $h_ligne, 'Annuel', '', 'C', false, 8.5, 4);
+cell2l($pdf, $w_res_val, $h_ligne, bt('Annuel', 'Annual'), '', 'C', false, 8.5, 4);
 
 // Lignes du récapitulatif : 'num' = 4 valeurs chiffrées (T1/T2/T3/Annuel),
 // 'bool' = case à cocher sur T1/T2/T3 seulement (l'appréciation annuelle est
@@ -1229,9 +1234,9 @@ $pdf->RoundedRect($ml, $y_cc, $w_cc, $h_cc_titre, $h_cc_titre / 2, 'FD');
 $pdf->SetXY($ml, $y_cc + 0.3);
 $pdf->SetFont('Arial', 'BI', 7.5);
 $pdf->SetTextColor(26, 60, 107);
-$pdf->Cell($w_cc, $h_cc_titre / 2, u('DECISION DU CONSEIL DE CLASSE'), 0, 2, 'C');
+$pdf->Cell($w_cc, $h_cc_titre / 2, u(bl('DECISION DU CONSEIL DE CLASSE', 'Class council decision')[0]), 0, 2, 'C');
 $pdf->SetFont('Arial', 'I', 6);
-$pdf->Cell($w_cc, $h_cc_titre / 2 - 0.3, 'Class council decision', 0, 1, 'C');
+$pdf->Cell($w_cc, $h_cc_titre / 2 - 0.3, u(bl('DECISION DU CONSEIL DE CLASSE', 'Class council decision')[1]), 0, 1, 'C');
 $pdf->SetTextColor(0, 0, 0);
 $pdf->SetLineWidth(0.2);
 
@@ -1242,15 +1247,15 @@ $y_cc2 = $y_cc + $h_cc_titre + 2;
 // pas renseigné dans ce cas) ; le motif saisi (observation) pour EXCLU(E)
 // POUR, s'il existe.
 $cc_lignes = [
-    ['PROMU(E) EN',        false, $dec_val === 'Admis',        $dec_val === 'Admis' ? $dec_next_classe : ''],
-    ['REDOUBLE LA',        false, $dec_val === 'Redoublement', $dec_val === 'Redoublement' ? ($insc['classe'] ?? '') : ''],
-    ["EXCLU(E) POUR",      false, $dec_val === 'Exclu',        $dec_val === 'Exclu' ? (string)$dec_observation : ''],
-    ['AGE', true, false, ''],
-    ['TRAVAIL INSUFFISANT', true, false, ''],
-    ['CONDUITE DEPLORABLE', true, false, ''],
-    ['NE PEUT TRIPLER', true, false, ''],
-    ["TROP D'ABSENCES", true, false, ''],
-    ['ABANDON', true, $dec_val === 'Abandon', ''],
+    [bt('PROMU(E) EN', 'PROMOTED TO'),        false, $dec_val === 'Admis',        $dec_val === 'Admis' ? $dec_next_classe : ''],
+    [bt('REDOUBLE LA', 'REPEATS'),        false, $dec_val === 'Redoublement', $dec_val === 'Redoublement' ? ($insc['classe'] ?? '') : ''],
+    [bt('EXCLU(E) POUR', 'EXCLUDED FOR'),      false, $dec_val === 'Exclu',        $dec_val === 'Exclu' ? (string)$dec_observation : ''],
+    [bt('AGE', 'AGE'), true, false, ''],
+    [bt('TRAVAIL INSUFFISANT', 'INSUFFICIENT WORK'), true, false, ''],
+    [bt('CONDUITE DEPLORABLE', 'DEPLORABLE CONDUCT'), true, false, ''],
+    [bt('NE PEUT TRIPLER', 'CANNOT REPEAT AGAIN'), true, false, ''],
+    [bt('TROP D\'ABSENCES', 'TOO MANY ABSENCES'), true, false, ''],
+    [bt('ABANDON', 'DROPPED OUT'), true, $dec_val === 'Abandon', ''],
 ];
 foreach ($cc_lignes as $i => $cl) {
     [$lib, $indente, $checked, $valeur] = $cl;
@@ -1274,17 +1279,17 @@ $pdf->MultiCell($w_obs, $h_obs_box, '', 'T', 'L');
 // ── 7. Date et signature (à l'intérieur du cadre Observations) ────
 $pdf->SetFont('Arial', '', 8.5);
 $pdf->SetXY($x_obs, $y_dec2 + 6);
-$pdf->Cell($w_obs, 5.5, u(lieu_edition_documents() . ', le ' . date('d-m-Y') . '.'), 0, 1, 'C');
+$pdf->Cell($w_obs, 5.5, u(lieu_edition_documents() . bt(', le ', ', on ') . date('d-m-Y') . '.'), 0, 1, 'C');
 $pdf->SetX($x_obs);
 $pdf->SetFont('Arial', 'I', 7.5);
-$pdf->Cell($w_obs, 4.5, 'On', 0, 1, 'C');
+$pdf->Cell($w_obs, 4.5, bt('On', 'Le'), 0, 1, 'C');
 $pdf->Ln(2.5);
 $pdf->SetX($x_obs);
 $pdf->SetFont('Arial', 'B', 8.5);
-$pdf->Cell($w_obs, 5.5, u(strtoupper($etab['chef_etablissement'] ?? 'LE PROVISEUR') . ','), 0, 1, 'C');
+$pdf->Cell($w_obs, 5.5, u(strtoupper(bt($etab['chef_etablissement'] ?? 'LE PROVISEUR', $etab['chef_etablissement_en'] ?? 'The Principal')) . ','), 0, 1, 'C');
 $pdf->SetX($x_obs);
 $pdf->SetFont('Arial', 'I', 7.5);
-$pdf->Cell($w_obs, 4.5, u($etab['chef_etablissement_en'] ?? 'The Principal'), 0, 1, 'C');
+$pdf->Cell($w_obs, 4.5, u(bt($etab['chef_etablissement_en'] ?? 'The Principal', $etab['chef_etablissement'] ?? 'Le Proviseur')), 0, 1, 'C');
 
 // Signature numérique (uniquement si demandée à l'impression — jamais
 // automatique — et si l'admin en a configuré une dans les paramètres).

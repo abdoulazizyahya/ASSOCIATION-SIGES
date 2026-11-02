@@ -121,6 +121,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $etab['IDEtablissement'],
             ]
         );
+        // Langue d'enseignement (migration v70) : langue proposée pour les bulletins.
+        if (db_colonne_existe('etablissement', 'langue_enseignement') && in_array(post('langue_enseignement'), ['francophone', 'anglophone', 'bilingue'], true)) {
+            db_exec("UPDATE etablissement SET langue_enseignement=? WHERE IDEtablissement=?", [post('langue_enseignement'), $etab['IDEtablissement']]);
+        }
         flash_set('succes', 'Établissement mis à jour.');
         rediriger('primaire/pages/parametres/index.php?onglet=etablissement');
     }
@@ -499,6 +503,17 @@ if (!$es_partiel) {
               <label class="form-label">Fonction du dirigeant (EN)</label>
               <input type="text" name="fonction_dirigeant_en" class="form-control" value="<?= h($ve('fonction_dirigeant_en')) ?>" placeholder="The Director">
             </div>
+            <?php if (array_key_exists('langue_enseignement', $etab)): ?>
+            <div class="col-md-6">
+              <label class="form-label">Langue d'enseignement</label>
+              <select name="langue_enseignement" class="form-select">
+                <?php foreach (['francophone' => 'Francophone', 'anglophone' => 'Anglophone', 'bilingue' => 'Bilingue (sections francophone et anglophone)'] as $lv => $ll): ?>
+                  <option value="<?= $lv ?>" <?= ($etab['langue_enseignement'] ?? '') === $lv ? 'selected' : '' ?>><?= h($ll) ?></option>
+                <?php endforeach; ?>
+              </select>
+              <div class="form-text" style="font-size:.72rem">Bilingue : les bulletins des classes de section « An » sont en anglais, traduits en français.</div>
+            </div>
+            <?php endif; ?>
           </div>
         </div>
       </div>

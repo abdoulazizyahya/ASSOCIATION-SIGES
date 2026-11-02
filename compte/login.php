@@ -2,6 +2,7 @@
 require_once __DIR__ . '/../config/config.php';
 require_once __DIR__ . '/../noyau/connexion.php';
 require_once __DIR__ . '/../noyau/fonctions.php';
+require_once __DIR__ . '/../noyau/langue.php';   // sélecteur FR/EN (02/11/2026)
 session_init();
 
 // Si déjà connecté → dashboard
@@ -23,6 +24,27 @@ $ecoles = annuaire_dispo()
     ? assoc_all("SELECT id, code, nom, type_enseignement FROM etablissement WHERE actif=1 ORDER BY type_enseignement='secondaire' DESC, nom")
     : [];
 $choix_ecole = count($ecoles) > 1;
+// Application Android (APK, 02/11/2026) : ouverte avec ?source=application.
+// Après une PREMIÈRE connexion réussie, l'application reste sur cet
+// établissement (cookie siges_app_ecole, posé seulement en cas de succès) ;
+// pour en changer : « Changer d'établissement », choisir puis réussir à se
+// connecter à la nouvelle école — tant que ce n'est pas fait, l'ancienne reste.
+if (($_GET['source'] ?? '') === 'application') {
+    setcookie('siges_app', '1', time() + 5 * 365 * 86400, APP_URL . '/', '', false, true);
+    $_COOKIE['siges_app'] = '1';
+    // Version de l'APK installée (…&apk=N, figée dans l'APK) : bandeau si une plus récente existe.
+    if ((int) ($_GET['apk'] ?? 0) > 0) {
+        setcookie('siges_apk', (string) (int) $_GET['apk'], time() + 5 * 365 * 86400, APP_URL . '/', '', false, true);
+        $_COOKIE['siges_apk'] = (string) (int) $_GET['apk'];
+    }
+}
+$mode_app = ($_COOKIE['siges_app'] ?? '') === '1';
+$changer_ecole = isset($_GET['changer']) || post('changer') === '1';
+$ecole_app = '';
+if ($choix_ecole && $mode_app && !$changer_ecole) {
+    $c = (string) ($_COOKIE['siges_app_ecole'] ?? '');
+    if ($c !== '' && in_array($c, array_column($ecoles, 'code'), true)) $ecole_app = $c;
+}
 // Annuaire présent mais AUCUNE école active (désactivée, création inachevée) :
 // connexion.php retombe sur DB_NAME, qui n'a pas les comptes — la requête
 // d'authentification tombait en erreur 500 (siges.beero.cm, 23/10/2026).
@@ -170,6 +192,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if ($retour !== '' && (str_starts_with($retour, APP_URL . '/primaire/pages/') || str_starts_with($retour, APP_URL . '/secondaire/')) &&!str_contains($retour, '//') && !str_contains($retour, '\\')) {
                 header('Location: ' . $retour); exit;
             }
+            // Application : cet établissement devient celui de l'appareil (connexion réussie).
+            if ($choix_ecole && !empty($ec['code'])) {
+                setcookie('siges_app_ecole', $ec['code'], time() + 5 * 365 * 86400, APP_URL . '/', '', false, true);
+            }
             header('Location: ' . APP_URL . $dest); exit;
         } elseif ($u && password_verify($mdp, $u_pwd_hash) && $u_actif !== 1) {
             audit_log('connexion_echec', ['login' => $login, 'id_etab' => $id_etab_ctx, 'cible' => 'compte désactivé']);
@@ -198,7 +224,7 @@ $etab = get_etablissement();
 // Présélection de la liste : la soumission en cours (erreur → on ne perd pas
 // la saisie) sinon le dernier établissement choisi sur cet appareil (cookie
 // posé plus haut à la connexion).
-$ecole_preselectionnee = post('ecole') !== '' ? post('ecole') : ($_SESSION['ecole_suggeree'] ?? ($_COOKIE['siges_dernier_ecole'] ?? ''));
+$ecole_preselectionnee = $ecole_app !== '' ? $ecole_app : (post('ecole') !== '' ? post('ecole') : ($_SESSION['ecole_suggeree'] ?? ($_COOKIE['siges_dernier_ecole'] ?? '')));
 if ($choix_ecole) {
     // L'en-tête montre TOUJOURS l'école sélectionnée dans la liste (23/10/2026) :
     // l'école restée en session (essai précédent, visite association…) pouvait
@@ -225,7 +251,7 @@ if (preg_match_all('/\b[\p{L}]/u', $marque_defaut, $mm) && count($mm[0]) > 1) {
 }
 ?>
 <!DOCTYPE html>
-<html lang="fr">
+<html lang="<?= langue_interface() ?>">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
@@ -236,6 +262,7 @@ if (preg_match_all('/\b[\p{L}]/u', $marque_defaut, $mm) && count($mm[0]) > 1) {
   <link rel="stylesheet" href="<?= APP_URL ?>/assets/vendor/bootstrap/css/bootstrap.min.css">
   <link rel="stylesheet" href="<?= APP_URL ?>/assets/vendor/bootstrap-icons/bootstrap-icons.min.css">
   <link rel="stylesheet" href="<?= APP_URL ?>/assets/vendor/inter/inter.css">
+  <?php require_once __DIR__ . '/../noyau/pwa.php'; echo pwa_balises(); ?>
   <style>
     body { font-family:'Inter',sans-serif; background:linear-gradient(135deg,#0f1a3a 0%,#1e4fd8 100%); min-height:100vh; display:flex; align-items:center; justify-content:center; margin:0; }
     .login-box { background:#fff; border-radius:16px; padding:2.2rem 2rem; width:min(96vw,380px); box-shadow:0 20px 60px rgba(0,0,0,.35); }
@@ -251,12 +278,13 @@ if (preg_match_all('/\b[\p{L}]/u', $marque_defaut, $mm) && count($mm[0]) > 1) {
   </style>
 </head>
 <body>
-<div class="login-box">
+<div class="login-box" style="position:relative">
+  <?= selecteur_langue_html('position:absolute;top:12px;right:12px') ?>
   <?php // pas de retour à la vitrine quand le site s'ouvre directement sur la connexion (portail association → Réglages)
   if (!function_exists('page_entree_site') || page_entree_site() === 'accueil'): ?>
   <a href="<?= APP_URL ?>/" class="d-inline-flex align-items-center gap-1 mb-2"
      style="font-size:.75rem;color:#6b7280;text-decoration:none">
-    <i class="bi bi-arrow-left"></i>Retour à l'accueil
+    <i class="bi bi-arrow-left"></i><?= h(tm("Retour à l'accueil")) ?>
   </a>
   <?php endif; ?>
   <div class="login-logo" id="loginLogo">
@@ -268,7 +296,7 @@ if (preg_match_all('/\b[\p{L}]/u', $marque_defaut, $mm) && count($mm[0]) > 1) {
   </div>
   <div class="login-etab">
     <strong id="loginEtabNom"><?= h($etab['Nom_Etab_Fr'] ?? $marque_defaut) ?></strong>
-    Espace de connexion
+    <?= h(tm('Espace de connexion')) ?>
   </div>
 
   <?php if ($erreur): ?>
@@ -282,18 +310,21 @@ if (preg_match_all('/\b[\p{L}]/u', $marque_defaut, $mm) && count($mm[0]) > 1) {
   <?php endif; ?>
 
   <form method="post" autocomplete="off">
-    <?php if ($choix_ecole): ?>
+    <?php if ($choix_ecole && $ecole_app !== ''): // application : établissement de l'appareil ?>
+    <input type="hidden" name="ecole" value="<?= h($ecole_app) ?>">
+    <?php elseif ($choix_ecole): ?>
+    <?php if ($changer_ecole): ?><input type="hidden" name="changer" value="1"><?php endif; ?>
     <div class="mb-3">
-      <label class="form-label">Établissement</label>
+      <label class="form-label"><?= h(tm('Établissement')) ?></label>
       <div class="input-group">
         <span class="input-group-text" style="background:#f8faff"><i class="bi bi-building" style="color:#6b7280"></i></span>
         <select name="ecole" class="form-select" required>
-          <option value="">— Choisir —</option>
+          <option value="">— <?= h(tm('Choisir')) ?> —</option>
           <?php $groupe_ouvert = null; // regroupées : Secondaire puis Primaire (tri SQL)
           foreach ($ecoles as $ec):
             $groupe = ($ec['type_enseignement'] ?? '') === 'secondaire' ? 'Secondaire' : 'Primaire';
             if ($groupe !== $groupe_ouvert): ?>
-            <?= $groupe_ouvert !== null ? '</optgroup>' : '' ?><optgroup label="<?= $groupe ?>">
+            <?= $groupe_ouvert !== null ? '</optgroup>' : '' ?><optgroup label="<?= h(tm($groupe)) ?>">
             <?php $groupe_ouvert = $groupe; endif; ?>
             <option value="<?= h($ec['code']) ?>" <?= $ecole_preselectionnee === $ec['code'] ? 'selected' : '' ?>>
               <?= h($ec['nom']) ?>
@@ -305,26 +336,37 @@ if (preg_match_all('/\b[\p{L}]/u', $marque_defaut, $mm) && count($mm[0]) > 1) {
     </div>
     <?php endif; ?>
     <div class="mb-3">
-      <label class="form-label">Identifiant</label>
+      <label class="form-label"><?= h(tm('Identifiant')) ?></label>
       <div class="input-group">
         <span class="input-group-text" style="background:#f8faff"><i class="bi bi-person" style="color:#6b7280"></i></span>
-        <input type="text" name="login" class="form-control" placeholder="Votre identifiant"
+        <input type="text" name="login" class="form-control" placeholder="<?= h(tm('Votre identifiant')) ?>"
                value="<?= h(post('login')) ?>" required autofocus>
       </div>
     </div>
     <div class="mb-4">
-      <label class="form-label">Mot de passe</label>
+      <label class="form-label"><?= h(tm('Mot de passe')) ?></label>
       <div class="input-group">
         <span class="input-group-text" style="background:#f8faff"><i class="bi bi-lock" style="color:#6b7280"></i></span>
         <input type="password" name="mdp" class="form-control" placeholder="••••••••" required>
       </div>
     </div>
     <button class="btn btn-primary btn-login w-100 text-white">
-      <i class="bi bi-box-arrow-in-right me-2"></i>Se connecter
+      <i class="bi bi-box-arrow-in-right me-2"></i><?= h(tm('Se connecter')) ?>
     </button>
   </form>
   <div class="text-hint" style="font-size:.75rem;text-align:center;margin-top:1rem">
-    <a href="<?= APP_URL ?>/compte/mot_de_passe_oublie.php" style="color:#3a6cff;text-decoration:none">Mot de passe oublié ?</a>
+    <a href="<?= APP_URL ?>/compte/mot_de_passe_oublie.php" style="color:#3a6cff;text-decoration:none"><?= h(tm('Mot de passe oublié ?')) ?></a>
+    <?php if ($mode_app): // « À propos » : seulement dans l'application installée ?>
+    <span style="color:#d1d5db"> · </span>
+    <a href="<?= APP_URL ?>/compte/a_propos.php" style="color:#3a6cff;text-decoration:none"><?= h(tm('À propos')) ?></a>
+    <?php endif; ?>
+    <?php if ($ecole_app !== ''): ?>
+    <span style="color:#d1d5db"> · </span>
+    <a href="<?= APP_URL ?>/compte/login.php?changer=1" style="color:#3a6cff;text-decoration:none"><?= h(tm("Changer d'établissement")) ?></a>
+    <?php elseif ($mode_app && $changer_ecole && !empty($_COOKIE['siges_app_ecole'])): ?>
+    <span style="color:#d1d5db"> · </span>
+    <a href="<?= APP_URL ?>/compte/login.php" style="color:#3a6cff;text-decoration:none"><?= h(tm('Annuler')) ?></a>
+    <?php endif; ?>
   </div>
   <?php if (annuaire_dispo()): ?>
   <?php // Vitrine désactivée (Réglages du site → connexion directe) : lien invisible
@@ -334,21 +376,22 @@ if (preg_match_all('/\b[\p{L}]/u', $marque_defaut, $mm) && count($mm[0]) > 1) {
     <a href="<?= APP_URL ?>/association/login.php" tabindex="<?= $acces_cache ? '-1' : '0' ?>"
        style="font-size:.78rem;color:<?= $acces_cache ? '#fff;cursor:default;user-select:none' : '#6b7280' ?>;text-decoration:none">
       <?php if ($acces_cache): ?>
-        <i class="bi bi-shield-lock me-1"></i>Espace réservé
+        <i class="bi bi-shield-lock me-1"></i><?= h(tm('Espace réservé')) ?>
       <?php else: ?>
-        <i class="bi bi-buildings me-1"></i>Espace association
+        <i class="bi bi-buildings me-1"></i><?= h(tm('Espace association')) ?>
       <?php endif; ?>
     </a>
   </div>
   <?php endif; ?>
 </div>
+<?= pwa_bandeau_apk()   // application : nouvelle version disponible ?>
 <script src="<?= APP_URL ?>/assets/vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
 <?php if ($choix_ecole): ?>
 <script>
 // Multi-établissement : afficher le logo + le nom de l'école dès qu'elle est
 // choisie dans la liste (accueil neutre tant qu'aucune n'est sélectionnée).
 (function () {
-  var sel  = document.querySelector('select[name="ecole"]');
+  var sel  = document.querySelector('[name="ecole"]');   // liste, ou champ caché (application)
   var logo = document.getElementById('loginLogo');
   var nom  = document.getElementById('loginEtabNom');
   if (!sel) return;

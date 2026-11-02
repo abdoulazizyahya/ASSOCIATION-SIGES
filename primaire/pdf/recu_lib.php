@@ -21,6 +21,7 @@ function finances_dessiner_recu_eleve(FPDF $pdf, int $id_eleve, int $id_classe, 
     $eleve  = db_one("SELECT * FROM eleve WHERE id_eleve=?", [$id_eleve]);
     $classe = db_one("SELECT * FROM classe WHERE IDClasses=?", [$id_classe]);
     if (!$eleve || !$classe) return false;
+    bulletin_fixer_langue($id_classe);   // section anglophone : reçu en anglais d'abord
 
     // Cas social (migration_v39) : réduction appliquée au montant total dû —
     // voir eleve_pourcentage_reduction() (fonctions.php), même règle que
@@ -41,7 +42,7 @@ function finances_dessiner_recu_eleve(FPDF $pdf, int $id_eleve, int $id_classe, 
 
     $etab_brut = get_etablissement();
     $sexe_lettre = stripos($eleve['Sexe_elv'] ?? '', 'F') === 0 ? 'F' : 'M';
-    $naiss = trim(date_fr($eleve['Date_naiss_elv'] ?: null) . ($eleve['Date_naiss_elv'] ? '' : '//') . '  à  ' . ($eleve['Lieu_naiss_elv'] ?? ''));
+    $naiss = trim(date_fr($eleve['Date_naiss_elv'] ?: null) . ($eleve['Date_naiss_elv'] ? '' : '//') . bt('  à  ', '  at  ') . ($eleve['Lieu_naiss_elv'] ?? ''));
 
     $pdf->AddPage();
     $BLEU = [106, 181, 255];
@@ -85,20 +86,21 @@ function finances_dessiner_recu_eleve(FPDF $pdf, int $id_eleve, int $id_classe, 
 
         // En-tête bilingue (3 lignes FR gauche / EN droite).
         $pdf->SetTextColor(0);
-        $texteAjuste($etab_brut['pays_etab_fr'] ?? 'REPUBLIQUE DU CAMEROUN', 23.35, 7.55 + $offY, 124, '', 8);
-        $texteAjuste('REPUBLIC OF CAMEROON', 149.39, 7.55 + $offY, 52, '', 8);
-        $texteAjuste($etab_brut['region_etab_fr'] ?: "REGION DE L'ADAMAOUA", 26.06, 10.95 + $offY, 121, '', 8);
-        $texteAjuste($etab_brut['region_etab_en'] ?: 'ADAMAWA REGION', 154.25, 10.95 + $offY, 47, '', 8);
-        $texteAjuste($etab_brut['Nom_Etab_Fr'] ?: 'GSBI LES POUSSINS DE JAYNITAARE', 14.21, 14.45 + $offY, 124, 'B', 9);
-        $texteAjuste($etab_brut['Nom_Etab_An'] ?: 'BISG THE CHICKS OF JAYNITAARE', 140.25, 14.45 + $offY, 65, 'B', 9);
+        $texteAjuste(bulletin_en() ? ('REPUBLIC OF CAMEROON') : ($etab_brut['pays_etab_fr'] ?? 'REPUBLIQUE DU CAMEROUN'), 23.35, 7.55 + $offY, 124, '', 8);
+        $texteAjuste(bulletin_en() ? ($etab_brut['pays_etab_fr'] ?? 'REPUBLIQUE DU CAMEROUN') : ('REPUBLIC OF CAMEROON'), 149.39, 7.55 + $offY, 52, '', 8);
+        $texteAjuste(bulletin_en() ? ($etab_brut['region_etab_en'] ?: 'ADAMAWA REGION') : ($etab_brut['region_etab_fr'] ?: "REGION DE L'ADAMAOUA"), 26.06, 10.95 + $offY, 121, '', 8);
+        $texteAjuste(bulletin_en() ? ($etab_brut['region_etab_fr'] ?: "REGION DE L'ADAMAOUA") : ($etab_brut['region_etab_en'] ?: 'ADAMAWA REGION'), 154.25, 10.95 + $offY, 47, '', 8);
+        $texteAjuste(bulletin_en() ? ($etab_brut['Nom_Etab_An'] ?: 'BISG THE CHICKS OF JAYNITAARE') : ($etab_brut['Nom_Etab_Fr'] ?: 'GSBI LES POUSSINS DE JAYNITAARE'), 14.21, 14.45 + $offY, 124, 'B', 9);
+        $texteAjuste(bulletin_en() ? ($etab_brut['Nom_Etab_Fr'] ?: 'GSBI LES POUSSINS DE JAYNITAARE') : ($etab_brut['Nom_Etab_An'] ?: 'BISG THE CHICKS OF JAYNITAARE'), 140.25, 14.45 + $offY, 65, 'B', 9);
 
         // Ruban de titre + case numéro
         pdf_ruban_chevron($pdf, 64, 145, 23.3 + $offY, 29.3 + $offY, 6, $BLEU);
         $pdf->SetTextColor(0);
         $pdf->SetFont('Arial', 'B', 13);
-        $pdf->Text(62, 28 + $offY, $u('REÇU DE PAIEMENT'));
+        $pdf->Text(62, 28 + $offY, $u(bt('REÇU DE PAIEMENT', 'PAYMENT RECEIPT')));
+        $x_titre2 = bulletin_en() ? 62 + $pdf->GetStringWidth($u('PAYMENT RECEIPT')) + 1.5 : 108.5;   // section anglophone : titre anglais plus court
         $pdf->SetFont('Arial', 'I', 11);
-        $pdf->Text(108.5, 27.8 + $offY, $u('/ PAYMENT RECEIPT'));
+        $pdf->Text($x_titre2, 27.8 + $offY, $u(bt('/ PAYMENT RECEIPT', '/ REÇU DE PAIEMENT')));
         $pdf->SetFont('Arial', 'B', 12);
         $pdf->Text(165, 28 + $offY, $u('N° :'));
         $pdf->Rect(175, 24 + $offY, 20, 5, 'S');
@@ -106,26 +108,26 @@ function finances_dessiner_recu_eleve(FPDF $pdf, int $id_eleve, int $id_classe, 
 
         // Identité de l'élève
         $pdf->SetFont('Arial', 'B', 9);
-        $pdf->Text(15, 26.5 + $offY, $u('Année scolaire: ' . $val_annee));
+        $pdf->Text(15, 26.5 + $offY, $u(bt('Année scolaire: ', 'School Year: ') . $val_annee));
         $pdf->SetFont('Arial', 'I', 8);
-        $pdf->Text(15, 29 + $offY, $u('School Year'));
+        $pdf->Text(15, 29 + $offY, $u(bt('School Year', 'Année scolaire')));
 
         $pdf->SetFont('Arial', 'B', 10);
-        $pdf->Text(12, 33.5 + $offY, $u('Classe : ' . $classe['DesignationClasses']));
-        $pdf->Text(95, 33.5 + $offY, $u('Matricule : ' . $eleve['Mat_elv']));
-        $pdf->Text(12, 40.5 + $offY, $u('Nom et Prénoms : ' . mb_strtoupper($eleve['Nom_elv']) . ' ' . ($eleve['Prenom_elv'] ?? '')));
-        $pdf->Text(12, 47.5 + $offY, $u('Date et lieu de naissance : ' . $naiss));
-        $pdf->Text(160, 47.5 + $offY, $u('Sexe : ' . $sexe_lettre));
+        $pdf->Text(12, 33.5 + $offY, $u(bt('Classe : ', 'Class: ') . $classe['DesignationClasses']));
+        $pdf->Text(95, 33.5 + $offY, $u(bt('Matricule : ', 'Register N°: ') . $eleve['Mat_elv']));
+        $pdf->Text(12, 40.5 + $offY, $u(bt('Nom et Prénoms : ', 'Surname and given names: ') . mb_strtoupper($eleve['Nom_elv']) . ' ' . ($eleve['Prenom_elv'] ?? '')));
+        $pdf->Text(12, 47.5 + $offY, $u(bt('Date et lieu de naissance : ', 'Date and place of birth: ') . $naiss));
+        $pdf->Text(160, 47.5 + $offY, $u(bt('Sexe : ', 'Sex: ') . $sexe_lettre));
         $pdf->SetFont('Arial', 'I', 8.2);
-        $pdf->Text(12, 35.8 + $offY, $u('Class'));
-        $pdf->Text(95, 35.8 + $offY, $u('Register N°'));
-        $pdf->Text(12, 42.8 + $offY, $u('Surname and given Names'));
-        $pdf->Text(12, 49.8 + $offY, $u('Date and place of birth'));
-        $pdf->Text(160, 49.8 + $offY, $u('Sex'));
+        $pdf->Text(12, 35.8 + $offY, $u(bt('Class', 'Classe')));
+        $pdf->Text(95, 35.8 + $offY, $u(bt('Register N°', 'Matricule')));
+        $pdf->Text(12, 42.8 + $offY, $u(bt('Surname and given Names', 'Nom et prénoms')));
+        $pdf->Text(12, 49.8 + $offY, $u(bt('Date and place of birth', 'Date et lieu de naissance')));
+        $pdf->Text(160, 49.8 + $offY, $u(bt('Sex', 'Sexe')));
 
         // ── Tableau récapitulatif des paiements ─────────────────────
         $pdf->SetFont('Arial', 'BI', 9.2);
-        $pdf->Text(12, 55.5 + $offY, $u('TABLEAU RECAPITULATIF DES PAIEMENTS'));
+        $pdf->Text(12, 55.5 + $offY, $u(bt('TABLEAU RECAPITULATIF DES PAIEMENTS', 'PAYMENT SUMMARY')));
 
         $tableTop = 56.5 + $offY;
         $headerH  = 4.0;
@@ -145,8 +147,8 @@ function finances_dessiner_recu_eleve(FPDF $pdf, int $id_eleve, int $id_classe, 
         $pdf->Rect($x1, $tableTop, $wMontant, $headerH, 'B');
         $pdf->Rect($x2, $tableTop, $wDate, $headerH, 'B');
         $pdf->SetFont('Arial', 'B', 9);
-        $pdf->Text($x0 + 7.74, $tableTop + $headerH + $n * $rowH / 2 + 0.6, $u('FRAIS'));
-        $pdf->Text($x1 + 3.06, $tableTop + $headerH - 1.05, $u('MONTANT'));
+        $pdf->Text($x0 + 7.74, $tableTop + $headerH + $n * $rowH / 2 + 0.6, $u(bt('FRAIS', 'FEES')));
+        $pdf->Text($x1 + 3.06, $tableTop + $headerH - 1.05, $u(bt('MONTANT', 'AMOUNT')));
         $pdf->Text($x2 + 3.94, $tableTop + $headerH - 1.05, $u('DATE'));
 
         $pdf->SetFont('Arial', '', $rowFont);
@@ -177,28 +179,28 @@ function finances_dessiner_recu_eleve(FPDF $pdf, int $id_eleve, int $id_classe, 
         $yPaye = $yTot + 7.0;
         $yReste = $yTot + 14.0;
         $pdf->SetFont('Arial', 'B', 9.5);
-        $pdf->Text(85, $yTot, $u('MONTANT TOTAL  : ' . number_format($total_du, 0, ',', ' ') . '  FCFA'));
-        $pdf->Text(85, $yPaye, $u('MONTANT PAYÉ    : ' . number_format($total_paye, 0, ',', ' ') . '  FCFA'));
-        $pdf->Text(85, $yReste, $u('RESTE À PAYER    : ' . number_format($reste, 0, ',', ' ') . '  FCFA'));
+        $pdf->Text(85, $yTot, $u(bt('MONTANT TOTAL  : ', 'TOTAL AMOUNT  : ') . number_format($total_du, 0, ',', ' ') . '  FCFA'));
+        $pdf->Text(85, $yPaye, $u(bt('MONTANT PAYÉ    : ', 'AMOUNT PAID    : ') . number_format($total_paye, 0, ',', ' ') . '  FCFA'));
+        $pdf->Text(85, $yReste, $u(bt('RESTE À PAYER    : ', 'BALANCE    : ') . number_format($reste, 0, ',', ' ') . '  FCFA'));
         $pdf->SetFont('Arial', 'I', 8.2);
-        $pdf->Text(85, $yTot + 2.3, $u('Total amount'));
-        $pdf->Text(85, $yPaye + 2.3, $u('Amount already pay'));
-        $pdf->Text(85, $yReste + 2.3, $u('Balance'));
+        $pdf->Text(85, $yTot + 2.3, $u(bt('Total amount', 'Montant total')));
+        $pdf->Text(85, $yPaye + 2.3, $u(bt('Amount already pay', 'Montant payé')));
+        $pdf->Text(85, $yReste + 2.3, $u(bt('Balance', 'Reste à payer')));
         if ($pourcentage_reduction > 0) {
             $pdf->SetFont('Arial', 'BI', 6.5);
             $pourcentage_txt = rtrim(rtrim(number_format($pourcentage_reduction, 2, '.', ''), '0'), '.');
-            $pdf->Text(85, $yReste + 5.3, $u("Cas social — réduction de {$pourcentage_txt}% appliquée"));
+            $pdf->Text(85, $yReste + 5.3, $u(bt("Cas social — réduction de {$pourcentage_txt}% appliquée", "Social case — {$pourcentage_txt}% reduction applied")));
         }
 
         // ── Signature ────────────────────────────────────────────────
         $pdf->SetFont('Arial', '', 8);
-        $pdf->Text(150, 56.5 + $offY, $u(($etab_pdf['lieu'] ?: $etab_pdf['ville']) . ', le ' . date('d/m/Y')));
+        $pdf->Text(150, 56.5 + $offY, $u(($etab_pdf['lieu'] ?: $etab_pdf['ville']) . bt(', le ', ', on ') . date('d/m/Y')));
         $pdf->SetFont('Arial', 'I', 7);
-        $pdf->Text(164.88, 59 + $offY, $u('On'));
+        $pdf->Text(164.88, 59 + $offY, $u(bt('On', 'Le')));
         $pdf->SetFont('Arial', 'B', 10);
-        $pdf->Text(162, 63.5 + $offY, $u('LE DIRECTEUR'));
+        $pdf->Text(162, 63.5 + $offY, $u(bt('LE DIRECTEUR', 'THE DIRECTOR')));
         $pdf->SetFont('Arial', 'I', 9);
-        $pdf->Text(162, 66 + $offY, $u('THE DIRECTOR'));
+        $pdf->Text(162, 66 + $offY, $u(bt('THE DIRECTOR', 'LE DIRECTEUR')));
         $pdf->SetFillColor(0, 0, 0);
         $pdf->Rect(162, 66.32 + $offY, 23.81, 0.16, 'F');
 
@@ -222,9 +224,9 @@ function finances_dessiner_recu_eleve(FPDF $pdf, int $id_eleve, int $id_classe, 
         $pdf->SetTextColor(0);
     };
 
-    $dessiner_copie(0, 'COUPON PARENT');
-    $dessiner_copie(98, 'COUPON DIRECTION');
-    $dessiner_copie(196, 'COUPON ARCHIVE');
+    $dessiner_copie(0, bt('COUPON PARENT', 'PARENT COPY'));
+    $dessiner_copie(98, bt('COUPON DIRECTION', 'SCHOOL COPY'));
+    $dessiner_copie(196, bt('COUPON ARCHIVE', 'ARCHIVE COPY'));
 
     return true;
 }

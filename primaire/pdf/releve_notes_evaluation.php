@@ -173,9 +173,10 @@ foreach ($pages as $it) {
     $bar = $it['bareme'] ?? null;
     // Feuille sans compétence / matière choisie (01/11/2026) : barème commun à toutes celles
     // de la classe s'il est identique (ex. arabe : toutes les matières sur 5 / 5 / 10 = 20) ;
-    // barèmes différents, toutes les classes ou fiche anonyme : laissé vide. Lu à chaque
+    // aussi pour chaque classe de « toutes les classes » (02/11/2026) ; barèmes différents
+    // ou fiche anonyme : laissé vide. Lu à chaque
     // impression : un barème modifié dans les paramètres est repris aussitôt.
-    if (!$it && !$toutes && !$anonyme && $items) {
+    if (!$it && !$anonyme && $items) {
         $cles = array_merge(array_keys($criteres), ['total_points']);
         $sig = fn($b) => $b ? implode('|', array_map(fn($k) => (float) ($b[$k] ?? 0), $cles)) : '';
         $sigs = array_unique(array_map(fn($i) => $sig($i['bareme']), $items));
@@ -386,7 +387,10 @@ foreach ($pages as $it) {
     $pied = array_filter([$rempli ? "Élèves notés : $remplies / $nb_reels" : '',
                           $annuel ? '' : 'Cote : NA non acquis, ECA en cours d\'acquisition, A acquis, A+ acquis avec facilité.']);
     if ($pied) $pdf->MultiCell($uw, 5.5, pdf_u(implode(' — ', $pied)), 0, 'L');   // texte agrandi : retour à la ligne si besoin
-    $y = max($pdf->GetY() + 3, $ph - 30);
+    // Signatures 2 lignes sous le tableau (02/11/2026 : plus repoussées en bas de page) ;
+    // nouvelle page seulement si le bloc (cachet / signature compris) n'y tient plus.
+    $y = $pdf->GetY() + 6;
+    if ($y + 34 > $ph - 8) { $pdf->AddPage(); pdf_filigrane($pdf, $etab, $pw, $ph); $y = 15; }
     $pdf->SetFont('Arial', '', 11.5);
     $pdf->SetXY($ml, $y); $pdf->Cell($uw / 2, 4.5, pdf_u('L\'enseignant(e)'), 0, 0, 'C');
     $pdf->Cell($uw / 2, 6, pdf_u(lieu_signature_pdf($etab) . 'le ' . date('d/m/Y')), 0, 1, 'C');

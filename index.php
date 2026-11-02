@@ -16,6 +16,11 @@
 require_once __DIR__ . '/config/config.php';
 require_once __DIR__ . '/noyau/fonctions.php';
 require_once __DIR__ . '/noyau/connexion_assoc.php';   // assoc_param() : réglage de la page d'entrée
+// Application installable / APK (manifest, service worker, icône) — voir noyau/pwa.php.
+if (isset($_GET['pwa'])) {
+    require_once __DIR__ . '/noyau/pwa.php';
+    pwa_servir((string) $_GET['pwa']);
+}
 session_init();
 
 $aller_login = isset($_GET['login']) || isset($_GET['connexion']) || isset($_GET['app'])

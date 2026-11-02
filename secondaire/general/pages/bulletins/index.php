@@ -57,6 +57,12 @@ $id_serie  = (int)($_GET['serie'] ?? 0);
 // Choix mémorisé pour la session.
 if (in_array($_GET['mise'] ?? '', ['page', 'lisible'], true)) $_SESSION['bull_sec_mise'] = $_GET['mise'];
 $mise      = $_SESSION['bull_sec_mise'] ?? 'page';
+// Langue du bulletin (école bilingue/anglophone, 01/11/2026) : français
+// traduit en anglais, ou anglais traduit en français (section anglophone).
+// Par défaut la langue de la section de la classe ; choix mémorisé par classe.
+$choix_langue = langue_enseignement_courante() !== 'francophone';
+if ($id_classe && in_array($_GET['langue'] ?? '', ['fr', 'en'], true)) $_SESSION['bull_sec_langue'][$id_classe] = $_GET['langue'];
+$langue_bull = $id_classe ? ($_SESSION['bull_sec_langue'][$id_classe] ?? sec_langue_classe($id_classe)) : 'fr';
 
 // Sécurité PP
 if ($is_ens && $id_classe) {
@@ -252,6 +258,7 @@ function pdf_url_bull(int $id_eleve, string $vue, int $id_trim, int $id_annee, b
         $base = APP_URL.'/secondaire/general/pages/bulletins/pdf.php?eleve='.$id_eleve.'&annee='.$id_annee.'&trim='.$id_trim;
         if (($GLOBALS['mise'] ?? 'page') === 'lisible') $base .= '&mise=lisible';
     }
+    $base .= '&langue=' . ($GLOBALS['langue_bull'] ?? 'fr');
     if ($dl) $base .= '&dl=1';
     return $base;
 }
@@ -263,6 +270,7 @@ function url_classe_bull(int $id_classe, string $vue, int $id_trim, int $id_anne
         if (($GLOBALS['mise'] ?? 'page') === 'lisible') $base .= '&mise=lisible';
     }
     if ($id_serie) $base .= '&serie='.$id_serie;
+    $base .= '&langue=' . ($GLOBALS['langue_bull'] ?? 'fr');
     if ($dl) $base .= '&dl=1';
     return $base;
 }
@@ -385,6 +393,20 @@ if ($vue === 'trim' && $id_classe) echo sec_controle_notes_html((int) $id_classe
              title="Police et espacements confortables, sur 2 pages au maximum">
             <i class="bi bi-files me-1"></i>Lisible (2 pages max)
           </a>
+        </div>
+      </div>
+      <?php endif; ?>
+      <?php if ($choix_langue):
+        $base_langue = '?vue=' . $vue . '&classe=' . $id_classe . '&ordre=' . $ordre
+                     . ($id_serie ? '&serie=' . $id_serie : '') . ($id_eleve ? '&eleve=' . $id_eleve : ''); ?>
+      <!-- Langue du bulletin (section anglophone : anglais traduit en français) -->
+      <div class="col-auto">
+        <label class="form-label mb-1" style="font-size:.78rem;font-weight:600;color:#1a3c6b">Langue du bulletin</label>
+        <div class="d-flex gap-1">
+          <a href="<?= h($base_langue . '&langue=fr') ?>" class="ordre-btn <?= $langue_bull === 'fr' ? 'active' : '' ?>"
+             title="Section francophone : français, traduction anglaise en dessous">Français / English</a>
+          <a href="<?= h($base_langue . '&langue=en') ?>" class="ordre-btn <?= $langue_bull === 'en' ? 'active' : '' ?>"
+             title="Section anglophone : anglais, traduction française en dessous">English / Français</a>
         </div>
       </div>
       <?php endif; ?>

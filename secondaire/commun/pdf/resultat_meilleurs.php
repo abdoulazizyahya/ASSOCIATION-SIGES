@@ -19,6 +19,7 @@ $dl       = ($_GET['dl'] ?? '0') === '1';
 
 $etab  = get_etablissement();
 $annee = db_one("SELECT * FROM annee_scolaire WHERE id=?", [$id_annee]) ?? ['libelle' => '—'];
+bulletin_fixer_langue(0);   // toutes classes : en anglais pour une école anglophone (ou ?langue=en)
 
 // Le Top N est TOUJOURS sélectionné au mérite d'abord (calc_resultat_annuel_comp
 // renvoie déjà par moyenne annuelle décroissante, non-classables en fin) —
@@ -28,10 +29,10 @@ $annee = db_one("SELECT * FROM annee_scolaire WHERE id=?", [$id_annee]) ?? ['lib
 $rows = array_slice(calc_resultat_annuel_comp($id_annee, 0), 0, $n);
 
 $short_labels = [
-    'no' => 'N°', 'niu' => 'NIU', 'nom' => 'Nom et Prénoms', 'date' => 'Date naiss.',
-    'lieu' => 'Lieu naiss.', 'sexe' => 'Sexe', 'classe' => 'Classe',
-    't1' => 'T1', 't2' => 'T2', 't3' => 'T3', 'abs' => 'Abs.NJ(h)', 'moy_an' => 'Moy.Ann.',
-    'rang' => 'Rang', 'decision' => 'Décision', 'classe_suiv' => 'Cl. suivante', 'obs' => 'Notes',
+    'no' => 'N°', 'niu' => 'NIU', 'nom' => bt('Nom et Prénoms', 'Names'), 'date' => bt('Date naiss.', 'Date of birth'),
+    'lieu' => bt('Lieu naiss.', 'Place of birth'), 'sexe' => bt('Sexe', 'Sex'), 'classe' => bt('Classe', 'Class'),
+    't1' => 'T1', 't2' => 'T2', 't3' => 'T3', 'abs' => bt('Abs.NJ(h)', 'Unj.Abs(h)'), 'moy_an' => bt('Moy.Ann.', 'Ann.Avg'),
+    'rang' => bt('Rang', 'Rank'), 'decision' => bt('Décision', 'Decision'), 'classe_suiv' => bt('Cl. suivante', 'Next class'), 'obs' => bt('Notes', 'Remarks'),
 ];
 $largeurs = [
     'no' => 8, 'niu' => 24, 'nom' => 40, 'date' => 20, 'lieu' => 24, 'sexe' => 10, 'classe' => 20,
@@ -65,9 +66,9 @@ $nb_m  = count(array_filter($rows, fn($r) => $r['sexe'] === 'M'));
 $nb_f  = $total - $nb_m;
 
 $pdf->SetFont('Arial', 'B', 9);
-$pdf->Cell(0, 5, pdf_u("Année scolaire : " . $annee['libelle'] . "    Top $n élève(s) — toutes classes confondues"), 0, 1, 'L');
+$pdf->Cell(0, 5, pdf_u(bulletin_en() ? 'School year: ' . $annee['libelle'] . "    Top $n student(s) — all classes" : "Année scolaire : " . $annee['libelle'] . "    Top $n élève(s) — toutes classes confondues"), 0, 1, 'L');
 $pdf->SetFont('Arial', '', 8);
-$pdf->Cell(0, 4.5, pdf_u("Total affiché : $total élève(s)   Garçons : $nb_m   Filles : $nb_f"), 0, 1, 'L');
+$pdf->Cell(0, 4.5, pdf_u(bulletin_en() ? "Total shown: $total student(s)   Boys: $nb_m   Girls: $nb_f" : "Total affiché : $total élève(s)   Garçons : $nb_m   Filles : $nb_f"), 0, 1, 'L');
 $pdf->Ln(1);
 
 $total_naturel = array_sum(array_map(fn($c) => $c[1], $sel));
@@ -102,7 +103,7 @@ $x_sign = $pw - 25 - $w_sign;
 pdf_fait_a_bilingue($pdf, $x_sign, $w_sign, lieu_edition_documents($etab), 'R', 9);
 $pdf->SetFont('Arial', 'B', 9);
 $pdf->SetX($x_sign);
-$pdf->Cell($w_sign, 5, pdf_u(strtoupper($etab['chef_etablissement'] ?? 'LE PROVISEUR')), 0, 1, 'R');
+$pdf->Cell($w_sign, 5, pdf_u(strtoupper(bt($etab['chef_etablissement'] ?? 'LE PROVISEUR', $etab['chef_etablissement_en'] ?? 'THE PRINCIPAL'))), 0, 1, 'R');
 
 if (($_GET['signature'] ?? '0') === '1') {
     $sig_w = 24;

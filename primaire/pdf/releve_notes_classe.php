@@ -20,6 +20,7 @@ $dl        = ($_GET['dl'] ?? '0') === '1';
 if (!$id_classe || !$id_trim) die('Paramètres classe/trim manquants.');
 
 $classe = db_one("SELECT * FROM classe WHERE IDClasses=?", [$id_classe]);
+bulletin_fixer_langue($id_classe);   // section anglophone : document en anglais
 if (!$classe) die('Classe introuvable.');
 $trimestre = db_one("SELECT * FROM trimestre WHERE id_trim=?", [$id_trim]);
 if (!$trimestre) die('Trimestre introuvable.');
@@ -70,7 +71,7 @@ pdf_bandeau($pdf, 'RELEVÉ DE NOTES', 'GRADE SHEET', $pw, 8);
 
 $pdf->SetFont('Arial', 'B', 8.5);
 $pdf->SetX(8);
-$pdf->Cell($uw, 4.5, pdf_u('Classe : ' . $classe['DesignationClasses'] . '   —   ' . $trimestre['libelle_trim'] . '   —   Année : ' . $val_annee), 0, 1, 'C');
+$pdf->Cell($uw, 4.5, pdf_u(bt('Classe : ', 'Class: ') . $classe['DesignationClasses'] . '   —   ' . $trimestre['libelle_trim'] . bt('   —   Année : ', '   —   Year: ') . $val_annee), 0, 1, 'C');
 $pdf->Ln(2);
 
 // ── Colonnes : N° / Élève / une par compétence (code) / Moy. / Rang / Décision ──
@@ -82,14 +83,14 @@ $w_comp = $nb_comp > 0 ? $w_reste / $nb_comp : 0;
 $pdf->SetX(8);
 $pdf->SetFont('Arial', 'B', 6.5);
 $pdf->SetFillColor(30, 79, 216); $pdf->SetTextColor(255, 255, 255);
-$pdf->Cell($w_no, 14, pdf_u('N°'), 1, 0, 'C', true);
-$pdf->Cell($w_nom, 14, pdf_u('Nom et prénoms'), 1, 0, 'C', true);
+$pdf->Cell($w_no, 14, pdf_u(bt('N°', 'No')), 1, 0, 'C', true);
+$pdf->Cell($w_nom, 14, pdf_u(bt('Nom et prénoms', 'Names')), 1, 0, 'C', true);
 foreach ($competences as $c) {
     $pdf->Cell($w_comp, 14, pdf_u($c['code_comp']), 1, 0, 'C', true);
 }
-$pdf->Cell($w_moy, 14, pdf_u('Moy.'), 1, 0, 'C', true);
+$pdf->Cell($w_moy, 14, pdf_u(bt('Moy.', 'Avg.')), 1, 0, 'C', true);
 $pdf->Cell($w_rang, 14, 'Rang', 1, 0, 'C', true);
-$pdf->Cell($w_dec, 14, pdf_u('Décision'), 1, 1, 'C', true);
+$pdf->Cell($w_dec, 14, pdf_u(bt('Décision', 'Decision')), 1, 1, 'C', true);
 $pdf->SetTextColor(0);
 
 // Légende des codes de compétence (pour ne pas répéter les libellés complets
@@ -127,7 +128,7 @@ foreach ($classement['lignes'] as $l) {
     $pdf->SetFont('Arial', '', 7);
     $pdf->Cell($w_rang, 5.5, pdf_u((string) $l['rang']), 1, 0, 'C', $fill);
     $dec = $dec_idx[$id_eleve]['decision'] ?? '';
-    $pdf->Cell($w_dec, 5.5, pdf_u($dec ?: '—'), 1, 1, 'C', $fill);
+    $pdf->Cell($w_dec, 5.5, pdf_u($dec ? decision_affichee($dec) : '—'), 1, 1, 'C', $fill);
     $no++; $fill = !$fill;
 }
 
@@ -138,7 +139,7 @@ $x_sign = $pw - 8 - $w_sign;
 pdf_fait_a_bilingue($pdf, $x_sign, $w_sign, (($etab['lieu'] ?: $etab['ville']) ?: ''), 'R', 8);
 $pdf->SetFont('Arial', 'B', 8);
 $pdf->SetX($x_sign);
-$pdf->Cell($w_sign, 4.5, pdf_u(mb_strtoupper($etab['chef_etablissement'] ?: 'LE DIRECTEUR') . ','), 0, 1, 'R');
+$pdf->Cell($w_sign, 4.5, pdf_u(mb_strtoupper(bt($etab['chef_etablissement'] ?: 'LE DIRECTEUR', $etab['chef_etablissement_en'] ?: 'THE DIRECTOR')) . ','), 0, 1, 'R');
 
 // Copyright standard du système (primaire/pdf/header_pdf.php) — texte unique sur
 // tous les PDF du projet, voir pdf_copyright().

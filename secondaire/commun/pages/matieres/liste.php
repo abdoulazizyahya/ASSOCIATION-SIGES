@@ -32,6 +32,46 @@ $annee     = get_annee_active();
 $val_annee = $annee['val_annee'] ?: '—';
 
 // ══════════════════════════════════════════════════════════════
+//  ONGLET Traductions (01/11/2026) — matières et compétences sans
+//  intitulé anglais, à compléter en une fois (bulletins de la section
+//  anglophone : « EN / FR », compétences en anglais).
+// ══════════════════════════════════════════════════════════════
+$trad_niveau = trim((string) ($_GET['niveau_trad'] ?? ''));
+$trad_mats = $trad_comps = [];
+$trad_nb_mats = $trad_nb_comps = 0;
+if ($onglet === 'traductions') {
+    if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+        csrf_verifier();
+        $n = 0;
+        foreach ((array) ($_POST['mat_en'] ?? []) as $id => $v) {
+            if (($v = trim((string) $v)) === '') continue;
+            db_exec("UPDATE matiere SET libelle_en=? WHERE id=?", [mb_substr($v, 0, 120), (int) $id]); $n++;
+        }
+        if (!est_technique()) {
+            foreach ((array) ($_POST['comp_en'] ?? []) as $id => $v) {
+                if (($v = trim((string) $v)) === '') continue;
+                db_exec("UPDATE competence SET libelle_en=? WHERE id=?", [mb_substr($v, 0, 150), (int) $id]); $n++;
+            }
+        }
+        flash_set('succes', $n ? "$n traduction(s) enregistrée(s)." : 'Aucune traduction saisie.');
+        rediriger('secondaire/commun/pages/matieres/liste.php?onglet=traductions' . ($trad_niveau !== '' ? '&niveau_trad=' . urlencode($trad_niveau) : ''));
+    }
+    // Matières de la section anglophone : déjà nommées en anglais, rien à traduire.
+    $trad_mats = db_all("SELECT id, libelle, code FROM matiere WHERE actif=1 AND COALESCE(libelle_en,'')='' AND COALESCE(libelle_section,'') NOT REGEXP '^(an|en)' ORDER BY ordre, libelle");
+    $trad_nb_mats = count($trad_mats);
+    if (!est_technique()) {
+        $trad_nb_comps = (int) db_val("SELECT COUNT(*) FROM competence WHERE COALESCE(libelle_en,'')=''");
+        if ($trad_niveau !== '') {
+            $trad_comps = db_all(
+                "SELECT co.id, co.libelle, m.libelle AS matiere, t.libelle AS trimestre
+                 FROM competence co JOIN matiere m ON m.id=co.id_matiere LEFT JOIN trimestre t ON t.id=co.id_trim
+                 WHERE co.code_niveau=? AND COALESCE(co.libelle_en,'')=''
+                 ORDER BY m.libelle, t.ordre, co.ordre", [$trad_niveau]);
+        }
+    }
+}
+
+// ══════════════════════════════════════════════════════════════
 //  ONGLET 1 — Catalogue global des matières
 // ══════════════════════════════════════════════════════════════
 $pp_cat      = 25;
@@ -472,6 +512,12 @@ function grp_style(string $lib, string $part): string {
     <a class="nav-link <?= $onglet==='enseignants'?'active':'' ?>"
        href="<?= APP_URL ?>/secondaire/commun/pages/matieres/liste.php?onglet=enseignants<?= $id_cl_ens?"&classe_ens=$id_cl_ens":'' ?>">
       <i class="bi bi-person-badge me-1"></i>Affectation enseignants
+    </a>
+  </li>
+  <li class="nav-item">
+    <a class="nav-link <?= $onglet==='traductions'?'active':'' ?>"
+       href="<?= APP_URL ?>/secondaire/commun/pages/matieres/liste.php?onglet=traductions">
+      <i class="bi bi-translate me-1"></i>Traductions
     </a>
   </li>
 </ul>
@@ -1629,6 +1675,78 @@ document.addEventListener('input', function(e) {
 });
 
 </script>
+
+<?php elseif ($onglet === 'traductions'): ?>
+<!-- ══════════════════════════════════════════════════
+     ONGLET Traductions — intitulés anglais manquants
+══════════════════════════════════════════════════ -->
+<div class="alert alert-info py-2 small">
+  <i class="bi bi-info-circle me-1"></i>
+  Les bulletins de la section anglophone affichent les matières « anglais / français » et les compétences en anglais.
+  Il manque <strong><?= $trad_nb_mats ?></strong> nom(s) de matière en anglais<?= est_technique() ? '' : ' et <strong>' . $trad_nb_comps . '</strong> intitulé(s) de compétence' ?>.
+  Remplissez ce que vous voulez puis enregistrez : une case vide ne change rien.
+</div>
+<form method="post" action="?onglet=traductions<?= $trad_niveau !== '' ? '&niveau_trad=' . urlencode($trad_niveau) : '' ?>">
+  <?= csrf_champ() ?>
+  <div class="card mb-3">
+    <div class="card-body">
+      <div class="section-titre mb-2"><i class="bi bi-journal-bookmark me-1"></i>Matières sans nom anglais (<?= $trad_nb_mats ?>)</div>
+      <?php if (!$trad_mats): ?>
+        <div class="text-success small"><i class="bi bi-check-circle me-1"></i>Toutes les matières actives ont leur nom anglais.</div>
+      <?php else: ?>
+      <table class="table table-sm align-middle mb-0">
+        <thead><tr><th>Matière</th><th style="width:45%">Nom en anglais</th></tr></thead>
+        <tbody>
+          <?php foreach ($trad_mats as $m): ?>
+          <tr>
+            <td><?= h($m['libelle']) ?><?= $m['code'] ? ' <span class="text-muted small">(' . h($m['code']) . ')</span>' : '' ?></td>
+            <td><input type="text" name="mat_en[<?= (int) $m['id'] ?>]" class="form-control form-control-sm" maxlength="120"></td>
+          </tr>
+          <?php endforeach; ?>
+        </tbody>
+      </table>
+      <?php endif; ?>
+    </div>
+  </div>
+
+  <?php if (!est_technique()): ?>
+  <div class="card mb-3">
+    <div class="card-body">
+      <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+        <div class="section-titre mb-0"><i class="bi bi-list-stars me-1"></i>Compétences sans intitulé anglais (<?= $trad_nb_comps ?>)</div>
+        <select class="form-select form-select-sm" style="width:auto"
+                onchange="location.href='?onglet=traductions&niveau_trad=' + encodeURIComponent(this.value)">
+          <option value="">— Choisir un niveau —</option>
+          <?php foreach ($niveaux as $nv): ?>
+            <option value="<?= h($nv['code_niveau']) ?>" <?= $trad_niveau === $nv['code_niveau'] ? 'selected' : '' ?>><?= h($nv['libelle_niv']) ?></option>
+          <?php endforeach; ?>
+        </select>
+      </div>
+      <?php if ($trad_niveau === ''): ?>
+        <div class="text-muted small">Choisissez un niveau pour afficher ses compétences à traduire.</div>
+      <?php elseif (!$trad_comps): ?>
+        <div class="text-success small"><i class="bi bi-check-circle me-1"></i>Toutes les compétences de ce niveau ont leur intitulé anglais.</div>
+      <?php else: ?>
+      <table class="table table-sm align-middle mb-0">
+        <thead><tr><th>Matière</th><th>Trim.</th><th>Compétence</th><th style="width:40%">Intitulé en anglais</th></tr></thead>
+        <tbody>
+          <?php foreach ($trad_comps as $c): ?>
+          <tr>
+            <td class="small"><?= h($c['matiere']) ?></td>
+            <td class="small text-muted"><?= h($c['trimestre'] ?? '') ?></td>
+            <td class="small"><?= h($c['libelle']) ?></td>
+            <td><input type="text" name="comp_en[<?= (int) $c['id'] ?>]" class="form-control form-control-sm" maxlength="150"></td>
+          </tr>
+          <?php endforeach; ?>
+        </tbody>
+      </table>
+      <?php endif; ?>
+    </div>
+  </div>
+  <?php endif; ?>
+
+  <button class="btn btn-primary btn-sm"><i class="bi bi-check-lg me-1"></i>Enregistrer les traductions</button>
+</form>
 
 <?php endif; // onglets ?>
 
