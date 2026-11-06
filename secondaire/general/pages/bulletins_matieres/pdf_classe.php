@@ -6,6 +6,7 @@
 require_once __DIR__ . '/../../../../config/config.php';
 require_once __DIR__ . '/../../../../noyau/connexion.php';
 require_once __DIR__ . '/../../../../noyau/fonctions.php';
+require_once __DIR__ . '/../../../commun/pdf/bulletin_presentation.php';   // police condensée, en-tête réduit
 // Modèle de bulletin du cycle (Paramètres, migration v28) : APC ↔ « Matières ».
 sec_aiguiller_modele((int) ($_GET['classe'] ?? 0), 'secondaire/general/pages/bulletins_matieres/pdf_classe.php', 'secondaire/general/pages/bulletins/pdf_classe.php', true);
 exiger_connexion();
@@ -245,7 +246,7 @@ if ($is_seq_mode) {
 } else {
     $trim_info  = db_one("SELECT * FROM trimestre WHERE id=?", [$id_trim]);
     $seqs_trim  = db_all("SELECT s.*, t.libelle AS trimestre FROM sequence s JOIN trimestre t ON t.id=s.id_trim WHERE s.id_trim=? ORDER BY s.ordre", [$id_trim]);
-    $titre_bull = strtoupper($trim_info['libelle'] ?? '');
+    $titre_bull = bulletin_trimestre_titre($trim_info);   // « PREMIER TRIMESTRE »…
 }
 $nb_seqs = count($seqs_trim);
 $seq_ids = array_column($seqs_trim, 'id');
@@ -262,6 +263,8 @@ require_once __DIR__ . '/../../../commun/pdf/header_pdf.php'; // pour pdf_filigr
 // classe qui hérite d'une classe non encore chargée provoque une erreur fatale.
 class PDF_LTM_C extends FPDF
 {
+    use BulletinPoliceCondensee;
+
     function RoundedRect($x, $y, $w, $h, $r, $style = '')
     {
         $k = $this->k;
@@ -636,74 +639,17 @@ foreach ($eleves as $el) {
     $pdf->SetLineWidth(0.2);
 
     // En-tête bilingue
-    $pdf->SetXY(bulletin_en() ? $ml + $col3 * 2 : $ml, $y0);   // section anglophone : français à droite
-    $pdf->SetFont('Arial', '', 6.5);
-    $pdf->MultiCell($col3, 3.5, uc(
-        "REPUBLIQUE DU CAMEROUN\nPaix - Travail - Patrie\n***************\n" .
-        ($etab['region_fr'] ?? '') . "\n" .
-        ($etab['departement_fr'] ?? '') . "\n" .
-        ($etab['arrondissement_fr'] ?? '') . "\n" .
-        strtoupper($etab['nom_fr'] ?? '') . "\n" .
-        "B.P. " . ($etab['boite_postale'] ?? '') . " " . ($etab['ville'] ?? '') . "  Tel.: " . ($etab['telephone'] ?? '') . "\n" .
-        ($etab['email'] ?? '')
-    ), 0, 'C');
-
-    // Logo agrandi et centré horizontalement ET verticalement (demande
-    // explicite, était calé en haut) — identique à secondaire/general/pages/bulletins_matieres/pdf.php.
+    // En-tête réduit (06/11/2026) : République, devise, région, département, nom de
+    // l'école, B.P./tél./e-mail, logo agrandi — commun/pdf/bulletin_presentation.php.
     $logo_path = !empty($etab['logo']) ? __DIR__ . '/../../../../assets/uploads/' . $etab['logo'] : '';
-    $logo_bande_h = 25; // hauteur du bloc en-tête (y0=8 à 33, voir plus bas)
-    $logo_w = 28;
-    $logo_h = $logo_w;
-    if ($logo_path && is_file($logo_path)) {
-        $dim = @getimagesize($logo_path);
-        if ($dim && $dim[0] > 0) $logo_h = $logo_w * $dim[1] / $dim[0];
-    }
-    $logo_x = $ml + $col3 + ($col3 - $logo_w) / 2;
-    $logo_y = $y0 + ($logo_bande_h - $logo_h) / 2;
-    if ($logo_path && is_file($logo_path)) {
-        $pdf->Image($logo_path, $logo_x, $logo_y+5, $logo_w);
-    } else {
-        $pdf->SetFont('Arial', 'B', 10);
-        $pdf->SetXY($logo_x, $y0 + ($logo_bande_h - 16) / 2);
-        $pdf->Cell($logo_w, 16, uc($etab['sigle'] ?? ''), 1, 0, 'C');
-    }
-
-    $xr = $ml + $col3 * 2;
-    $pdf->SetXY(bulletin_en() ? $ml : $xr, $y0);
-    $pdf->SetFont('Arial', '', 6.5);
-    $pdf->MultiCell($col3, 3.5, uc(
-        "REPUBLIC OF CAMEROON\nPeace - Work - Fatherland\n***************\n" .
-        ($etab['region_en'] ?? '') . "\n" .
-        ($etab['division_en'] ?? '') . "\n" .
-        ($etab['subdivision_en'] ?? '') . "\n" .
-        strtoupper($etab['nom_en'] ?? '') . "\n" .
-        "P.O. BOX. " . ($etab['boite_postale'] ?? '') . " " . ($etab['ville'] ?? '') . "  Phone: " . ($etab['telephone'] ?? '') . "\n" .
-        ($etab['email'] ?? '')
-    ),
-    0, 'C');
-
-    $pdf->SetY(max($pdf->GetY(), 33));
-    $pdf->SetFont('Arial', 'I', 7);
-    $pdf->SetX($ml);
-    $pdf->Cell($uw, 4, uc('IMMATRICULATION : ' . ($etab['immatriculation'] ?? '')), 0, 1, 'C');
+    bulletin_entete_reduit($pdf, $etab, $ml, $uw, $logo_path);
 
     // Titre en bandeau pilule — identique à secondaire/general/pages/bulletins_matieres/pdf.php (était un
     // simple rectangle sans remplissage, autre différence de forme corrigée).
     $y_titre = $pdf->GetY();
-    $h_titre = 8;
-    pdf_fill($pdf, 'bandeau_titre');
-    pdf_draw($pdf, 'bordure_marque');
-    $pdf->SetLineWidth(0.3);
-    $pdf->RoundedRect($ml, $y_titre, $uw, $h_titre, $h_titre / 2, 'FD');
-    $pdf->SetXY($ml, $y_titre-1);
-    $pdf->SetFont('Arial', 'BI', 12);
-    $pdf->SetTextColor(26, 60, 107);
-    // Section anglophone : titre anglais en grand, français en dessous.
-    [$titre_l1, $titre_l2] = bl('BULLETIN SCOLAIRE DU ' . $titre_bull, (([1 => 'First ', 2 => 'Second ', 3 => 'Third '][(int) ($trim_info['ordre'] ?? 0)] ?? '') . 'Term Report'));
-    $pdf->Cell($uw, $h_titre, uc($titre_l1), 0, 1, 'C');
-    $pdf->SetFont('Arial', 'I', 11);
-	$pdf->ln(-1.7);
-	$pdf->Cell($uw, $h_titre * 0.35, uc(bulletin_en() ? $titre_l2 : 'Term Report '), 2, 1, 'C');
+    // Titre FR / EN sur une seule ligne, comme le bulletin APC (06/11/2026).
+    [$titre_l1, $titre_l2] = bl('BULLETIN SCOLAIRE DU ' . $titre_bull, (([1 => 'First ', 2 => 'Second ', 3 => 'Third '][(int) ($trim_info['ordre'] ?? 0)] ?? '') . 'Term Report Card'));
+    bulletin_titre_bandeau($pdf, $ml, $uw, $titre_l1, $titre_l2);
 	$pdf->SetTextColor(0, 0, 0);
 	$pdf->SetLineWidth(0.2);
 	$pdf->SetFont('Arial', 'B', 9);
@@ -713,7 +659,7 @@ foreach ($eleves as $el) {
     // Infos élève
     $pdf->Ln(0.5);
 
-    $photo_w = 26; $photo_h = 29.5;
+    $photo_w = 26; $photo_h = 23.5;   // 4 lignes d'identification
     $x_photo = $ml; $y_photo = $pdf->GetY();
     $x_info  = $ml + $photo_w; $w_info = $uw - $photo_w;
 
@@ -784,15 +730,13 @@ foreach ($eleves as $el) {
 	//$pdf->ln(20);
 	$pdf->SetXY($x_info, $y_row3 + 6);
 	//$pdf->ln();
-	cell2l_c($pdf, 30, 5.5, 'PROF PRINCIPAL :', 'Class Teacher', 'L', true, 8, 7.5, $gris, true);
+	// Prof principal et parents sur la même ligne (06/11/2026).
+	cell2l_c($pdf, 26, 5.5, 'PROF PRINCIPAL :', 'Class Teacher', 'L', true, 8, 7.5, $gris, true);
 	$pdf->SetFont('Arial', 'I', 8);
-	$pdf->Cell(138, 5.5, uc($nom_pp), 1, 1, 'L');
-
-	$pdf->ln(0.5);
-	$pdf->SetX($x_info);
-	cell2l_c($pdf, 42, 5.5, 'NOM ET CONTACTS DES PARENTS :', "Parent's Name & Contact", 'L', true, 8, 7.5, $gris, true);
-	$pdf->SetFont('Arial', '', 7);
-	$pdf->Cell(126, 5.5, uc($contacts_parents), 1, 1, 'L');
+	$pdf->Cell(54, 5.5, uc($nom_pp), 1, 0, 'L');
+	cell2l_c($pdf, 36, 5.5, 'NOM ET CONTACT DES PARENTS :', "Parent's Name & Contact", 'L', true, 8, 7.5, $gris, true);
+	$pdf->SetFont('Arial', '', bulletin_taille_ligne($pdf, uc($contacts_parents), '', 53, 7, 5));
+	$pdf->Cell(54, 5.5, uc($contacts_parents), 1, 1, 'L');
 
 	$pdf->SetY(max($pdf->GetY(), $y_photo + $photo_h));
 

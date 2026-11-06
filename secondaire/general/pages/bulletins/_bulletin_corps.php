@@ -42,7 +42,7 @@ if ($is_seq) {
 }
 $trim_info = db_one("SELECT * FROM trimestre WHERE id=?", [$id_trim]);
 if (!$trim_info) die('Trimestre introuvable.');
-$titre_bull = strtoupper($trim_info['libelle'] ?? '');
+$titre_bull = bulletin_trimestre_titre($trim_info);   // « PREMIER TRIMESTRE »…
 
 // ── Établissement ─────────────────────────────────────────────────
 $etab = get_etablissement();
@@ -289,68 +289,10 @@ if ($lisible) {
     $pdf->SetDisplayMode('real');    // ouverture à 100 %
 }
 
-// ── 1. En-tête bilingue ──────────────────────────────────────────
-$col3 = $uw / 3;
-$y0   = 8;
-
-// Section anglophone : bloc anglais à gauche, bloc français à droite.
-$entete_fr = "REPUBLIQUE DU CAMEROUN\nPaix - Travail - Patrie\n***************\n" .
-    ($etab['region_fr'] ?? "VOTRE REGION ICI") . "\n" .
-    ($etab['departement_fr'] ?? 'DEPARTEMENT ') . "\n" .
-    ($etab['arrondissement_fr'] ?? 'ARRONDISSEMENT') . "\n" .
-    strtoupper($etab['nom_fr'] ?? 'NOM ECOLE ') . "\n" .
-    "B.P. " . ($etab['boite_postale'] ?? 'XX') . " ville Tel.: " . ($etab['telephone'] ?? '') . "\n" .
-    ($etab['email'] ?? 'adresse email');
-
-// Logo agrandi et centré horizontalement ET verticalement dans la bande du
-// milieu (demande explicite, était calé en haut) — hauteur réelle déduite du
-// ratio de l'image pour un centrage vertical exact quel que soit son format.
+// ── 1. En-tête bilingue réduit (06/11/2026) : République, devise, région,
+// département, nom de l'école, B.P./tél./e-mail — commun/pdf/bulletin_presentation.php.
 $logo_path = !empty($etab['logo']) ? __DIR__ . '/../../../../assets/uploads/' . $etab['logo'] : '';
-$logo_bande_h = 21; // hauteur du bloc en-tête (y0=8 à 29, voir plus bas)
-$logo_w = 28;
-$logo_h = $logo_w;
-if ($logo_path && is_file($logo_path)) {
-    $dim = @getimagesize($logo_path);
-    if ($dim && $dim[0] > 0) $logo_h = $logo_w * $dim[1] / $dim[0];
-}
-$logo_x = $ml + $col3 + ($col3 - $logo_w) / 2;
-$logo_y = $y0 + ($logo_bande_h - $logo_h) / 2;
-if ($logo_path && is_file($logo_path)) {
-    // (logo dessiné plus bas, une fois la position de l'immatriculation connue)
-} else {
-    $pdf->SetFont('Arial', 'B', 10);
-    $pdf->SetXY($logo_x, $y0 + ($logo_bande_h - 16) / 2);
-    $pdf->Cell($logo_w, 16, u($etab['sigle'] ?? ''), 1, 0, 'C');
-}
-
-$entete_en = "REPUBLIC OF CAMEROON\nPeace - Work - Fatherland\n***************\n" .
-    ($etab['region_en'] ?? '') . "\n" .
-    ($etab['division_en'] ?? '') . "\n" .
-    ($etab['subdivision_en'] ?? '') . "\n" .
-    strtoupper($etab['nom_en'] ?? '') . "\n" .
-    "P.O. BOX. " . ($etab['boite_postale'] ?? '') . " " . ($etab['ville'] ?? '') . "  Phone: " . ($etab['telephone'] ?? '') . "\n" .
-    ($etab['email'] ?? '');
-[$entete_g, $entete_d] = bulletin_en() ? [$entete_en, $entete_fr] : [$entete_fr, $entete_en];
-$pdf->SetXY($ml, $y0);
-$pdf->SetFont('Arial', '', 6.5);
-$pdf->MultiCell($col3, 3.0, u($entete_g), 0, 'C');
-$xr = $ml + $col3 * 2;
-$pdf->SetXY($xr, $y0);
-$pdf->SetFont('Arial', '', 6.5);
-$pdf->MultiCell($col3, 3.0, u($entete_d), 0, 'C');
-
-$pdf->SetY(max($pdf->GetY(), 29));
-// Logo ajusté automatiquement dans l'espace libre entre le haut de l'en-tête
-// et l'immatriculation (proportions conservées) : il ne touche jamais
-// l'immatriculation, même si les noms FR/EN prennent plus de lignes.
-if ($logo_path && is_file($logo_path)) {
-    $y_immat = $pdf->GetY();
-    pdf_logo_cadre($pdf, $logo_path, $ml + $col3 + ($col3 - 34) / 2, $y0 + 0.5, 34, $y_immat - $y0 - 1.5);
-    $pdf->SetY($y_immat);
-}
-$pdf->SetFont('Arial', 'I', 6.5);
-$pdf->SetX($ml);
-$pdf->Cell($uw, 3.2, u('IMMATRICULATION : ' . ($etab['immatriculation'] ?? '')), 0, 1, 'C');
+bulletin_entete_reduit($pdf, $etab, $ml, $uw, $logo_path);
 
 // ── 2. Titre (bandeau en pilule, comme le modèle) ──────────────────
 // Bandeau titre compacté (demande explicite : gagner de la place du haut
@@ -424,7 +366,7 @@ $pdf->Ln(0.3);
 // jusqu'au bas du bulletin plutôt que de trop réduire la police du tableau
 // des compétences).
 $photo_w = 20;
-$photo_h = 22;
+$photo_h = 19.4;   // 4 lignes d'identification (prof principal et parents sur la même ligne)
 // Mode lisible : lignes d'identification plus hautes et espacées, polices
 // agrandies ; la case photo suit la hauteur du bloc (photo non déformée).
 $h_id  = $lisible ? 6.4 : 4.7;   // hauteur d'une ligne
@@ -432,7 +374,7 @@ $g_id  = $lisible ? 0.9 : 0.2;   // espace entre deux lignes
 $f_lbl = $lisible ? 8.5 : 8;     // libellé FR (gras)
 $f_en  = $lisible ? 7 : 7.5;     // libellé EN (italique)
 $f_val = $lisible ? 9 : 8;       // valeurs
-if ($lisible) $photo_h = 5 * $h_id + 4 * $g_id;
+if ($lisible) $photo_h = 4 * $h_id + 3 * $g_id;
 $x_photo = $ml;
 $y_photo = $pdf->GetY();
 $x_info  = $ml + $photo_w;
@@ -513,15 +455,13 @@ checkbox_ltm($pdf, $x_row3 + 23, $y_row3 + $dy3, !$is_redoub);
 //$pdf->ln(20);
 $pdf->SetXY($x_info, $y_row3 + $h_id + $g_id + 0.1);
 //$pdf->ln();
-cell2l($pdf, 30, $h_id, 'PROF PRINCIPAL :', 'Class Teacher', 'L', true, $f_lbl, $f_en, $gris, true);
+// Prof principal et parents sur la même ligne (06/11/2026).
+cell2l($pdf, 26, $h_id, 'PROF PRINCIPAL :', 'Class Teacher', 'L', true, $f_lbl, $f_en, $gris, true);
 $pdf->SetFont('Arial', 'I', $f_val);
-$pdf->Cell(138, $h_id, u($nom_pp), 1, 1, 'L');
-
-$pdf->ln($g_id);
-$pdf->SetX($x_info);
-cell2l($pdf, 42, $h_id, 'NOM ET CONTACTS DES PARENTS :', "Parent's Name & Contact", 'L', true, $f_lbl, $f_en, $gris, true);
-$pdf->SetFont('Arial', '', $lisible ? 8.5 : 7);
-$pdf->Cell(126, $h_id, u($contacts_parents), 1, 1, 'L');
+$pdf->Cell(54, $h_id, u($nom_pp), 1, 0, 'L');
+cell2l($pdf, 36, $h_id, 'NOM ET CONTACT DES PARENTS :', "Parent's Name & Contact", 'L', true, $f_lbl, $f_en, $gris, true);
+$pdf->SetFont('Arial', '', cell2l_taille_ajustee($pdf, $contacts_parents, '', 53, $lisible ? 8.5 : 7, 5));
+$pdf->Cell(54, $h_id, u($contacts_parents), 1, 1, 'L');
 
 $pdf->SetY(max($pdf->GetY(), $y_photo + $photo_h));
 
@@ -546,7 +486,7 @@ $hdr_h = 4.6;
 // le haut et le bas du bulletin plutôt que de continuer à réduire la
 // police).
 // Lignes du bas plus hautes (30/10/2026) : libellés FR/EN lisibles, sans chevauchement.
-$h_bas = 5;
+$h_bas = 4.6;
 $h_ligne = 5;
 $h_dec = 3.2;
 $decisions = [
@@ -603,7 +543,7 @@ $dispo_table = $bas_dispo - $y_table0 - $hdr_h - $footer_fixe - 4;
 // Taille de départ relevée à 7.5pt (demande explicite du 17/09/2026) — repli
 // automatique vers un plancher de 7pt (voir plus bas) si une classe a trop
 // de compétences pour tenir sur une page à 7.5pt.
-$taille_comp = 7.5;
+$taille_comp = 9.0;   // mode 2 pages : départ à 9pt (police condensée)
 $lignes_par_mat = []; // [id_mat] => [ [id_comp, nb_lignes], ... ]
 $total_lignes = 0;
 $h_unit = 4;
@@ -614,7 +554,7 @@ $h_unit = 4;
 // décision, observations/signature, QR) reste groupé sur la dernière page.
 // On part de 9.5pt et on ne réduit (par pas de 0.25, plancher 7.5pt) que si
 // la pagination simulée dépasse 2 pages.
-$h_fin_tab   = $ph - 13;         // bas utile d'une page de tableau (sans QR)
+$h_fin_tab   = $ph - 13 - 22;    // bas utile d'une page de tableau (place du QR réservée : il ne cache plus de note)
 $y_haut_suite = 10;              // haut du tableau sur une page suivante
 $h_mat_l     = 6.2;              // ligne d'en-tête « COMPETENCE N: MATIERE »
 $pad_l       = 1.4;              // marge interne (haut + bas) d'une compétence
@@ -666,8 +606,13 @@ if ($lisible) $h_unit = $h_mat_l;
 // $h_unit = place disponible répartie sur toutes les lignes, plafonnée à
 // 0.6 × la police (au-delà, l'espace reste en bas plutôt que des lignes
 // trop hautes). Si la place manque : marge réduite, puis police (plancher 6.75pt).
-$taille_comp = 8.0;
+// Police condensée (06/11/2026) : départ à 9pt, plancher 7.5pt. Une matière
+// à une seule compétence garde une hauteur mini ($h_grp_min) pour afficher
+// l'appréciation complète FR/EN. En mode 2 pages, la taille calculée plus
+// haut est conservée (l'écraser ici coupait la fin des compétences).
+if (!$lisible) $taille_comp = 9.0;
 $pad_c = 1.2;
+$h_grp_min = 5.0;
 while (!$lisible) {
     $lignes_par_mat = [];
     $total_lignes = 0; $nb_c = 0; $nb_m = 0;
@@ -683,8 +628,18 @@ while (!$lisible) {
             $total_lignes += $nl; $nb_c++;
         }
     }
-    $h_unit = ($dispo_table - $nb_c * $pad_c - $nb_m * 0.8) / max(1, $total_lignes + $nb_m);
-    if ($h_unit >= $taille_comp * 0.45 || $taille_comp <= 6.75) break;
+    $h_unit = min($taille_comp * 0.6, ($dispo_table - $nb_c * $pad_c - $nb_m * 0.8) / max(1, $total_lignes + $nb_m));
+    $hauteur_tab = function (float $hu) use ($disciplines, $lignes_par_mat, $pad_c, $h_grp_min) {
+        $t = 0;
+        foreach ($disciplines as $d) {
+            $g = 0;
+            foreach ($lignes_par_mat[(int)$d['id_mat']] as [, $nl]) $g += $nl * $hu + $pad_c;
+            $t += $hu + 0.8 + max($h_grp_min, $g ?: $hu + $pad_c);
+        }
+        return $t;
+    };
+    while ($h_unit > 1.6 && $hauteur_tab($h_unit) > $dispo_table) $h_unit -= 0.05;
+    if ($h_unit >= $taille_comp * 0.45 || $taille_comp <= 7.5) break;
     if ($pad_c > 0.5) { $pad_c = 0.5; continue; }
     $taille_comp -= 0.25;
 }
@@ -711,7 +666,7 @@ $entete_tableau = function () use ($pdf, $ml, $hdr_h, $cD, $cN, $cM, $cCF, $cMXC
     ];
     foreach ($cols as $i => [$larg, $txt]) {
         // Chaque intitulé s'ajuste à sa colonne (jamais de débordement).
-        $t = cell2l_taille_ajustee($pdf, $txt, 'B', $larg - 1.4, $lisible ? 7.2 : 6.3, 4.2);
+        $t = cell2l_taille_ajustee($pdf, $txt, 'B', $larg - 1.4, 7.2, 4.2);
         $pdf->SetFont('Arial', 'B', $t);
         $pdf->Cell($larg, $hdr_h, u($txt), 1, $i === count($cols) - 1 ? 1 : 0, 'C', true);
     }
@@ -798,16 +753,19 @@ foreach ($disciplines as $d) {
         $h_grp = $h_unit + $pad_c;
     } else {
         $h_grp = 0;
-        foreach ($lignes_par_mat[$id_mat] as [$id_comp, $nb_lignes]) {
+        foreach ($lignes_par_mat[$id_mat] as $k => [$id_comp, $nb_lignes]) {
             $comp = null;
             foreach ($comps as $c) { if ((int)$c['id'] === $id_comp) { $comp = $c; break; } }
-            // Hauteur = lignes de texte × interligne commun + marge interne.
+            // Hauteur = lignes de texte × interligne commun + marge interne
+            // (+ hauteur mini de la matière sur la dernière compétence).
             $h_row_reel = $nb_lignes * $h_unit + $pad_c;
+            if ($k === count($lignes_par_mat[$id_mat]) - 1 && $h_grp + $h_row_reel < $h_grp_min) $h_row_reel = $h_grp_min - $h_grp;
             $x0 = $ml; $y0 = $pdf->GetY();
-            $pdf->SetFillColor(...$bg);
+            // Une ligne sur deux grisée (hors matière en échec, déjà colorée).
+            $pdf->SetFillColor(...(($k % 2 === 1 && $bg === [255, 255, 255]) ? [238, 242, 248] : $bg));
             $pdf->SetFont('Arial', '', $taille_comp);
             $pdf->Rect($x0, $y0, $cD, $h_row_reel, 'DF');
-            $pdf->SetXY($x0, $y0 + $pad_c / 2);
+            $pdf->SetXY($x0, $y0 + ($h_row_reel - $nb_lignes * $h_unit) / 2);
             $pdf->MultiCell($cD, $h_unit, u($comp['libelle'] ?? ''), 0, 'L', false);
             $h_grp += $h_row_reel;
             $pdf->SetXY($x0 + $cD, $y0);
@@ -870,11 +828,11 @@ foreach ($disciplines as $d) {
         if ($h_grp >= 5) {
             $h2 = min($lisible ? 4.2 : 3.4, $h_grp / 2);
             $y_txt = $centrer_y($h2 * 2);
-            $t_fr = cell2l_taille_ajustee($pdf, $appr['APPR1_FR'], 'B', $cAPPR - 2, $lisible ? 7.5 : 6, 4.2);
+            $t_fr = cell2l_taille_ajustee($pdf, $appr['APPR1_FR'], 'B', $cAPPR - 2, 7.5, 4.2);
             $pdf->SetFont('Arial', 'B', $t_fr);
             $pdf->SetXY($x_appr, $y_txt);
             $pdf->Cell($cAPPR, $h2, u($appr['APPR1_FR']), 0, 0, 'C');
-            $t_en = cell2l_taille_ajustee($pdf, $appr['APPR1_EN'], 'I', $cAPPR - 2, $lisible ? 6.5 : 5.2, 3.8);
+            $t_en = cell2l_taille_ajustee($pdf, $appr['APPR1_EN'], 'I', $cAPPR - 2, 6.5, 3.8);
             $pdf->SetFont('Arial', 'I', $t_en);
             $pdf->SetXY($x_appr, $y_txt + $h2);
             $pdf->Cell($cAPPR, $h2, u($appr['APPR1_EN']), 0, 0, 'C');

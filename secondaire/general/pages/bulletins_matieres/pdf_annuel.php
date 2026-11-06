@@ -31,6 +31,7 @@ if (!$acces_public) {
 }
 require_once __DIR__ . '/../../../commun/pdf/fpdf.php';
 require_once __DIR__ . '/../../../commun/pdf/header_pdf.php';
+require_once __DIR__ . '/../../../commun/pdf/bulletin_presentation.php';   // police condensée, en-tête réduit
 
 //function u(string $s): string { return utf8_decode($s); }
 function u(string $s): string {
@@ -103,6 +104,8 @@ function fpdf_texte_ajuste(FPDF $pdf, string $texte, float $largeur_max, float $
 // à coins arrondis utilisés pour le cadre de page et le bandeau du titre.
 class PDF_LTM extends FPDF
 {
+    use BulletinPoliceCondensee;
+
     function RoundedRect($x, $y, $w, $h, $r, $style = '')
     {
         $k = $this->k;
@@ -554,74 +557,18 @@ $pdf->SetLineWidth(0.2);
 $col3 = $uw / 3;
 $y0   = 8;
 
-$pdf->SetXY(bulletin_en() ? $ml + $col3 * 2 : $ml, $y0);   // section anglophone : français à droite
-$pdf->SetFont('Arial', '', 6.5);
-$pdf->MultiCell($col3, 3.5, u(
-    "REPUBLIQUE DU CAMEROUN\nPaix - Travail - Patrie\n***************\n" .
-    ($etab['region_fr'] ?? "VOTRE REGION ICI") . "\n" .
-    ($etab['departement_fr'] ?? 'DEPARTEMENT ') . "\n" .
-    ($etab['arrondissement_fr'] ?? 'ARRONDISSEMENT') . "\n" .
-    strtoupper($etab['nom_fr'] ?? 'NOM ECOLE ') . "\n" .
-    "B.P. " . ($etab['boite_postale'] ?? 'XX') . " ville Tel.: " . ($etab['telephone'] ?? '') . "\n" .
-    ($etab['email'] ?? 'adresse email')
-), 0, 'C');
-
-// Logo agrandi et centré horizontalement ET verticalement dans la bande du
-// milieu (demande explicite, était calé en haut) — hauteur réelle déduite du
-// ratio de l'image pour un centrage vertical exact quel que soit son format.
+// En-tête réduit (06/11/2026) : République, devise, région, département, nom de
+// l'école, B.P./tél./e-mail, logo agrandi — commun/pdf/bulletin_presentation.php.
 $logo_path = !empty($etab['logo']) ? __DIR__ . '/../../../../assets/uploads/' . $etab['logo'] : '';
-$logo_bande_h = 25; // hauteur du bloc en-tête (y0=8 à 33, voir plus bas)
-$logo_w = 28;
-$logo_h = $logo_w;
-if ($logo_path && is_file($logo_path)) {
-    $dim = @getimagesize($logo_path);
-    if ($dim && $dim[0] > 0) $logo_h = $logo_w * $dim[1] / $dim[0];
-}
-$logo_x = $ml + $col3 + ($col3 - $logo_w) / 2;
-$logo_y = $y0 + ($logo_bande_h - $logo_h) / 2;
-if ($logo_path && is_file($logo_path)) {
-    $pdf->Image($logo_path, $logo_x, $logo_y+3, $logo_w);
-} else {
-    $pdf->SetFont('Arial', 'B', 10);
-    $pdf->SetXY($logo_x, $y0 + ($logo_bande_h - 16) / 2);
-    $pdf->Cell($logo_w, 16, u($etab['sigle'] ?? ''), 1, 0, 'C');
-}
-
-$xr = $ml + $col3 * 2;
-$pdf->SetXY(bulletin_en() ? $ml : $xr, $y0);
-$pdf->SetFont('Arial', '', 6.5);
-$pdf->MultiCell($col3, 3.5, u(
-    "REPUBLIC OF CAMEROON\nPeace - Work - Fatherland\n***************\n" .
-    ($etab['region_en'] ?? '') . "\n" .
-    ($etab['division_en'] ?? '') . "\n" .
-    ($etab['subdivision_en'] ?? '') . "\n" .
-    strtoupper($etab['nom_en'] ?? '') . "\n" .
-    "P.O. BOX. " . ($etab['boite_postale'] ?? '') . " " . ($etab['ville'] ?? '') . "  Phone: " . ($etab['telephone'] ?? '') . "\n" .
-    ($etab['email'] ?? '')
-),
-0, 'C');
-
-$pdf->SetY(max($pdf->GetY(), 33)-2.5);
-$pdf->SetFont('Arial', 'I', 7);
-$pdf->SetX($ml);
-$pdf->Cell($uw, 4, u('IMMATRICULATION : ' . ($etab['immatriculation'] ?? '')), 0, 1, 'C');
+bulletin_entete_reduit($pdf, $etab, $ml, $uw, $logo_path);
 
 // ── 2. Titre (bandeau en pilule, comme le modèle) ──────────────────
 // Titre FR + traduction EN en italique en dessous (demande explicite),
 // même principe bilingue que le reste du bulletin — bandeau agrandi (8→9.5)
 // pour accueillir les 2 lignes sans les tasser.
 $y_titre = $pdf->GetY();
-$h_titre = 9.5;
-pdf_fill($pdf, 'bandeau_titre');
-pdf_draw($pdf, 'bordure_marque');
-$pdf->SetLineWidth(0.3);
-$pdf->RoundedRect($ml, $y_titre, $uw, $h_titre, $h_titre / 2, 'FD');
-$pdf->SetXY($ml, $y_titre + 0.3);
-$pdf->SetFont('Arial', 'BI', 17.5);
-$pdf->SetTextColor(26, 60, 107);
-$pdf->Cell($uw, $h_titre * 0.6, u(bl('BULLETIN DE NOTES ANNUEL', 'Annual Report Card')[0] . ''), 0, 2, 'C');
-$pdf->SetFont('Arial', 'I', 11);
-$pdf->Cell($uw, $h_titre * 0.38, u(bl('BULLETIN DE NOTES ANNUEL', 'Annual Report Card')[1]), 0, 1, 'C');
+// Titre FR / EN sur une seule ligne, comme les autres bulletins (06/11/2026).
+bulletin_titre_bandeau($pdf, $ml, $uw, ...bl('BULLETIN DE NOTES ANNUEL', 'Annual Report Card'));
 $pdf->SetTextColor(0, 0, 0);
 $pdf->SetLineWidth(0.2);
 // "Année scolaire" (accent rétabli, demande explicite) en gras.
@@ -783,7 +730,7 @@ function cell2l(FPDF $pdf, float $w, float $h, string $fr, string $en, string $a
 // PARTOUT dans ce bulletin — en-tête du tableau de notes et ligne "Rappel".)
 
 $photo_w = 26;
-$photo_h = 29.5;
+$photo_h = 23.5;   // 4 lignes d'identification
 $x_photo = $ml;
 $y_photo = $pdf->GetY();
 $x_info  = $ml + $photo_w;
@@ -857,15 +804,13 @@ checkbox_ltm($pdf, $x_row3 + 23, $y_row3 + 1, !$is_redoub);
 //$pdf->ln(20);
 $pdf->SetXY($x_info, $y_row3 + 6);
 //$pdf->ln();
-cell2l($pdf, 30, 5.5, 'PROF PRINCIPAL :', 'Class Teacher', 'L', true, 8, 7.5, $gris, true);
+// Prof principal et parents sur la même ligne (06/11/2026).
+cell2l($pdf, 26, 5.5, 'PROF PRINCIPAL :', 'Class Teacher', 'L', true, 8, 7.5, $gris, true);
 $pdf->SetFont('Arial', 'I', 8);
-$pdf->Cell(138, 5.5, u($nom_pp), 1, 1, 'L');
-
-$pdf->ln(0.5);
-$pdf->SetX($x_info);
-cell2l($pdf, 42, 5.5, 'NOM ET CONTACTS DES PARENTS :', "Parent's Name & Contact", 'L', true, 8, 7.5, $gris, true);
-$pdf->SetFont('Arial', '', 7);
-$pdf->Cell(126, 5.5, u($contacts_parents), 1, 1, 'L');
+$pdf->Cell(54, 5.5, u($nom_pp), 1, 0, 'L');
+cell2l($pdf, 36, 5.5, 'NOM ET CONTACT DES PARENTS :', "Parent's Name & Contact", 'L', true, 8, 7.5, $gris, true);
+$pdf->SetFont('Arial', '', bulletin_taille_ligne($pdf, u($contacts_parents), '', 53, 7, 5));
+$pdf->Cell(54, 5.5, u($contacts_parents), 1, 1, 'L');
 
 $pdf->SetY(max($pdf->GetY(), $y_photo + $photo_h));
 

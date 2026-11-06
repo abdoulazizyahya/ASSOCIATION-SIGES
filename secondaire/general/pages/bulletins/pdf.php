@@ -55,6 +55,7 @@ if (!$acces_public) {
 }
 require_once __DIR__ . '/../../../commun/pdf/fpdf.php';
 require_once __DIR__ . '/../../../commun/pdf/header_pdf.php';
+require_once __DIR__ . '/../../../commun/pdf/bulletin_presentation.php';   // police condensée, en-tête réduit
 
 //function u(string $s): string { return utf8_decode($s); }
 function u(string $s): string {
@@ -127,6 +128,8 @@ function fpdf_texte_ajuste(FPDF $pdf, string $texte, float $largeur_max, float $
 // à coins arrondis utilisés pour le cadre de page et le bandeau du titre.
 class PDF_LTM extends FPDF
 {
+    use BulletinPoliceCondensee;
+
     function RoundedRect($x, $y, $w, $h, $r, $style = '')
     {
         $k = $this->k;
