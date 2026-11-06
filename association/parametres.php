@@ -86,6 +86,22 @@ asso_haut('Réglages du site');
   </form>
 </div>
 <div class="asso-card mb-3" style="max-width:720px">
+  <h6 class="mb-1"><i class="bi bi-pc-display me-1"></i>Installer SIGES sur un autre ordinateur</h6>
+  <p class="small text-muted2 mb-2">
+    Zip « SIGES vierge » : tout le programme et ses bibliothèques, <strong>sans aucune donnée</strong>
+    (ni école, ni élève, ni configuration de ce serveur). Sur l'autre ordinateur (WampServer) : copier le
+    dossier <span class="font-monospace">SIGES</span> du zip dans <span class="font-monospace">C:\wamp64\www\</span>,
+    puis ouvrir <span class="font-monospace">http://localhost/SIGES/installation/install.php</span>, qui vérifie PHP,
+    les extensions et les modules Apache, puis crée l'école. Mode d'emploi détaillé dans le fichier
+    <span class="font-monospace">LISEZMOI_INSTALLATION.txt</span> du zip.
+  </p>
+  <a href="<?= APP_URL ?>/association/telecharger_siges.php" class="btn btn-primary btn-sm">
+    <i class="bi bi-download me-1"></i>Télécharger SIGES (installation vierge)
+  </a>
+  <span class="small text-muted2 ms-2">Préparation de quelques secondes (environ 1 900 fichiers).</span>
+</div>
+
+<div class="asso-card mb-3" style="max-width:720px">
   <h6 class="mb-1"><i class="bi bi-phone me-1"></i>Application Android</h6>
   <p class="small text-muted2 mb-3">
     L'application affiche le site en direct : les mises à jour de SIGES sont visibles sans rien réinstaller.

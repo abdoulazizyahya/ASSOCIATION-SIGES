@@ -329,6 +329,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 $exemple_slug = install_slug(($val['mode'] === 'reseau' ? $val['nom_association'] : $val['nom_ecole']) ?: 'Mon École');
+
+// Prérequis (06/11/2026) : PHP, extensions et modules Apache. Une page web ne
+// peut pas modifier php.ini / httpd.conf ni redémarrer son propre serveur :
+// on vérifie, et on indique le menu WampServer à utiliser.
+$prerequis = [['PHP 8.1 ou plus récent (actuel : ' . PHP_VERSION . ')', version_compare(PHP_VERSION, '8.1', '>='),
+               'icône Wamp > PHP > Version', true]];
+foreach (['mysqli' => true, 'gd' => true, 'zip' => true, 'mbstring' => true, 'openssl' => true, 'fileinfo' => false] as $ext => $bloquant) {
+    $prerequis[] = ["Extension PHP « $ext »", extension_loaded($ext), "icône Wamp > PHP > Extensions PHP > $ext", $bloquant];
+}
+if (function_exists('apache_get_modules')) {   // PHP en module Apache (WampServer)
+    $mods = apache_get_modules();
+    $prerequis[] = ['Module Apache « rewrite »', in_array('mod_rewrite', $mods, true), 'icône Wamp > Apache > Modules Apache > rewrite_module', false];
+    $prerequis[] = ['Module Apache « headers »', in_array('mod_headers', $mods, true), 'icône Wamp > Apache > Modules Apache > headers_module', false];
+}
+$prerequis_ko = array_filter($prerequis, fn($p) => !$p[1]);
+$prerequis_bloquant = (bool) array_filter($prerequis_ko, fn($p) => $p[3]);
 ?>
 <!doctype html>
 <html lang="fr">
@@ -420,7 +436,21 @@ $exemple_slug = install_slug(($val['mode'] === 'reseau' ? $val['nom_association'
       <a class="btn" href="<?= htmlspecialchars(APP_URL) ?>/<?= $val['mode'] === 'reseau' ? 'association/login.php' : 'compte/login.php' ?>">Continuer →</a>
     <?php else: ?>
 
-    <form method="post" autocomplete="off">
+    <?php if ($prerequis_ko): ?>
+    <div class="alert <?= $prerequis_bloquant ? 'alert-err' : '' ?>" style="<?= $prerequis_bloquant ? '' : 'background:#fff8e6;border:1px solid #f0d58c' ?>">
+      <strong><?= $prerequis_bloquant ? 'À corriger avant d\'installer' : 'Recommandé' ?></strong> — dans WampServer
+      (Wamp redémarre tout seul), puis rechargez cette page :
+      <ul style="margin:.4rem 0 0 1.1rem;padding:0">
+        <?php foreach ($prerequis_ko as [$lib, , $aide]): ?>
+          <li><?= htmlspecialchars($lib) ?> : <em><?= htmlspecialchars($aide) ?></em></li>
+        <?php endforeach; ?>
+      </ul>
+    </div>
+    <?php else: ?>
+    <div class="alert alert-ok" style="padding:.5rem .8rem;font-size:.85rem">✔ PHP, extensions et modules Apache : tout est prêt.</div>
+    <?php endif; ?>
+
+    <form method="post" autocomplete="off"<?= $prerequis_bloquant ? ' style="opacity:.5;pointer-events:none"' : '' ?>>
       <label>Combien d'établissements allez-vous gérer ?</label>
       <div class="choix">
         <label class="opt">
