@@ -4,8 +4,8 @@
 //  des bulletins du secondaire GÉNÉRAL (06/11/2026, demande de lisibilité) :
 //   - police condensée Roboto Condensed (licence Apache 2.0, font/robotoc*)
 //     à la place d'Arial : plus de texte par ligne à taille égale ;
-//   - en-tête réduit (République, devise, région, département, nom de
-//     l'école en gras sur une ligne, B.P. / tél. / e-mail sur une ligne),
+//   - en-tête (République, devise, région, département, arrondissement, nom
+//     de l'école en gras sur une ligne, B.P. / tél. / e-mail sur une ligne),
 //     logo agrandi, immatriculation en dessous ;
 //   - intitulé du trimestre en toutes lettres (« PREMIER TRIMESTRE »).
 //  Le technique et le primaire n'utilisent pas ce fichier.
@@ -29,6 +29,30 @@ trait BulletinPoliceCondensee
             $family = 'RobotoC';
         }
         parent::SetFont($family, $style, $size);
+    }
+
+    // Filigrane (06/11/2026) : il est dessiné en fond de page, et les cases
+    // remplies de BLANC le cachaient entièrement. Un remplissage blanc n'est
+    // donc plus peint (la case reste transparente, bordure conservée) ; les
+    // couleurs (échec, bandeaux, lignes grisées) restent peintes.
+    private function remplissage_blanc(): bool
+    {
+        return in_array($this->FillColor, ['1.000 g', '1.000 1.000 1.000 rg'], true);
+    }
+
+    function Cell($w, $h = 0, $txt = '', $border = 0, $ln = 0, $align = '', $fill = false, $link = '')
+    {
+        parent::Cell($w, $h, $txt, $border, $ln, $align, $fill && !$this->remplissage_blanc(), $link);
+    }
+
+    function Rect($x, $y, $w, $h, $style = '')
+    {
+        $s = strtoupper((string) $style);
+        if (str_contains($s, 'F') && $this->remplissage_blanc()) {
+            if ($s === 'F') return;   // fond blanc seul : rien à dessiner
+            $style = 'D';
+        }
+        parent::Rect($x, $y, $w, $h, $style);
     }
 }
 
@@ -83,6 +107,22 @@ function bulletin_titre_bandeau(FPDF $pdf, float $ml, float $uw, string $fr, str
     $pdf->SetXY($ml, $y + $h);
 }
 
+// Cadre du bas (DÉCISION | OBSERVATIONS) prolongé jusque sous le copyright
+// (06/11/2026) : sa bordure basse passe juste sous le copyright au lieu de
+// couper le QR code ; la séparation centrale s'arrête au-dessus du copyright
+// (elle le coupait sinon). Remplace le dernier Rect() de DÉCISION et le cadre
+// MultiCell() d'OBSERVATIONS. $y_fill = bas des lignes de décision.
+function bulletin_cadre_bas(FPDF $pdf, float $x, float $w_dec, float $w_obs, float $y_haut, float $y_fill, float $y_bas): void {
+    $y_coupe = $y_bas - 4.6;   // haut de la ligne du copyright
+    $x_sep = $x + $w_dec; $x_fin = $x_sep + $w_obs;
+    $pdf->SetDrawColor(0, 0, 0);
+    $pdf->Line($x_sep, $y_haut, $x_fin, $y_haut);             // haut d'OBSERVATIONS
+    $pdf->Line($x, $y_fill, $x, $y_bas);                       // bord gauche
+    $pdf->Line($x_sep, $y_haut, $x_sep, $y_coupe);             // séparation centrale
+    $pdf->Line($x_fin, $y_haut, $x_fin, $y_bas);               // bord droit
+    $pdf->Line($x, $y_bas, $x_fin, $y_bas);                    // bas, sous le copyright
+}
+
 // En-tête du bulletin : bloc français à gauche, anglais à droite (inversés
 // pour la section anglophone), logo au centre, immatriculation en dessous.
 // Laisse le curseur sous l'immatriculation.
@@ -99,12 +139,13 @@ function bulletin_entete_reduit(FPDF $pdf, array $etab, float $ml, float $uw, st
             trim((string) ($etab['email'] ?? '')),
         ]));
         $lignes = [
-            [$en ? 'REPUBLIC OF CAMEROON' : 'REPUBLIQUE DU CAMEROUN', 'B', 7.5, 3.0],
-            [$en ? 'Peace - Work - Fatherland' : 'Paix - Travail - Patrie', 'I', 6.5, 2.7],
-            [(string) ($en ? ($etab['region_en'] ?? '') : ($etab['region_fr'] ?? '')), '', 6.3, 2.6],
-            [(string) ($en ? ($etab['division_en'] ?? '') : ($etab['departement_fr'] ?? '')), '', 6.3, 2.6],
-            [mb_strtoupper((string) ($en ? ($etab['nom_en'] ?? '') : ($etab['nom_fr'] ?? ''))), 'B', 10.5, 4.2],
-            [$contact, '', 6.3, 2.8],
+            [$en ? 'REPUBLIC OF CAMEROON' : 'REPUBLIQUE DU CAMEROUN', 'B', 8, 3.4],
+            [$en ? 'Peace - Work - Fatherland' : 'Paix - Travail - Patrie', 'I', 7, 3.1],
+            [(string) ($en ? ($etab['region_en'] ?? '') : ($etab['region_fr'] ?? '')), '', 6.8, 3.0],
+            [(string) ($en ? ($etab['division_en'] ?? '') : ($etab['departement_fr'] ?? '')), '', 6.8, 3.0],
+            [(string) ($en ? ($etab['subdivision_en'] ?? '') : ($etab['arrondissement_fr'] ?? '')), '', 6.8, 3.0],
+            [mb_strtoupper((string) ($en ? ($etab['nom_en'] ?? '') : ($etab['nom_fr'] ?? ''))), 'B', 11, 4.8],
+            [$contact, '', 6.8, 3.1],
         ];
         $y = $y0;
         foreach ($lignes as [$txt, $st, $t_max, $h]) {

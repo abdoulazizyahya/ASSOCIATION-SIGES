@@ -1180,7 +1180,8 @@ $x_dec = $ml; $x_obs = $ml + $w_dec; $y_dec2 = $pdf->GetY();
 // vérification est désormais dessiné À L'INTÉRIEUR de ce même cadre (voir
 // plus bas, section 8), donc plus besoin de réserver de place en dessous.
 // Ne descend jamais sous la hauteur de la liste DECISION.
-$h_obs_box = max(count($decisions) * $h_dec, $bas_dispo - $y_dec2);
+// Cadre prolongé jusque sous le copyright (06/11/2026) : sa bordure basse ne coupe plus le QR code.
+$h_obs_box = max(count($decisions) * $h_dec, ($ph - 4.8) - $y_dec2);
 foreach ($decisions as $i => $dec) {
     $y_row = $y_dec2 + $i * $h_dec;
     // Cases cochées automatiquement sur des règles définies :
@@ -1211,9 +1212,9 @@ foreach ($decisions as $i => $dec) {
 // le cadre OBSERVATIONS.
 $y_fill   = $y_dec2 + count($decisions) * $h_dec;
 $h_rempli = $h_obs_box - count($decisions) * $h_dec;
-if ($h_rempli > 0.01) {
-    $pdf->Rect($x_dec, $y_fill, $w_dec, $h_rempli);
-}
+// Cadre jusque sous le copyright, dessiné plus bas (bulletin_cadre_bas()) ;
+// le QR reste au-dessus de la ligne du copyright.
+$h_rempli_qr = min($h_rempli, ($ph - 9.6) - $y_fill);
 
 // QR code de vérification d'authenticité — dans la dernière cellule de
 // DECISION, aligné à droite, avec la photo de l'élève incrustée au centre
@@ -1223,7 +1224,7 @@ if ($h_rempli > 0.01) {
 require_once __DIR__ . '/../../../commun/pdf/verif_lib.php';
 require_once __DIR__ . '/../../../commun/pdf/qrcode.php';
 
-if ($h_rempli > 15) {
+if ($h_rempli_qr > 15) {
     $verif_url = bulletin_verif_url(
         $id_eleve,
         $is_seq ? 'seq' : 'trim',
@@ -1239,11 +1240,11 @@ if ($h_rempli > 15) {
         imagepng($qr_img, $qr_tmp);
         imagedestroy($qr_img);
 
-        $qr_size = min(26, $w_dec - 6, $h_rempli - 4);
+        $qr_size = min(26, $w_dec - 6, $h_rempli_qr - 4);
         $qr_x    = $x_dec + $w_dec - $qr_size - 3; // aligné à droite
         // Aligné en bas, à 2mm de la ligne finale du tableau (demande
         // explicite) — plus haut ancré en haut de la cellule restante.
-        $qr_y    = $y_fill + $h_rempli - $qr_size - 2;
+        $qr_y    = $y_fill + $h_rempli_qr - $qr_size - 2;
         $pdf->Image($qr_tmp, $qr_x, $qr_y, $qr_size, $qr_size, 'PNG');
     } finally {
         if (is_file($qr_tmp)) unlink($qr_tmp);
@@ -1251,8 +1252,7 @@ if ($h_rempli > 15) {
 }
 
 $pdf->SetFont('Arial', '', 6);
-$pdf->SetXY($x_obs, $y_dec2);
-$pdf->MultiCell($w_obs, $h_obs_box, '', 1, 'L');
+bulletin_cadre_bas($pdf, $x_dec, $w_dec, $w_obs, $y_dec2, $y_fill, $y_dec2 + $h_obs_box);
 
 // ── 7. Date et signature (à l'intérieur du cadre Observations) ────
 // Remonté et centré (demande explicite), au lieu d'être bas et aligné à droite.

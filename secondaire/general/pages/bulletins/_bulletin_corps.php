@@ -1017,7 +1017,9 @@ $x_dec = $ml; $x_obs = $ml + $w_dec; $y_dec2 = $pdf->GetY();
 // vérification est désormais dessiné À L'INTÉRIEUR de ce même cadre (voir
 // plus bas, section 8), donc plus besoin de réserver de place en dessous.
 // Ne descend jamais sous la hauteur de la liste DECISION.
-$h_obs_box = max(count($decisions) * $h_dec, $h_sig_min, $bas_dispo - $y_dec2);
+// Cadre prolongé jusque sous le copyright (06/11/2026) : sa bordure basse ne coupe
+// plus le QR code, qui se retrouve à l'intérieur du cadre.
+$h_obs_box = max(count($decisions) * $h_dec, $h_sig_min, ($ph - 4.8) - $y_dec2);
 // Mode lisible : cadre de hauteur raisonnable (signature + QR) plutôt que
 // tout le reste d'une page éventuellement presque vide.
 if ($lisible) $h_obs_box = max(count($decisions) * $h_dec, $h_sig_min, min($h_obs_box, $h_obs_max_l));
@@ -1049,13 +1051,15 @@ foreach ($decisions as $i => $dec) {
 // même hauteur.
 $y_fill   = $y_dec2 + count($decisions) * $h_dec;
 $h_rempli = $h_obs_box - count($decisions) * $h_dec;
-if ($h_rempli > 0.01) {
-    $pdf->Rect($x_dec, $y_fill, $w_dec, $h_rempli);
+if ($lisible) {
+    if ($h_rempli > 0.01) $pdf->Rect($x_dec, $y_fill, $w_dec, $h_rempli);
+    $pdf->SetXY($x_obs, $y_dec2);
+    $pdf->MultiCell($w_obs, $h_obs_box, '', 1, 'L');
+} else {
+    // Cadre jusque sous le copyright (bulletin_presentation.php).
+    bulletin_cadre_bas($pdf, $x_dec, $w_dec, $w_obs, $y_dec2, $y_fill, $y_dec2 + $h_obs_box);
 }
-
 $pdf->SetFont('Arial', '', 6);
-$pdf->SetXY($x_obs, $y_dec2);
-$pdf->MultiCell($w_obs, $h_obs_box, '', 1, 'L');
 
 // ── 7. Date et signature (à l'intérieur du cadre Observations) ────
 // Remonté et centré (demande explicite), au lieu d'être bas et aligné à droite.

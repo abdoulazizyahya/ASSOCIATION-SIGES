@@ -1134,7 +1134,8 @@ foreach ($eleves as $el) {
     // plus bas), donc plus besoin de réserver de place en dessous. Ne descend
     // jamais sous la hauteur de la liste DECISION. $bas_dispo_c déjà déclaré
     // avant le tableau.
-    $h_obs_box_c = max(count($decs) * $h_dec, $bas_dispo_c - $yd2);
+    // Cadre prolongé jusque sous le copyright (06/11/2026) : sa bordure basse ne coupe plus le QR code.
+    $h_obs_box_c = max(count($decs) * $h_dec, ($pdf->GetPageHeight() - 4.8) - $yd2);
     foreach ($decs as $i => $dec) {
         $y_row = $yd2 + $i * $h_dec;
         // Mêmes règles automatiques que secondaire/general/pages/bulletins_matieres/pdf.php.
@@ -1162,9 +1163,9 @@ foreach ($eleves as $el) {
     // plus dans le cadre OBSERVATIONS.
     $y_fill_c   = $yd2 + count($decs) * $h_dec;
     $h_rempli_c = $h_obs_box_c - count($decs) * $h_dec;
-    if ($h_rempli_c > 0.01) {
-        $pdf->Rect($ml, $y_fill_c, $wDec, $h_rempli_c);
-    }
+    // Cadre jusque sous le copyright, dessiné plus bas (bulletin_cadre_bas()) ;
+    // le QR reste au-dessus de la ligne du copyright.
+    $h_rempli_qr_c = min($h_rempli_c, ($pdf->GetPageHeight() - 9.6) - $y_fill_c);
 
     // QR code de vérification d'authenticité — dans la dernière cellule de
     // DECISION, aligné à droite, avec la photo de l'élève incrustée au
@@ -1172,7 +1173,7 @@ foreach ($eleves as $el) {
     require_once __DIR__ . '/../../../commun/pdf/verif_lib.php';
     require_once __DIR__ . '/../../../commun/pdf/qrcode.php';
 
-    if ($h_rempli_c > 15) {
+    if ($h_rempli_qr_c > 15) {
         $verif_url_c = bulletin_verif_url(
             $id_eleve,
             $is_seq_mode ? 'seq' : 'trim',
@@ -1205,17 +1206,16 @@ foreach ($eleves as $el) {
             imagedestroy($qr_img_c);
         }
 
-        $qr_size_c = min(26, $wDec - 6, $h_rempli_c - 4);
+        $qr_size_c = min(26, $wDec - 6, $h_rempli_qr_c - 4);
         $qr_x_c    = $ml + $wDec - $qr_size_c - 3; // aligné à droite
         // Aligné en bas, à 2mm de la ligne finale du tableau (demande
         // explicite) — identique à secondaire/general/pages/bulletins_matieres/pdf.php.
-        $qr_y_c    = $y_fill_c + $h_rempli_c - $qr_size_c - 2;
+        $qr_y_c    = $y_fill_c + $h_rempli_qr_c - $qr_size_c - 2;
         $pdf->Image($qr_tmp_c, $qr_x_c, $qr_y_c, $qr_size_c, $qr_size_c, 'PNG');
     }
 
     $pdf->SetFont('Arial', '', 6);
-    $pdf->SetXY($ml + $wDec, $yd2);
-    $pdf->MultiCell($wObs, $h_obs_box_c, '', 1, 'L');
+    bulletin_cadre_bas($pdf, $ml, $wDec, $wObs, $yd2, $y_fill_c, $yd2 + $h_obs_box_c);
 
     // Signature — remontée et centrée (demande explicite). Décalage fixe
     // (pas proportionnel à $h_obs_box_c, qui peut désormais être grand) pour
