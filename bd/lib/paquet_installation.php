@@ -35,7 +35,7 @@ INSTALLATION SUR UN ORDINATEUR (WampServer)
 ==========================================
 
 1. WampServer installé et démarré (icône verte).
-   - PHP 8.1 ou plus récent : icône Wamp > PHP > Version.
+   - PHP 7.4 ou plus récent (8.x conseillé) : icône Wamp > PHP > Version.
    - Extensions PHP à cocher (icône Wamp > PHP > Extensions PHP) :
      mysqli, gd, zip, mbstring, openssl, fileinfo.
    - Modules Apache à cocher (icône Wamp > Apache > Modules Apache) :

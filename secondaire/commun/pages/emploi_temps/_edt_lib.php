@@ -45,7 +45,8 @@ function edt_t(string $nom): string {
     if (!$prim) return $nom;
     $an = "(SELECT val_annee FROM annee_scolaire WHERE Etat_annee_scolaire = 1 LIMIT 1)";
     $ar = EDT_PRIM_ARABE;
-    return match ($nom) {
+    // Tableau plutôt que match (compatibilité PHP 7.4).
+    return [
         'matiere' => 'edt_matiere',
         'annee_scolaire' => "(SELECT CAST(LEFT(a.val_annee, 4) AS UNSIGNED) AS id, a.val_annee AS libelle, a.Etat_annee_scolaire AS active FROM annee_scolaire a)",
         'classe' => "(SELECT c.IDClasses AS id, c.DesignationClasses AS designation, c.Niveau AS code_niveau, NULL AS libelle_section,
@@ -74,8 +75,7 @@ function edt_t(string $nom): string {
                            WHERE NOT EXISTS (SELECT 1 FROM discipline_arabe d3 WHERE d3.IDClasses = cl.IDClasses AND d3.actif = 1 AND d3.annee_scol = $an))",
         // enseignant « principal » de la classe = titulaire de la piste française
         'enseignat_principal' => "(SELECT matricule_ens, IDClasses, val_annee FROM enseignat_classe)",
-        default => $nom,
-    };
+    ][$nom] ?? $nom;
 }
 /** Où sont tenues les affectations enseignant ↔ classe (texte des pages). */
 function edt_lib_affectations(): string {
@@ -886,11 +886,10 @@ function edt_grille_html(int $a, string $vue, int $id, array $opt = []): string 
     $creneaux = edt_creneaux($a);
     $jours = edt_jours_ouvres($a);
     $editable = !empty($opt['editable']);
-    $filtre = match ($vue) {
-        'classe' => fn($s) => $s['id_classe'] === $id,
-        'enseignant' => fn($s) => $s['matricule_ens'] === $id,
-        default => fn($s) => $s['id_salle'] === $id,
-    };
+    // Ternaires plutôt que match (compatibilité PHP 7.4).
+    $filtre = $vue === 'classe' ? fn($s) => $s['id_classe'] === $id
+            : ($vue === 'enseignant' ? fn($s) => $s['matricule_ens'] === $id
+            : fn($s) => $s['id_salle'] === $id);
     $blocs = $mod->blocs($filtre);
     if ($vue === 'enseignant') $blocs = $mod->blocsSansDoublonCommun($blocs);
     // Un bloc ne traverse pas une pause à l'affichage : il est coupé en segments.
@@ -944,11 +943,10 @@ function edt_grille_html(int $a, string $vue, int $id, array $opt = []): string 
                 foreach ($items as $it) {
                     $b = $it['bloc'];
                     $titre = h($mod->mat[$b['id_mat']] ?? '?');
-                    $sous = match ($vue) {
-                        'classe' => h(edt_nom_court($mod->ens[$b['matricule_ens']] ?? '')),
-                        'enseignant' => h(implode(' + ', $mod->classesCommunes($b))),
-                        default => h(($mod->classes[$b['id_classe']]['designation'] ?? '?') . ' · ' . edt_nom_court($mod->ens[$b['matricule_ens']] ?? '')),
-                    };
+                    // Ternaires plutôt que match (compatibilité PHP 7.4).
+                    $sous = $vue === 'classe' ? h(edt_nom_court($mod->ens[$b['matricule_ens']] ?? ''))
+                          : ($vue === 'enseignant' ? h(implode(' + ', $mod->classesCommunes($b)))
+                          : h(($mod->classes[$b['id_classe']]['designation'] ?? '?') . ' · ' . edt_nom_court($mod->ens[$b['matricule_ens']] ?? '')));
                     $extra = ($b['id_salle'] && $vue !== 'salle' ? '<div class="edt-salle"><i class="bi bi-geo-alt"></i> ' . h($mod->salles[$b['id_salle']] ?? '') . '</div>' : '')
                            . ($b['code_commun'] ? '<div class="edt-commun" title="Cours commun"><i class="bi bi-people"></i> '
                                . ($vue === 'classe' && count($cc = array_diff($mod->classesCommunes($b), [$mod->classes[$b['id_classe']]['designation'] ?? ''])) ? 'avec ' . h(implode(', ', $cc)) : 'commun') . '</div>' : '')

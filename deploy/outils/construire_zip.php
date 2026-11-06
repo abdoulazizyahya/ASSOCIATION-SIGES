@@ -11,6 +11,7 @@
 // mise à jour refuse tout fichier altéré ou ajouté après coup.
 if (PHP_SAPI !== 'cli') { http_response_code(403); exit; }
 chdir(__DIR__ . '/../..');
+require_once 'bd/lib/compat_php74.php';   // str_contains()… sous PHP 7.4
 require_once 'bd/lib/mise_a_jour.php';
 
 [$depart, $nom] = [$argv[1] ?? '', $argv[2] ?? ''];

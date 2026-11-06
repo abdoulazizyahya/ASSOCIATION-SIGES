@@ -333,7 +333,7 @@ $exemple_slug = install_slug(($val['mode'] === 'reseau' ? $val['nom_association'
 // Prérequis (06/11/2026) : PHP, extensions et modules Apache. Une page web ne
 // peut pas modifier php.ini / httpd.conf ni redémarrer son propre serveur :
 // on vérifie, et on indique le menu WampServer à utiliser.
-$prerequis = [['PHP 8.1 ou plus récent (actuel : ' . PHP_VERSION . ')', version_compare(PHP_VERSION, '8.1', '>='),
+$prerequis = [['PHP 7.4 ou plus récent (actuel : ' . PHP_VERSION . ')', version_compare(PHP_VERSION, '7.4', '>='),
                'icône Wamp > PHP > Version', true]];
 foreach (['mysqli' => true, 'gd' => true, 'zip' => true, 'mbstring' => true, 'openssl' => true, 'fileinfo' => false] as $ext => $bloquant) {
     $prerequis[] = ["Extension PHP « $ext »", extension_loaded($ext), "icône Wamp > PHP > Extensions PHP > $ext", $bloquant];

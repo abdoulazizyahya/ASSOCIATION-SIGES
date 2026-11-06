@@ -252,9 +252,16 @@ tr.innerHTML='<td><input type="hidden" name="cr_id[]" value="0"><input class="fo
     $nomCible = function (array $r) use ($mats, $ens, $classes, $salles, $niveaux) {
         $id = (string) $r['cible_id'];
         $f = fn($list, $k, $l) => ($x = current(array_filter($list, fn($e) => (string) $e[$k] === $id))) ? $x[$l] : $id;
-        return match ($r['cible_type']) {
-            'tous' => 'Tout l\'établissement', 'matiere' => $f($mats, 'id', 'libelle'), 'groupe' => mb_strtolower($id), 'enseignant' => $f($ens, 'matricule_ens', 'nom'),
-            'classe' => $f($classes, 'id', 'designation'), 'niveau' => $f($niveaux, 'code_niveau', 'libelle_niv'), 'salle' => $f($salles, 'id', 'nom'), default => $id };
+        switch ($r['cible_type']) {   // switch plutôt que match (compatibilité PHP 7.4)
+            case 'tous':       return 'Tout l\'établissement';
+            case 'matiere':    return $f($mats, 'id', 'libelle');
+            case 'groupe':     return mb_strtolower($id);
+            case 'enseignant': return $f($ens, 'matricule_ens', 'nom');
+            case 'classe':     return $f($classes, 'id', 'designation');
+            case 'niveau':     return $f($niveaux, 'code_niveau', 'libelle_niv');
+            case 'salle':      return $f($salles, 'id', 'nom');
+            default:           return $id;
+        }
     };
 ?>
 <div class="alert alert-info small"><i class="bi bi-lightbulb me-1"></i>

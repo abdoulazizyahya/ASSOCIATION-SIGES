@@ -9,7 +9,8 @@ egal('GS-2026-01', photo_nom_fichier('', 'GS/2026/01', 5), 'sans NIU : matricule
 egal('eleve_5', photo_nom_fichier(' ', '', 5), 'ni NIU ni matricule : eleve_<id>');
 
 /** Exporte la classe dans ce processus, renvoie la liste des fichiers du ZIP (ou un message). */
-function export_zip(string $classe, string $f): array|string {
+/** @return array|string */
+function export_zip(string $classe, string $f) {
     $_GET = ['classe' => $classe];
     ob_start();
     include __DIR__ . "/../$f/photos_export.php";

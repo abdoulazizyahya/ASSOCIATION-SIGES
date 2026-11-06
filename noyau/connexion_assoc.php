@@ -253,14 +253,14 @@ function tester_identifiants_bd(string $db, string $u, string $p): ?string {
         mysqli_close($l);
         return null;
     } catch (\Throwable $e) {
-        return match ((int) $e->getCode()) {
-            1045    => "Utilisateur « $u » ou mot de passe MySQL incorrect.",
-            1044    => "L'utilisateur « $u » n'a pas accès à la base « $db » (nom mal saisi, ou utilisateur non rattaché). Dans le cPanel → Bases de données MySQL → "
+        switch ((int) $e->getCode()) {   // switch plutôt que match (compatibilité PHP 7.4)
+            case 1045: return "Utilisateur « $u » ou mot de passe MySQL incorrect.";
+            case 1044: return "L'utilisateur « $u » n'a pas accès à la base « $db » (nom mal saisi, ou utilisateur non rattaché). Dans le cPanel → Bases de données MySQL → "
                      . "« Ajouter un utilisateur à une base de données », rattachez-le avec TOUS LES PRIVILÈGES."
-                     . _diagnostic_acces_bd($u, $p),
-            1049    => "La base « $db » n'existe pas : créez-la d'abord dans le cPanel.",
-            default => 'Connexion à la base impossible : ' . $e->getMessage(),
-        };
+                     . _diagnostic_acces_bd($u, $p);
+            case 1049: return "La base « $db » n'existe pas : créez-la d'abord dans le cPanel.";
+            default:   return 'Connexion à la base impossible : ' . $e->getMessage();
+        }
     }
 }
 
