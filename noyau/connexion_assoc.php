@@ -385,7 +385,7 @@ function charger_schema_ecole(mysqli &$l, array $seed, string $type = 'primaire'
     if ($schema === false || trim($schema) === '') {
         throw new RuntimeException('Schéma de référence introuvable (' . basename($fichier) . ').');
     }
-    if (mysqli_multi_query($l, $schema)) {
+    if (mysqli_multi_query($l, sql_compat_serveur($l, $schema))) {
         do { if ($r = mysqli_store_result($l)) mysqli_free_result($r); } while (mysqli_more_results($l) && mysqli_next_result($l));
     }
     if (mysqli_errno($l)) {
@@ -2116,7 +2116,7 @@ function migration_instructions(string $sql): array {
 const MIGRATION_ERREURS_DEJA_FAIT = [1050, 1060, 1061, 1068, 1091, 1826, 1022];
 function migration_executer(mysqli $l, string $sql): int {
     $sautees = 0;
-    foreach (migration_instructions($sql) as $ins) {
+    foreach (migration_instructions(sql_compat_serveur($l, $sql)) as $ins) {
         try {
             $ok = mysqli_query($l, $ins);
             if ($ok === false) throw new mysqli_sql_exception(mysqli_error($l), mysqli_errno($l));
@@ -2183,6 +2183,7 @@ function assoc_migrations_en_retard(): array {
 function assoc_reparer_colonnes_ref(mysqli $l, string $type, bool $simuler = false): array {
     $ref = @file_get_contents(__DIR__ . '/../bd/assoc/' . ($type === 'secondaire' ? 'schema_ref_ecole_secondaire.sql' : 'schema_ref_ecole.sql'));
     if (!$ref) return [];
+    $ref = sql_compat_serveur($l, $ref);   // définitions de colonnes jouées telles quelles
     // Colonnes dont une migration de la série s'occupe (ADD/CHANGE/MODIFY/RENAME).
     $geres = [];
     foreach (assoc_migrations_disponibles($type) as $f) {

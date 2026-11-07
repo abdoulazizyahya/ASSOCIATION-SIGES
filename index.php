@@ -13,6 +13,7 @@
 //  directive DirectoryIndex en .htaccess (AllowOverride restreint) — ce
 //  qui provoquait un « Internal Server Error / DirectoryIndex not allowed ».
 // ─────────────────────────────────────────────────────────────────────
+require_once __DIR__ . '/bd/lib/garde_version_php.php';   // PHP < 7.4 : message clair au lieu d'une « Parse error »
 require_once __DIR__ . '/config/config.php';
 require_once __DIR__ . '/noyau/fonctions.php';
 require_once __DIR__ . '/noyau/connexion_assoc.php';   // assoc_param() : réglage de la page d'entrée

@@ -242,7 +242,7 @@ function ecole_importer_sql(string $db, string $sql): array {
         $l = ecole_maint_lien($db);
         ecole_maint_drop_tout($l);
 
-        if (mysqli_multi_query($l, $sql)) {
+        if (mysqli_multi_query($l, sql_compat_serveur($l, $sql))) {
             do { if ($r = mysqli_store_result($l)) mysqli_free_result($r); } while (mysqli_more_results($l) && mysqli_next_result($l));
         }
         if (mysqli_errno($l)) {

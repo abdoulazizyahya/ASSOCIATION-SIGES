@@ -18,6 +18,7 @@ if (version_compare(PHP_VERSION, '7.4.0', '<')) {
        . 'WampServer : clic sur l’icône → PHP → Version → choisir 7.4 ou plus.</p>');
 }
 require_once __DIR__ . '/../bd/lib/compat_php74.php';   // fonctions PHP 8 absentes de PHP 7.4
+require_once __DIR__ . '/../bd/lib/compat_sql.php';     // collation MySQL 8 sur MariaDB / MySQL 5.7
 
 // config/config.local.php (emplacement actuel) ; repli sur l'ancien
 // emplacement à la racine de l'application (installations antérieures à la
