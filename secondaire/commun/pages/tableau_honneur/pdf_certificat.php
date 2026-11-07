@@ -357,8 +357,11 @@ foreach ($qualifies as $q) {
 
 		
 		
-		$filigrane_path = __DIR__ . '/../../../../assets/uploads/bordure1.jpg';
-		$pdf->Image($filigrane_path,2,2,293,207);
+		// Bordure : image versionnée et livrée dans le zip (07/11/2026) — l'ancien
+		// assets/uploads/bordure1.jpg n'existait que sur le poste de développement
+		// (uploads non déployés) : FPDF levait une exception → erreur 500 sur Camoo.
+		$filigrane_path = __DIR__ . '/../../../../assets/img/pdf/tableau_honneur/bordure.jpg';
+		if (is_file($filigrane_path)) $pdf->Image($filigrane_path, 2, 2, 293, 207);
 		
 		
 		// ── Filigrane logo en fond (fonction centralisée) ─────────────────
@@ -379,7 +382,7 @@ foreach ($qualifies as $q) {
 		($etab['departement_fr'] ?? 'DEPARTEMENT ') . "\n" .
 		($etab['arrondissement_fr'] ?? 'ARRONDISSEMENT') . "\n" .
 		strtoupper($etab['nom_fr'] ?? 'NOM ECOLE ') . "\n" .
-		"B.P. " . ($etab['boite_postale'] ?? 'XX') . " ville Tel.: " . ($etab['telephone'] ?? '') . "\n" .
+		"B.P. " . ($etab['boite_postale'] ?? '') . " " . ($etab['ville'] ?? '') . "  Tel.: " . ($etab['telephone'] ?? '') . "\n" .
 		($etab['email'] ?? 'adresse email')
 	), 0, 'C');
 
