@@ -465,7 +465,7 @@ $pdf->MultiCell($col3, 3.5, u(
     ($etab['departement_fr'] ?? 'DEPARTEMENT ') . "\n" .
     ($etab['arrondissement_fr'] ?? 'ARRONDISSEMENT') . "\n" .
     strtoupper($etab['nom_fr'] ?? 'NOM ECOLE ') . "\n" .
-    "B.P. " . ($etab['boite_postale'] ?? 'XX') . " ville Tel.: " . ($etab['telephone'] ?? '') . "\n" .
+    "B.P. " . ($etab['boite_postale'] ?? '') . " " . ($etab['ville'] ?? '') . "  Tel.: " . ($etab['telephone'] ?? '') . "\n" .
     ($etab['email'] ?? 'adresse email')
 ), 0, 'C');
 
