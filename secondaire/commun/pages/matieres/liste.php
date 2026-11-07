@@ -248,7 +248,7 @@ if ($onglet === 'par_classe') {
              JOIN matiere m ON m.id = d.id_mat AND m.actif=1
              LEFT JOIN groupe g ON g.id_groupe_comp = d.id_groupe
              WHERE d.IDClasses=?
-             ORDER BY d.id_groupe, d.ordre, m.libelle",
+             ORDER BY d.id_groupe, d.ordre" . sec_ordre_num() . ", m.libelle",
             [$id_cl_aff]
         );
         $total_coeff  = array_sum(array_column($disciplines, 'coef'));
@@ -437,7 +437,7 @@ if ($onglet === 'enseignants') {
              LEFT JOIN enseignant e ON e.matricule_ens = disp.matricule_ens
              WHERE d.IDClasses=?
              GROUP BY d.id_mat, d.IDClasses, d.id_groupe, d.coef, d.ordre, m.libelle, g.libelle_groupe_comp
-             ORDER BY d.id_groupe, d.ordre, m.libelle",
+             ORDER BY d.id_groupe, d.ordre" . sec_ordre_num() . ", m.libelle",
             [$val_annee, $id_cl_ens]
         );
         $historique_ens  = sec_historique_affectations($id_cl_ens, $val_annee);
@@ -586,8 +586,8 @@ async function ajaxSelectReload(selectEl, containerId) {
         </select>
       </div>
       <div class="col-md-1">
-        <label class="form-label">Ordre</label>
-        <input type="number" name="ordre" id="f_ordre" class="form-control" value="1" min="1">
+        <label class="form-label" title="Rang de la matière au bulletin, proposé par défaut quand on l'affecte à une classe (modifiable ensuite classe par classe)">Ordre <i class="bi bi-question-circle text-muted" style="font-size:.7rem"></i></label>
+        <input type="number" name="ordre" id="f_ordre" class="form-control" value="1" min="1" max="30" title="Rang au bulletin proposé par défaut lors de l'affectation à une classe">
       </div>
       <div class="col-md-1 form-check ms-1 mb-1">
         <input type="checkbox" name="actif" id="f_actif" class="form-check-input" value="1" checked>
@@ -851,7 +851,9 @@ function reinitForm() {
               <div>
                 <select name="ordre[<?= $m['id'] ?>]" class="form-select form-select-sm text-center"
                         style="font-size:.78rem;padding:3px 4px">
-                  <?php for ($o=1;$o<=30;$o++): ?><option value="<?= $o ?>"><?= $o ?></option><?php endfor; ?>
+                  <?php // Ordre du catalogue proposé par défaut (08/11/2026) — rang au bulletin
+                        $o_def = max(1, min(30, (int) ($m['ordre'] ?? 1)));
+                        for ($o=1;$o<=30;$o++): ?><option value="<?= $o ?>"<?= $o === $o_def ? ' selected' : '' ?>><?= $o ?></option><?php endfor; ?>
                 </select>
               </div>
               <?php else: ?>
