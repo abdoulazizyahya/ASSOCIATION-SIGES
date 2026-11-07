@@ -7,6 +7,7 @@ require_once __DIR__ . '/../../../../config/config.php';
 require_once __DIR__ . '/../../../../noyau/connexion.php';
 require_once __DIR__ . '/../../../../noyau/fonctions.php';
 exiger_role(['ADMIN', 'PROVISEUR', 'FONDATEUR', 'CENSEUR']);
+$peut_fiche_complete = ((function_exists('est_proprietaire_ecole') && est_proprietaire_ecole()) || in_array(role_connecte(), ['ADMIN', 'PROVISEUR', 'FONDATEUR'], true));
 
 $q = trim($_GET['q'] ?? '');
 // Comptes de connexion (17/10/2026) : gérés depuis la fiche, plus depuis Paramètres → Utilisateurs.
@@ -185,6 +186,12 @@ require_once __DIR__ . '/../../../../noyau/layout/header.php';
                  class="btn btn-sm btn-light" style="padding:3px 7px">
                 <i class="bi bi-pencil" style="font-size:.78rem"></i>
               </a>
+              <?php if ($peut_fiche_complete): ?>
+              <a href="<?= APP_URL ?>/secondaire/commun/pages/enseignants/mon_profil.php?id=<?= (int) $e['matricule_ens'] ?>"
+                 class="btn btn-sm btn-light" style="padding:3px 7px" title="Fiche complète (carrière, recrutement, affectation, signature)">
+                <i class="bi bi-person-vcard" style="font-size:.78rem"></i>
+              </a>
+              <?php endif; ?>
               <!-- Documents administratifs (portés d'ABZ_MBE) : aperçu avant impression -->
               <div class="dropdown d-inline">
                 <button class="btn btn-sm btn-light dropdown-toggle" style="padding:3px 7px" data-bs-toggle="dropdown" title="Documents">

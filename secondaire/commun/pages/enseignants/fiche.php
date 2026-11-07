@@ -49,6 +49,7 @@ require_once __DIR__ . '/../../../../noyau/layout/header.php';
   </h4>
   <div class="d-flex gap-2 flex-wrap">
     <a href="form.php?id=<?= urlencode($mat) ?>" class="btn btn-sm btn-abz-outline"><i class="bi bi-pencil me-1"></i>Modifier</a>
+    <?php if (((function_exists('est_proprietaire_ecole') && est_proprietaire_ecole()) || in_array(role_connecte(), ['ADMIN', 'PROVISEUR', 'FONDATEUR'], true))): ?><a href="mon_profil.php?id=<?= urlencode($mat) ?>" class="btn btn-sm btn-abz-outline"><i class="bi bi-person-vcard me-1"></i>Fiche complète</a><?php endif; ?>
     <a href="apercu.php?id=<?= urlencode($mat) ?>&type=attestation" class="btn btn-sm btn-abz-primary">
       <i class="bi bi-file-earmark-text me-1"></i>Attestation présence
     </a>

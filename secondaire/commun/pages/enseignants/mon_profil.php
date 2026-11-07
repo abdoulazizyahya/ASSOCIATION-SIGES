@@ -21,12 +21,30 @@ header('Cache-Control: no-store, no-cache, must-revalidate');
 require_once __DIR__ . '/../../../../config/config.php';
 require_once __DIR__ . '/../../../../noyau/connexion.php';
 require_once __DIR__ . '/../../../../noyau/fonctions.php';
+require_once __DIR__ . '/_listes_carriere.php';
 // Ouvert à TOUT le personnel (03/10/2026) : chacun voit et complète SES
 // propres informations, même s'il n'enseigne pas (Proviseur/Principal,
 // Administrateur, Censeur, Surveillant général, Intendant, Secrétaire).
-exiger_role(['ADMIN', 'PROVISEUR', 'CENSEUR', 'SG', 'INTENDANT', 'SECRETAIRE', 'ENSEIGNANT']);
+exiger_role(['ADMIN', 'PROVISEUR', 'FONDATEUR', 'CENSEUR', 'SG', 'INTENDANT', 'SECRETAIRE', 'ENSEIGNANT']);
 
-$mat = matricule_ens_courant();
+// Gestion par l'administration (07/11/2026) : le Proviseur/Principal, l'Admin,
+// le Fondateur et le compte propriétaire ouvrent la fiche COMPLÈTE de n'importe
+// quel membre du personnel (?id=<matricule_ens>) pour la créer / la modifier —
+// jusqu'ici chacun ne pouvait renseigner que la sienne.
+$peut_gerer_fiches = (function_exists('est_proprietaire_ecole') && est_proprietaire_ecole())
+    || in_array(role_connecte(), ['ADMIN', 'PROVISEUR', 'FONDATEUR'], true);
+$id_gere = (int) ($_GET['id'] ?? 0);
+$mode_gestion = false;
+if ($id_gere > 0 && $id_gere !== (int) matricule_ens_courant()) {
+    if (!$peut_gerer_fiches) { flash_set('erreur', 'Accès refusé : vous ne pouvez modifier que votre propre fiche.'); rediriger('secondaire/commun/pages/enseignants/mon_profil.php'); }
+    $mat = $id_gere;
+    $mode_gestion = true;
+} else {
+    $mat = matricule_ens_courant();
+    // Fondateur sans fiche du personnel : il gère celles des autres, il n'en crée pas pour lui.
+    if (!$mat && role_connecte() === 'FONDATEUR') rediriger('secondaire/commun/pages/enseignants/liste.php');
+}
+$url_ici = 'secondaire/commun/pages/enseignants/mon_profil.php' . ($mode_gestion ? '?id=' . (int) $mat : '');
 
 // Compte sans fiche du personnel (fréquent au secondaire : utilisateur.
 // matricule_ens est facultatif) : la personne crée elle-même sa fiche,
@@ -77,6 +95,7 @@ if (!$e) { flash_set('erreur', 'Fiche enseignant introuvable.'); rediriger('noya
 
 $v = fn(string $k) => $e[$k] ?? '';
 $regions = db_all("SELECT id, nom FROM region ORDER BY nom");
+try { $grades = db_all("SELECT code_grade, libelle_grade FROM grade_enseignant ORDER BY ordre_affichage, libelle_grade"); } catch (\Throwable $ex) { $grades = []; }
 
 // Tous les champs éditables par l'enseignant lui-même (identité + carrière + affectation).
 // Seul le matricule (clé primaire) reste hors de cette liste : il ne peut pas être modifié.
@@ -99,7 +118,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && post('form') === 'signature') {
     csrf_verifier();
     if (empty($_FILES['signature']['tmp_name']) || $_FILES['signature']['error'] !== UPLOAD_ERR_OK) {
         flash_set('erreur', 'Aucun fichier reçu.');
-        rediriger('secondaire/commun/pages/enseignants/mon_profil.php');
+        rediriger($url_ici);
     }
     $ext_ok = ['jpg' => 'image/jpeg', 'jpeg' => 'image/jpeg', 'png' => 'image/png'];
     $ext    = strtolower(pathinfo($_FILES['signature']['name'], PATHINFO_EXTENSION));
@@ -108,7 +127,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && post('form') === 'signature') {
     finfo_close($fi);
     if (!isset($ext_ok[$ext]) || $ext_ok[$ext] !== $mime) {
         flash_set('erreur', 'Fichier invalide — JPG ou PNG uniquement.');
-        rediriger('secondaire/commun/pages/enseignants/mon_profil.php');
+        rediriger($url_ici);
     }
     // Fond blanc nettoyé/rendu transparent (PNG) : le texte du document
     // (bulletin, PV, fiche statistique de sa classe) reste visible même si
@@ -123,7 +142,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && post('form') === 'signature') {
     } else {
         flash_set('erreur', "Échec du traitement de l'image.");
     }
-    rediriger('secondaire/commun/pages/enseignants/mon_profil.php');
+    rediriger($url_ici);
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -134,22 +153,56 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
     $vals = [];
     foreach ($champs as $f) {
-        $vals[$f] = trim($d[$f] ?? '') ?: null;
+        $vals[$f] = is_array($d[$f] ?? null) ? null : (trim((string) ($d[$f] ?? '')) ?: null);
     }
     foreach ($champs_date as $df) {
         if (empty($vals[$df])) $vals[$df] = null;
     }
+    // Champs à liste de choix (+ « Autre… ») et matières multiples (07/11/2026).
+    foreach (['qualite', 'diplome', 'specialite', 'poste_anterieur'] as $f) $vals[$f] = carriere_post($f);
+    $vals['matiere_enseignee'] = carriere_post_matieres('matiere_enseignee');
 
     $set = implode(', ', array_map(fn($f) => "$f=?", $champs));
     $params = array_merge(array_values($vals), [$mat]);
     db_exec("UPDATE enseignant SET $set WHERE matricule_ens=?", $params);
-    flash_set('succes', 'Vos informations ont été mises à jour avec succès.');
-    rediriger('secondaire/commun/pages/enseignants/mon_profil.php');
+
+    // Grade : modifiable seulement par l'administration (fiche gérée), jamais
+    // par la personne elle-même. « Autre… » ajoute le grade à la grille
+    // (salaire 0, à compléter dans Ressources humaines > Grille salariale).
+    if ($mode_gestion && array_key_exists('grade', $_POST)) {
+        $g = (string) $_POST['grade'];
+        if ($g === '__autre__') {
+            $lib = carriere_post('grade');
+            $g = '';
+            if ($lib !== null) {
+                $exist = db_one("SELECT code_grade FROM grade_enseignant WHERE LOWER(code_grade)=LOWER(?) OR LOWER(libelle_grade)=LOWER(?)", [$lib, $lib]);
+                if ($exist) {
+                    $g = $exist['code_grade'];
+                } else {
+                    $g = carriere_code_grade($lib);
+                    for ($i = 2, $base = mb_substr($g, 0, 17); db_one("SELECT 1 FROM grade_enseignant WHERE code_grade=?", [$g]); $i++) $g = $base . $i;
+                    db_exec("INSERT INTO grade_enseignant (code_grade, libelle_grade, salaire_base, ordre_affichage) VALUES (?, ?, 0, 99)", [$g, $lib]);
+                    journaliser_action('grade_ajoute', null, $g . ' — ' . $lib);
+                }
+            }
+        } elseif ($g !== '' && !db_one("SELECT 1 FROM grade_enseignant WHERE code_grade=?", [$g])) {
+            $g = '';
+        }
+        db_exec("UPDATE enseignant SET id_grade=? WHERE matricule_ens=?", [$g !== '' ? $g : null, $mat]);
+    }
+    if ($mode_gestion) {
+        journaliser_action('fiche_personnel_modifiee', null, 'fiche ' . $mat . ' (' . trim(($vals['nom_ens'] ?? '') . ' ' . ($vals['prenom_ens'] ?? '')) . ')');
+        flash_set('succes', 'La fiche a été mise à jour avec succès.');
+    } else {
+        flash_set('succes', 'Vos informations ont été mises à jour avec succès.');
+    }
+    rediriger($url_ici);
 }
 
 $manquants = identite_ens_manquants($e);
 
-$titre_page = 'Mes informations';
+$nom_complet = trim(mb_strtoupper((string) ($e['nom_ens'] ?? '')) . ' ' . ($e['prenom_ens'] ?? ''));
+$titre_page = $mode_gestion ? 'Fiche du personnel — ' . $nom_complet : 'Mes informations';
 require_once __DIR__ . '/../../../../noyau/layout/header.php';
 ?>
 <style>
@@ -161,10 +214,22 @@ require_once __DIR__ . '/../../../../noyau/layout/header.php';
 </style>
 
 <div class="page-titre d-flex align-items-center justify-content-between flex-wrap gap-2">
+<?php if ($mode_gestion): ?>
+  <h4><i class="bi bi-person-vcard me-2" style="color:#1a3c6b"></i>Fiche complète — <?= h($nom_complet) ?></h4>
+  <div class="d-flex gap-2 flex-wrap">
+    <a href="<?= APP_URL ?>/secondaire/commun/pages/enseignants/form.php?id=<?= (int) $mat ?>" class="btn btn-sm btn-abz-outline">
+      <i class="bi bi-pencil me-1"></i>Grade, fonction, paie
+    </a>
+    <a href="<?= APP_URL ?>/secondaire/commun/pages/enseignants/voir.php?id=<?= (int) $mat ?>" class="btn btn-sm btn-abz-outline">
+      <i class="bi bi-arrow-left me-1"></i>Retour à la fiche
+    </a>
+  </div>
+<?php else: ?>
   <h4><i class="bi bi-person-vcard me-2" style="color:#1a3c6b"></i>Mes informations</h4>
   <a href="<?= APP_URL ?>/secondaire/commun/pages/demandes/index.php" class="btn btn-sm btn-abz-outline">
     <i class="bi bi-file-earmark-text me-1"></i>Mes demandes de documents
   </a>
+<?php endif; ?>
 </div>
 
 <?= flash_html() ?>
@@ -172,10 +237,16 @@ require_once __DIR__ . '/../../../../noyau/layout/header.php';
 <div class="alert alert-info d-flex gap-2" style="font-size:.86rem">
   <i class="bi bi-info-circle mt-1"></i>
   <div>
+    <?php if ($mode_gestion): ?>
+    Vous modifiez la fiche de <strong><?= h($nom_complet) ?></strong>. Ces informations servent à générer
+    ses documents officiels (attestation de présence, certificats de prise/reprise de service).
+    Le grade, la fonction et la paie se modifient avec le bouton « Grade, fonction, paie ».
+    <?php else: ?>
     Ces informations servent à générer vos documents officiels (attestation de présence,
     certificats de prise/reprise de service). Merci de toutes les renseigner avec exactitude —
     elles seront vérifiées par le Censeur puis le Proviseur lors du traitement de vos demandes.
     Seul le matricule ne peut pas être modifié.
+    <?php endif; ?>
   </div>
 </div>
 
@@ -285,8 +356,21 @@ require_once __DIR__ . '/../../../../noyau/layout/header.php';
   <div class="col-12"><div class="section-title"><i class="bi bi-briefcase me-1"></i>Carrière professionnelle</div></div>
   <div class="col-md-4">
     <label class="form-label">Grade</label>
-    <input type="text" value="<?= h($v('id_grade')) ?>" class="form-control form-control-sm" disabled
-           title="Géré par l'administration">
+    <?php if ($mode_gestion): ?>
+      <select name="grade" class="form-select form-select-sm js-carriere-select">
+        <option value="">— Choisir —</option>
+        <?php foreach ($grades as $g): ?>
+          <option value="<?= h($g['code_grade']) ?>" <?= $v('id_grade') === $g['code_grade'] ? 'selected' : '' ?>><?= h($g['code_grade'] . ' — ' . $g['libelle_grade']) ?></option>
+        <?php endforeach; ?>
+        <option value="__autre__">➕ Autre (ajouter à la grille)…</option>
+      </select>
+      <input type="text" name="grade_autre" maxlength="120" class="form-control form-control-sm mt-1 js-carriere-autre" style="display:none" placeholder="Intitulé du nouveau grade">
+    <?php else: ?>
+      <?php $lib_g = ''; foreach ($grades as $g) if ($g['code_grade'] === $v('id_grade')) $lib_g = $g['code_grade'] . ' — ' . $g['libelle_grade']; ?>
+      <input type="text" value="<?= h($lib_g ?: ($v('id_grade') ?: 'Non renseigné')) ?>" class="form-control form-control-sm" disabled
+             title="Le grade est renseigné par l'administration (Proviseur / Principal)">
+      <div class="form-text" style="font-size:.72rem">Renseigné par l'administration.</div>
+    <?php endif; ?>
   </div>
   <div class="col-md-4">
     <label class="form-label">Fonction</label>
@@ -295,23 +379,23 @@ require_once __DIR__ . '/../../../../noyau/layout/header.php';
   </div>
   <div class="col-md-4">
     <label class="form-label">Qualité / En qualité de</label>
-    <input type="text" name="qualite" value="<?= h($v('qualite')) ?>" class="form-control form-control-sm">
+    <?= carriere_select('qualite', $v('qualite'), carriere_options('qualite')) ?>
   </div>
   <div class="col-md-4">
     <label class="form-label">Diplôme</label>
-    <input type="text" name="diplome" value="<?= h($v('diplome')) ?>" class="form-control form-control-sm">
+    <?= carriere_select('diplome', $v('diplome'), carriere_options('diplome')) ?>
   </div>
   <div class="col-md-4">
     <label class="form-label">Spécialité</label>
-    <input type="text" name="specialite" value="<?= h($v('specialite')) ?>" class="form-control form-control-sm">
+    <?= carriere_select('specialite', $v('specialite'), carriere_options('specialite')) ?>
   </div>
   <div class="col-md-4">
-    <label class="form-label">Matière effectivement enseignée</label>
-    <input type="text" name="matiere_enseignee" value="<?= h($v('matiere_enseignee')) ?>" class="form-control form-control-sm">
-  </div>
-  <div class="col-md-3">
     <label class="form-label">Poste antérieur</label>
-    <input type="text" name="poste_anterieur" value="<?= h($v('poste_anterieur')) ?>" class="form-control form-control-sm">
+    <?= carriere_select('poste_anterieur', $v('poste_anterieur'), carriere_options('poste_anterieur')) ?>
+  </div>
+  <div class="col-12">
+    <label class="form-label">Matière(s) effectivement enseignée(s) <span class="text-muted" style="font-size:.75rem">— plusieurs possibles</span></label>
+    <?= carriere_matieres('matiere_enseignee', $v('matiere_enseignee'), carriere_options_matieres()) ?>
   </div>
   <div class="col-md-3">
     <label class="form-label">Lieu poste antérieur</label>
@@ -477,5 +561,7 @@ require_once __DIR__ . '/../../../../noyau/layout/header.php';
   }
 })();
 </script>
+
+<?= carriere_script() ?>
 
 <?php require_once __DIR__ . '/../../../../noyau/layout/footer.php'; ?>

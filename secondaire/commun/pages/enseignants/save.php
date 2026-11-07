@@ -4,6 +4,7 @@
 require_once __DIR__ . '/../../../../config/config.php';
 require_once __DIR__ . '/../../../../noyau/connexion.php';
 require_once __DIR__ . '/../../../../noyau/fonctions.php';
+require_once __DIR__ . '/_listes_carriere.php';
 exiger_role(['ADMIN', 'PROVISEUR', 'FONDATEUR', 'CENSEUR']);
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') rediriger('secondaire/commun/pages/enseignants/liste.php');
@@ -21,9 +22,9 @@ $mail       = post('mail') ?: null;
 $situation  = in_array(post('situation'), ['Celibataire', 'Marie', 'Divorce', 'Veuf'], true) ? post('situation') : null;
 $fonction   = post('fonction') ?: null;
 $grade      = post('grade') ?: null;
-$matiere_enseignee = post('matiere_enseignee') ?: null;
-$diplome    = post('diplome') ?: null;
-$specialite = post('specialite') ?: null;
+$matiere_enseignee = carriere_post_matieres('matiere_enseignee');   // plusieurs matières (07/11/2026)
+$diplome    = carriere_post('diplome');
+$specialite = carriere_post('specialite');
 // Matricule officiel (migration secondaire v19) : alphanumérique, facultatif, unique.
 // Distinct de matricule_ens, l'identifiant interne jamais affiché.
 $matricule  = mb_strtoupper(preg_replace('/\s+/', ' ', trim(post('matricule')))) ?: null;

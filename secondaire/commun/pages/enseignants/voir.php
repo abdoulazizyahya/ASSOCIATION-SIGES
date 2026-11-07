@@ -49,7 +49,12 @@ require_once __DIR__ . '/../../../../noyau/layout/header.php';
     <?php if ($ens['matricule']): ?><div class="sub"><span class="badge-code">Matricule <?= h($ens['matricule']) ?></span></div><?php endif; ?>
     <?php if (!$en_service): ?><span class="badge bg-danger"><?= h(SEC_SITUATIONS[$ens['statut_ens']] ?? 'Parti') ?></span><?php endif; ?>
   </div>
-  <a href="<?= APP_URL ?>/secondaire/commun/pages/enseignants/form.php?id=<?= (int) $ens['matricule_ens'] ?>" class="btn btn-primary btn-sm ms-auto">
+  <?php if (((function_exists('est_proprietaire_ecole') && est_proprietaire_ecole()) || in_array(role_connecte(), ['ADMIN', 'PROVISEUR', 'FONDATEUR'], true))): ?>
+  <a href="<?= APP_URL ?>/secondaire/commun/pages/enseignants/mon_profil.php?id=<?= (int) $ens['matricule_ens'] ?>" class="btn btn-outline-primary btn-sm ms-auto" title="Identité, origine, carrière, acte de recrutement, affectation, signature">
+    <i class="bi bi-person-vcard me-1"></i>Fiche complète
+  </a>
+  <?php endif; ?>
+  <a href="<?= APP_URL ?>/secondaire/commun/pages/enseignants/form.php?id=<?= (int) $ens['matricule_ens'] ?>" class="btn btn-primary btn-sm<?= ((function_exists('est_proprietaire_ecole') && est_proprietaire_ecole()) || in_array(role_connecte(), ['ADMIN', 'PROVISEUR', 'FONDATEUR'], true)) ? '' : ' ms-auto' ?>">
     <i class="bi bi-pencil me-1"></i>Modifier
   </a>
 </div>

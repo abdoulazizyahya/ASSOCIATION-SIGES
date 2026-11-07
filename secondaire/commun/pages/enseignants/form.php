@@ -7,6 +7,7 @@
 require_once __DIR__ . '/../../../../config/config.php';
 require_once __DIR__ . '/../../../../noyau/connexion.php';
 require_once __DIR__ . '/../../../../noyau/fonctions.php';
+require_once __DIR__ . '/_listes_carriere.php';
 require_once __DIR__ . '/../../../../noyau/paie_fonctions.php';
 exiger_role(['ADMIN', 'PROVISEUR', 'FONDATEUR', 'CENSEUR']);
 
@@ -124,17 +125,17 @@ require_once __DIR__ . '/../../../../noyau/layout/header.php';
           <input type="hidden" name="grade" value="<?= $ve('id_grade') ?>">
           <?php endif; ?>
         </div>
-        <div class="col-md-4">
-          <label class="form-label">Matière enseignée</label>
-          <input type="text" name="matiere_enseignee" class="form-control" value="<?= $ve('matiere_enseignee') ?>">
-        </div>
         <div class="col-md-6">
           <label class="form-label">Diplôme</label>
-          <input type="text" name="diplome" class="form-control" value="<?= $ve('diplome') ?>">
+          <?= carriere_select('diplome', $ens['diplome'] ?? '', carriere_options('diplome'), 'form-select') ?>
         </div>
         <div class="col-md-6">
           <label class="form-label">Spécialité</label>
-          <input type="text" name="specialite" class="form-control" value="<?= $ve('specialite') ?>">
+          <?= carriere_select('specialite', $ens['specialite'] ?? '', carriere_options('specialite'), 'form-select') ?>
+        </div>
+        <div class="col-12">
+          <label class="form-label">Matière(s) enseignée(s) <span class="text-muted" style="font-size:.75rem">— plusieurs possibles</span></label>
+          <?= carriere_matieres('matiere_enseignee', $ens['matiere_enseignee'] ?? '', carriere_options_matieres()) ?>
         </div>
       </div>
     </div>
@@ -192,5 +193,7 @@ require_once __DIR__ . '/../../../../noyau/layout/header.php';
     <a href="<?= APP_URL ?>/secondaire/commun/pages/enseignants/liste.php" class="btn btn-light btn-sm">Annuler</a>
   </div>
 </form>
+
+<?= carriere_script() ?>
 
 <?php require_once __DIR__ . '/../../../../noyau/layout/footer.php'; ?>
