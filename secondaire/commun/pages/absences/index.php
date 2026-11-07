@@ -56,7 +56,7 @@ if ($id_classe) {
         $matieres = db_all(
             "SELECT d.id_mat, m.libelle FROM discipline d
              JOIN matiere m ON m.id=d.id_mat AND m.actif=1
-             WHERE d.IDClasses=? ORDER BY d.ordre, m.libelle",
+             WHERE d.IDClasses=? ORDER BY d.ordre" . sec_ordre_num() . ", m.libelle",
             [$id_classe]
         );
     } else {
@@ -65,7 +65,7 @@ if ($id_classe) {
              JOIN discipline d ON d.id_mat=disp.id_mat AND d.IDClasses=disp.IDClasses
              JOIN matiere m ON m.id=d.id_mat AND m.actif=1
              WHERE disp.matricule_ens=? AND disp.val_annee=? AND disp.IDClasses=?
-             ORDER BY d.ordre, m.libelle",
+             ORDER BY d.ordre" . sec_ordre_num() . ", m.libelle",
             [$mat_ens, $val_annee, $id_classe]
         );
     }

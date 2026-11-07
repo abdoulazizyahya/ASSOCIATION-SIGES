@@ -312,7 +312,7 @@ $disciplines = db_all(
      LEFT JOIN groupe g ON g.id_groupe_comp=d.id_groupe
      LEFT JOIN dispenser disp ON disp.id_mat=d.id_mat AND disp.IDClasses=d.IDClasses AND disp.val_annee=?
      LEFT JOIN enseignant e ON e.matricule_ens=" . sec_sql_enseignant_trimestre($val_annee, (int) db_val("SELECT ordre FROM trimestre WHERE id=?", [(int) $id_trim])) . "   -- enseignant DE CE TRIMESTRE (remplacements, v22)
-     WHERE d.IDClasses=? ORDER BY d.id_groupe, d.ordre, m.libelle",
+     WHERE d.IDClasses=? ORDER BY d.id_groupe, d.ordre+0, m.libelle",
     [$val_annee, $id_classe]
 );
 

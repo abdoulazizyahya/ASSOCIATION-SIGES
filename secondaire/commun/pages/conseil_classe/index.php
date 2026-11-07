@@ -155,7 +155,7 @@ if ($id_classe) {
     // Disciplines (matière + coefficient) de la classe
     $disciplines = db_all(
         "SELECT d.id_mat, d.coef, m.libelle AS matiere FROM discipline d
-         JOIN matiere m ON m.id=d.id_mat AND m.actif=1 WHERE d.IDClasses=? ORDER BY d.ordre, m.libelle",
+         JOIN matiere m ON m.id=d.id_mat AND m.actif=1 WHERE d.IDClasses=? ORDER BY d.ordre" . sec_ordre_num() . ", m.libelle",
         [$id_classe]
     );
 

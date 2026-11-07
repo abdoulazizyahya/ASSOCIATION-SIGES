@@ -220,7 +220,7 @@ $disciplines = db_all(
      LEFT JOIN dispenser disp ON disp.id_mat=d.id_mat AND disp.IDClasses=d.IDClasses AND disp.val_annee=?
      LEFT JOIN enseignant e ON e.matricule_ens=disp.matricule_ens
      WHERE d.IDClasses=?
-     ORDER BY d.id_groupe, d.ordre, m.libelle",
+     ORDER BY d.id_groupe, d.ordre+0, m.libelle",
     [$val_annee, $insc['id_classe']]
 );
 

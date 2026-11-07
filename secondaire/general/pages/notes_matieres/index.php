@@ -88,14 +88,14 @@ if ($onglet === 'classe') {
                  JOIN dispenser disp ON disp.id_mat=d.id_mat AND disp.IDClasses=d.IDClasses
                                     AND disp.matricule_ens=? AND disp.val_annee=?
                  WHERE d.IDClasses=?
-                 ORDER BY d.ordre, m.libelle",
+                 ORDER BY d.ordre+0, m.libelle",
                 [$mat_ens, $val_annee, $id_cl_c]
             );
         } else {
             $mats_c = db_all(
                 "SELECT m.id, m.libelle, m.code, d.coef
                  FROM discipline d JOIN matiere m ON m.id=d.id_mat
-                 WHERE d.IDClasses=? ORDER BY d.ordre, m.libelle",
+                 WHERE d.IDClasses=? ORDER BY d.ordre+0, m.libelle",
                 [$id_cl_c]
             );
         }
@@ -188,7 +188,7 @@ if ($onglet === 'eleve') {
                                     AND disp.matricule_ens=? AND disp.val_annee=?
                  LEFT JOIN note n ON n.id_matiere=m.id AND n.id_eleve=? AND n.id_seq=?
                  WHERE d.IDClasses=?
-                 ORDER BY d.ordre, m.libelle",
+                 ORDER BY d.ordre+0, m.libelle",
                 [$mat_ens, $val_annee, $id_eleve, $id_seq_e, $id_cl_e]
             );
         } else {
@@ -199,7 +199,7 @@ if ($onglet === 'eleve') {
                  JOIN matiere m ON m.id=d.id_mat
                  LEFT JOIN note n ON n.id_matiere=m.id AND n.id_eleve=? AND n.id_seq=?
                  WHERE d.IDClasses=?
-                 ORDER BY d.ordre, m.libelle",
+                 ORDER BY d.ordre+0, m.libelle",
                 [$id_eleve, $id_seq_e, $id_cl_e]
             );
         }
@@ -268,13 +268,13 @@ if ($onglet === 'copie' && ($is_admin || $is_ens)) {
                  JOIN matiere m ON m.id=d.id_mat
                  JOIN dispenser disp ON disp.id_mat=d.id_mat AND disp.IDClasses=d.IDClasses
                                     AND disp.matricule_ens=? AND disp.val_annee=?
-                 WHERE d.IDClasses=? ORDER BY d.ordre, m.libelle",
+                 WHERE d.IDClasses=? ORDER BY d.ordre+0, m.libelle",
                 [$mat_ens, $val_annee, $id_cl_cop]
             );
         } else {
             $mats_cop = db_all(
                 "SELECT m.id, m.libelle FROM discipline d JOIN matiere m ON m.id=d.id_mat
-                 WHERE d.IDClasses=? ORDER BY d.ordre, m.libelle", [$id_cl_cop]
+                 WHERE d.IDClasses=? ORDER BY d.ordre+0, m.libelle", [$id_cl_cop]
             );
         }
     }
@@ -370,7 +370,7 @@ if ($onglet === 'non_saisis' && $seq_active) {
              LEFT JOIN enseignant e ON e.matricule_ens=disp.matricule_ens
              WHERE 1=1 $where_cl_a
              HAVING nb_eleves > 0 AND nb_saisis = 0
-             ORDER BY c.ordre, c.designation, d.ordre, m.libelle",
+             ORDER BY c.ordre, c.designation, d.ordre+0, m.libelle",
             [$id_annee, $id_annee, $id_seq_ns, $val_annee]
         );
     } elseif ($is_ens && $mat_ens) {
@@ -392,7 +392,7 @@ if ($onglet === 'non_saisis' && $seq_active) {
                  LEFT JOIN enseignant e ON e.matricule_ens=disp.matricule_ens
                  WHERE d.IDClasses=?
                  HAVING nb_eleves > 0 AND nb_saisis = 0
-                 ORDER BY d.ordre, m.libelle",
+                 ORDER BY d.ordre+0, m.libelle",
                 [$id_annee, $id_annee, $id_seq_ns, $val_annee, $id_cl_ns]
             );
         } else {
@@ -413,7 +413,7 @@ if ($onglet === 'non_saisis' && $seq_active) {
                  LEFT JOIN enseignant e ON e.matricule_ens=disp.matricule_ens
                  WHERE 1=1 $where_cl_a
                  HAVING nb_eleves > 0 AND nb_saisis = 0
-                 ORDER BY c.ordre, c.designation, d.ordre, m.libelle",
+                 ORDER BY c.ordre, c.designation, d.ordre+0, m.libelle",
                 [$id_annee, $id_annee, $id_seq_ns, $mat_ens, $val_annee]
             );
         }
@@ -435,10 +435,10 @@ $matieres_rv = [];
 if ($onglet === 'releve_vierge' && $id_cl_rv) {
     // Matières de la classe ; l'enseignant ne voit que celles qu'il enseigne.
     $matieres_rv = $is_admin
-        ? db_all("SELECT m.id, m.libelle FROM discipline d JOIN matiere m ON m.id=d.id_mat WHERE d.IDClasses=? ORDER BY d.ordre, m.libelle", [$id_cl_rv])
+        ? db_all("SELECT m.id, m.libelle FROM discipline d JOIN matiere m ON m.id=d.id_mat WHERE d.IDClasses=? ORDER BY d.ordre+0, m.libelle", [$id_cl_rv])
         : db_all("SELECT m.id, m.libelle FROM discipline d JOIN matiere m ON m.id=d.id_mat
                   JOIN dispenser p ON p.IDClasses=d.IDClasses AND p.id_mat=d.id_mat AND p.val_annee=? AND p.matricule_ens=?
-                  WHERE d.IDClasses=? ORDER BY d.ordre, m.libelle", [$val_annee, (int) $mat_ens, $id_cl_rv]);
+                  WHERE d.IDClasses=? ORDER BY d.ordre+0, m.libelle", [$val_annee, (int) $mat_ens, $id_cl_rv]);
     if ($id_mat_rv && !in_array($id_mat_rv, array_map('intval', array_column($matieres_rv, 'id')), true)) $id_mat_rv = 0;
 }
 if ($mode_rv === 'rempli' && !$id_mat_rv) $mode_rv = 'vierge';   // rempli : une matière précise

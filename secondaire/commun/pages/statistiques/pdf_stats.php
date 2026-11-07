@@ -237,7 +237,7 @@ if ($onglet === 'eleves') {
              FROM discipline d JOIN matiere m ON m.id=d.id_mat AND m.actif=1
              LEFT JOIN dispenser disp ON disp.id_mat=d.id_mat AND disp.IDClasses=d.IDClasses AND disp.val_annee=?
              LEFT JOIN enseignant e ON e.matricule_ens=disp.matricule_ens
-             WHERE d.IDClasses=? ORDER BY d.ordre,m.libelle",
+             WHERE d.IDClasses=? ORDER BY d.ordre" . sec_ordre_num() . ",m.libelle",
             [$val_annee, $c['id']]
         );
         if (empty($disc)) continue;

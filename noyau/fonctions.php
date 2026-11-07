@@ -1678,6 +1678,14 @@ function est_technique(): bool {
     return ordre_enseignement_courant() === 'technique';
 }
 
+// Tri des matières d'une classe (08/11/2026) : discipline.ordre est un
+// VARCHAR, « ORDER BY d.ordre » rangeait 10 avant 6 sur les bulletins. Au
+// général, tri numérique (« d.ordre+0 ») ; technique inchangé (demande
+// explicite). À concaténer juste après « d.ordre » dans un ORDER BY.
+function sec_ordre_num(): string {
+    return est_technique() ? '' : '+0';
+}
+
 // Langue d'enseignement de l'école, primaire ou secondaire (migrations v70
 // primaire et v33 secondaire) : 'francophone', 'anglophone' ou 'bilingue'
 // (sections Fr et An). Choisie à la création de l'école, modifiable dans
@@ -2473,7 +2481,7 @@ function sec_controle_notes_html(int $id_classe, int $id_trim, string $mode): st
                         FROM discipline d JOIN matiere m ON m.id=d.id_mat
                         LEFT JOIN dispenser disp ON disp.IDClasses=d.IDClasses AND disp.id_mat=d.id_mat AND disp.val_annee=?
                         LEFT JOIN enseignant e ON e.matricule_ens=$ens
-                        WHERE d.IDClasses=? ORDER BY d.ordre, m.libelle",
+                        WHERE d.IDClasses=? ORDER BY d.ordre" . sec_ordre_num() . ", m.libelle",
                        array_merge([$t['id_annee']], $pf, [(string) $t['annee'], $id_classe]));
     } catch (\Throwable $e) { return ''; }
     $manque = array_filter($rows, fn($r) => (int) $r['notes'] < $nb);

@@ -81,7 +81,7 @@ $dcomp = pv_charger_donnees_comp($id_classe, $id_trim, $id_annee);
 $disciplines = db_all(
     "SELECT d.id_mat, d.coef, d.ordre, m.libelle AS matiere
      FROM discipline d JOIN matiere m ON m.id=d.id_mat AND m.actif=1
-     WHERE d.IDClasses=? ORDER BY d.id_groupe, d.ordre, m.libelle",
+     WHERE d.IDClasses=? ORDER BY d.id_groupe, d.ordre" . sec_ordre_num() . ", m.libelle",
     [$id_classe]
 );
 $nb_mat = count($disciplines);
