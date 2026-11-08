@@ -292,7 +292,8 @@ function photo_circulaire_th(string $photo_path, int $taille_px = 240): string {
 // (primaire/pdf/verif_honneur_lib.php) : scanner ce QR confirme l'authenticité de
 // CE certificat, sans jamais rediriger vers le bulletin de l'élève.
 function dessiner_qr_th(FPDF $pdf, array $el, string $vue_verif, int $id_periode_verif, float $x, float $y, float $size): void {
-    $verif_url = honneur_verif_url((int)$el['id'], $vue_verif, $id_periode_verif, id_affichage_eleve($el));
+    // &ec=CODE ajouté par honneur_verif_url() (08/11/2026) ; &m= rouvre le même modèle.
+    $verif_url = honneur_verif_url((int)$el['id'], $vue_verif, $id_periode_verif, id_affichage_eleve($el), (int) ($GLOBALS['modele'] ?? 0));
     $qr_tmp = tempnam(sys_get_temp_dir(), 'abzqrth_') . '.png';
     try {
         $qr_gen = new QRCode($verif_url, ['s' => 'qr-h']);

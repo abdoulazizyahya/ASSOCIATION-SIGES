@@ -9,6 +9,8 @@
 // Inclus par secondaire/commun/pages/enseignants/pdf_attestation.php et pdf_prise_service.php
 // (génération du QR), et verif/attestation.php (vérification lors du scan).
 
+require_once __DIR__ . '/verif_lib.php';   // verif_commun.php : verif_ajout_ec()
+
 if (!defined('BULLETIN_VERIF_SECRET')) {
     define('BULLETIN_VERIF_SECRET', 'CHANGE_ME_ABZ_MBE_INSECURE_DEFAULT_SECRET');
 }
@@ -30,5 +32,6 @@ function attestation_verif_base_url(): string {
 
 function attestation_verif_url(string $type, string $matricule): string {
     $h = attestation_verif_hash($type, $matricule);
-    return attestation_verif_base_url() . '/verif/attestation.php?t=' . urlencode($type) . '&m=' . urlencode($matricule) . '&h=' . $h;
+    // &ec=CODE (08/11/2026) : sans lui, en multi-établissement, le scan affichait « Établissement non précisé ».
+    return verif_ajout_ec(attestation_verif_base_url() . '/verif/attestation.php?t=' . urlencode($type) . '&m=' . urlencode($matricule) . '&h=' . $h);
 }

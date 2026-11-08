@@ -30,10 +30,13 @@ if ($e && $type && $h_recu !== '') {
 // bouton "Ouvrir" (jamais automatiquement). Le jeton "vh" (= le hash déjà
 // vérifié ci-dessus) permet à pdf_attestation.php / pdf_prise_service.php de
 // servir ce document précis sans exiger de connexion.
+// École secondaire : générateurs de secondaire/commun/pages/enseignants/ (08/11/2026).
+$dossier_ens = (function_exists('type_enseignement_courant') && type_enseignement_courant() === 'secondaire')
+    ? '/secondaire/commun/pages/enseignants/' : '/primaire/pages/enseignants/';
 $pdf_urls = [
-    'attestation' => '/primaire/pages/enseignants/pdf_attestation.php?id=' . urlencode($mat) . '&vh=' . urlencode($h_recu),
-    'prise'       => '/primaire/pages/enseignants/pdf_prise_service.php?type=prise&id=' . urlencode($mat) . '&vh=' . urlencode($h_recu),
-    'reprise'     => '/primaire/pages/enseignants/pdf_prise_service.php?type=reprise&id=' . urlencode($mat) . '&vh=' . urlencode($h_recu),
+    'attestation' => $dossier_ens . 'pdf_attestation.php?id=' . urlencode($mat) . '&vh=' . urlencode($h_recu),
+    'prise'       => $dossier_ens . 'pdf_prise_service.php?type=prise&id=' . urlencode($mat) . '&vh=' . urlencode($h_recu),
+    'reprise'     => $dossier_ens . 'pdf_prise_service.php?type=reprise&id=' . urlencode($mat) . '&vh=' . urlencode($h_recu),
 ];
 // verif_ajout_ec() : en multi-établissement, propage &ec=CODE — sinon le
 // générateur (accès public par « vh ») reste pointé sur l'annuaire.

@@ -8,6 +8,24 @@
 require_once __DIR__ . '/../config/config.php';
 require_once __DIR__ . '/../noyau/connexion.php';
 require_once __DIR__ . '/../noyau/fonctions.php';
+
+// Certificat d'école SECONDAIRE (08/11/2026) : son QR ne porte pas « t »
+// (piste fr/ar du primaire), et « v » peut valoir « seq ». Aiguillage AVANT
+// la bibliothèque du primaire (mêmes noms de fonctions). Un certificat
+// imprimé sans &ec=CODE retrouve son école par sa signature.
+$qr_secondaire = !isset($_GET['t']) || ($_GET['v'] ?? '') === 'seq'
+    || (function_exists('ecole_courante') && ecole_courante() && type_enseignement_courant() === 'secondaire');
+if ($qr_secondaire) {
+    require_once __DIR__ . '/../secondaire/commun/pdf/verif_honneur_lib.php';
+    verif_trouver_ecole('secondaire', function () {
+        try { return honneur_sec_verif_valider((int) ($_GET['e'] ?? 0), (string) ($_GET['v'] ?? ''), (int) ($_GET['p'] ?? 0), (string) ($_GET['h'] ?? '')) !== null; }
+        catch (\Throwable $e) { return false; }
+    });
+    if (!ecole_courante() || type_enseignement_courant() === 'secondaire') {
+        require __DIR__ . '/../secondaire/commun/verif_honneur_contenu.php';
+        exit;
+    }
+}
 require_once __DIR__ . '/../primaire/pdf/verif_lib.php';
 require_once __DIR__ . '/../primaire/pdf/verif_honneur_lib.php';
 verif_exiger_ecole_publique();  // multi-école : URL sans &ec= -> page neutre
