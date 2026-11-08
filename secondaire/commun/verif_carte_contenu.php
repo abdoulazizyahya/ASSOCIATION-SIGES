@@ -42,7 +42,7 @@ $pdf_url = $authentique
       <p class="text-muted mb-3">
         <?php if (!empty($etab['nom_fr'])): ?><strong><?= h($etab['nom_fr']) ?></strong><br><?php endif; ?>
         <strong><?= h(mb_strtoupper($eleve['nom']) . ' ' . ($eleve['prenom'] ?? '')) ?></strong><br>
-        <?= niu_eleve($eleve) !== '' ? 'NIU ' . h(niu_eleve($eleve)) . '<br>' : '' ?>
+        <?= ($id_html = verif_identifiant_eleve_html($eleve)) !== '' ? $id_html . '<br>' : '' ?>
         Classe : <?= h($eleve['classe']) ?> — Année scolaire <?= h($eleve['annee']) ?>
       </p>
       <a href="<?= h($pdf_url) ?>" class="btn btn-success btn-sm">

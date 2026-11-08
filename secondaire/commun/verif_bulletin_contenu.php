@@ -60,7 +60,7 @@ $etab = get_etablissement();
       <h4 class="mt-2 mb-1 text-success">Document authentique</h4>
       <p class="text-muted mb-3">
         Bulletin de <strong><?= h(mb_strtoupper((string) $eleve['nom']) . ' ' . ($eleve['prenom'] ?? '')) ?></strong><br>
-        Matricule : <?= h(id_affichage_eleve($eleve)) ?>
+        <?= verif_identifiant_eleve_html($eleve) ?>
         <?php if ($libelle_periode !== ''): ?><br>Période : <?= h($libelle_periode) ?><?php endif; ?>
         <br><small><?= h($etab['nom_fr'] ?? '') ?></small>
       </p>

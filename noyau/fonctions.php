@@ -3247,6 +3247,18 @@ function niu_eleve(array $eleve): string {
 }
 
 /**
+ * Ligne d'identifiant de l'élève sur les pages publiques de vérification
+ * d'un QR code (08/11/2026) : au secondaire le NIU, ou le matricule tant que
+ * l'élève n'a pas encore de NIU. HTML déjà échappé, '' si aucun des deux.
+ */
+function verif_identifiant_eleve_html(array $eleve): string {
+    $niu = niu_eleve($eleve);
+    if ($niu !== '') return 'NIU : ' . h($niu);
+    $mat = id_affichage_eleve($eleve);
+    return $mat !== '' ? 'Matricule : ' . h($mat) : '';
+}
+
+/**
  * PDF (FPDF) : « Fait à <lieu>, le <date> » puis, juste en dessous, l'anglais
  * aligné mot à mot : « Done at » commence sous « Fait à », « on » sous « le ».
  * La ligne est placée dans la zone [$x, $x + $w] selon $align (L, C, R) ;

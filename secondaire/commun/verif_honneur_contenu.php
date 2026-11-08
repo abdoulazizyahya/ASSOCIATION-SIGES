@@ -72,7 +72,7 @@ $pdf_url = ($authentique && $classe)
       <p class="text-muted mb-3">
         <?php if (!empty($etab['nom_fr'])): ?><strong><?= h($etab['nom_fr']) ?></strong><br><?php endif; ?>
         <strong><?= h(mb_strtoupper((string) $eleve['nom']) . ' ' . ($eleve['prenom'] ?? '')) ?></strong><br>
-        <?= h(id_affichage_eleve($eleve)) !== '' ? 'Matricule : ' . h(id_affichage_eleve($eleve)) . '<br>' : '' ?>
+        <?= ($id_html = verif_identifiant_eleve_html($eleve)) !== '' ? $id_html . '<br>' : '' ?>
         <?php if ($classe): ?>Classe : <?= h($classe['designation']) ?><br><?php endif; ?>
         <?php if ($periode !== ''): ?><?= h($periode) ?><?php endif; ?>
       </p>

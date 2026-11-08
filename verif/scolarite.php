@@ -89,7 +89,7 @@ $pdf_url = $authentique
       <h4 class="mt-2 mb-1 text-success">Certificat de scolarité authentique</h4>
       <p class="text-muted mb-0">
         <strong><?= h(mb_strtoupper($eleve['Nom_elv']) . ' ' . ($eleve['Prenom_elv'] ?? '')) ?></strong><br>
-        NIU : <?= h(id_affichage_eleve($eleve)) ?><br>
+        <?= $secondaire ? verif_identifiant_eleve_html($eleve) : 'NIU : ' . h(id_affichage_eleve($eleve)) ?><br>
         <?php if ($classe): ?>
           Classe : <?= h($classe['designation']) ?><br>
           Année scolaire : <?= h($classe['annee']) ?>
