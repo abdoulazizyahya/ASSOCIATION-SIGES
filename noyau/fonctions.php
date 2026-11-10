@@ -638,10 +638,26 @@ function sec_roles_attribuables(): array {
 // fiche : identifiant tiré du nom, mot de passe = identifiant (à changer à la
 // première connexion), rôle déduit de la fonction.
 
+/**
+ * Texte sans accents (10/11/2026) : Normalizer (extension intl) s'il existe,
+ * sinon table de correspondance — un hébergeur sans intl faisait échouer la
+ * création du compte d'une fiche (« Class Normalizer not found »).
+ */
+function sans_accents(string $s): string {
+    if (class_exists('Normalizer')) {
+        $n = \Normalizer::normalize($s, \Normalizer::FORM_D);
+        if ($n !== false && $n !== null) return preg_replace('/\p{Mn}+/u', '', $n);
+    }
+    return strtr($s, ['à'=>'a','â'=>'a','ä'=>'a','á'=>'a','ã'=>'a','ç'=>'c','é'=>'e','è'=>'e','ê'=>'e','ë'=>'e',
+        'î'=>'i','ï'=>'i','í'=>'i','ô'=>'o','ö'=>'o','ó'=>'o','õ'=>'o','ù'=>'u','û'=>'u','ü'=>'u','ú'=>'u','ÿ'=>'y','ñ'=>'n',
+        'À'=>'A','Â'=>'A','Ä'=>'A','Á'=>'A','Ç'=>'C','É'=>'E','È'=>'E','Ê'=>'E','Ë'=>'E','Î'=>'I','Ï'=>'I','Ô'=>'O','Ö'=>'O',
+        'Ù'=>'U','Û'=>'U','Ü'=>'U','Ÿ'=>'Y','Ñ'=>'N','œ'=>'oe','Œ'=>'OE','æ'=>'ae','Æ'=>'AE']);
+}
+
 /** Rôle par défaut d'après la fonction saisie sur la fiche (« Censeur », « SG »…). */
 function sec_role_depuis_fonction(?string $fonction): string {
     $f = mb_strtolower(trim((string) $fonction));
-    $f = preg_replace('/\p{Mn}+/u', '', \Normalizer::normalize($f, \Normalizer::FORM_D) ?: $f);
+    $f = sans_accents($f);
     if (fonction_est_chef($fonction))                                    return 'PROVISEUR';
     if (str_contains($f, 'censeur'))                                     return 'CENSEUR';
     if ($f === 'sg' || str_contains($f, 'surveillant'))                  return 'SG';
@@ -653,8 +669,7 @@ function sec_role_depuis_fonction(?string $fonction): string {
 /** Identifiant libre tiré d'un des mots du nom (minuscules, sans accent), sinon nom + chiffre. */
 function sec_login_libre(string $nom, ?string $prenom = null, int $sauf_id = 0): string {
     $ascii = function (string $s): string {
-        $s = \Normalizer::normalize(mb_strtolower($s), \Normalizer::FORM_D) ?: mb_strtolower($s);
-        return preg_replace('/[^a-z0-9]/', '', preg_replace('/\p{Mn}+/u', '', $s));
+        return preg_replace('/[^a-z0-9]/', '', sans_accents(mb_strtolower($s)));
     };
     $pris = fn(string $l) => (bool) db_val("SELECT 1 FROM utilisateur WHERE LOWER(login)=? AND id<>?", [$l, $sauf_id]);
     $mots = array_values(array_filter(array_map($ascii, preg_split('/[\s\-\']+/u', trim($nom . ' ' . $prenom))), fn($m) => strlen($m) >= 2));
@@ -687,6 +702,43 @@ function sec_creer_compte_fiche(int $matricule_ens): ?array {
     return sec_compte_de_fiche($matricule_ens);
 }
 
+/**
+ * Comptes manquants du personnel EN SERVICE (secondaire) : un compte par
+ * défaut (identifiant tiré du nom = mot de passe) pour chaque fiche qui n'en
+ * a pas. Retourne les identifiants créés.
+ */
+function sec_creer_comptes_manquants(): array {
+    $crees = [];
+    foreach (db_all("SELECT e.matricule_ens FROM enseignant e
+                     WHERE NOT EXISTS (SELECT 1 FROM utilisateur u WHERE u.matricule_ens=e.matricule_ens)
+                       AND " . sec_sql_ens_en_service('e')) as $e) {   // pas de compte pour un ancien (muté, parti…)
+        if ($u = sec_creer_compte_fiche((int) $e['matricule_ens'])) $crees[] = $u['login'];
+    }
+    return $crees;
+}
+
+/**
+ * À l'ouverture de la liste du personnel (10/11/2026) : crée d'office les
+ * comptes manquants (fiches créées ou importées avant le 17/10/2026, ou
+ * dont la création du compte avait échoué) — seulement pour qui gère les
+ * comptes, jamais en lecture seule. Message avec les identifiants créés.
+ */
+function personnel_creer_comptes_manquants_auto(): void {
+    if (function_exists('est_lecture_seule') && est_lecture_seule()) return;
+    try {
+        if (function_exists('type_enseignement_courant') && type_enseignement_courant() === 'secondaire') {
+            if (!sec_peut_gerer_comptes()) return;
+            $crees = sec_creer_comptes_manquants();
+        } else {
+            $crees = prim_creer_comptes_manquants();
+        }
+    } catch (\Throwable $e) { return; }
+    if (!$crees) return;
+    if (function_exists('journaliser_action')) journaliser_action('comptes_personnel_crees', null, implode(', ', $crees));
+    flash_set('succes', count($crees) . ' compte(s) de connexion créé(s) automatiquement pour le personnel qui n\'en avait pas — '
+        . 'identifiant = mot de passe : ' . implode(', ', $crees) . '.');
+}
+
 /** Rôles qui suivent automatiquement la fonction de la fiche (17/10/2026). */
 const SEC_ROLES_SUIVANT_FONCTION = ['SG', 'CENSEUR'];
 
@@ -716,8 +768,7 @@ function sec_aligner_role_fiche(int $matricule_ens): ?string {
 /** Identifiant libre (primaire) tiré d'un des mots du nom. */
 function prim_login_libre(string $nom, ?string $prenom = null, int $sauf_id = 0): string {
     $ascii = function (string $s): string {
-        $s = \Normalizer::normalize(mb_strtolower($s), \Normalizer::FORM_D) ?: mb_strtolower($s);
-        return preg_replace('/[^a-z0-9]/', '', preg_replace('/\p{Mn}+/u', '', $s));
+        return preg_replace('/[^a-z0-9]/', '', sans_accents(mb_strtolower($s)));
     };
     $pris = fn(string $l) => (bool) db_val("SELECT 1 FROM user WHERE LOWER(login_user)=? AND id_user<>?", [$l, $sauf_id]);
     $mots = array_values(array_filter(array_map($ascii, preg_split('/[\s\-\']+/u', trim($nom . ' ' . $prenom))), fn($m) => strlen($m) >= 2));
@@ -741,6 +792,18 @@ function prim_creer_compte_fiche(int $matricule_ens): ?array {
     db_exec("INSERT INTO user (login_user, pwd_user, actif, matricule_ens) VALUES (?, ?, 1, ?)",
             [$login, password_hash($login, PASSWORD_DEFAULT), $matricule_ens]);
     return prim_compte_de_fiche($matricule_ens);
+}
+
+/** Comptes manquants du personnel ACTIF (primaire), fiches gérables seulement. Retourne les identifiants créés. */
+function prim_creer_comptes_manquants(): array {
+    $crees = [];
+    foreach (db_all("SELECT e.matricule_ens, e.id_fonction FROM enseignant e
+                     WHERE COALESCE(e.statut_ens, 'actif') = 'actif'
+                       AND NOT EXISTS (SELECT 1 FROM user u WHERE u.matricule_ens = e.matricule_ens)") as $e) {
+        if (!fiche_gerable((int) $e['matricule_ens'], (string) $e['id_fonction'])) continue;
+        if ($u = prim_creer_compte_fiche((int) $e['matricule_ens'])) $crees[] = $u['login_user'];
+    }
+    return $crees;
 }
 
 /** École privée ? (primaire : etablissement.statut, migration v62 ; privé si absent). */
@@ -1987,6 +2050,21 @@ function pdf_couleurs_defaut_secondaire(): array {
         'bandeau_section'           => ['libelle' => 'Bandeaux de section (Disciplines/Travail/Profil/Résultats, matière, décision)', 'r' => 216, 'g' => 210, 'b' => 248],
         'ligne_echec'               => ['libelle' => 'Surlignage moyenne insuffisante (< 10/20)', 'r' => 255, 'g' => 235, 'b' => 235],
     ];
+}
+
+/**
+ * Libellé court de la séquence / évaluation active pour l'en-tête sur mobile
+ * (10/11/2026) : « Séquence 3 » → « 3e SEQ », « Évaluation 2 » → « 2e EVAL ».
+ * Numéro = celui du libellé, sinon l'ordre. Un libellé déjà court (« UA1 »
+ * au primaire) ou sans mot reconnu est gardé tel quel.
+ */
+function libelle_seq_abrege(array $s): string {
+    $lib = trim((string) ($s['libelle_seq'] ?? $s['libelle'] ?? ''));
+    $bas = mb_strtolower(sans_accents($lib));
+    $mot = str_contains($bas, 'valuation') ? 'EVAL' : (str_contains($bas, 'sequence') ? 'SEQ' : '');
+    if ($mot === '') return $lib;
+    $n = preg_match('/(\d+)\s*$/', $lib, $m) ? (int) $m[1] : (int) ($s['ordre'] ?? 0);
+    return $n > 0 ? $n . 'e ' . $mot : $mot;
 }
 
 function get_sequence_active(): array {

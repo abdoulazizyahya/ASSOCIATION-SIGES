@@ -471,11 +471,11 @@ function lien_actif(string $url): string {
           <span class="badge-seq"<?= $seq_dblclic !== ''
               ? ' style="cursor:pointer" title="Double-cliquer pour changer de séquence / configurer les évaluations" ondblclick="location.href=\'' . h($seq_dblclic) . '\'"'
               : '' ?>>
-            <i class="bi bi-pencil-square me-1"></i><?= h($seq_act['libelle_seq']) ?>
+            <i class="bi bi-pencil-square me-1"></i><span class="d-none d-md-inline"><?= h($seq_act['libelle_seq']) ?></span><span class="d-md-none"><?= h(libelle_seq_abrege($seq_act)) ?></span>
           </span>
         <?php endif; ?>
         <?php if (!empty($annee_act['val_annee']) && $annee_act['val_annee'] !== '—'): ?>
-          <span class="badge-annee">
+          <span class="badge-annee d-none d-md-inline"><!-- masquée sur mobile (10/11/2026) -->
             <i class="bi bi-calendar3 me-1"></i><?= h($annee_act['val_annee']) ?>
           </span>
         <?php endif; ?>

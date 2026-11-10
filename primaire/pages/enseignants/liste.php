@@ -3,6 +3,7 @@ require_once __DIR__ . '/../../../config/config.php';
 require_once __DIR__ . '/../../../noyau/connexion.php';
 require_once __DIR__ . '/../../../noyau/fonctions.php';
 exiger_role(['DIRECTEUR']);
+personnel_creer_comptes_manquants_auto();   // fiches sans compte (anciennes, importées) : compte créé d'office (10/11/2026)
 
 $onglet = in_array($_GET['onglet'] ?? '', ['liste', 'affectation'], true) ? $_GET['onglet'] : 'liste';
 

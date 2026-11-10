@@ -22,12 +22,8 @@ $journal = fn(string $a, string $cible) => function_exists('journaliser_action')
 
 // ── Tous les comptes manquants (liste du personnel) ───────────────────────
 if ($action === 'creer_manquants') {
-    $crees = [];
-    foreach (db_all("SELECT e.matricule_ens FROM enseignant e
-                     WHERE NOT EXISTS (SELECT 1 FROM utilisateur u WHERE u.matricule_ens=e.matricule_ens)
-                       AND " . sec_sql_ens_en_service('e')) as $e) {   // pas de compte pour un ancien (muté, parti…)
-        if ($u = sec_creer_compte_fiche((int) $e['matricule_ens'])) $crees[] = $u['login'];
-    }
+    $crees = sec_creer_comptes_manquants();
+
     if ($crees) $journal('comptes_personnel_crees', implode(', ', $crees));
     flash_set('succes', $crees ? count($crees) . ' compte(s) créé(s) — mot de passe = identifiant : ' . implode(', ', $crees) . '.' : 'Tout le personnel a déjà un compte.');
     rediriger($retour);

@@ -7,6 +7,7 @@ require_once __DIR__ . '/../../../../config/config.php';
 require_once __DIR__ . '/../../../../noyau/connexion.php';
 require_once __DIR__ . '/../../../../noyau/fonctions.php';
 exiger_role(['ADMIN', 'PROVISEUR', 'FONDATEUR', 'CENSEUR']);
+personnel_creer_comptes_manquants_auto();   // fiches sans compte (anciennes, importées) : compte créé d'office (10/11/2026)
 $peut_fiche_complete = ((function_exists('est_proprietaire_ecole') && est_proprietaire_ecole()) || in_array(role_connecte(), ['ADMIN', 'PROVISEUR', 'FONDATEUR'], true));
 
 $q = trim($_GET['q'] ?? '');

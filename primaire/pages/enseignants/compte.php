@@ -20,13 +20,8 @@ $retour = $mat ? 'primaire/pages/enseignants/voir.php?mat=' . $mat . '#compte' :
 
 // ── Tous les comptes manquants (liste du personnel) ───────────────────────
 if ($action === 'creer_manquants') {
-    $crees = [];
-    foreach (db_all("SELECT e.matricule_ens, e.id_fonction FROM enseignant e
-                     WHERE COALESCE(e.statut_ens, 'actif') = 'actif'
-                       AND NOT EXISTS (SELECT 1 FROM user u WHERE u.matricule_ens = e.matricule_ens)") as $e) {
-        if (!fiche_gerable((int) $e['matricule_ens'], (string) $e['id_fonction'])) continue;
-        if ($u = prim_creer_compte_fiche((int) $e['matricule_ens'])) $crees[] = $u['login_user'];
-    }
+    $crees = prim_creer_comptes_manquants();
+
     if ($crees) journaliser_action('comptes_personnel_crees', null, implode(', ', $crees));
     flash_set('succes', $crees ? count($crees) . ' compte(s) créé(s) — mot de passe = identifiant : ' . implode(', ', $crees) . '.' : 'Tout le personnel actif a déjà un compte.');
     rediriger($retour);
