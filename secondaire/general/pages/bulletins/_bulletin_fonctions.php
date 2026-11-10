@@ -33,6 +33,25 @@ function fmt_note_b(?float $v): string {
     return $dec !== null ? "$int.$dec" : $int;
 }
 
+/**
+ * Appréciation APC d'une MOYENNE (10/11/2026) : cote d'appreciation()
+ * (mêmes seuils que les lignes de matières) + niveau d'acquisition, sans
+ * « Compétences » — ex. ['cote' => 'B+', 'fr' => 'Bien acquis', 'en' => 'Well acquired'].
+ */
+function appreciation_moyenne_apc(float $moy): ?array {
+    $cote = appreciation($moy)['COTE'] ?? '';
+    $lib = [
+        'D'  => ['Non acquis',         'Not acquired'],
+        'C'  => ['Moyennement acquis', 'Averagely acquired'],
+        'C+' => ['Acquis',             'Acquired'],
+        'B'  => ['Bien acquis',        'Well acquired'],
+        'B+' => ['Bien acquis',        'Well acquired'],
+        'A'  => ['Très bien acquis',   'Very well acquired'],
+        'A+' => ['Très bien acquis',   'Very well acquired'],
+    ][$cote] ?? null;
+    return $lib ? ['cote' => $cote, 'fr' => $lib[0], 'en' => $lib[1]] : null;
+}
+
 function mention_gen_b(float $a): string {
     if (bulletin_en()) {
         if ($a >= 16) return 'Excellent'; if ($a >= 14) return 'Very good';

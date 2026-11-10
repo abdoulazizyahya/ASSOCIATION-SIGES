@@ -57,6 +57,10 @@ $id_serie  = (int)($_GET['serie'] ?? 0);
 // Choix mémorisé pour la session.
 if (in_array($_GET['mise'] ?? '', ['page', 'lisible'], true)) $_SESSION['bull_sec_mise'] = $_GET['mise'];
 $mise      = $_SESSION['bull_sec_mise'] ?? 'page';
+// Date sous les observations du chef d'établissement (10/11/2026) : 'jour' =
+// date du jour, 'vide' = « Ville, le .......... » à compléter. Mémorisé pour la session.
+if (in_array($_GET['date'] ?? '', ['jour', 'vide'], true)) $_SESSION['bull_sec_date'] = $_GET['date'];
+$date_bull = $_SESSION['bull_sec_date'] ?? 'jour';
 // Langue du bulletin (école bilingue/anglophone, 01/11/2026) : français
 // traduit en anglais, ou anglais traduit en français (section anglophone).
 // Par défaut la langue de la section de la classe ; choix mémorisé par classe.
@@ -257,6 +261,7 @@ function pdf_url_bull(int $id_eleve, string $vue, int $id_trim, int $id_annee, b
     } else {
         $base = APP_URL.'/secondaire/general/pages/bulletins/pdf.php?eleve='.$id_eleve.'&annee='.$id_annee.'&trim='.$id_trim;
         if (($GLOBALS['mise'] ?? 'page') === 'lisible') $base .= '&mise=lisible';
+        if (($GLOBALS['date_bull'] ?? 'jour') === 'vide') $base .= '&date=vide';
     }
     $base .= '&langue=' . ($GLOBALS['langue_bull'] ?? 'fr');
     if ($dl) $base .= '&dl=1';
@@ -268,6 +273,7 @@ function url_classe_bull(int $id_classe, string $vue, int $id_trim, int $id_anne
     } else {
         $base = APP_URL.'/secondaire/general/pages/bulletins/pdf_classe.php?classe='.$id_classe.'&annee='.$id_annee.'&ordre='.$ordre.'&trim='.$id_trim;
         if (($GLOBALS['mise'] ?? 'page') === 'lisible') $base .= '&mise=lisible';
+        if (($GLOBALS['date_bull'] ?? 'jour') === 'vide') $base .= '&date=vide';
     }
     if ($id_serie) $base .= '&serie='.$id_serie;
     $base .= '&langue=' . ($GLOBALS['langue_bull'] ?? 'fr');
@@ -392,6 +398,20 @@ if ($vue === 'trim' && $id_classe) echo sec_controle_notes_html((int) $id_classe
           <a href="<?= h($base_mise . '&mise=lisible') ?>" class="ordre-btn <?= $mise === 'lisible' ? 'active' : '' ?>"
              title="Police et espacements confortables, sur 2 pages au maximum">
             <i class="bi bi-files me-1"></i>Lisible (2 pages max)
+          </a>
+        </div>
+      </div>
+      <!-- Date sous les observations du chef d'établissement -->
+      <div class="col-auto">
+        <label class="form-label mb-1" style="font-size:.78rem;font-weight:600;color:#1a3c6b">Date</label>
+        <div class="d-flex gap-1">
+          <a href="<?= h($base_mise . '&date=jour') ?>" class="ordre-btn <?= $date_bull === 'jour' ? 'active' : '' ?>"
+             title="<?= h(lieu_edition_documents() . ', le ' . date('d-m-Y')) ?>">
+            <i class="bi bi-calendar-check me-1"></i>Du jour
+          </a>
+          <a href="<?= h($base_mise . '&date=vide') ?>" class="ordre-btn <?= $date_bull === 'vide' ? 'active' : '' ?>"
+             title="<?= h(lieu_edition_documents() . ', le ....................') ?> — à compléter à la main">
+            <i class="bi bi-three-dots me-1"></i>Pointillés
           </a>
         </div>
       </div>

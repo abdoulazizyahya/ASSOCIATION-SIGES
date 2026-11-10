@@ -991,10 +991,26 @@ $taille_rang = cell2l_taille_ajustee($pdf, $rang_str, 'B', $wB_right * 0.45 - 2.
 cell_rang($pdf, $wB_right * 0.45, $h_ligne, $rang_general, ' / ' . $nb_classes, 1, 'C', $taille_rang);
 $pdf->Ln($h_ligne);
 $pdf->SetX($xR);
-cell2l($pdf, $wB_right * 0.55, $h_ligne, 'APPRECIATION', 'Appreciation', 'L', false, $f5_fr, $f5_en);
-$pdf->SetFont('Arial', 'B', 8.5);
-$pdf->SetTextColor(0, 130, 0);
-$pdf->Cell($wB_right * 0.45, $h_ligne, u($mention_str), 1, 1, 'C');
+// Appréciation APC de la MOYENNE (10/11/2026) au lieu de « Bien / Passable » :
+// « (cote) appréciation », ex. « (B+) Bien acquis » — sans « Compétences… »
+// (c'est la moyenne générale, pas une compétence). Cote et seuils = ceux des
+// lignes de matières (appreciation()). Ligne reconstruite au même
+// emplacement : case du libellé plus étroite, case de la valeur plus large.
+$w_lbl_app = $wB_right * 0.34;
+$w_app     = $wB_right - $w_lbl_app;
+cell2l($pdf, $w_lbl_app, $h_ligne, 'APPRECIATION', 'Appreciation', 'L', false, $f5_fr, $f5_en);
+$x_app = $pdf->GetX(); $y_app = $pdf->GetY();
+$pdf->Cell($w_app, $h_ligne, '', 1, 0, 'C');   // cadre
+$a_gen = $moy_generale !== null ? appreciation_moyenne_apc($moy_generale) : null;
+if ($a_gen) {
+    $hex = ltrim(appr_color($a_gen['cote']), '#');
+    $pdf->SetTextColor(hexdec(substr($hex, 0, 2)), hexdec(substr($hex, 2, 2)), hexdec(substr($hex, 4, 2)));
+    $txt_app = '(' . $a_gen['cote'] . ') ' . (bulletin_en() ? $a_gen['en'] : $a_gen['fr']);
+    $pdf->SetFont('Arial', 'B', cell2l_taille_ajustee($pdf, $txt_app, 'B', $w_app - 2.4, $lisible ? 10 : 9.5, 6));
+    $pdf->SetXY($x_app, $y_app);
+    $pdf->Cell($w_app, $h_ligne, u($txt_app), 0, 0, 'C');
+}
+$pdf->SetXY($xR, $y_app + $h_ligne);
 $pdf->SetTextColor(0, 0, 0);
 $pdf->SetFont('Arial', '', 6.5);
 
@@ -1070,7 +1086,10 @@ $pdf->SetFont('Arial', '', 6);
 // libérée en dessous sert à la signature (cadre de 30 mm en mode 1 page).
 $pdf->SetFont('Arial', '', 8.5);
 $pdf->SetXY($x_obs, $y_dec2 + 1.2);
-$pdf->Cell($w_obs, 4.2, u(lieu_edition_documents() . bt(', le ', ', on ') . date('d-m-Y') . '.'), 0, 1, 'C');
+// Date (10/11/2026, option « Date » de la page Bulletins) : date du jour, ou
+// pointillés à compléter à la main (&date=vide).
+$date_obs = (($_GET['date'] ?? '') === 'vide') ? '....................' : date('d-m-Y') . '.';
+$pdf->Cell($w_obs, 4.2, u(lieu_edition_documents() . bt(', le ', ', on ') . $date_obs), 0, 1, 'C');
 $pdf->SetX($x_obs);
 $pdf->SetFont('Arial', 'I', 7.5);
 $pdf->Cell($w_obs, 3.2, bt('On', 'Le'), 0, 1, 'C');

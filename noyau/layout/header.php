@@ -455,8 +455,21 @@ function lien_actif(string $url): string {
                index.php?onglet=evaluations), réservée au DIRECTEUR (exiger_role()
                y refuse sèchement l'accès aux autres rôles, inutile de proposer le
                raccourci si la page derrière refusera de toute façon). -->
-          <span class="badge-seq"<?= $role === 'DIRECTEUR'
-              ? ' style="cursor:pointer" title="Double-cliquer pour configurer/activer les évaluations" ondblclick="location.href=\'' . APP_URL . '/primaire/pages/parametres/index.php?onglet=evaluations\'"'
+          <?php
+            // Secondaire (10/11/2026) : double-clic -> Paramètres > Évaluations,
+            // où l'on change la séquence active (mêmes rôles que la page :
+            // ADMIN, PROVISEUR, FONDATEUR, et le compte propriétaire).
+            $seq_dblclic = '';
+            if (function_exists('type_enseignement_courant') && type_enseignement_courant() === 'secondaire') {
+                if (in_array($role, ['ADMIN', 'PROVISEUR', 'FONDATEUR'], true) || (function_exists('est_proprietaire_ecole') && est_proprietaire_ecole())) {
+                    $seq_dblclic = APP_URL . '/secondaire/commun/pages/parametres/index.php?onglet=evaluations';
+                }
+            } elseif ($role === 'DIRECTEUR') {
+                $seq_dblclic = APP_URL . '/primaire/pages/parametres/index.php?onglet=evaluations';
+            }
+          ?>
+          <span class="badge-seq"<?= $seq_dblclic !== ''
+              ? ' style="cursor:pointer" title="Double-cliquer pour changer de séquence / configurer les évaluations" ondblclick="location.href=\'' . h($seq_dblclic) . '\'"'
               : '' ?>>
             <i class="bi bi-pencil-square me-1"></i><?= h($seq_act['libelle_seq']) ?>
           </span>
