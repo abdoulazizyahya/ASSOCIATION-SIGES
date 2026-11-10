@@ -56,6 +56,7 @@ $menu = [
     ],
     'Discipline' => [
         ['Discipline', 'secondaire/commun/pages/discipline/index.php', 'shield-exclamation', ['ADMIN','CENSEUR','PROVISEUR','FONDATEUR','SG','ENSEIGNANT'], 'pp'],
+        ['Billets & autorisations', 'secondaire/commun/pages/billets/index.php', 'ticket-perforated', ['ADMIN','PROVISEUR','FONDATEUR','CENSEUR','SG','SECRETAIRE']],
     ],
     // Module Emploi du temps (migration secondaire v17, 15/10/2026) : construit
     // par le Censeur (écriture ADMIN/PROVISEUR/CENSEUR, voir _edt_lib.php),

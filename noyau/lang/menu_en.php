@@ -60,6 +60,7 @@ return [
     'Contacts des parents'      => 'Parent contacts',
     'Envoyer aux parents'       => 'Message parents',
     'Passerelle SMS'            => 'SMS gateway',
+    'Billets & autorisations'   => 'Passes & permissions',
     'Grille salariale'          => 'Salary scale',
     'Paie'                      => 'Payroll',
     'Avances sur salaire'       => 'Salary advances',

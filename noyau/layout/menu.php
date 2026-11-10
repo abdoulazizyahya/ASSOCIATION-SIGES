@@ -64,6 +64,7 @@ $menu = [
     // dans header.php, agent_est_aussi_enseignant() dans fonctions.php).
     'Discipline' => [
         ['Absences',   'primaire/pages/absences/index.php',    'person-x', ['DIRECTEUR','ENSEIGNANT','SECRETAIRE']],
+        ['Billets & autorisations', 'secondaire/commun/pages/billets/index.php', 'ticket-perforated', ['DIRECTEUR','SECRETAIRE','FONDATEUR']],
     ],
     // Pédagogie : les deux pistes de notation coexistent (l'école est
     // bilingue français/arabe) et sont volontairement regroupées séparément —
