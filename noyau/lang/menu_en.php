@@ -59,6 +59,7 @@ return [
     'Comptes utilisateurs'      => 'User accounts',
     'Contacts des parents'      => 'Parent contacts',
     'Envoyer aux parents'       => 'Message parents',
+    'Passerelle SMS'            => 'SMS gateway',
     'Grille salariale'          => 'Salary scale',
     'Paie'                      => 'Payroll',
     'Avances sur salaire'       => 'Salary advances',

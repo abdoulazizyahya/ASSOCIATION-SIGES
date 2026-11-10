@@ -40,6 +40,7 @@ $menu = [
         // Contacts des parents (10/11/2026) : base des SMS / WhatsApp.
         ['Contacts des parents', 'secondaire/commun/pages/communication/contacts_parents.php', 'telephone', ['ADMIN','PROVISEUR','FONDATEUR','CENSEUR','SG','SECRETAIRE','INTENDANT']],
         ['Envoyer aux parents', 'secondaire/commun/pages/communication/envoyer.php', 'send', ['ADMIN','PROVISEUR','FONDATEUR','CENSEUR','SG','SECRETAIRE','INTENDANT']],
+        ['Passerelle SMS', 'secondaire/commun/pages/communication/passerelle.php', 'phone', ['ADMIN','PROVISEUR','FONDATEUR']],
     ],
     // 'pp' (5e élément) : pour l'ENSEIGNANT, entrée affichée seulement s'il est
     // professeur principal d'une classe (menu_entree_visible(), 24/10/2026).

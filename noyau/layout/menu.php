@@ -25,6 +25,7 @@ $menu = [
         // Contacts des parents (10/11/2026) : module commun aux deux types — base des SMS / WhatsApp.
         ['Contacts des parents', 'secondaire/commun/pages/communication/contacts_parents.php', 'telephone', ['DIRECTEUR','SECRETAIRE','COMPTABLE','FONDATEUR']],
         ['Envoyer aux parents', 'secondaire/commun/pages/communication/envoyer.php', 'send', ['DIRECTEUR','SECRETAIRE','COMPTABLE','FONDATEUR']],
+        ['Passerelle SMS', 'secondaire/commun/pages/communication/passerelle.php', 'phone', ['DIRECTEUR','FONDATEUR']],
     ],
 
     // Finances : remontée au-dessus de Pédagogie (demande explicite) — le

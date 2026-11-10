@@ -14,6 +14,7 @@
 require_once __DIR__ . '/../../../../config/config.php';
 require_once __DIR__ . '/../../../../noyau/connexion.php';
 require_once __DIR__ . '/../../../../noyau/fonctions.php';
+require_once __DIR__ . '/_passerelle_lib.php';
 
 $secondaire = type_enseignement_courant() === 'secondaire';
 exiger_role($secondaire ? ['ADMIN', 'PROVISEUR', 'FONDATEUR', 'CENSEUR', 'SG', 'SECRETAIRE', 'INTENDANT'] : ['DIRECTEUR', 'SECRETAIRE', 'COMPTABLE', 'FONDATEUR']);
@@ -171,6 +172,8 @@ $identique = $genere && $lignes && count(array_unique(array_column($lignes, 'tex
 $nums_uniques = [];
 foreach ($lignes as $l) foreach ($l['nums'] as $n) $nums_uniques[$n] = $n;
 $nums_uniques = array_values($nums_uniques);
+$gw_actif    = sms_gw_actif();        // passerelle SMS (téléphone de l'école) : envoi automatique
+$gw_peut_cfg = sms_gw_peut_configurer();
 $cle_campagne = 'comm_' . md5($type . '|' . $id_classe . '|' . $id_trim . '|' . $modele . '|' . date('Y-m-d'));
 
 $titre_page = 'Envoyer aux parents';
@@ -251,47 +254,65 @@ require_once __DIR__ . '/../../../../noyau/layout/header.php';
 </div>
 
 <?php if ($lignes): ?>
-<?php if ($identique): ?>
-<!-- Message identique : SMS groupé par lots -->
-<div class="card mb-3">
-  <div class="card-body">
-    <div class="fw-semibold mb-1"><i class="bi bi-people me-1"></i>SMS groupé — <?= count($nums_uniques) ?> numéro(s) différent(s)</div>
-    <div class="d-flex flex-wrap align-items-center gap-2 mb-2" style="font-size:.8rem">
-      <label>Numéros par envoi <input type="number" id="taille-lot" class="form-control form-control-sm d-inline-block" style="width:80px" min="1" max="100" value="20"></label>
-      <label>Séparateur <select id="separateur" class="form-select form-select-sm d-inline-block" style="width:90px"><option value=",">virgule</option><option value=";">point-virgule</option></select></label>
-      <span class="text-muted">Si l'application Messages ne prend que le 1er numéro, essayez l'autre séparateur. Réglage Android conseillé : messages de groupe envoyés en <em>SMS individuels</em>, pas en MMS.</span>
-    </div>
-    <div id="lots" class="d-flex flex-wrap gap-2"></div>
-    <button type="button" class="btn btn-outline-secondary btn-sm mt-2" onclick="copierNumeros()"><i class="bi bi-clipboard me-1"></i>Copier tous les numéros</button>
-  </div>
-</div>
-<?php endif; ?>
-
-<!-- Envoi en série (un message par parent) -->
+<!-- Envoi à la sélection (10/11/2026) : cocher, puis « Envoyer à la sélection » -->
 <div class="card">
   <div class="card-body">
     <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2">
-      <div class="fw-semibold"><i class="bi bi-collection me-1"></i>Envoi en série <span class="text-muted fw-normal" id="avancement" style="font-size:.8rem"></span></div>
-      <div class="d-flex gap-2">
-        <button type="button" class="btn btn-success btn-sm" onclick="envoyerSuivant('sms')"><i class="bi bi-chat-dots me-1"></i>SMS au suivant</button>
-        <button type="button" class="btn btn-sm text-white" style="background:#16a34a" onclick="envoyerSuivant('wa')"><i class="bi bi-whatsapp me-1"></i>WhatsApp au suivant</button>
-        <button type="button" class="btn btn-outline-secondary btn-sm" onclick="if(confirm('Tout remettre à « non envoyé » ?')) reinitialiser()"><i class="bi bi-arrow-counterclockwise"></i></button>
+      <div class="d-flex align-items-center gap-2">
+        <input type="checkbox" class="form-check-input" id="sel-tous" checked title="Tout cocher / décocher">
+        <label for="sel-tous" class="fw-semibold mb-0">Destinataires</label>
+        <span class="text-muted" id="avancement" style="font-size:.8rem"></span>
+      </div>
+      <div class="d-flex flex-wrap gap-2">
+        <?php if ($gw_actif): ?>
+          <button type="button" class="btn btn-success btn-sm" onclick="envoyerSelection('auto')" title="Envoi automatique par le téléphone de l'école (passerelle SMS)">
+            <i class="bi bi-lightning-charge me-1"></i>Envoyer à la sélection (SMS automatique)</button>
+        <?php endif; ?>
+        <button type="button" class="btn btn-<?= $gw_actif ? 'outline-' : '' ?>success btn-sm" onclick="envoyerSelection('sms')" title="Ouvre l'application Messages du téléphone : appuyer sur Envoyer, revenir — le suivant s'ouvre tout seul">
+          <i class="bi bi-chat-dots me-1"></i>Envoyer à la sélection (SMS)</button>
+        <button type="button" class="btn btn-sm text-white" style="background:#16a34a" onclick="envoyerSelection('wa')" title="Ouvre WhatsApp pour chaque parent : appuyer sur Envoyer, revenir — le suivant s'ouvre tout seul">
+          <i class="bi bi-whatsapp me-1"></i>Envoyer à la sélection (WhatsApp)</button>
+        <button type="button" class="btn btn-outline-secondary btn-sm" onclick="if(confirm('Remettre tous les messages à « non envoyé » ?')) reinitialiser()" title="Recommencer"><i class="bi bi-arrow-counterclockwise"></i></button>
       </div>
     </div>
+
+    <div id="bandeau-envoi" class="alert alert-info py-2 d-none" style="font-size:.84rem">
+      <span id="bandeau-texte"></span>
+      <button type="button" class="btn btn-sm btn-outline-primary ms-2" onclick="suivant()"><i class="bi bi-play-fill"></i> Continuer</button>
+      <button type="button" class="btn btn-sm btn-outline-dark ms-1" onclick="arreterEnvoi()"><i class="bi bi-pause-fill"></i> Arrêter</button>
+    </div>
+
+    <?php if (!$gw_actif): ?>
+    <div class="text-muted mb-2" style="font-size:.78rem">
+      <i class="bi bi-info-circle me-1"></i>Sans passerelle, le téléphone demande d'appuyer sur « Envoyer » pour chaque message (sécurité d'Android) : revenez ensuite dans SIGES, le message suivant s'ouvre tout seul.
+      <?php if ($identique): ?>Message identique pour tous : les numéros sont regroupés par lots dans un seul SMS groupé.<?php endif; ?>
+      <?php if ($gw_peut_cfg): ?><br><a href="<?= APP_URL ?>/secondaire/commun/pages/communication/passerelle.php"><i class="bi bi-lightning-charge"></i> Activer l'envoi automatique de tous les SMS en un clic (passerelle SMS gratuite)</a><?php endif; ?>
+    </div>
+    <?php endif; ?>
+
+    <?php if ($identique): ?>
+    <div class="d-flex flex-wrap align-items-center gap-2 mb-2" style="font-size:.78rem">
+      <label>SMS groupé : numéros par envoi <input type="number" id="taille-lot" class="form-control form-control-sm d-inline-block" style="width:70px" min="1" max="100" value="20"></label>
+      <label>Séparateur <select id="separateur" class="form-select form-select-sm d-inline-block" style="width:110px"><option value=",">virgule</option><option value=";">point-virgule</option></select></label>
+      <span class="text-muted">Si Messages ne garde que le 1er numéro, changez de séparateur. Réglage Android conseillé : groupe envoyé en <em>SMS individuels</em> (pas MMS).</span>
+    </div>
+    <?php endif; ?>
+
     <div class="table-responsive">
       <table class="table table-sm align-middle mb-0">
         <tbody>
         <?php $k = 0; foreach ($lignes as $l): foreach ($l['nums'] as $n): ?>
           <tr class="comm-ligne" data-k="<?= $k ?>" data-tel="<?= h($n) ?>" data-texte="<?= h($l['texte']) ?>">
-            <td style="width:34px"><input type="checkbox" class="form-check-input comm-fait" title="Envoyé"></td>
+            <td style="width:34px"><input type="checkbox" class="form-check-input comm-sel" checked title="Sélectionner"></td>
             <td>
-              <div class="fw-semibold" style="font-size:.82rem"><?= h($l['eleve']) ?> <span class="text-muted fw-normal">— <?= h($l['classe']) ?></span></div>
+              <div class="fw-semibold" style="font-size:.82rem"><?= h($l['eleve']) ?> <span class="text-muted fw-normal">— <?= h($l['classe']) ?></span>
+                <span class="badge comm-etat ms-1"></span></div>
               <div style="font-size:.76rem"><a href="tel:+237<?= h($n) ?>"><?= h(tel_affiche($n)) ?></a> <span class="text-muted"><?= h($l['qui']) ?></span></div>
               <div class="comm-texte mt-1"><?= h($l['texte']) ?></div>
             </td>
             <td class="text-end text-nowrap" style="width:100px">
-              <button type="button" class="btn btn-sm btn-outline-success comm-btn" onclick="envoyerLigne(<?= $k ?>,'sms')" title="SMS"><i class="bi bi-chat-dots"></i></button>
-              <button type="button" class="btn btn-sm btn-outline-success comm-btn" onclick="envoyerLigne(<?= $k ?>,'wa')" title="WhatsApp"><i class="bi bi-whatsapp"></i></button>
+              <button type="button" class="btn btn-sm btn-outline-success comm-btn" onclick="envoyerLigne(<?= $k ?>,'sms')" title="SMS à ce parent"><i class="bi bi-chat-dots"></i></button>
+              <button type="button" class="btn btn-sm btn-outline-success comm-btn" onclick="envoyerLigne(<?= $k ?>,'wa')" title="WhatsApp à ce parent"><i class="bi bi-whatsapp"></i></button>
             </td>
           </tr>
         <?php $k++; endforeach; endforeach; ?>
@@ -319,59 +340,110 @@ require_once __DIR__ . '/../../../../noyau/layout/header.php';
 })();
 
 var CLE = <?= json_encode($cle_campagne) ?>;
-var NUMS = <?= json_encode($nums_uniques) ?>;
-var TEXTE_GROUPE = <?= json_encode($identique ? $lignes[0]['texte'] : '') ?>;
-function lireFaits() { try { return JSON.parse(localStorage.getItem(CLE) || '{}'); } catch (e) { return {}; } }
-function ecrireFaits(f) { try { localStorage.setItem(CLE, JSON.stringify(f)); } catch (e) {} }
+var URL_GW = <?= json_encode(APP_URL . '/secondaire/commun/pages/communication/envoyer_passerelle.php') ?>;
+var CSRF = <?= json_encode(csrf_generer()) ?>;
+function lireEtat() { try { return JSON.parse(localStorage.getItem(CLE) || '{}'); } catch (e) { return {}; } }
+function ecrireEtat(f) { try { localStorage.setItem(CLE, JSON.stringify(f)); } catch (e) {} }
+function lireAuto() { try { return JSON.parse(localStorage.getItem(CLE + '_auto') || 'null'); } catch (e) { return null; } }
+function ecrireAuto(a) { try { a ? localStorage.setItem(CLE + '_auto', JSON.stringify(a)) : localStorage.removeItem(CLE + '_auto'); } catch (e) {} }
+function lignes() { return Array.prototype.slice.call(document.querySelectorAll('.comm-ligne')); }
+function ligneK(k) { return document.querySelector('.comm-ligne[data-k="' + k + '"]'); }
+function selectionnees() { var f = lireEtat(); return lignes().filter(function (t) { return t.querySelector('.comm-sel').checked && f[t.dataset.k] !== 'ok'; }); }
 function lienSms(nums, texte) {
   var sep = (document.getElementById('separateur') || {}).value || ',';
   return 'sms:' + nums.map(function (n) { return '+237' + n; }).join(sep) + '?body=' + encodeURIComponent(texte);
 }
 function lienWa(n, texte) { return 'https://wa.me/237' + n + '?text=' + encodeURIComponent(texte); }
-function lignes() { return Array.prototype.slice.call(document.querySelectorAll('.comm-ligne')); }
+
 function majAffichage() {
-  var f = lireFaits(), ls = lignes(), nb = 0;
-  ls.forEach(function (tr) { var ok = !!f[tr.dataset.k]; tr.classList.toggle('fait', ok); tr.querySelector('.comm-fait').checked = ok; if (ok) nb++; });
-  var a = document.getElementById('avancement'); if (a) a.textContent = '— ' + nb + ' / ' + ls.length + ' envoyé(s)';
-  document.querySelectorAll('.lot-btn').forEach(function (b) { b.classList.toggle('btn-success', !!f['lot' + b.dataset.i]); b.classList.toggle('btn-outline-success', !f['lot' + b.dataset.i]); });
+  var f = lireEtat(), ls = lignes(), nb = 0, ko = 0;
+  ls.forEach(function (tr) {
+    var e = f[tr.dataset.k], b = tr.querySelector('.comm-etat');
+    tr.classList.toggle('fait', e === 'ok');
+    if (e === 'ok') { nb++; b.textContent = '✓ envoyé'; b.style.background = '#d1fae5'; b.style.color = '#065f46'; }
+    else if (e && e !== 'ok') { ko++; b.textContent = '✗ échec'; b.title = e; b.style.background = '#fee2e2'; b.style.color = '#991b1b'; }
+    else { b.textContent = ''; b.title = ''; }
+  });
+  var nsel = lignes().filter(function (t) { return t.querySelector('.comm-sel').checked; }).length;
+  var a = document.getElementById('avancement');
+  if (a) a.textContent = '— ' + nsel + ' sélectionné(s) · ' + nb + ' / ' + ls.length + ' envoyé(s)' + (ko ? ' · ' + ko + ' échec(s)' : '');
 }
-function marquer(cle) { var f = lireFaits(); f[cle] = 1; ecrireFaits(f); majAffichage(); }
+function marquer(k, etat) { var f = lireEtat(); f[k] = etat; ecrireEtat(f); majAffichage(); }
+function bandeau(txt) { var b = document.getElementById('bandeau-envoi'); if (!b) return; b.classList.toggle('d-none', !txt); document.getElementById('bandeau-texte').textContent = txt || ''; }
+
+// Un parent : ouvre Messages ou WhatsApp (le téléphone exige un appui sur « Envoyer »).
 function envoyerLigne(k, canal) {
-  var tr = document.querySelector('.comm-ligne[data-k="' + k + '"]'); if (!tr) return;
-  marquer(k);
+  var tr = ligneK(k); if (!tr) return;
+  marquer(k, 'ok');
   window.location.href = canal === 'wa' ? lienWa(tr.dataset.tel, tr.dataset.texte) : lienSms([tr.dataset.tel], tr.dataset.texte);
 }
-function envoyerSuivant(canal) {
-  var f = lireFaits(), tr = lignes().filter(function (t) { return !f[t.dataset.k]; })[0];
-  if (!tr) { alert('Tous les messages ont été envoyés.'); return; }
-  tr.scrollIntoView({ block: 'center' });
-  envoyerLigne(tr.dataset.k, canal);
+
+// « Envoyer à la sélection »
+var envoiAutoEnCours = false;
+function envoyerSelection(canal) {
+  var sel = selectionnees();
+  if (!sel.length) { alert('Aucun destinataire sélectionné à envoyer.'); return; }
+  if (canal === 'auto') return envoyerParPasserelle(sel);
+  if (!confirm(sel.length + ' message(s) à envoyer par ' + (canal === 'wa' ? 'WhatsApp' : 'SMS') + '. Le téléphone ouvrira chaque message : appuyez sur « Envoyer » puis revenez dans SIGES, le suivant s\'ouvrira tout seul.')) return;
+  ecrireAuto({ canal: canal });
+  suivant();
 }
-function reinitialiser() { ecrireFaits({}); majAffichage(); }
-function construireLots() {
-  var zone = document.getElementById('lots'); if (!zone) return;
-  var taille = Math.max(1, parseInt(document.getElementById('taille-lot').value, 10) || 20);
-  zone.innerHTML = '';
-  for (var i = 0; i * taille < NUMS.length; i++) {
-    (function (i) {
-      var lot = NUMS.slice(i * taille, (i + 1) * taille), b = document.createElement('button');
-      b.type = 'button'; b.className = 'btn btn-sm btn-outline-success lot-btn'; b.dataset.i = i;
-      b.innerHTML = '<i class="bi bi-chat-dots me-1"></i>Lot ' + (i + 1) + ' (' + lot.length + ')';
-      b.onclick = function () { marquer('lot' + i); window.location.href = lienSms(lot, TEXTE_GROUPE); };
-      zone.appendChild(b);
-    })(i);
+// Ouvre le message suivant de la sélection (SMS : regroupe les messages identiques par lots).
+function suivant() {
+  var a = lireAuto(); if (!a) return;
+  var sel = selectionnees();
+  if (!sel.length) { ecrireAuto(null); bandeau(''); alert('Envoi terminé.'); return; }
+  bandeau('Envoi en cours (' + (a.canal === 'wa' ? 'WhatsApp' : 'SMS') + ') — reste ' + sel.length + ' message(s). Après chaque envoi, revenez dans SIGES.');
+  if (a.canal === 'sms') {
+    var texte = sel[0].dataset.texte, taille = Math.max(1, parseInt((document.getElementById('taille-lot') || {}).value, 10) || 20);
+    var lot = sel.filter(function (t) { return t.dataset.texte === texte; }).slice(0, taille);
+    var nums = [], vus = {};
+    lot.forEach(function (t) { if (!vus[t.dataset.tel]) { vus[t.dataset.tel] = 1; nums.push(t.dataset.tel); } marquer(t.dataset.k, 'ok'); });
+    window.location.href = lienSms(nums, texte);
+  } else {
+    marquer(sel[0].dataset.k, 'ok');
+    window.location.href = lienWa(sel[0].dataset.tel, sel[0].dataset.texte);
   }
-  majAffichage();
 }
-function copierNumeros() {
-  var t = NUMS.map(function (n) { return '+237' + n; }).join(', ');
-  if (navigator.clipboard) navigator.clipboard.writeText(t).then(function () { alert(NUMS.length + ' numéro(s) copiés.'); });
-}
-document.addEventListener('change', function (e) {
-  if (e.target.classList.contains('comm-fait')) { var f = lireFaits(), k = e.target.closest('tr').dataset.k; if (e.target.checked) f[k] = 1; else delete f[k]; ecrireFaits(f); majAffichage(); }
-  if (e.target.id === 'taille-lot' || e.target.id === 'separateur') construireLots();
+function arreterEnvoi() { ecrireAuto(null); envoiAutoEnCours = false; bandeau(''); }
+// Retour dans SIGES après un envoi : on ouvre le suivant.
+document.addEventListener('visibilitychange', function () {
+  if (document.visibilityState === 'visible' && lireAuto()) setTimeout(function () { if (document.visibilityState === 'visible' && lireAuto()) suivant(); }, 1200);
 });
-construireLots(); majAffichage();
+
+// Passerelle : envoi automatique, par paquets de 10.
+function envoyerParPasserelle(sel) {
+  if (envoiAutoEnCours) return;
+  if (!confirm(sel.length + ' SMS vont être envoyés automatiquement par le téléphone de l\'école. Continuer ?')) return;
+  envoiAutoEnCours = true;
+  var reste = sel.slice(), total = sel.length, faits = 0;
+  function paquet() {
+    if (!envoiAutoEnCours) { bandeau(''); return; }
+    if (!reste.length) { envoiAutoEnCours = false; bandeau(''); majAffichage(); alert('Envoi terminé : ' + faits + ' / ' + total + ' transmis au téléphone de l\'école.'); return; }
+    var lot = reste.splice(0, 10);
+    bandeau('Envoi automatique : ' + faits + ' / ' + total + '…');
+    var fd = new FormData();
+    fd.append('csrf', CSRF);
+    fd.append('items', JSON.stringify(lot.map(function (t) { return { k: t.dataset.k, tel: t.dataset.tel, texte: t.dataset.texte }; })));
+    fetch(URL_GW, { method: 'POST', body: fd, credentials: 'same-origin' })
+      .then(function (r) { return r.json(); })
+      .then(function (j) {
+        if (!j.ok) { envoiAutoEnCours = false; bandeau(''); alert('Envoi interrompu : ' + (j.erreur || 'erreur')); return; }
+        lot.forEach(function (t) { var r = j.resultats[t.dataset.k]; marquer(t.dataset.k, r && r.ok ? 'ok' : (r ? r.erreur : 'échec')); if (r && r.ok) faits++; });
+        setTimeout(paquet, 300);
+      })
+      .catch(function () { envoiAutoEnCours = false; bandeau(''); alert('Connexion perdue : envoi interrompu. Relancez « Envoyer à la sélection » pour continuer.'); });
+  }
+  paquet();
+}
+
+function reinitialiser() { ecrireEtat({}); ecrireAuto(null); bandeau(''); majAffichage(); }
+document.addEventListener('change', function (e) {
+  if (e.target.id === 'sel-tous') lignes().forEach(function (t) { t.querySelector('.comm-sel').checked = e.target.checked; });
+  if (e.target.id === 'sel-tous' || e.target.classList.contains('comm-sel')) majAffichage();
+});
+majAffichage();
+if (lireAuto()) bandeau('Envoi en cours — « Continuer » ouvre le message suivant, « Arrêter » met fin à l\'envoi.');
 </script>
 
 <?php require_once __DIR__ . '/../../../../noyau/layout/footer.php'; ?>
