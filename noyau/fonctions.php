@@ -2068,11 +2068,16 @@ function provisionner_trimestres_annee(int $id_annee): void {
     // le 16/09/2026, étape 9/Notes, quand ce contrôle était imbriqué dans
     // la seule branche « trimestre absent »).
     if (!db_val("SELECT COUNT(*) FROM sequence s JOIN trimestre t ON t.id=s.id_trim WHERE t.id_annee=?", [$id_annee])) {
+        // Numérotation continue sur l'année (10/11/2026, migration secondaire
+        // v36) : Séquence 1-2 au 1er trimestre, 3-4 au 2e, 5-6 au 3e — et
+        // non plus « Séquence 1, Séquence 2 » dans chaque trimestre.
         $trims = db_all("SELECT id FROM trimestre WHERE id_annee=? ORDER BY ordre", [$id_annee]);
+        $n_seq = 0;
         foreach ($trims as $tr) {
-            foreach (['Séquence 1', 'Séquence 2'] as $j => $lib_s) {
+            for ($j = 0; $j < 2; $j++) {
+                $n_seq++;
                 db_exec("INSERT INTO sequence (libelle, ordre, active, id_trim) VALUES (?, ?, 0, ?)",
-                        [$lib_s, $j + 1, $tr['id']]);
+                        ['Séquence ' . $n_seq, $n_seq, $tr['id']]);
             }
         }
     }
