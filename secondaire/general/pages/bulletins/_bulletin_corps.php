@@ -1115,7 +1115,7 @@ $pdf->SetFont('Arial', '', 8.5);
 $pdf->SetXY($x_obs, $y_dec2 + 1.2);
 // Date (10/11/2026, option « Date » de la page Bulletins) : date du jour, ou
 // pointillés à compléter à la main (&date=vide).
-$date_obs = (($_GET['date'] ?? '') === 'vide') ? '....................' : date('d-m-Y') . '.';
+$date_obs = bulletin_date_obs();
 $pdf->Cell($w_obs, 4.2, u(lieu_edition_documents() . bt(', le ', ', on ') . $date_obs), 0, 1, 'C');
 $pdf->SetX($x_obs);
 $pdf->SetFont('Arial', 'I', 7.5);

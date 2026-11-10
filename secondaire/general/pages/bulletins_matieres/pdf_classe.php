@@ -1223,7 +1223,7 @@ foreach ($eleves as $el) {
     // Police agrandie (demande explicite).
     $pdf->SetFont('Arial', '', 8.5);
     $pdf->SetXY($ml + $wDec, $yd2 + 6);
-    $pdf->Cell($wObs, 5.5, uc(lieu_edition_documents() . bt(', le ', ', on ') . date('d-m-Y') . '.'), 0, 1, 'C');
+    $pdf->Cell($wObs, 5.5, uc(lieu_edition_documents() . bt(', le ', ', on ') . bulletin_date_obs()), 0, 1, 'C');
     $pdf->SetX($ml + $wDec);
     $pdf->SetFont('Arial', 'I', 7.5);
     $pdf->Cell($wObs, 4.5, bt('On', 'Le'), 0, 1, 'C');

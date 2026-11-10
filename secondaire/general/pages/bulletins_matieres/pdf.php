@@ -1261,7 +1261,7 @@ bulletin_cadre_bas($pdf, $x_dec, $w_dec, $w_obs, $y_dec2, $y_fill, $y_dec2 + $h_
 // hauteur réelle. Police agrandie (demande explicite).
 $pdf->SetFont('Arial', '', 8.5);
 $pdf->SetXY($x_obs, $y_dec2 + 6);
-$pdf->Cell($w_obs, 5.5, u(lieu_edition_documents() . bt(', le ', ', on ') . date('d-m-Y') . '.'), 0, 1, 'C');
+$pdf->Cell($w_obs, 5.5, u(lieu_edition_documents() . bt(', le ', ', on ') . bulletin_date_obs()), 0, 1, 'C');
 $pdf->SetX($x_obs);
 $pdf->SetFont('Arial', 'I', 7.5);
 $pdf->Cell($w_obs, 4.5, bt('On', 'Le'), 0, 1, 'C');

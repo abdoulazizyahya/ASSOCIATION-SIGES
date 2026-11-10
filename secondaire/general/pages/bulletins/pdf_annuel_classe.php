@@ -821,7 +821,7 @@ foreach ($eleves as $el) {
         $stat   = $mat_stats[$id_mat] ?? ['min' => null, 'avg' => null, 'max' => null, 'avgs_sorted' => []];
         $rg     = ($avg !== null && !empty($stat['avgs_sorted'])) ? $rang_eleve($avg, $stat['avgs_sorted']) : null;
         $nxc    = $avg !== null ? $avg * $d['coef'] : null;
-        $men    = $mention_mat($avg);
+        $men    = $avg === null ? '' : apc_mention_matiere_2l($avg);   // même échelle que le trimestriel (10/11/2026)
 
         $bg = ($avg !== null && $avg < 10) ? [255, 235, 235] : [255, 255, 255];
         $pdf->SetFillColor(...$bg);
@@ -1023,10 +1023,10 @@ foreach ($eleves as $el) {
     $pdf->SetX($xFar);
     cell2l_c($pdf, $wFar, $hFar, 'COTE', 'Grade', 'C', true, 9, 7.5);
     $pdf->Ln($hFar); $pdf->SetX($xFar);
-    $pdf->SetFont('Arial', 'B', 12);
-    $pdf->SetTextColor(0, 130, 0);
-    $pdf->Cell($wFar, $hFar, uc($cote_str_c), 1, 1, 'C');
-    $pdf->SetTextColor(0, 0, 0);
+    // Cote APC (10/11/2026) : même échelle que le trimestriel, libellé sous la cote.
+    $y_cote_c = $pdf->GetY();
+    apc_case_cote($pdf, $xFar, $y_cote_c, $wFar, $hFar, $moy_gen, 'uc');
+    $pdf->SetXY($xFar, $y_cote_c + $hFar);
     $pdf->SetFont('Arial', '', 6.5);
 
     $pdf->SetY($y_bas + 9 * $h_ligne);
@@ -1118,7 +1118,7 @@ foreach ($eleves as $el) {
     // Signature
     $pdf->SetFont('Arial', '', 8.5);
     $pdf->SetXY($ml + $wDec, $yd2 + 6);
-    $pdf->Cell($wObs, 5.5, uc(lieu_edition_documents() . bt(', le ', ', on ') . date('d-m-Y') . '.'), 0, 1, 'C');
+    $pdf->Cell($wObs, 5.5, uc(lieu_edition_documents() . bt(', le ', ', on ') . bulletin_date_obs()), 0, 1, 'C');
     $pdf->SetX($ml + $wDec);
     $pdf->SetFont('Arial', 'I', 7.5);
     $pdf->Cell($wObs, 4.5, bt('On', 'Le'), 0, 1, 'C');

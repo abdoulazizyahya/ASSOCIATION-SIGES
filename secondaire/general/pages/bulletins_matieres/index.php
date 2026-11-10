@@ -63,6 +63,11 @@ $vue       = in_array($_GET['vue'] ?? '', ['trim', 'annee'], true) ? $_GET['vue'
 $id_eleve  = (int)($_GET['eleve']  ?? 0);
 $ordre     = in_array($_GET['ordre'] ?? '', ['alpha','merite']) ? $_GET['ordre'] : 'alpha';
 $voir_tous = isset($_GET['voir_tous']);
+// Date sous les observations du chef d'établissement (10/11/2026) : 'jour'
+// ou 'vide' (« Ville, le .......... »). Mémorisé pour la session, partagé
+// avec la page Bulletins APC.
+if (in_array($_GET['date'] ?? '', ['jour', 'vide'], true)) $_SESSION['bull_sec_date'] = $_GET['date'];
+$date_bull = $_SESSION['bull_sec_date'] ?? 'jour';
 // Langue du bulletin (école bilingue/anglophone, 01/11/2026) : français
 // traduit en anglais, ou anglais traduit en français (section anglophone).
 // Par défaut la langue de la section de la classe ; choix mémorisé par classe.
@@ -248,6 +253,7 @@ function pdf_url_bull(int $id_eleve, string $vue, int $id_trim, int $id_seq, int
         $base .= $vue === 'trim' ? '&trim='.$id_trim : '&seq='.$id_seq;
     }
     $base .= '&langue=' . ($GLOBALS['langue_bull'] ?? 'fr');
+    if (($GLOBALS['date_bull'] ?? 'jour') === 'vide') $base .= '&date=vide';
     if ($dl) $base .= '&dl=1';
     return $base;
 }
@@ -259,6 +265,7 @@ function url_classe_bull(int $id_classe, string $vue, int $id_trim, int $id_seq,
         $base .= $vue === 'trim' ? '&trim='.$id_trim : '&seq='.$id_seq;
     }
     $base .= '&langue=' . ($GLOBALS['langue_bull'] ?? 'fr');
+    if (($GLOBALS['date_bull'] ?? 'jour') === 'vide') $base .= '&date=vide';
     if ($dl) $base .= '&dl=1';
     return $base;
 }
@@ -357,6 +364,21 @@ if ($vue === 'trim' && $id_classe) echo sec_controle_notes_html((int) $id_classe
           <a href="?vue=<?= $vue ?>&classe=<?= $id_classe ?>&ordre=merite<?= $id_eleve?'&eleve='.$id_eleve:'' ?>" data-ajax-nav
              class="ordre-btn <?= $ordre==='merite'?'active':'' ?>">
             <i class="bi bi-trophy me-1"></i>Mérite
+          </a>
+        </div>
+      </div>
+      <?php $base_date = '?vue=' . $vue . '&classe=' . $id_classe . '&ordre=' . $ordre . ($id_eleve ? '&eleve=' . $id_eleve : ''); ?>
+      <!-- Date sous les observations du chef d'établissement -->
+      <div class="col-auto">
+        <label class="form-label mb-1" style="font-size:.78rem;font-weight:600;color:#1a3c6b">Date</label>
+        <div class="d-flex gap-1">
+          <a href="<?= h($base_date . '&date=jour') ?>" data-ajax-nav class="ordre-btn <?= $date_bull === 'jour' ? 'active' : '' ?>"
+             title="<?= h(lieu_edition_documents() . ', le ' . date('d-m-Y')) ?>">
+            <i class="bi bi-calendar-check me-1"></i>Du jour
+          </a>
+          <a href="<?= h($base_date . '&date=vide') ?>" data-ajax-nav class="ordre-btn <?= $date_bull === 'vide' ? 'active' : '' ?>"
+             title="<?= h(lieu_edition_documents() . ', le ....................') ?> — à compléter à la main">
+            <i class="bi bi-three-dots me-1"></i>Pointillés
           </a>
         </div>
       </div>

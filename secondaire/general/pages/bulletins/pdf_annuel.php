@@ -877,7 +877,8 @@ foreach ($disciplines as $d) {
     $stat   = $mat_stats[$id_mat] ?? ['min' => null, 'avg' => null, 'max' => null, 'avgs_sorted' => []];
     $rang   = ($avg !== null && !empty($stat['avgs_sorted'])) ? rang_eleve_b($avg, $stat['avgs_sorted']) : null;
     $nxc    = ($avg !== null) ? $avg * $d['coef'] : null;
-    $men    = ($avg !== null) ? mention_mat_b($avg) : '';
+    // Même échelle que le trimestriel (10/11/2026) — apc_mention_matiere_2l().
+    $men    = ($avg !== null) ? apc_mention_matiere_2l($avg) : '';
 
     $bg = ($avg !== null && $avg < 10) ? [255, 235, 235] : [255, 255, 255];
     $pdf->SetFillColor(...$bg);
@@ -1119,10 +1120,11 @@ $pdf->Ln($hFar); $pdf->SetX($xFar);
 $pdf->SetX($xFar);
 cell2l($pdf, $wFar, $hFar, 'COTE', 'Grade', 'C', true, 9, 7.5);
 $pdf->Ln($hFar); $pdf->SetX($xFar);
-$pdf->SetFont('Arial', 'B', 12);
-$pdf->SetTextColor(0, 130, 0);
-$pdf->Cell($wFar, $hFar, u($cote_str), 1, 1, 'C');
-$pdf->SetTextColor(0, 0, 0);
+// Cote APC (10/11/2026) : même échelle que le trimestriel (D à A+) avec
+// « Compétences … acquises » sous la cote, dans la même case.
+$y_cote = $pdf->GetY();
+apc_case_cote($pdf, $xFar, $y_cote, $wFar, $hFar, $moy_generale, 'u');
+$pdf->SetXY($xFar, $y_cote + $hFar);
 $pdf->SetFont('Arial', '', 6.5);
 
 $pdf->SetY($y_bas + 9 * $h_ligne);
@@ -1225,7 +1227,7 @@ $pdf->MultiCell($w_obs, $h_obs_box, '', 'T', 'L');
 // ── 7. Date et signature (à l'intérieur du cadre Observations) ────
 $pdf->SetFont('Arial', '', 8.5);
 $pdf->SetXY($x_obs, $y_dec2 + 6);
-$pdf->Cell($w_obs, 5.5, u(lieu_edition_documents() . bt(', le ', ', on ') . date('d-m-Y') . '.'), 0, 1, 'C');
+$pdf->Cell($w_obs, 5.5, u(lieu_edition_documents() . bt(', le ', ', on ') . bulletin_date_obs()), 0, 1, 'C');
 $pdf->SetX($x_obs);
 $pdf->SetFont('Arial', 'I', 7.5);
 $pdf->Cell($w_obs, 4.5, bt('On', 'Le'), 0, 1, 'C');

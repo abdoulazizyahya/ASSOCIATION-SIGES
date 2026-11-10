@@ -258,6 +258,7 @@ $peut_configurer_sig_bull = signature_politique()["bulletin"];   // signature d�
 function pdf_url_bull(int $id_eleve, string $vue, int $id_trim, int $id_annee, bool $dl=false): string {
     if ($vue === 'annee') {
         $base = APP_URL.'/secondaire/general/pages/bulletins/pdf_annuel.php?eleve='.$id_eleve.'&annee='.$id_annee;
+        if (($GLOBALS['date_bull'] ?? 'jour') === 'vide') $base .= '&date=vide';
     } else {
         $base = APP_URL.'/secondaire/general/pages/bulletins/pdf.php?eleve='.$id_eleve.'&annee='.$id_annee.'&trim='.$id_trim;
         if (($GLOBALS['mise'] ?? 'page') === 'lisible') $base .= '&mise=lisible';
@@ -270,6 +271,7 @@ function pdf_url_bull(int $id_eleve, string $vue, int $id_trim, int $id_annee, b
 function url_classe_bull(int $id_classe, string $vue, int $id_trim, int $id_annee, string $ordre, bool $dl=false, int $id_serie=0): string {
     if ($vue === 'annee') {
         $base = APP_URL.'/secondaire/general/pages/bulletins/pdf_annuel_classe.php?classe='.$id_classe.'&annee='.$id_annee.'&ordre='.$ordre;
+        if (($GLOBALS['date_bull'] ?? 'jour') === 'vide') $base .= '&date=vide';
     } else {
         $base = APP_URL.'/secondaire/general/pages/bulletins/pdf_classe.php?classe='.$id_classe.'&annee='.$id_annee.'&ordre='.$ordre.'&trim='.$id_trim;
         if (($GLOBALS['mise'] ?? 'page') === 'lisible') $base .= '&mise=lisible';
@@ -401,7 +403,10 @@ if ($vue === 'trim' && $id_classe) echo sec_controle_notes_html((int) $id_classe
           </a>
         </div>
       </div>
-      <!-- Date sous les observations du chef d'établissement -->
+      <?php endif; ?>
+      <?php $base_mise = '?vue=' . $vue . '&classe=' . $id_classe . '&ordre=' . $ordre
+                   . ($id_serie ? '&serie=' . $id_serie : '') . ($id_eleve ? '&eleve=' . $id_eleve : ''); ?>
+      <!-- Date sous les observations du chef d'établissement (trimestriel et annuel) -->
       <div class="col-auto">
         <label class="form-label mb-1" style="font-size:.78rem;font-weight:600;color:#1a3c6b">Date</label>
         <div class="d-flex gap-1">
@@ -415,7 +420,6 @@ if ($vue === 'trim' && $id_classe) echo sec_controle_notes_html((int) $id_classe
           </a>
         </div>
       </div>
-      <?php endif; ?>
       <?php if ($choix_langue):
         $base_langue = '?vue=' . $vue . '&classe=' . $id_classe . '&ordre=' . $ordre
                      . ($id_serie ? '&serie=' . $id_serie : '') . ($id_eleve ? '&eleve=' . $id_eleve : ''); ?>

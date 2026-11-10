@@ -2639,6 +2639,91 @@ function appreciation($note): array {
     return            ['COTE' => 'A+', 'APPR1_FR' => 'Compétences TB acquises',   'APPR2_FR' => 'CTBA','APPR1_EN' => 'Competences Very Well Acquired','APPR2_EN' => 'CVWA'];
 }
 
+/**
+ * Appréciation APC d'une MOYENNE (10/11/2026) : cote d'appreciation()
+ * (mêmes seuils que les lignes de matières) + formule APC « Compétences …
+ * acquises » (la moyenne générale est la moyenne des compétences évaluées).
+ * Partagée par les bulletins trimestriel et annuel du général.
+ */
+function appreciation_moyenne_apc(float $moy): ?array {
+    $cote = appreciation($moy)['COTE'] ?? '';
+    $lib = [
+        'D'  => ['Compétences non acquises',         'Competences not acquired',         'CNA',  'CNA'],
+        'C'  => ['Compétences moyennement acquises', 'Competences averagely acquired',   'CMA',  'CAA'],
+        'C+' => ['Compétences acquises',             'Competences acquired',             'CA',   'CA'],
+        'B'  => ['Compétences bien acquises',        'Competences well acquired',        'CBA',  'CWA'],
+        'B+' => ['Compétences bien acquises',        'Competences well acquired',        'CBA',  'CWA'],
+        'A'  => ['Compétences très bien acquises',   'Competences very well acquired',   'CTBA', 'CVWA'],
+        'A+' => ['Compétences très bien acquises',   'Competences very well acquired',   'CTBA', 'CVWA'],
+    ][$cote] ?? null;
+    return $lib ? ['cote' => $cote, 'fr' => $lib[0], 'en' => $lib[1], 'abr_fr' => $lib[2], 'abr_en' => $lib[3]] : null;
+}
+
+/**
+ * Mention d'une matière sur 2 lignes (colonne MENTIONS du bulletin annuel
+ * APC, 10/11/2026) — même échelle que le trimestriel (appreciation()) au
+ * lieu de l'ancienne échelle à 4 niveaux (≥14 / ≥12 / ≥10). Libellés courts
+ * pour tenir en 2 lignes dans une colonne de 20 mm.
+ */
+function apc_mention_matiere_2l(float $a): string {
+    $cote = appreciation($a)['COTE'] ?? '';
+    $en = function_exists('bulletin_en') && bulletin_en();
+    $l2 = [
+        'D'  => ['non acquises',  'not acquired'],
+        'C'  => ['moy. acquises', 'avg. acquired'],
+        'C+' => ['acquises',      'acquired'],
+        'B'  => ['bien acquises', 'well acquired'],
+        'B+' => ['bien acquises', 'well acquired'],
+        'A'  => ['TB acquises',   'very well acquired'],
+        'A+' => ['TB acquises',   'very well acquired'],
+    ][$cote] ?? null;
+    if (!$l2) return '';
+    return ($en ? 'Competences' : 'Compétences') . "\n" . $l2[$en ? 1 : 0];
+}
+
+/**
+ * Case COTE d'un bulletin (annuel) : la cote APC en grand, et sous elle, dans
+ * la MÊME case (sans l'agrandir), « Compétences … acquises » — réduit pour
+ * tenir, sinon abrégé (CBA…). $u : conversion du texte pour FPDF.
+ */
+function apc_case_cote(FPDF $pdf, float $x, float $y, float $w, float $h, ?float $moy, callable $u): void {
+    $pdf->SetXY($x, $y);
+    $pdf->Cell($w, $h, '', 1, 0, 'C');
+    $a = $moy !== null ? appreciation_moyenne_apc($moy) : null;
+    if (!$a) {
+        $pdf->SetFont('Arial', 'B', 12);
+        $pdf->SetXY($x, $y);
+        $pdf->Cell($w, $h, '-', 0, 0, 'C');
+        return;
+    }
+    $hex = ltrim(appr_color($a['cote']), '#');
+    $pdf->SetTextColor(hexdec(substr($hex, 0, 2)), hexdec(substr($hex, 2, 2)), hexdec(substr($hex, 4, 2)));
+    $en  = function_exists('bulletin_en') && bulletin_en();
+    $h1  = $h * 0.58; $h2 = $h - $h1;
+    $pdf->SetFont('Arial', 'B', min(12, $h1 / 0.3528 * 0.9));
+    $pdf->SetXY($x, $y + 0.2);
+    $pdf->Cell($w, $h1, $u($a['cote']), 0, 0, 'C');
+    $lib = $en ? $a['en'] : $a['fr'];
+    $dispo = $w - 2;
+    $t = min(7, $h2 / 0.3528 * 0.9);
+    $pdf->SetFont('Arial', 'B', $t);
+    while ($t > 5 && $pdf->GetStringWidth($u($lib)) > $dispo) { $t -= 0.25; $pdf->SetFont('Arial', 'B', $t); }
+    if ($pdf->GetStringWidth($u($lib)) > $dispo) $lib = $en ? $a['abr_en'] : $a['abr_fr'];
+    $pdf->SetXY($x, $y + $h1 - 0.3);
+    $pdf->Cell($w, $h2, $u($lib), 0, 0, 'C');
+    $pdf->SetTextColor(0, 0, 0);
+}
+
+/**
+ * Date sous les observations du chef d'établissement sur les bulletins du
+ * général (10/11/2026) : date du jour, ou pointillés à compléter à la main
+ * quand l'impression est lancée avec &date=vide (option « Date » des pages
+ * Bulletins, APC et Matières).
+ */
+function bulletin_date_obs(): string {
+    return (($_GET['date'] ?? '') === 'vide') ? '....................' : date('d-m-Y') . '.';
+}
+
 function appr_color(string $cote): string {
     if ($cote === 'A+' || $cote === 'A') return '#15803d';
     if ($cote === 'B+' || $cote === 'B') return '#1d4ed8';
