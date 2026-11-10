@@ -129,6 +129,8 @@ foreach ($lignes as $n => $l) {
     $vals = [(string) ($n + 1), $l['nom'], $l['role'], $l['login'], $l['mdp'], $l['actif']];
     foreach ($cols as $i => [, $w, $al]) {
         $pdf->SetFont('Arial', in_array($i, [3, 4], true) && $l['mdp'] !== 'Personnalisé' && $l['mdp'] !== '—' ? 'B' : '', 8);
+        // Texte trop long (ex. « Agent financier / Comptable ») : police réduite pour rester dans sa case (10/11/2026).
+        for ($t = 8; $t > 5.5 && $pdf->GetStringWidth(pdf_u($vals[$i])) > $w - 2; $t -= 0.25) $pdf->SetFontSize($t);
         $pdf->Cell($w, 6, pdf_u($vals[$i]), 1, 0, $al, $fill);
     }
     $pdf->Ln(); $fill = !$fill;

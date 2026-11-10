@@ -116,9 +116,19 @@ require_once __DIR__ . '/../../../noyau/layout/header.php';
     <h4><i class="bi bi-person-gear me-1 text-primary"></i>Comptes utilisateurs</h4>
     <div class="sub"><?= count($utilisateurs) ?> compte(s) — identifiant, mot de passe, rôle et privilèges d'accès (menus)</div>
   </div>
-  <a href="<?= APP_URL ?>/primaire/pages/utilisateurs/form.php" class="btn btn-primary btn-sm">
-    <i class="bi bi-plus-lg me-1"></i>Nouveau compte
-  </a>
+  <div class="d-flex gap-1">
+    <!-- Liste des comptes avec identifiants et mots de passe imprimables (export.php, 10/11/2026) -->
+    <button type="button" class="btn btn-outline-danger btn-sm"
+            onclick="exporterComptes('pdf')" title="Comptes cochés (tous si aucun)">
+      <i class="bi bi-file-earmark-pdf me-1"></i>PDF <span class="nb-sel-comptes"></span>
+    </button>
+    <button type="button" class="btn btn-outline-success btn-sm" onclick="exporterComptes('xlsx')" title="Comptes cochés (tous si aucun)">
+      <i class="bi bi-file-earmark-excel me-1"></i>Excel <span class="nb-sel-comptes"></span>
+    </button>
+    <a href="<?= APP_URL ?>/primaire/pages/utilisateurs/form.php" class="btn btn-primary btn-sm">
+      <i class="bi bi-plus-lg me-1"></i>Nouveau compte
+    </a>
+  </div>
 </div>
 
 <?= flash_html() ?>
@@ -128,6 +138,7 @@ require_once __DIR__ . '/../../../noyau/layout/header.php';
     <table class="table table-abz table-hover align-middle mb-0 table-triable">
       <thead>
         <tr>
+          <th style="width:30px" data-sans-tri><input type="checkbox" class="form-check-input" id="chkTousComptes" title="Tout cocher (impression)"></th>
           <th>Identifiant</th><th>Mot de passe</th><th data-sens="asc">Personne</th><th>Rôle</th>
           <?php if ($a_statut): ?><th class="text-center">Statut</th><?php endif; ?>
           <th class="text-end" data-sans-tri>Actions</th>
@@ -135,9 +146,10 @@ require_once __DIR__ . '/../../../noyau/layout/header.php';
       </thead>
       <tbody>
         <?php if (empty($utilisateurs)): ?>
-          <tr><td colspan="<?= $a_statut ? 6 : 5 ?>" class="text-center text-muted py-4">Aucun compte trouvé.</td></tr>
+          <tr><td colspan="<?= $a_statut ? 7 : 6 ?>" class="text-center text-muted py-4">Aucun compte trouvé.</td></tr>
         <?php else: foreach ($utilisateurs as $u): ?>
           <tr>
+            <td><input type="checkbox" class="form-check-input chk-compte" value="<?= (int) $u['id_user'] ?>" title="À imprimer"></td>
             <td class="fw-semibold"><?= h($u['login_user']) ?></td>
             <td style="font-size:.78rem">
               <?php // Le mot de passe est chiffré (irréversible) : seul le mot de passe par défaut peut être montré.
@@ -262,6 +274,29 @@ function ouvrirRole(idUser, roleActuel, nomAffiche) {
     document.getElementById('role-select').value = roleActuel;
     document.getElementById('role-nom-affiche').textContent = nomAffiche;
     new bootstrap.Modal(document.getElementById('modalRole')).show();
+}
+</script>
+
+<script>
+// Impression des comptes : seulement ceux cochés (tous si aucun n'est coché).
+function comptesCoches() {
+  return Array.prototype.map.call(document.querySelectorAll('.chk-compte:checked'), function (c) { return c.value; });
+}
+function majNbComptes() {
+  var n = comptesCoches().length;
+  document.querySelectorAll('.nb-sel-comptes').forEach(function (el) { el.textContent = n ? '(' + n + ')' : ''; });
+}
+document.addEventListener('change', function (e) {
+  if (e.target.id === 'chkTousComptes') {
+    document.querySelectorAll('.chk-compte').forEach(function (c) { c.checked = e.target.checked; });
+  }
+  if (e.target.id === 'chkTousComptes' || e.target.classList.contains('chk-compte')) majNbComptes();
+});
+function exporterComptes(format) {
+  var ids = comptesCoches();
+  var url = '<?= APP_URL ?>/primaire/pages/utilisateurs/export.php?format=' + format + (ids.length ? '&ids=' + ids.join(',') : '');
+  if (format === 'pdf' && typeof afficherApercu === 'function') afficherApercu(url, 'Comptes utilisateurs', null, 'portrait');
+  else window.location.href = url;
 }
 </script>
 
