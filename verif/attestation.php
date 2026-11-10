@@ -63,7 +63,9 @@ $pdf_url = $authentique ? verif_ajout_ec(APP_URL . $pdf_urls[$type]) : '';
       <h4 class="mt-2 mb-1 text-success"><?= h($libelles[$type]) ?> authentique</h4>
       <p class="text-muted mb-0">
         <strong><?= h(strtoupper(trim(($e['civilite_ens'] ?? '') . ' ' . $e['nom_ens'] . ' ' . ($e['prenom_ens'] ?? '')))) ?></strong><br>
-        Matricule : <?= h($e['matricule_ens']) ?><br>
+        <?php // Matricule officiel saisi sur la fiche (08/11/2026) — jamais le numéro interne matricule_ens.
+              $mat_off = trim((string) ($e['matricule'] ?? $e['mat_ens'] ?? '')); ?>
+        <?php if ($mat_off !== ''): ?>Matricule : <?= h($mat_off) ?><br><?php endif; ?>
         <?php if (!empty($e['id_grade'])): ?>Grade : <?= h($e['id_grade']) ?><?php endif; ?>
       </p>
       <a href="<?= h($pdf_url) ?>" class="btn btn-success btn-sm mt-2">

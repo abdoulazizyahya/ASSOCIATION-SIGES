@@ -49,7 +49,7 @@ $etab = $authentique ? get_etablissement() : [];
         <?php if (!empty($etab['nom_fr'])): ?><strong><?= h($etab['nom_fr']) ?></strong><br><?php endif; ?>
         Reçu N° <strong><?= h($paiement['numero_recu']) ?></strong><br>
         <?= h(mb_strtoupper($paiement['nom']) . ' ' . ($paiement['prenom'] ?? '')) ?>
-        <?= niu_eleve($paiement) !== '' ? '— NIU ' . h(niu_eleve($paiement)) : '' ?><br>
+        <?= ($id_html = verif_identifiant_eleve_html($paiement)) !== '' ? '— ' . $id_html : '' ?><br>
         Montant : <?= number_format((float) $paiement['montant'], 0, ',', ' ') ?> FCFA<br>
         Date : <?= h(date('d/m/Y', strtotime($paiement['date_paiement']))) ?>
       </p>
