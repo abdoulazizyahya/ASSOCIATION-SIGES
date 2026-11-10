@@ -992,10 +992,11 @@ cell_rang($pdf, $wB_right * 0.45, $h_ligne, $rang_general, ' / ' . $nb_classes, 
 $pdf->Ln($h_ligne);
 $pdf->SetX($xR);
 // Appréciation APC de la MOYENNE (10/11/2026) au lieu de « Bien / Passable » :
-// « (cote) appréciation », ex. « (B+) Bien acquis » — sans « Compétences… »
-// (c'est la moyenne générale, pas une compétence). Cote et seuils = ceux des
-// lignes de matières (appreciation()). Ligne reconstruite au même
-// emplacement : case du libellé plus étroite, case de la valeur plus large.
+// « (cote) Compétences … acquises », ex. « (B+) Compétences bien acquises ».
+// Cote et seuils = ceux des lignes de matières (appreciation()). Ligne
+// reconstruite au même emplacement : case du libellé plus étroite, case de
+// la valeur plus large. Trop long pour une ligne lisible : 2 lignes dans la
+// MÊME hauteur de case ; en dernier recours, l'abrégé (CMA, CTBA…).
 $w_lbl_app = $wB_right * 0.34;
 $w_app     = $wB_right - $w_lbl_app;
 cell2l($pdf, $w_lbl_app, $h_ligne, 'APPRECIATION', 'Appreciation', 'L', false, $f5_fr, $f5_en);
@@ -1005,10 +1006,36 @@ $a_gen = $moy_generale !== null ? appreciation_moyenne_apc($moy_generale) : null
 if ($a_gen) {
     $hex = ltrim(appr_color($a_gen['cote']), '#');
     $pdf->SetTextColor(hexdec(substr($hex, 0, 2)), hexdec(substr($hex, 2, 2)), hexdec(substr($hex, 4, 2)));
-    $txt_app = '(' . $a_gen['cote'] . ') ' . (bulletin_en() ? $a_gen['en'] : $a_gen['fr']);
-    $pdf->SetFont('Arial', 'B', cell2l_taille_ajustee($pdf, $txt_app, 'B', $w_app - 2.4, $lisible ? 10 : 9.5, 6));
-    $pdf->SetXY($x_app, $y_app);
-    $pdf->Cell($w_app, $h_ligne, u($txt_app), 0, 0, 'C');
+    $lib_app = bulletin_en() ? $a_gen['en'] : $a_gen['fr'];
+    $txt_app = '(' . $a_gen['cote'] . ') ' . $lib_app;
+    $dispo   = $w_app - 2.4;
+    $t_max   = $lisible ? 10 : 9.5;
+    $t_1l    = cell2l_taille_ajustee($pdf, $txt_app, 'B', $dispo, $t_max, 7);
+    $pdf->SetFont('Arial', 'B', $t_1l);
+    if ($pdf->GetStringWidth(u($txt_app)) <= $dispo) {
+        $pdf->SetXY($x_app, $y_app);
+        $pdf->Cell($w_app, $h_ligne, u($txt_app), 0, 0, 'C');
+    } else {
+        // 2 lignes : « (C) Compétences » / « moyennement acquises », dans la hauteur de la case.
+        $mots  = explode(' ', $lib_app, 2);
+        $l1    = '(' . $a_gen['cote'] . ') ' . $mots[0];
+        $l2    = $mots[1] ?? '';
+        $h2l   = $h_ligne / 2;
+        $t_2l  = min($t_max, $h2l / 0.3528 * 0.92);   // corps qui tient dans une demi-case (1 pt = 0,3528 mm)
+        $t_2l  = min(cell2l_taille_ajustee($pdf, $l1, 'B', $dispo, $t_2l, 5), cell2l_taille_ajustee($pdf, $l2, 'B', $dispo, $t_2l, 5));
+        $pdf->SetFont('Arial', 'B', $t_2l);
+        if ($pdf->GetStringWidth(u($l1)) <= $dispo && $pdf->GetStringWidth(u($l2)) <= $dispo) {
+            $pdf->SetXY($x_app, $y_app);
+            $pdf->Cell($w_app, $h2l, u($l1), 0, 0, 'C');
+            $pdf->SetXY($x_app, $y_app + $h2l);
+            $pdf->Cell($w_app, $h2l, u($l2), 0, 0, 'C');
+        } else {
+            $abr = '(' . $a_gen['cote'] . ') ' . (bulletin_en() ? $a_gen['abr_en'] : $a_gen['abr_fr']);
+            $pdf->SetFont('Arial', 'B', cell2l_taille_ajustee($pdf, $abr, 'B', $dispo, $t_max, 6));
+            $pdf->SetXY($x_app, $y_app);
+            $pdf->Cell($w_app, $h_ligne, u($abr), 0, 0, 'C');
+        }
+    }
 }
 $pdf->SetXY($xR, $y_app + $h_ligne);
 $pdf->SetTextColor(0, 0, 0);

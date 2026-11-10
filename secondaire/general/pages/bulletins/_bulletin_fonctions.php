@@ -35,21 +35,22 @@ function fmt_note_b(?float $v): string {
 
 /**
  * Appréciation APC d'une MOYENNE (10/11/2026) : cote d'appreciation()
- * (mêmes seuils que les lignes de matières) + niveau d'acquisition, sans
- * « Compétences » — ex. ['cote' => 'B+', 'fr' => 'Bien acquis', 'en' => 'Well acquired'].
+ * (mêmes seuils que les lignes de matières) + formule APC « Compétences …
+ * acquises » (la moyenne générale est la moyenne des compétences évaluées) —
+ * ex. ['cote' => 'B+', 'fr' => 'Compétences bien acquises', 'en' => …, 'abr' => 'CBA'].
  */
 function appreciation_moyenne_apc(float $moy): ?array {
     $cote = appreciation($moy)['COTE'] ?? '';
     $lib = [
-        'D'  => ['Non acquis',         'Not acquired'],
-        'C'  => ['Moyennement acquis', 'Averagely acquired'],
-        'C+' => ['Acquis',             'Acquired'],
-        'B'  => ['Bien acquis',        'Well acquired'],
-        'B+' => ['Bien acquis',        'Well acquired'],
-        'A'  => ['Très bien acquis',   'Very well acquired'],
-        'A+' => ['Très bien acquis',   'Very well acquired'],
+        'D'  => ['Compétences non acquises',         'Competences not acquired',         'CNA',  'CNA'],
+        'C'  => ['Compétences moyennement acquises', 'Competences averagely acquired',   'CMA',  'CAA'],
+        'C+' => ['Compétences acquises',             'Competences acquired',             'CA',   'CA'],
+        'B'  => ['Compétences bien acquises',        'Competences well acquired',        'CBA',  'CWA'],
+        'B+' => ['Compétences bien acquises',        'Competences well acquired',        'CBA',  'CWA'],
+        'A'  => ['Compétences très bien acquises',   'Competences very well acquired',   'CTBA', 'CVWA'],
+        'A+' => ['Compétences très bien acquises',   'Competences very well acquired',   'CTBA', 'CVWA'],
     ][$cote] ?? null;
-    return $lib ? ['cote' => $cote, 'fr' => $lib[0], 'en' => $lib[1]] : null;
+    return $lib ? ['cote' => $cote, 'fr' => $lib[0], 'en' => $lib[1], 'abr_fr' => $lib[2], 'abr_en' => $lib[3]] : null;
 }
 
 function mention_gen_b(float $a): string {
