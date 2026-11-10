@@ -39,7 +39,7 @@ $sheet->setTitle('Élèves à importer');
 
 $colonnes = [
     'Matricule', 'Nom*', 'Prénom(s)', 'Nom en arabe', 'Sexe (M/F)', 'Date de naissance (AAAA-MM-JJ)',
-    'Lieu de naissance', 'Arrondissement', 'Adresse', 'NIU', 'Classe', 'Statut',
+    'Lieu de naissance', 'Arrondissement', 'Adresse', 'Téléphone du parent', 'NIU', 'Classe', 'Statut',
 ];
 foreach ($colonnes as $i => $lbl) {
     $sheet->setCellValue([$i + 1, 1], $lbl);
@@ -50,7 +50,7 @@ $sheet->getStyle($plage_entete)->getFill()->setFillType(Fill::FILL_SOLID)->getSt
 $sheet->getStyle($plage_entete)->getAlignment()->setWrapText(true);
 
 // Ligne d'exemple (Matricule laissé vide : génération automatique à l'import)
-$exemple = ['', 'DOUKOURE', 'Awa', '', 'F', '2016-03-12', 'Ngaoundéré', 'Ngaoundéré 1er (Vina)', 'Quartier Baladji', '', 'SIL', 'Nouveau'];
+$exemple = ['', 'DOUKOURE', 'Awa', '', 'F', '2016-03-12', 'Ngaoundéré', 'Ngaoundéré 1er (Vina)', 'Quartier Baladji', '696 51 43 46', '', 'SIL', 'Nouveau'];
 foreach ($exemple as $i => $val) { $sheet->setCellValue([$i + 1, 2], $val); }
 $sheet->getStyle('A2:' . chr(64 + count($colonnes)) . '2')->getFont()->setItalic(true)->getColor()->setRGB('9CA3AF');
 
@@ -217,8 +217,8 @@ function appliquer_liste_deroulante(
 
 $derniere_ligne_saisie = 300;
 appliquer_liste_deroulante($sheet, 'H', 2, $derniere_ligne_saisie, "'Listes de référence'!\$B\$2:\$B\$$derniere_ligne_arrondissements");
-appliquer_liste_deroulante($sheet, 'K', 2, $derniere_ligne_saisie, "'Listes de référence'!\$A\$2:\$A\$$derniere_ligne_classes");
-appliquer_liste_deroulante($sheet, 'L', 2, $derniere_ligne_saisie, "'Listes de référence'!\$C\$2:\$C\$3");
+appliquer_liste_deroulante($sheet, 'L', 2, $derniere_ligne_saisie, "'Listes de référence'!\$A\$2:\$A\$$derniere_ligne_classes");
+appliquer_liste_deroulante($sheet, 'M', 2, $derniere_ligne_saisie, "'Listes de référence'!\$C\$2:\$C\$3");
 
 $sp->setActiveSheetIndex(0);
 

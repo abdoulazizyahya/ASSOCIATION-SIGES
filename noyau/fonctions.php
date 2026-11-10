@@ -3410,6 +3410,103 @@ function id_affichage_eleve(array $eleve): string {
 // affiché sous l'intitulé « NIU » — chaîne vide s'il n'est pas renseigné.
 // À ne pas confondre avec id_affichage_eleve() (matricule), qui reste la
 // valeur des QR codes de vérification déjà imprimés.
+// ── Téléphones des parents (10/11/2026) — préparation SMS / WhatsApp ────────
+// Les numéros sont dispersés selon l'école : primaire = eleve.tel_parent
+// (migration v71), parent.telephone (père, mère, tuteur) et numéros saisis
+// dans l'adresse ; secondaire = tuteur.telephone, parent.telephone /
+// telephone2 (père, mère : eleve.id_pere / id_mere), eleve.telephone, et
+// numéros saisis dans une adresse.
+
+/** Numéro camerounais normalisé (9 chiffres, commence par 6 ou 2), ou null. */
+function tel_normaliser_cm(?string $t): ?string {
+    $d = preg_replace('/\D+/', '', (string) $t);
+    if (strlen($d) === 14 && strpos($d, '00237') === 0) $d = substr($d, 5);
+    elseif (strlen($d) === 12 && strpos($d, '237') === 0) $d = substr($d, 3);
+    return preg_match('/^[26]\d{8}$/', $d) ? $d : null;
+}
+
+/** Tous les numéros camerounais trouvés dans un texte libre (adresse, contact…). */
+function tels_extraire(?string $texte): array {
+    $out = [];
+    if (preg_match_all('/\+?\d[\d .\-\/]{7,}\d/', (string) $texte, $m)) {
+        foreach ($m[0] as $morceau) {
+            // « 696514346/677000000 » : deux numéros collés par une barre
+            foreach (preg_split('#\s*/\s*#', $morceau) as $p) if (($n = tel_normaliser_cm($p)) !== null) $out[$n] = $n;
+        }
+    }
+    return array_values($out);
+}
+
+/** Affichage lisible : 696514346 → 6 96 51 43 46. */
+function tel_affiche(string $t): string {
+    return strlen($t) === 9 ? $t[0] . ' ' . substr($t, 1, 2) . ' ' . substr($t, 3, 2) . ' ' . substr($t, 5, 2) . ' ' . substr($t, 7, 2) : $t;
+}
+
+/**
+ * Contacts téléphoniques des parents d'un élève, du plus fiable au moins
+ * fiable, sans doublon : [['tel' => '696514346', 'qui' => 'Père', 'nom' => 'ABBA Moussa'], …].
+ */
+function contacts_parents_eleve(int $id_eleve): array {
+    return contacts_parents_lot([$id_eleve])[$id_eleve] ?? [];
+}
+
+/**
+ * Contacts de plusieurs élèves en quelques requêtes (liste d'une classe,
+ * bilan de l'école, envoi groupé) : [id_eleve => [contacts…]].
+ */
+function contacts_parents_lot(array $ids): array {
+    $ids = array_values(array_unique(array_filter(array_map('intval', $ids))));
+    if (!$ids) return [];
+    $res = array_fill_keys($ids, []);
+    $nom = fn(array $p) => trim(mb_strtoupper((string) ($p['nom'] ?? '')) . ' ' . ($p['prenom'] ?? ''));
+    $ajout = function (int $id, ?string $brut, string $qui, string $nom = '', bool $texte_libre = false) use (&$res) {
+        foreach ($texte_libre ? tels_extraire($brut) : array_filter([tel_normaliser_cm($brut)]) as $t) {
+            if (!isset($res[$id][$t])) $res[$id][$t] = ['tel' => $t, 'qui' => $qui, 'nom' => trim($nom)];
+        }
+    };
+    try {
+        foreach (array_chunk($ids, 500) as $lot) {
+            $in = implode(',', $lot);   // entiers uniquement (intval ci-dessus)
+            if (function_exists('type_enseignement_courant') && type_enseignement_courant() === 'secondaire') {
+                $eleves  = db_all("SELECT id, id_pere, id_mere, telephone, adresse FROM eleve WHERE id IN ($in)");
+                $tuteurs = [];
+                foreach (db_all("SELECT * FROM tuteur WHERE id_eleve IN ($in) ORDER BY id") as $t) $tuteurs[(int) $t['id_eleve']][] = $t;
+                $ids_par = array_filter(array_merge(array_column($eleves, 'id_pere'), array_column($eleves, 'id_mere')));
+                $parents = [];
+                if ($ids_par) foreach (db_all("SELECT * FROM parent WHERE id IN (" . implode(',', array_map('intval', $ids_par)) . ")") as $p) $parents[(int) $p['id']] = $p;
+                foreach ($eleves as $e) {
+                    $id = (int) $e['id'];
+                    foreach ($tuteurs[$id] ?? [] as $t) $ajout($id, $t['telephone'] ?? null, 'Tuteur' . (!empty($t['lien']) ? ' (' . $t['lien'] . ')' : ''), $nom($t));
+                    foreach (['Père' => 'id_pere', 'Mère' => 'id_mere'] as $qui => $col) {
+                        $p = $parents[(int) ($e[$col] ?? 0)] ?? null;
+                        if (!$p) continue;
+                        $ajout($id, $p['telephone'] ?? null, $qui, $nom($p));
+                        $ajout($id, $p['telephone2'] ?? null, $qui, $nom($p));
+                        $ajout($id, $p['adresse'] ?? null, $qui, $nom($p), true);
+                    }
+                    $ajout($id, $e['telephone'] ?? null, 'Contact de la fiche');
+                    $ajout($id, $e['adresse'] ?? null, 'Adresse de la fiche', '', true);
+                }
+            } else {
+                $eleves  = db_all("SELECT * FROM eleve WHERE id_eleve IN ($in)");
+                $parents = [];
+                foreach (db_all("SELECT * FROM parent WHERE id_eleve IN ($in) ORDER BY FIELD(sexe, 'Masculin', 'Feminin'), id") as $p) $parents[(int) $p['id_eleve']][] = $p;
+                foreach ($eleves as $e) {
+                    $id = (int) $e['id_eleve'];
+                    $ajout($id, $e['tel_parent'] ?? null, 'Parent');
+                    foreach ($parents[$id] ?? [] as $p) {
+                        $qui = $p['sexe'] === 'Masculin' ? 'Père' : ($p['sexe'] === 'Feminin' ? 'Mère' : 'Tuteur');
+                        $ajout($id, $p['telephone'] ?? null, $qui, $nom($p));
+                        $ajout($id, $p['adresse'] ?? null, $qui, $nom($p), true);
+                    }
+                    $ajout($id, $e['Adresse_elv'] ?? null, 'Adresse de la fiche', '', true);
+                }
+            }
+        }
+    } catch (\Throwable $ex) { /* table ou colonne absente (migration pas encore passée) */ }
+    return array_map('array_values', $res);
+}
+
 function niu_eleve(array $eleve): string {
     return trim((string) ($eleve['niu'] ?? ''));
 }

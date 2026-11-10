@@ -50,6 +50,8 @@ $CHAMPS = [
                          'syn' => ['arrondissement','arrond','commune']],
     'adresse'        => ['label' => 'Adresse',          'requis' => false, 'aide' => '',
                          'syn' => ['adresse','address','domicile','residence','quartier']],
+    'tel_parent'     => ['label' => 'Téléphone du parent', 'requis' => false, 'aide' => 'SMS / WhatsApp',
+                         'syn' => ['telephoneduparent','telparent','telephoneparent','contactparent','telephone','tel','contact','phone','numero','numerodetelephone','portable','mobile','cellulaire']],
     'niu'            => ['label' => 'NIU',              'requis' => false, 'aide' => '',
                          'syn' => ['niu','identifiantunique','numeroidentifiantunique','numeroidentifiant']],
     'classe'         => ['label' => 'Classe',           'requis' => false, 'aide' => 'Classe existante, ou créée automatiquement si ≥ 5 élèves',
@@ -61,7 +63,7 @@ $CHAMPS = [
 // réservent leur colonne AVANT les plus génériques (« Nom en arabe » /
 // « Lieu de naissance » avant « Nom » / « Date de naissance »).
 $ORDRE_DETECTION = ['nom_arabe','lieu_naiss','date_naiss','matricule','niu','arrondissement',
-                    'adresse','sexe','statut','classe','prenom','nom'];
+                    'tel_parent','adresse','sexe','statut','classe','prenom','nom'];
 
 $TMP_PREFIX = 'siges_import_eleves_';
 
@@ -318,6 +320,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $lieu_naiss  = $val($ligne, 'lieu_naiss');
                 $arrond_brut = $val($ligne, 'arrondissement');
                 $adresse     = $val($ligne, 'adresse');
+                $tel_parent  = $val($ligne, 'tel_parent');
                 $niu         = $val($ligne, 'niu');
                 $classe_lbl  = $val($ligne, 'classe');
                 $statut_insc = $val($ligne, 'statut');
@@ -408,6 +411,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                      $id_arrondissement, $id_arrondissement ? null : ($arrond_brut ?: null), $adresse ?: null, $niu ?: null]
                 );
                 $id_eleve = (int) db_last_id();
+                // Téléphone du parent (migration v71) : colonne dédiée, sinon numéro trouvé dans l'adresse.
+                if (db_colonne_existe('eleve', 'tel_parent')) {
+                    $tel_imp = tel_normaliser_cm((string) $tel_parent) ?? (tels_extraire((string) $adresse)[0] ?? null) ?? (trim((string) $tel_parent) !== '' ? mb_substr(trim((string) $tel_parent), 0, 30) : null);
+                    if ($tel_imp !== null) db_exec("UPDATE eleve SET tel_parent=? WHERE id_eleve=?", [$tel_imp, $id_eleve]);
+                }
 
                 if ($classe_trouvee) {
                     db_exec(

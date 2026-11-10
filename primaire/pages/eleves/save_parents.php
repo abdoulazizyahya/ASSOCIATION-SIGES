@@ -28,21 +28,31 @@ $action = post('action');
  * pour cet élève — jaynitaare n'a qu'une seule table `parent` (pas de
  * id_pere/id_mere sur eleve comme ABZ_MBE), un rôle = un sexe.
  */
-function upsert_parent(int $id_eleve, string $sexe, string $nom, string $prenom, string $profession, string $adresse): void {
-    $nom = trim($nom); $prenom = trim($prenom); $profession = trim($profession); $adresse = trim($adresse);
+function upsert_parent(int $id_eleve, string $sexe, string $nom, string $prenom, string $profession, string $adresse, string $telephone = ''): void {
+    $nom = trim($nom); $prenom = trim($prenom); $profession = trim($profession); $adresse = trim($adresse); $telephone = trim($telephone);
     $existant = db_one("SELECT id FROM parent WHERE id_eleve=? AND sexe=? LIMIT 1", [$id_eleve, $sexe]);
 
-    if ($nom === '' && $prenom === '' && $profession === '' && $adresse === '') {
+    if ($nom === '' && $prenom === '' && $profession === '' && $adresse === '' && $telephone === '') {
         if ($existant) db_exec("DELETE FROM parent WHERE id=?", [$existant['id']]);
         return;
     }
     if ($existant) {
         db_exec("UPDATE parent SET nom=?, prenom=?, profession=?, adresse=? WHERE id=?",
             [$nom, $prenom, $profession, $adresse, $existant['id']]);
+        $id_p = (int) $existant['id'];
     } else {
         db_exec("INSERT INTO parent (nom, prenom, profession, adresse, sexe, id_eleve) VALUES (?, ?, ?, ?, ?, ?)",
             [$nom, $prenom, $profession, $adresse, $sexe, $id_eleve]);
+        $id_p = (int) db_last_id();
     }
+    parent_enregistrer_tel($id_p, $telephone);
+}
+
+/** Téléphone du parent / tuteur (migration v71) : normalisé s'il est reconnu, sinon tel que saisi. */
+function parent_enregistrer_tel(int $id_parent, string $telephone): void {
+    if (!db_colonne_existe('parent', 'telephone')) return;
+    $telephone = trim($telephone);
+    db_exec("UPDATE parent SET telephone=? WHERE id=?", [$telephone === '' ? null : (tel_normaliser_cm($telephone) ?? mb_substr($telephone, 0, 30)), $id_parent]);
 }
 
 if ($action === 'tuteur_ajouter') {
@@ -50,14 +60,15 @@ if ($action === 'tuteur_ajouter') {
     if ($nom !== '') {
         db_exec("INSERT INTO parent (nom, prenom, profession, adresse, sexe, id_eleve) VALUES (?, ?, ?, ?, 'titeur', ?)",
             [$nom, post('tuteur_prenom'), post('tuteur_profession'), post('tuteur_adresse'), $id]);
+        parent_enregistrer_tel((int) db_last_id(), post('tuteur_telephone'));
         flash_set('succes', 'Tuteur ajouté.');
     }
 } elseif ($action === 'tuteur_supprimer') {
     db_exec("DELETE FROM parent WHERE id=? AND id_eleve=? AND sexe='titeur'", [(int) post('id'), $id]);
     flash_set('succes', 'Tuteur retiré.');
 } else {
-    upsert_parent($id, 'Masculin', post('pere_nom'), post('pere_prenom'), post('pere_profession'), post('pere_adresse'));
-    upsert_parent($id, 'Feminin',  post('mere_nom'),  post('mere_prenom'),  post('mere_profession'),  post('mere_adresse'));
+    upsert_parent($id, 'Masculin', post('pere_nom'), post('pere_prenom'), post('pere_profession'), post('pere_adresse'), post('pere_telephone'));
+    upsert_parent($id, 'Feminin',  post('mere_nom'),  post('mere_prenom'),  post('mere_profession'),  post('mere_adresse'),  post('mere_telephone'));
     flash_set('succes', 'Informations des parents mises à jour.');
 }
 

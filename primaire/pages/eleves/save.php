@@ -171,5 +171,11 @@ if ($id_classe) {
     if ($classe_avant !== null) journaliser_mouvement_classe($id, $val_annee, $classe_avant, null, 'retrait');
 }
 
+// Téléphone du parent (migration v71, 10/11/2026) : enregistré normalisé s'il est reconnu, sinon tel que saisi.
+if ($id && db_colonne_existe('eleve', 'tel_parent') && array_key_exists('tel_parent', $_POST)) {
+    $tel_saisi = trim((string) post('tel_parent'));
+    db_exec("UPDATE eleve SET tel_parent=? WHERE id_eleve=?", [$tel_saisi === '' ? null : (tel_normaliser_cm($tel_saisi) ?? mb_substr($tel_saisi, 0, 30)), $id]);
+}
+
 flash_set('succes', $msg);
 rediriger('primaire/pages/eleves/voir.php?id=' . $id);

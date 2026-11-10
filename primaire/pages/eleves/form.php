@@ -165,9 +165,13 @@ if (!$es_partiel) {
                        value="<?= $eleve ? h($eleve['Mat_elv'] ?: '—') : 'Généré automatiquement' ?>">
               <?php endif; ?>
             </div>
-            <div class="col-md-12">
+            <div class="col-md-7">
               <label class="form-label">Adresse</label>
               <input type="text" name="adresse" class="form-control" value="<?= h($ve('Adresse_elv')) ?>">
+            </div>
+            <div class="col-md-5">
+              <label class="form-label">Téléphone du parent <span class="text-muted" style="font-size:.72rem">(SMS / WhatsApp)</span></label>
+              <input type="tel" name="tel_parent" class="form-control" value="<?= h($ve('tel_parent')) ?>" placeholder="ex. 696 51 43 46" maxlength="30">
             </div>
           </div>
         </div>

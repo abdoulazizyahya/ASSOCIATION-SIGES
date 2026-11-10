@@ -229,6 +229,7 @@ if (!$es_partiel) {
           "Département d'origine" => $lieu['intitule_depart'] ?? '—',
           "Arrondissement d'origine" => $lieu['intitule_arrond'] ?? ($eleve['arrondissement_elv'] ?: '—'),
           'Adresse'           => $eleve['Adresse_elv'] ?: '—',
+          'Téléphone du parent' => !empty($eleve['tel_parent']) ? tel_affiche((string) $eleve['tel_parent']) : '—',
         ];
         foreach ($champs as $lbl => $val): ?>
           <div class="d-flex py-1" style="border-bottom:1px solid #f3f4f6;font-size:.8rem">
@@ -256,6 +257,7 @@ if (!$es_partiel) {
             <?php if ($pere): ?>
               <div class="fw-semibold" style="font-size:.8rem"><?= h($pere['nom'] . ' ' . ($pere['prenom'] ?? '')) ?></div>
               <?php if ($pere['profession']): ?><div style="font-size:.74rem;color:#6b7280"><?= h($pere['profession']) ?></div><?php endif; ?>
+              <?php if (!empty($pere['telephone'])): ?><div style="font-size:.74rem"><i class="bi bi-telephone me-1"></i><?= h(tel_affiche((string) $pere['telephone'])) ?></div><?php endif; ?>
               <?php if ($pere['adresse']): ?><div style="font-size:.74rem"><i class="bi bi-geo-alt me-1"></i><?= h($pere['adresse']) ?></div><?php endif; ?>
             <?php else: ?>
               <div class="text-muted" style="font-size:.78rem">—</div>
@@ -266,6 +268,7 @@ if (!$es_partiel) {
             <?php if ($mere): ?>
               <div class="fw-semibold" style="font-size:.8rem"><?= h($mere['nom'] . ' ' . ($mere['prenom'] ?? '')) ?></div>
               <?php if ($mere['profession']): ?><div style="font-size:.74rem;color:#6b7280"><?= h($mere['profession']) ?></div><?php endif; ?>
+              <?php if (!empty($mere['telephone'])): ?><div style="font-size:.74rem"><i class="bi bi-telephone me-1"></i><?= h(tel_affiche((string) $mere['telephone'])) ?></div><?php endif; ?>
               <?php if ($mere['adresse']): ?><div style="font-size:.74rem"><i class="bi bi-geo-alt me-1"></i><?= h($mere['adresse']) ?></div><?php endif; ?>
             <?php else: ?>
               <div class="text-muted" style="font-size:.78rem">—</div>
@@ -294,6 +297,7 @@ if (!$es_partiel) {
             <div class="flex-grow-1">
               <div class="fw-semibold"><?= h($t['nom'] . ' ' . ($t['prenom'] ?? '')) ?></div>
               <?php if ($t['profession']): ?><div style="color:#6b7280;font-size:.72rem"><?= h($t['profession']) ?></div><?php endif; ?>
+              <?php if (!empty($t['telephone'])): ?><div style="font-size:.72rem"><i class="bi bi-telephone me-1"></i><?= h(tel_affiche((string) $t['telephone'])) ?></div><?php endif; ?>
             </div>
             <?php if ($peut_gerer): ?>
             <form method="post" action="<?= APP_URL ?>/primaire/pages/eleves/save_parents.php" data-ajax-post-form onsubmit="return confirm('Retirer ce tuteur ?')">
@@ -601,6 +605,7 @@ function genererCarteUnique() {
               <input type="text" name="pere_nom" class="form-control form-control-sm mb-1" placeholder="Nom" value="<?= h($pere['nom'] ?? '') ?>">
               <input type="text" name="pere_prenom" class="form-control form-control-sm mb-1" placeholder="Prénom" value="<?= h($pere['prenom'] ?? '') ?>">
               <input type="text" name="pere_profession" class="form-control form-control-sm mb-1" placeholder="Profession" value="<?= h($pere['profession'] ?? '') ?>">
+              <input type="tel" name="pere_telephone" class="form-control form-control-sm mb-1" placeholder="Téléphone" maxlength="30" value="<?= h($pere['telephone'] ?? '') ?>">
               <input type="text" name="pere_adresse" class="form-control form-control-sm" placeholder="Adresse" value="<?= h($pere['adresse'] ?? '') ?>">
             </div>
             <div class="col-6">
@@ -608,6 +613,7 @@ function genererCarteUnique() {
               <input type="text" name="mere_nom" class="form-control form-control-sm mb-1" placeholder="Nom" value="<?= h($mere['nom'] ?? '') ?>">
               <input type="text" name="mere_prenom" class="form-control form-control-sm mb-1" placeholder="Prénom" value="<?= h($mere['prenom'] ?? '') ?>">
               <input type="text" name="mere_profession" class="form-control form-control-sm mb-1" placeholder="Profession" value="<?= h($mere['profession'] ?? '') ?>">
+              <input type="tel" name="mere_telephone" class="form-control form-control-sm mb-1" placeholder="Téléphone" maxlength="30" value="<?= h($mere['telephone'] ?? '') ?>">
               <input type="text" name="mere_adresse" class="form-control form-control-sm" placeholder="Adresse" value="<?= h($mere['adresse'] ?? '') ?>">
             </div>
           </div>
@@ -638,6 +644,7 @@ function genererCarteUnique() {
           <input type="text" name="tuteur_nom" class="form-control form-control-sm mb-1" placeholder="Nom" required>
           <input type="text" name="tuteur_prenom" class="form-control form-control-sm mb-1" placeholder="Prénom">
           <input type="text" name="tuteur_profession" class="form-control form-control-sm mb-1" placeholder="Profession">
+          <input type="tel" name="tuteur_telephone" class="form-control form-control-sm mb-1" placeholder="Téléphone" maxlength="30">
           <input type="text" name="tuteur_adresse" class="form-control form-control-sm" placeholder="Adresse">
         </div>
         <div class="modal-footer py-2">

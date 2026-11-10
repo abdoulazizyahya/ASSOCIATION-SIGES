@@ -37,6 +37,9 @@ $menu = [
     'Scolarité' => [
         ['Élèves',  'secondaire/commun/pages/eleves/liste.php',  'people',    ['ADMIN','PROVISEUR', 'FONDATEUR','CENSEUR','SG','SECRETAIRE']],
         ['Classes', 'secondaire/commun/pages/classes/liste.php', 'door-open', ['ADMIN','PROVISEUR', 'FONDATEUR','CENSEUR']],
+        // Contacts des parents (10/11/2026) : base des SMS / WhatsApp.
+        ['Contacts des parents', 'secondaire/commun/pages/communication/contacts_parents.php', 'telephone', ['ADMIN','PROVISEUR','FONDATEUR','CENSEUR','SG','SECRETAIRE','INTENDANT']],
+        ['Envoyer aux parents', 'secondaire/commun/pages/communication/envoyer.php', 'send', ['ADMIN','PROVISEUR','FONDATEUR','CENSEUR','SG','SECRETAIRE','INTENDANT']],
     ],
     // 'pp' (5e élément) : pour l'ENSEIGNANT, entrée affichée seulement s'il est
     // professeur principal d'une classe (menu_entree_visible(), 24/10/2026).

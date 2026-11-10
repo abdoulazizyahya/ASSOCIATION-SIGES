@@ -141,7 +141,9 @@ if (function_exists('type_enseignement_courant')) {
                 || str_starts_with($_rel, 'verif/')
                 // Emploi du temps : module commun au primaire et au secondaire (migration
                 // primaire v63, 17/10/2026) — type-aware à travers edt_t() / edt_primaire().
-                || str_starts_with($_rel, 'secondaire/commun/pages/emploi_temps/');
+                || str_starts_with($_rel, 'secondaire/commun/pages/emploi_temps/')
+                // Communication avec les parents (contacts, SMS / WhatsApp, 10/11/2026) : commun, type-aware.
+                || str_starts_with($_rel, 'secondaire/commun/pages/communication/');
     if (!$_commun) {
         $_secondaire = type_enseignement_courant() === 'secondaire';
         if ($_secondaire && !str_starts_with($_rel, 'secondaire/')) {

@@ -57,6 +57,8 @@ return [
     'Mon emploi du temps'       => 'My timetable',
     'Enseignant(e)s'            => 'Teachers',
     'Comptes utilisateurs'      => 'User accounts',
+    'Contacts des parents'      => 'Parent contacts',
+    'Envoyer aux parents'       => 'Message parents',
     'Grille salariale'          => 'Salary scale',
     'Paie'                      => 'Payroll',
     'Avances sur salaire'       => 'Salary advances',
