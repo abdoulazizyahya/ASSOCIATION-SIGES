@@ -15,6 +15,7 @@ require_once __DIR__ . '/../../../../config/config.php';
 require_once __DIR__ . '/../../../../noyau/connexion.php';
 require_once __DIR__ . '/../../../../noyau/fonctions.php';
 require_once __DIR__ . '/_passerelle_lib.php';
+require_once __DIR__ . '/_sms_lib.php';   // modèles de l'école, journal, reste à payer (10/11/2026)
 
 $secondaire = type_enseignement_courant() === 'secondaire';
 exiger_role($secondaire ? ['ADMIN', 'PROVISEUR', 'FONDATEUR', 'CENSEUR', 'SG', 'SECRETAIRE', 'INTENDANT'] : ['DIRECTEUR', 'SECRETAIRE', 'COMPTABLE', 'FONDATEUR']);
@@ -61,11 +62,13 @@ $lib_trim = '';
 foreach ($trimestres as $t) if ((int) $t['id'] === $id_trim) $lib_trim = (string) $t['libelle'];
 
 // Modèles par défaut : sans ê, ô, î, â, ç (ils font passer le SMS de 160 à 70 caractères).
+// Textes par défaut = modèles de l'école (onglet « Modèles & automatiques »).
+$sms_mods = sms_modeles();
 $modeles = [
-    'libre'    => "{ecole} : Chers parents, ",
-    'paiement' => "{ecole} : Bonjour, il reste {reste} FCFA a payer pour la scolarite de {eleve} ({classe}). Merci de regulariser rapidement.",
-    'moyenne'  => "{ecole} : {eleve} ({classe}) a obtenu {moyenne}/20 au {trimestre}, rang {rang}/{effectif}. {appreciation}.",
-    'absences' => "{ecole} : {eleve} ({classe}) totalise {absences} d'absence non justifiee au {trimestre}. Merci de nous contacter.",
+    'libre'    => $sms_mods['communique']['fr'],
+    'paiement' => $sms_mods['relance']['fr'],
+    'moyenne'  => $sms_mods['bulletin']['fr'],
+    'absences' => $sms_mods['absence']['fr'],
 ];
 $modele = trim((string) ($_GET['modele'] ?? ''));
 if ($modele === '' || !isset($_GET['modele_type']) || $_GET['modele_type'] !== $type) $modele = $modeles[$type];
@@ -97,20 +100,8 @@ if ($genere) {
         $extra = [];   // valeurs propres au type, par élève
 
         if ($type === 'paiement') {
-            if ($secondaire) {
-                foreach ($eleves as $e) {
-                    $du = 0.0; $paye = 0.0;
-                    foreach (eleve_obligations_annee((int) $e['id'], (string) $cl['code_niveau'], $id_annee) as $o) { $du += (float) $o['montant']; $paye += (float) $o['paye']; }
-                    $extra[(int) $e['id']] = ['du' => $du, 'paye' => $paye, 'reste' => max(0.0, $du - $paye)];
-                }
-            } else {
-                $paye_p = [];
-                foreach (db_all("SELECT id_eleve, SUM(montant_paiement) AS p FROM paiement_frais WHERE val_annee=? GROUP BY id_eleve", [$val_annee]) as $r) $paye_p[(int) $r['id_eleve']] = (float) $r['p'];
-                foreach (finances_du_par_eleve($val_annee, (int) $cl['id'], null) as $r) {
-                    $p = $paye_p[(int) $r['id_eleve']] ?? 0.0;
-                    $extra[(int) $r['id_eleve']] = ['du' => (float) $r['du'], 'paye' => $p, 'reste' => max(0.0, (float) $r['du'] - $p)];
-                }
-            }
+            // Tous les systèmes de frais (primaire, secondaire public et privé) : sms_finances_lot().
+            $extra = sms_finances_lot($ids);
         } elseif ($type === 'moyenne' && $id_trim) {
             if ($secondaire) {
                 $moys = est_technique() ? [] : calc_moys_classe_periode_comp((int) $cl['id'], $id_annee, 'trimestre', $id_trim, $ids);
@@ -191,6 +182,7 @@ require_once __DIR__ . '/../../../../noyau/layout/header.php';
 </div>
 
 <?= flash_html() ?>
+<?php $onglet_comm = 'envoyer'; require __DIR__ . '/_onglets.php'; ?>
 
 <form method="get" class="card mb-3">
   <div class="card-body">
@@ -228,6 +220,15 @@ require_once __DIR__ . '/../../../../noyau/layout/header.php';
           <span id="compteur" class="text-muted" style="font-size:.76rem"></span>
         </label>
         <textarea name="modele" id="modele" rows="3" class="form-control form-control-sm"><?= h($modele) ?></textarea>
+        <?php if ($type === 'libre'): ?>
+        <div class="d-flex align-items-center gap-2 mt-1" style="font-size:.78rem">
+          <span class="text-muted">Charger un modèle :</span>
+          <select class="form-select form-select-sm" style="max-width:320px" onchange="if(this.value){document.getElementById('modele').value=this.value;document.getElementById('modele').dispatchEvent(new Event('input'));this.selectedIndex=0;}">
+            <option value="">— choisir —</option>
+            <?php foreach ($sms_mods as $__m): ?><option value="<?= h($__m['fr']) ?>"><?= h($__m['libelle']) ?> (FR)</option><option value="<?= h($__m['en']) ?>"><?= h($__m['libelle']) ?> (EN)</option><?php endforeach; ?>
+          </select>
+        </div>
+        <?php endif; ?>
         <div id="alerte-gsm" class="form-text text-warning" style="display:none"><i class="bi bi-exclamation-triangle me-1"></i>Caractères spéciaux (ex. ê, ô, ç, apostrophe typographique) : un SMS ne contient plus que 70 caractères — le coût double ou triple.</div>
       </div>
       <div class="col-md-5">
@@ -302,7 +303,7 @@ require_once __DIR__ . '/../../../../noyau/layout/header.php';
       <table class="table table-sm align-middle mb-0">
         <tbody>
         <?php $k = 0; foreach ($lignes as $l): foreach ($l['nums'] as $n): ?>
-          <tr class="comm-ligne" data-k="<?= $k ?>" data-tel="<?= h($n) ?>" data-texte="<?= h($l['texte']) ?>">
+          <tr class="comm-ligne" data-k="<?= $k ?>" data-tel="<?= h($n) ?>" data-nom="<?= h($l['eleve']) ?>" data-texte="<?= h($l['texte']) ?>">
             <td style="width:34px"><input type="checkbox" class="form-check-input comm-sel" checked title="Sélectionner"></td>
             <td>
               <div class="fw-semibold" style="font-size:.82rem"><?= h($l['eleve']) ?> <span class="text-muted fw-normal">— <?= h($l['classe']) ?></span>
@@ -424,7 +425,8 @@ function envoyerParPasserelle(sel) {
     bandeau('Envoi automatique : ' + faits + ' / ' + total + '…');
     var fd = new FormData();
     fd.append('csrf', CSRF);
-    fd.append('items', JSON.stringify(lot.map(function (t) { return { k: t.dataset.k, tel: t.dataset.tel, texte: t.dataset.texte }; })));
+    fd.append('type', <?= json_encode(['libre' => 'communique', 'paiement' => 'relance', 'moyenne' => 'bulletin', 'absences' => 'absence'][$type]) ?>);
+    fd.append('items', JSON.stringify(lot.map(function (t) { return { k: t.dataset.k, tel: t.dataset.tel, nom: t.dataset.nom, texte: t.dataset.texte }; })));
     fetch(URL_GW, { method: 'POST', body: fd, credentials: 'same-origin' })
       .then(function (r) { return r.json(); })
       .then(function (j) {

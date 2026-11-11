@@ -73,6 +73,7 @@ $pct = fn(int $a, int $n) => $n > 0 ? round(100 * $a / $n) : 0;
 </div>
 
 <?= flash_html() ?>
+<?php $onglet_comm = 'contacts'; require_once __DIR__ . '/_passerelle_lib.php'; require __DIR__ . '/_onglets.php'; ?>
 
 <div class="row g-3">
   <div class="col-lg-4">

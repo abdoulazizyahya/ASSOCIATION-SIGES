@@ -13,6 +13,7 @@
 require_once __DIR__ . '/../../../../config/config.php';
 require_once __DIR__ . '/../../../../noyau/connexion.php';
 require_once __DIR__ . '/../../../../noyau/fonctions.php';
+require_once __DIR__ . '/../communication/_sms_lib.php';   // SMS automatiques (10/11/2026)
 exiger_role(['ADMIN', 'PROVISEUR', 'SECRETAIRE', 'INTENDANT']);
 
 $annee     = get_annee_active();
@@ -161,7 +162,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         fn($r) => $r['nom'] . ' : ' . number_format($r['montant'], 0, ',', ' ') . ' F',
                         $repartition
                     ));
-                    flash_set('succes', 'Versement de ' . number_format($montant, 0, ',', ' ') . " F réparti automatiquement — $detail.");
+                    flash_set('succes', 'Versement de ' . number_format($montant, 0, ',', ' ') . " F réparti automatiquement — $detail."
+                        . sms_auto('paiement', (int) $id_eleve, ['montant' => number_format($montant, 0, ',', ' '), 'date' => date('d/m/Y', strtotime((string) $date_paiement))]));
                 }
             }
         }

@@ -2,6 +2,7 @@
 require_once __DIR__ . '/../../../../config/config.php';
 require_once __DIR__ . '/../../../../noyau/connexion.php';
 require_once __DIR__ . '/../../../../noyau/fonctions.php';
+require_once __DIR__ . '/../communication/_sms_lib.php';   // SMS automatiques (10/11/2026)
 exiger_role(['ADMIN','PROVISEUR', 'FONDATEUR','CENSEUR','INTENDANT']);
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
@@ -69,11 +70,13 @@ foreach ($obligations_cochees as $id_obligation) {
     );
     $nb_ok++;
     $recus[] = $numero_recu;
+    $total_sms = ($total_sms ?? 0) + (float) $solde;
 }
 
 if ($nb_ok > 0) {
     $msg = "$nb_ok paiement(s) enregistré(s) — reçu n° " . implode(', ', array_unique($recus)) . '.';
     if ($nb_skip > 0) $msg .= " $nb_skip frais ignoré(s) (déjà soldé ou canal de paiement invalide).";
+    $msg .= sms_auto('paiement', (int) $id_eleve, ['montant' => number_format((float) ($total_sms ?? 0), 0, ',', ' '), 'date' => date('d/m/Y', strtotime((string) $date_paiement))]);
     flash_set('succes', $msg);
 } else {
     flash_set('erreur', "Aucun paiement enregistré ($nb_skip frais ignoré(s) — déjà soldé ou canal de paiement invalide).");

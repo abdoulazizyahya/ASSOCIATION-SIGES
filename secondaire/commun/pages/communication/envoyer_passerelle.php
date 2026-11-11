@@ -10,6 +10,7 @@ require_once __DIR__ . '/../../../../config/config.php';
 require_once __DIR__ . '/../../../../noyau/connexion.php';
 require_once __DIR__ . '/../../../../noyau/fonctions.php';
 require_once __DIR__ . '/_passerelle_lib.php';
+require_once __DIR__ . '/_sms_lib.php';
 
 header('Content-Type: application/json; charset=utf-8');
 $secondaire = type_enseignement_courant() === 'secondaire';
@@ -30,7 +31,7 @@ foreach ($items as $it) {
     $texte = trim((string) ($it['texte'] ?? ''));
     if ($k === '' || $tel === null || $texte === '') { $res[$k] = ['ok' => false, 'erreur' => 'Numéro ou texte invalide.']; continue; }
     $texte = mb_substr($texte, 0, 918);   // 6 SMS au plus
-    $groupes[$texte][] = ['k' => $k, 'tel' => $tel];
+    $groupes[$texte][] = ['k' => $k, 'tel' => $tel, 'nom' => mb_substr((string) ($it['nom'] ?? ''), 0, 150)];
 }
 $res = $res ?? [];
 $nb_ok = 0; $nb_ko = 0;
@@ -38,6 +39,7 @@ foreach ($groupes as $texte => $dest) {
     $r = sms_gw_envoyer($texte, array_column($dest, 'tel'));
     foreach ($dest as $d) {
         $res[$d['k']] = ['ok' => $r['ok'], 'erreur' => $r['erreur']];
+        sms_journaliser(array_key_exists((string) post('type'), SMS_TYPES) ? post('type') : 'communique', 'passerelle', null, $d['nom'], $d['tel'], $texte, $r['ok'] ? 'envoye' : 'echec', $r['erreur']);
         $r['ok'] ? $nb_ok++ : $nb_ko++;
     }
 }

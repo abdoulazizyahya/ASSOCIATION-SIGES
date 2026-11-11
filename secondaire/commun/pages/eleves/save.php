@@ -3,6 +3,7 @@
 require_once __DIR__ . '/../../../../config/config.php';
 require_once __DIR__ . '/../../../../noyau/connexion.php';
 require_once __DIR__ . '/../../../../noyau/fonctions.php';
+require_once __DIR__ . '/../communication/_sms_lib.php';   // SMS automatiques (10/11/2026)
 exiger_role(['ADMIN', 'PROVISEUR', 'FONDATEUR', 'CENSEUR', 'SG', 'SECRETAIRE']);
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') rediriger('secondaire/commun/pages/eleves/liste.php');
@@ -51,6 +52,7 @@ if ($id) {
     );
     $id  = (int) db_last_id();
     $msg = 'Élève créé — matricule ' . $matricule . '.';
+    $sms_inscription = true;
 }
 
 if ($id_classe && $id_annee) {
@@ -65,5 +67,6 @@ if ($id_classe && $id_annee) {
     db_exec("DELETE FROM inscription WHERE id_eleve=? AND id_annee=?", [$id, $id_annee]);
 }
 
+if (!empty($sms_inscription) && $id_classe) $msg .= sms_auto('inscription', (int) $id);
 flash_set('succes', $msg);
 rediriger('secondaire/commun/pages/eleves/voir.php?id=' . $id);

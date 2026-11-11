@@ -2,6 +2,7 @@
 require_once __DIR__ . '/../../../config/config.php';
 require_once __DIR__ . '/../../../noyau/connexion.php';
 require_once __DIR__ . '/../../../noyau/fonctions.php';
+require_once __DIR__ . '/../../../secondaire/commun/pages/communication/_sms_lib.php';   // SMS automatiques (10/11/2026)
 exiger_role(['DIRECTEUR','SECRETAIRE','COMPTABLE']);
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') rediriger('primaire/pages/eleves/liste.php');
@@ -133,6 +134,7 @@ if ($id_existant) {
         [$mat, $nom, $nom_arabe, $prenom, $sexe, $date_naiss, $lieu_naiss, $id_arrondissement, $arrondissement, $adresse, $niu, $photo_bin]
     );
     $id = (int) db_last_id();
+    $sms_inscription = true;
     // Registre NIU central (multi-établissement) : passe la réservation en
     // « actif », renseigne l'identité et l'école courante, trace le mouvement.
     niu_enregistrer_inscription($niu, ['nom' => $nom, 'prenom' => $prenom,
@@ -177,5 +179,6 @@ if ($id && db_colonne_existe('eleve', 'tel_parent') && array_key_exists('tel_par
     db_exec("UPDATE eleve SET tel_parent=? WHERE id_eleve=?", [$tel_saisi === '' ? null : (tel_normaliser_cm($tel_saisi) ?? mb_substr($tel_saisi, 0, 30)), $id]);
 }
 
+if (!empty($sms_inscription)) $msg .= sms_auto('inscription', (int) $id);
 flash_set('succes', $msg);
 rediriger('primaire/pages/eleves/voir.php?id=' . $id);

@@ -6,7 +6,7 @@ require_once __DIR__ . '/../../../../config/config.php';
 require_once __DIR__ . '/../../../../noyau/connexion.php';
 require_once __DIR__ . '/../../../../noyau/fonctions.php';
 require_once __DIR__ . '/_billets_lib.php';
-require_once __DIR__ . '/../communication/_passerelle_lib.php';
+require_once __DIR__ . '/../communication/_sms_lib.php';
 
 exiger_role(billets_roles());
 billets_assurer_table();
@@ -54,16 +54,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $id = (int) db_last_id();
     journaliser_action('billet_emis', null, $numero . ' — ' . $T['libelle'] . ' — ' . $nom);
     $msg = $T['libelle'] . ' ' . $numero . ' enregistré.';
-    // SMS au parent (sortie, infirmerie) par la passerelle de l'école.
-    if (post('sms') === '1' && $tels && sms_gw_actif()) {
-        $etab = etab_pour_pdf(get_etablissement());
-        $ecole = trim((string) (($etab['sigle'] ?? '') ?: ($etab['nom_fr'] ?? '')));
-        $txt = $type === 'sortie'
-            ? "$ecole : votre enfant $nom ($classe) a quitte l'etablissement le " . date('d/m/Y', strtotime($date)) . ($heure ? " a $heure" : '') . (post('motif') !== '' ? '. Motif : ' . post('motif') : '') . '.'
-            : "$ecole : votre enfant $nom ($classe) est passe(e) a l'infirmerie le " . date('d/m/Y', strtotime($date)) . ($heure ? " a $heure" : '') . (post('motif') !== '' ? '. Motif : ' . post('motif') : '') . '.';
-        $r = sms_gw_envoyer($txt, [$tels[0]]);
-        db_exec("UPDATE billet SET sms=? WHERE id=?", [$r['ok'] ? $tels[0] : 'échec', $id]);
-        $msg .= $r['ok'] ? ' SMS envoyé au parent (' . tel_affiche($tels[0]) . ').' : ' SMS non envoyé : ' . $r['erreur'];
+    // SMS au parent (sortie, infirmerie) : modèle de l'école, journal, file d'attente.
+    if (post('sms') === '1' && $tels && in_array($type, ['sortie', 'infirmerie'], true)) {
+        $mods = sms_modeles();
+        $txt = sms_rendre($mods[$type][sms_langue((int) ($e['id_classe'] ?? 0))], ['eleve' => $nom, 'classe' => $classe,
+            'date' => date('d/m/Y', strtotime($date)), 'heure' => $heure ?: '-', 'motif' => post('motif') ?: '-']);
+        $r = sms_envoyer($type, $id_eleve, $nom, $tels[0], $txt, 'billet');
+        db_exec("UPDATE billet SET sms=? WHERE id=?", [$r['ok'] ? $tels[0] : (!empty($r['attente']) ? 'attente' : 'échec'), $id]);
+        $msg .= $r['ok'] ? ' SMS envoyé au parent (' . tel_affiche($tels[0]) . ').' : (!empty($r['attente']) ? ' SMS au parent mis en attente (voir le journal des SMS).' : ' SMS non envoyé : ' . $r['erreur']);
     }
     flash_set('succes', $msg);
     rediriger($ici . '?type=' . $type . '&imprimer=' . $id);
@@ -90,7 +88,8 @@ $motifs = [
     'infirmerie' => ['Maux de tête', 'Fièvre', 'Maux de ventre', 'Blessure', 'Malaise', 'Crise de paludisme'],
     'autorisation' => ['Raison de santé', 'Évènement familial', 'Formation / séminaire', 'Démarche administrative', 'Décès / deuil'],
 ][$type];
-$sms_possible = in_array($type, ['sortie', 'infirmerie'], true) && sms_gw_actif();
+$sms_possible = in_array($type, ['sortie', 'infirmerie'], true);
+$sms_coche = $sms_possible && (sms_gw_actif() || !empty(sms_modeles()[$type]['auto']));
 
 $titre_page = 'Billets & autorisations';
 require_once __DIR__ . '/../../../../noyau/layout/header.php';
@@ -180,8 +179,8 @@ require_once __DIR__ . '/../../../../noyau/layout/header.php';
           </div>
           <?php if ($sms_possible): ?>
           <div class="form-check mb-2">
-            <input class="form-check-input" type="checkbox" name="sms" value="1" id="b-sms" checked>
-            <label class="form-check-label" for="b-sms">Prévenir le parent par SMS (passerelle de l'école)</label>
+            <input class="form-check-input" type="checkbox" name="sms" value="1" id="b-sms" <?= $sms_coche ? 'checked' : '' ?>>
+            <label class="form-check-label" for="b-sms">Prévenir le parent par SMS<?= sms_gw_actif() ? '' : ' (mis en attente : passerelle SMS non configurée)' ?></label>
           </div>
           <?php endif; ?>
           <button class="btn btn-primary btn-sm"><i class="bi bi-printer me-1"></i>Enregistrer et imprimer</button>
