@@ -26,6 +26,7 @@ $menu = [
         ['Contacts des parents', 'secondaire/commun/pages/communication/contacts_parents.php', 'telephone', ['DIRECTEUR','SECRETAIRE','COMPTABLE','FONDATEUR']],
         ['Envoyer aux parents', 'secondaire/commun/pages/communication/envoyer.php', 'send', ['DIRECTEUR','SECRETAIRE','COMPTABLE','FONDATEUR']],
         ['Passerelle SMS', 'secondaire/commun/pages/communication/passerelle.php', 'phone', ['DIRECTEUR','FONDATEUR']],
+        ['Centre d\'impression', 'secondaire/commun/pages/impression/index.php', 'printer', ['DIRECTEUR','SECRETAIRE','COMPTABLE','FONDATEUR']],
     ],
 
     // Finances : remontée au-dessus de Pédagogie (demande explicite) — le

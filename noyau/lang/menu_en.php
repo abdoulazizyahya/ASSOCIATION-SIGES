@@ -62,6 +62,7 @@ return [
     'Passerelle SMS'            => 'SMS gateway',
     'Billets & autorisations'   => 'Passes & permissions',
     'Couvertures de bulletins'  => 'Report booklet covers',
+    'Centre d\'impression'      => 'Print centre',
     'Grille salariale'          => 'Salary scale',
     'Paie'                      => 'Payroll',
     'Avances sur salaire'       => 'Salary advances',
