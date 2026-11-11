@@ -77,6 +77,7 @@ $menu = [
         ['Annulation d\'évaluation','primaire/pages/notes/annulation_evaluation.php', 'calendar-x', ['SECRETAIRE']],
         ['Bulletins',              'primaire/pages/bulletins/index.php',   'file-earmark-text', ['DIRECTEUR','ENSEIGNANT','SECRETAIRE']],
         ['Couvertures de bulletins', 'secondaire/commun/pages/couvertures/index.php', 'journal-bookmark', ['DIRECTEUR','SECRETAIRE','FONDATEUR']],
+        ['Analyse des performances', 'secondaire/commun/pages/analyse/index.php', 'graph-up-arrow', ['DIRECTEUR','FONDATEUR','SECRETAIRE']],
         ['Statistiques',           'primaire/pages/statistiques/index.php','bar-chart-line', ['DIRECTEUR','ENSEIGNANT','SECRETAIRE']],
         ['Conseil de classe',      'primaire/pages/conseil_classe/index.php', 'mortarboard', ['DIRECTEUR','ENSEIGNANT','SECRETAIRE']],
         ['Tableau d\'honneur/ Relevé',    'primaire/pages/statistiques/documents.php', 'files', ['DIRECTEUR','ENSEIGNANT','SECRETAIRE']],

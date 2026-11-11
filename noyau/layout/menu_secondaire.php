@@ -51,6 +51,7 @@ $menu = [
         ['Absences',             'secondaire/commun/pages/absences/index.php',         'person-x',           ['ADMIN','PROVISEUR', 'FONDATEUR','CENSEUR','ENSEIGNANT']],
         ['Bulletins',            'secondaire/general/pages/bulletins/index.php',        'file-earmark-text',  ['ADMIN','PROVISEUR', 'FONDATEUR','CENSEUR','ENSEIGNANT'], 'pp'],
         ['Couvertures de bulletins', 'secondaire/commun/pages/couvertures/index.php', 'journal-bookmark', ['ADMIN','PROVISEUR','FONDATEUR','CENSEUR','SECRETAIRE']],
+        ['Analyse des performances', 'secondaire/commun/pages/analyse/index.php', 'graph-up-arrow', ['ADMIN','PROVISEUR','FONDATEUR','CENSEUR','SG']],
         ['Conseil de Classe',    'secondaire/commun/pages/conseil_classe/index.php',   'mortarboard',         ['ADMIN','PROVISEUR', 'FONDATEUR','CENSEUR','SG','ENSEIGNANT'], 'pp'],
         ['Statistiques',         'secondaire/commun/pages/statistiques/index.php',     'bar-chart-line',      ['ADMIN','PROVISEUR', 'FONDATEUR','CENSEUR','ENSEIGNANT']],
         ['Documents de classe',  'secondaire/commun/pages/statistiques/documents.php', 'files',                ['ADMIN','PROVISEUR', 'FONDATEUR','CENSEUR','ENSEIGNANT'], 'pp'],
