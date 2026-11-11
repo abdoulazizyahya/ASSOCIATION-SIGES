@@ -64,11 +64,14 @@ function ed_eleve(int $id): ?array {
 
 /** Personnel actif : [['id' => matricule_ens, 'nom', 'prenom', 'fonction', 'matricule' (officiel), 'tel']]. */
 function ed_personnel(): array {
-    $sys = function_exists('sql_hors_compte_systeme') && !voit_tous_les_comptes() ? ' AND ' . sql_hors_compte_systeme('e') : '';
+    // Documents imprimés : les comptes propriétaires (système) n'y figurent
+    // JAMAIS, même quand c'est le propriétaire qui imprime (11/11/2026).
+    $sys = function_exists('sql_hors_compte_systeme') ? ' AND ' . sql_hors_compte_systeme('e') : '';
     if (ed_secondaire()) {
         $actif = function_exists('sec_sql_ens_en_service') ? ' AND ' . sec_sql_ens_en_service('e') : '';
+        $hors_sys = " AND NOT EXISTS (SELECT 1 FROM utilisateur u WHERE u.matricule_ens = e.matricule_ens AND u.compte_systeme = 1)";
         return db_all("SELECT e.matricule_ens AS id, e.nom_ens AS nom, e.prenom_ens AS prenom, e.id_fonction AS fonction,
-                              e.matricule, e.tel_ens AS tel FROM enseignant e WHERE 1=1 $actif ORDER BY e.nom_ens, e.prenom_ens");
+                              e.matricule, e.tel_ens AS tel FROM enseignant e WHERE 1=1 $actif $hors_sys ORDER BY e.nom_ens, e.prenom_ens");
     }
     return db_all("SELECT e.matricule_ens AS id, e.nom_ens AS nom, e.prenom_ens AS prenom, e.id_fonction AS fonction,
                           e.mat_ens AS matricule, e.tel_ens AS tel FROM enseignant e

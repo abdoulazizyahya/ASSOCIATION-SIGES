@@ -10,6 +10,13 @@
 class FPDF
 {
 const VERSION = '1.86';
+// SIGES — Apparence des documents (11/11/2026) : réglages de l'école posés par
+// app_appliquer() (noyau/partage/apparence_docs.php). Vides = FPDF d'origine.
+public $siges_police = null;      // 'helvetica' | 'times' | 'courier' | 'robotoc' : remplace Arial/Helvetica
+public $siges_echelle = 1.0;      // taille du texte (0,9 à 1,15)
+public $siges_couleurs = [];      // ['30,79,216' => [r,g,b]] : couleur du modèle → couleur de l'école
+public $siges_police_dir = '';    // dossier des polices embarquées (Roboto condensée)
+public $siges_copyright_auto = true;   // mention de copyright ajoutée en bas de chaque page qui n'en a pas (11/11/2026)
 protected $page;               // current page number
 protected $n;                  // current object number
 protected $offsets;            // array of object offsets
@@ -375,6 +382,14 @@ function PageNo()
 
 function SetDrawColor($r, $g=null, $b=null)
 {
+	if($this->siges_couleurs)
+	{
+		$cle = $g===null ? "$r,$r,$r" : "$r,$g,$b";
+		if(isset($this->siges_couleurs['D:'.$cle]))
+			list($r,$g,$b) = $this->siges_couleurs['D:'.$cle];
+		elseif($g!==null && isset($this->siges_couleurs[$cle]))
+			list($r,$g,$b) = $this->siges_couleurs[$cle];
+	}
 	// Set color for all stroking operations
 	if(($r==0 && $g==0 && $b==0) || $g===null)
 		$this->DrawColor = sprintf('%.3F G',$r/255);
@@ -386,6 +401,14 @@ function SetDrawColor($r, $g=null, $b=null)
 
 function SetFillColor($r, $g=null, $b=null)
 {
+	if($this->siges_couleurs)
+	{
+		$cle = $g===null ? "$r,$r,$r" : "$r,$g,$b";
+		if(isset($this->siges_couleurs['F:'.$cle]))
+			list($r,$g,$b) = $this->siges_couleurs['F:'.$cle];
+		elseif($g!==null && isset($this->siges_couleurs[$cle]))
+			list($r,$g,$b) = $this->siges_couleurs[$cle];
+	}
 	// Set color for all filling operations
 	if(($r==0 && $g==0 && $b==0) || $g===null)
 		$this->FillColor = sprintf('%.3F g',$r/255);
@@ -398,12 +421,36 @@ function SetFillColor($r, $g=null, $b=null)
 
 function SetTextColor($r, $g=null, $b=null)
 {
+	if($this->siges_couleurs)
+	{
+		$cle = $g===null ? "$r,$r,$r" : "$r,$g,$b";
+		if(isset($this->siges_couleurs['T:'.$cle]))
+			list($r,$g,$b) = $this->siges_couleurs['T:'.$cle];
+		elseif($g!==null && isset($this->siges_couleurs[$cle]))
+			list($r,$g,$b) = $this->siges_couleurs[$cle];
+	}
 	// Set color for text
 	if(($r==0 && $g==0 && $b==0) || $g===null)
 		$this->TextColor = sprintf('%.3F g',$r/255);
 	else
 		$this->TextColor = sprintf('%.3F %.3F %.3F rg',$r/255,$g/255,$b/255);
 	$this->ColorFlag = ($this->FillColor!=$this->TextColor);
+}
+
+function siges_famille($style)
+{
+	// Police choisie par l'école ; Roboto condensée est chargée à la demande.
+	if($this->siges_police!=='robotoc')
+		return $this->siges_police;
+	$st = strtoupper(str_replace(array('U','u'), '', (string)$style));
+	if($st=='IB')
+		$st = 'BI';
+	if(!isset($this->fonts['robotoc'.$st]))
+	{
+		$fichiers = array(''=>'robotoc', 'B'=>'robotocb', 'I'=>'robotoci', 'BI'=>'robotocbi');
+		$this->AddFont('RobotoC', $st, $fichiers[$st].'.php', $this->siges_police_dir);
+	}
+	return 'RobotoC';
 }
 
 function GetStringWidth($s)
@@ -478,6 +525,10 @@ function AddFont($family, $style='', $file='', $dir='')
 
 function SetFont($family, $style='', $size=0)
 {
+	if($this->siges_police && $family!='' && in_array(strtolower($family), array('arial','helvetica'), true))
+		$family = $this->siges_famille($style);
+	if($size>0 && $this->siges_echelle!=1.0)
+		$size = round($size*$this->siges_echelle, 2);
 	// Select a font; size given in points
 	if($family=='')
 		$family = $this->FontFamily;
@@ -528,6 +579,8 @@ function SetFont($family, $style='', $size=0)
 
 function SetFontSize($size)
 {
+	if($this->siges_echelle!=1.0)
+		$size = round($size*$this->siges_echelle, 2);
 	// Set font size in points
 	if($this->FontSizePt==$size)
 		return;
@@ -1183,7 +1236,26 @@ protected function _beginpage($orientation, $size, $rotation)
 
 protected function _endpage()
 {
+	// SIGES (11/11/2026) : mention de copyright UNIQUE (siges_copyright(),
+	// noyau/fonctions.php) en bas de chaque page qui n'en porte pas déjà une —
+	// jamais en double. Petite, grise, centrée, dans les 3 derniers mm.
+	if($this->siges_copyright_auto && $this->page>0 && strpos($this->pages[$this->page],'Copyright')===false && function_exists('siges_copyright'))
+		$this->siges_pied_copyright();
 	$this->state = 1;
+}
+
+protected function siges_pied_copyright()
+{
+	$txt = siges_copyright();
+	$cp = function_exists('iconv') ? @iconv('UTF-8', 'windows-1252//TRANSLIT', $txt) : false;
+	$txt = $cp!==false ? $cp : (function_exists('mb_convert_encoding') ? mb_convert_encoding($txt, 'Windows-1252', 'UTF-8') : $txt);
+	$sauve = array($this->siges_police, $this->siges_echelle, $this->siges_couleurs);
+	$this->siges_police = null; $this->siges_echelle = 1.0; $this->siges_couleurs = array();
+	$this->SetFont('Helvetica', 'I', 5.5);
+	$this->SetTextColor(130, 130, 130);
+	$mm = 72 / 25.4 / $this->k;   // 1 mm en unités du document
+	$this->Text(($this->w - $this->GetStringWidth($txt)) / 2, $this->h - 2.2 * $mm, $txt);
+	list($this->siges_police, $this->siges_echelle, $this->siges_couleurs) = $sauve;
 }
 
 protected function _loadfont($path)

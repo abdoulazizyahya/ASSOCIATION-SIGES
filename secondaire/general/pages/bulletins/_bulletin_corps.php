@@ -217,6 +217,7 @@ $disciplines = array_values(array_filter($disciplines, fn($d) => !sec_hors_serie
 // Un seul document pour toute la classe : créé au premier élève.
 if (!isset($pdf)) {
     $pdf = new PDF_LTM('P', 'mm', 'A4');
+    require_once __DIR__ . '/../../../../noyau/partage/apparence_docs.php'; app_appliquer_doc($pdf, 'bulletins');   // Apparence des documents
     $pdf->SetMargins(8, 8, 8);
 }
 // Marge de saut de page alignée sur le cadre extérieur (4mm) — la mention
@@ -270,12 +271,13 @@ $decor_page = function () use ($pdf, $etab, $pw, $ph) {
     $pdf->RoundedRect(4, 4, $pw - 8, $ph - 8, 4, 'D');
     $pdf->SetLineWidth(0.2);
 };
-$fin_page = function () use ($pdf, $ml, $uw, $pw, $ph, $acces_public, $qr_tmp, $qr_taille, $y_qr) {
+$qr_dans_gab = false;
+$fin_page = function () use ($pdf, $ml, $uw, $pw, $ph, $acces_public, $qr_tmp, $qr_taille, $y_qr, &$qr_dans_gab) {
     // QR au premier plan : dessiné après tout le contenu de la page.
-    $pdf->Image($qr_tmp, ($pw - $qr_taille) / 2, $y_qr, $qr_taille, $qr_taille, 'PNG');
+    if (!$qr_dans_gab) $pdf->Image($qr_tmp, ($pw - $qr_taille) / 2, $y_qr, $qr_taille, $qr_taille, 'PNG');
     $pdf->SetFont('Arial', '', 6.5);
     $pdf->SetXY($ml, $ph - 9);
-    $pdf->Cell($uw, 4, u('Copyright © SIGES ABZ   , E-mail: abdoulazizyahya@gmail.com'), 0, 1, 'C');
+    $pdf->Cell($uw, 4, u(siges_copyright()), 0, 1, 'C');
     // Ouvert depuis le scan du QR code : tampon « AUTHENTIQUE » comme sur les
     // reçus, redessiné PAR-DESSUS le bulletin (lettres creuses) — celui posé
     // en fond par pdf_filigrane() serait caché par les cases remplies.
@@ -288,6 +290,30 @@ if ($lisible) {
     $pdf->SetAutoPageBreak(false);   // sauts de page décidés à la main (une matière n'est jamais coupée)
     $pdf->SetDisplayMode('real');    // ouverture à 100 %
 }
+
+// ── Haut du bulletin dessiné par l'école (concepteur, 11/11/2026) ──
+// Paramètres → Apparence des documents → Concepteur → « Haut du bulletin » :
+// remplace les sections 1 à 3 (en-tête, titre, identité) ; le tableau suit.
+require_once __DIR__ . '/../../../../noyau/partage/gabarits.php';
+if (!array_key_exists('__gab_bulletin', $GLOBALS)) {
+    $GLOBALS['__gab_bulletin'] = (!empty($_GET['gab_brouillon']) || gab_existe('bulletin')) ? gab_charger('bulletin', !empty($_GET['gab_brouillon'])) : null;
+}
+$gab_bul = $GLOBALS['__gab_bulletin'];
+if ($gab_bul) {
+    $titre_fr_g = 'BULLETIN SCOLAIRE DU ' . $titre_bull;
+    $titre_en_g = ([1 => 'First', 2 => 'Second', 3 => 'Third'][(int) ($trim_info['ordre'] ?? 0)] ?? '') . ' Term Report Card';
+    $photo_g = !empty($eleve['photo']) ? photo_sec_fichier_tmp((int) $eleve['id']) : '';
+    if (!$photo_g || !is_file($photo_g)) $photo_g = __DIR__ . '/../../../../assets/img/avatars/' . ((strtoupper($eleve['sexe'] ?? '') === 'F') ? 'fille.png' : 'garcon.png');
+    $vars_g = gab_vars_eleve($eleve + ['classe' => $insc['classe'] ?? '']) + gab_vars_ecole($etab, $val_annee) + [
+        'titre' => $titre_fr_g, 'titre_en' => trim($titre_en_g), 'periode' => $titre_bull, 'periode_en' => trim(str_replace(' Report Card', '', $titre_en_g)),
+        'effectif' => (string) $nb_inscrits, 'identifiant' => niu_eleve($eleve), 'niu' => niu_eleve($eleve),
+        'redoublant' => strtolower($insc['statut'] ?? '') === 'redoublant' ? bt('Oui', 'Yes') : bt('Non', 'No'),
+        'titulaire' => $nom_pp, 'parents' => $contacts_parents,
+    ];
+    gab_rendre($pdf, $gab_bul, $ml, 8, $uw, (float) $gab_bul['hauteur'], $vars_g, ['logo' => gab_logo($etab), 'photo' => $photo_g, 'qr' => $qr_tmp]);
+    $qr_dans_gab = (bool) array_filter($gab_bul['elements'], fn($e) => $e['type'] === 'image' && $e['source'] === 'qr');
+    $pdf->SetXY($ml, 8 + (float) $gab_bul['hauteur'] + 1);
+} else {
 
 // ── 1. En-tête bilingue réduit (06/11/2026) : République, devise, région,
 // département, nom de l'école, B.P./tél./e-mail — commun/pdf/bulletin_presentation.php.
@@ -464,6 +490,7 @@ $pdf->SetFont('Arial', '', cell2l_taille_ajustee($pdf, $contacts_parents, '', 53
 $pdf->Cell(54, $h_id, u($contacts_parents), 1, 1, 'L');
 
 $pdf->SetY(max($pdf->GetY(), $y_photo + $photo_h));
+}   // fin du haut du bulletin standard
 
 // ── 4. Tableau des compétences ──────────────────────────────────────
 // Reproduit le modèle fourni par l'utilisateur (others/Form 1.pdf pour la

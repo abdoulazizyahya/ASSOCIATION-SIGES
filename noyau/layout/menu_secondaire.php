@@ -138,6 +138,7 @@ $menu = [
         // Secondaire : pas de « Directeur » (17/10/2026) — Proviseur (public) ou Principal (privé)
         [$statut_ecole === 'prive' ? 'Principal' : 'Proviseur', 'secondaire/commun/pages/fondateur/directeur.php', 'person-badge', ['FONDATEUR']],
         ['Configurations',    'secondaire/commun/pages/parametres/index.php',   'gear',        ['ADMIN','PROVISEUR', 'FONDATEUR']],
+        ['Apparence des documents', 'secondaire/commun/pages/apparence/index.php', 'palette', ['ADMIN','PROVISEUR', 'FONDATEUR']],
         // « Utilisateurs » retiré (17/10/2026) : comptes gérés dans Ressources humaines → Enseignants
         // (fiche de chaque membre, bouton « Tous les comptes » de la liste).
         ['Journal d\'audit',  'secondaire/commun/pages/utilisateurs/journal.php','shield-check',['ADMIN','PROVISEUR', 'FONDATEUR']],

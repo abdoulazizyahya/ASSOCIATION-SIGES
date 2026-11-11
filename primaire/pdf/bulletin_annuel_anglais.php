@@ -595,6 +595,7 @@ foreach (trimestres_de_annee($val_annee) as $__id_trim) {
 
 try {
 $pdf = new FPDF('P', 'mm', 'A4');
+require_once __DIR__ . '/../../noyau/partage/apparence_docs.php'; app_appliquer_doc($pdf, 'bulletins');   // Apparence des documents
 $pdf->SetAutoPageBreak(false, 0);
 
 foreach ($liste as $e) {

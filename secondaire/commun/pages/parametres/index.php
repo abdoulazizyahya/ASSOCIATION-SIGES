@@ -1260,6 +1260,7 @@ $__url = $__el && $__trim ? APP_URL . '/secondaire/' . (est_technique() ? 'techn
     <i class="bi bi-eye me-1"></i>Voir un vrai bulletin avec ces couleurs
   </button>
   <span class="text-muted" style="font-size:.76rem">Bulletin PDF réel d'un élève de l'école (couleurs enregistrées) — enregistrez vos changements avant de l'ouvrir.</span>
+  <a href="<?= APP_URL ?>/secondaire/commun/pages/apparence/index.php?onglet=bulletins" class="btn btn-outline-secondary btn-sm ms-auto"><i class="bi bi-fonts me-1"></i>Police des documents</a>
 </div>
 <?php endif; ?>
 
@@ -1440,7 +1441,7 @@ td.comp{text-align:left}
         </div>
 
         <div class="cbk-foot">
-          <span>Copyright © SIGES – <?= h($annee_act['libelle'] ?? '2025/2026') ?> · Scanner pour vérifier l'authenticité</span>
+          <span><?= h(siges_copyright()) ?> · Scanner pour vérifier l'authenticité</span>
           <span>Page 1 / 1</span>
         </div>
       </div>

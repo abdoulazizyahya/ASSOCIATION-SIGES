@@ -367,7 +367,7 @@ try {
 $pdf->SetFont('Arial', 'I', 6.5);
 $pdf->SetTextColor(120);
 $pdf->SetXY($ml, $ph - 12);
-$pdf->Cell($uw, 4, u('Copyright © SIGES ABZ , E-mail: abdoulazizyahya@gmail.com'), 0, 0, 'C');
+$pdf->Cell($uw, 4, u(siges_copyright()), 0, 0, 'C');
 $pdf->SetTextColor(0);
 
 $pdf->Output($dl ? 'D' : 'I', 'certificat_scolarite_' . ($eleve['matricule'] ?? $id_eleve) . '.pdf');

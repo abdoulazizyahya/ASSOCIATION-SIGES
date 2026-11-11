@@ -104,7 +104,7 @@ if ($genere) {
             $extra = sms_finances_lot($ids);
         } elseif ($type === 'moyenne' && $id_trim) {
             if ($secondaire) {
-                $moys = est_technique() ? [] : calc_moys_classe_periode_comp((int) $cl['id'], $id_annee, 'trimestre', $id_trim, $ids);
+                $moys = calc_moys_classe_periode_comp((int) $cl['id'], $id_annee, 'trimestre', $id_trim, $ids);
             } else {
                 $moys = [];
                 foreach ($ids as $eid) { $m = calculer_moyenne_trimestre_eleve((int) $eid, $id_trim, (int) $cl['id'], $val_annee); if ($m !== null) $moys[(int) $eid] = $m; }
@@ -251,7 +251,6 @@ require_once __DIR__ . '/../../../../noyau/layout/header.php';
   <strong><?= count($lignes) ?></strong> message(s) à envoyer
   <?php if ($ignores): ?> · <?= $ignores ?> élève(s) non concerné(s)<?php endif; ?>
   <?php if ($sans_num): ?> · <span class="text-danger"><?= $sans_num ?> élève(s) sans numéro</span> (<a href="<?= APP_URL ?>/secondaire/commun/pages/communication/contacts_parents.php?classe=<?= $id_classe ?>&filtre=sans">compléter</a>)<?php endif; ?>
-  <?php if ($type === 'moyenne' && $secondaire && est_technique()): ?><div class="text-danger mt-1">Moyennes non disponibles ici pour l'enseignement technique.</div><?php endif; ?>
 </div>
 
 <?php if ($lignes): ?>

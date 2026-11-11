@@ -204,7 +204,7 @@ foreach ($frames as $i => [$x0, $y0]) {
     $pdf->SetFont('Arial', '', 5.5);
     $pdf->SetTextColor(90);
     $pdf->TextWithDirection($x0 + $w0 - 1.5, $y0 + $h0 - 4, pdf_u(
-        'Copyright © SIGES ABZ Tel: (+237) 661 00 06 57 / 699 75 86 12 / 675 74 40 62, E-mail: abdoulazizyahya@gmail.com'
+        siges_copyright()
     ), 'U');
     $pdf->SetTextColor(0);
 }

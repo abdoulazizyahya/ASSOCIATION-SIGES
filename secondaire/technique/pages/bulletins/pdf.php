@@ -432,6 +432,7 @@ unset($moy_ref);
 
 // ── Génération PDF ────────────────────────────────────────────────
 $pdf = new PDF_LTM('P', 'mm', 'A4');
+require_once __DIR__ . '/../../../../noyau/partage/apparence_docs.php'; app_appliquer_doc($pdf, 'bulletins');   // Apparence des documents
 $pdf->SetMargins(8, 8, 8);
 // Marge de saut de page alignée sur le cadre extérieur (4mm) — la mention
 // copyright est dessinée volontairement tout en bas, juste au-dessus du
@@ -453,6 +454,125 @@ $pdf->SetLineWidth(0.4);
 $pdf->RoundedRect(4, 4, $pw - 8, $ph - 8, 4, 'D');
 $pdf->SetLineWidth(0.2);
 
+// Aides de dessin (sorties de la section 3 : elles servent aussi au reste du
+// bulletin quand le haut est dessiné par l'école).
+function checkbox_ltm(FPDF $pdf, float $x, float $y, bool $checked, float $s = 3): void {
+    $pdf->SetDrawColor(0, 0, 0);
+    $pdf->Rect($x, $y, $s, $s);
+    if ($checked) {
+        $pdf->SetLineWidth(0.35);
+        $pdf->Line($x + 0.4, $y + 0.4, $x + $s - 0.4, $y + $s - 0.4);
+        $pdf->Line($x + $s - 0.4, $y + 0.4, $x + 0.4, $y + $s - 0.4);
+        $pdf->SetLineWidth(0.2);
+    }
+}
+
+function cell_rang(FPDF $pdf, float $w, float $h, ?int $rang, string $suffixe, int $border, string $align, float $taille, bool $bold = true): void {
+    $x = $pdf->GetX(); $y = $pdf->GetY();
+    $style = $bold ? 'B' : '';
+    if ($border) { $pdf->Rect($x, $y, $w, $h); }
+    if ($rang === null) {
+        $pdf->SetFont('Arial', $style, $taille);
+        $pdf->SetXY($x, $y);
+        $pdf->Cell($w, $h, '-', 0, 0, $align);
+        $pdf->SetXY($x + $w, $y);
+        return;
+    }
+
+    $part1 = (string)$rang;
+    $taille_e = round($taille * 0.62, 2);
+    $pdf->SetFont('Arial', $style, $taille);
+    $w1 = $pdf->GetStringWidth($part1);
+    $w2 = $pdf->GetStringWidth(u($suffixe));
+    $pdf->SetFont('Arial', $style, $taille_e);
+    $ord = rang_suffixe((int) $rang);
+    $we = $pdf->GetStringWidth($ord);
+    $total = $w1 + $we + $w2;
+    if ($align === 'C')     { $x0 = $x + ($w - $total) / 2; }
+    elseif ($align === 'R') { $x0 = $x + $w - $total - 1.2; }
+    else                    { $x0 = $x + 1.2; }
+
+    $pdf->SetFont('Arial', $style, $taille);
+    $pdf->SetXY($x0, $y);
+    $pdf->Cell($w1, $h, $part1, 0, 0, 'L');
+
+    $raise = $taille * 0.12; // décalage vertical approximatif (mm)
+    $pdf->SetXY($x0 + $w1, $y - $raise);
+    $pdf->SetFont('Arial', $style, $taille_e);
+    $pdf->Cell($we, $h, $ord, 0, 0, 'L');
+
+    $pdf->SetXY($x0 + $w1 + $we, $y);
+    $pdf->SetFont('Arial', $style, $taille);
+    $pdf->Cell($w2, $h, u($suffixe), 0, 0, 'L');
+
+    $pdf->SetXY($x + $w, $y);
+}
+
+function cell2l_taille_ajustee(FPDF $pdf, string $texte, string $style, float $largeur_max, float $taille_max, float $taille_min): float {
+    $taille = $taille_max;
+    $pdf->SetFont('Arial', $style, $taille);
+    while ($taille > $taille_min && $pdf->GetStringWidth(u($texte)) > $largeur_max) {
+        $taille -= 0.25;
+        $pdf->SetFont('Arial', $style, $taille);
+    }
+    return $taille;
+}
+
+function cell2l(FPDF $pdf, float $w, float $h, string $fr, string $en, string $align = 'L', bool $fill = false, float $taille_fr = 6, float $taille_en = 4.3, ?array $fill_color = null, bool $tight = false): void {
+    [$fr, $en] = bl($fr, $en);   // section anglophone : l'anglais à la place du français
+    $fill_color ??= couleur_pdf('bandeau_section');
+    $x = $pdf->GetX(); $y = $pdf->GetY();
+    if ($fill) { $pdf->SetFillColor($fill_color[0], $fill_color[1], $fill_color[2]); $pdf->Rect($x, $y, $w, $h, 'F'); }
+    $pdf->Rect($x, $y, $w, $h);
+    // Marge de sécurité (offset 0.8+0.4 + cMargin interne de Cell()) — même
+    // principe que fpdf_texte_ajuste() ailleurs dans ce fichier.
+    $dispo = $w - 2.4;
+    if ($en === '') {
+        $taille_fr = cell2l_taille_ajustee($pdf, $fr, 'B', $dispo, $taille_fr, 5.5);
+        $pdf->SetFont('Arial', 'B', $taille_fr);
+        $pdf->SetXY($x + 0.8, $y);
+        $pdf->Cell($w - 1.2, $h, u($fr), 0, 0, $align);
+    } else {
+        $taille_fr = cell2l_taille_ajustee($pdf, $fr, 'B', $dispo, $taille_fr, 5.5);
+        $taille_en = cell2l_taille_ajustee($pdf, $en, 'I', $dispo, $taille_en, 4.5);
+        // Interligne FR/EN resserré (demande explicite) : quasiment plus de
+        // marge morte entre les 2 lignes, pour laisser le plus de place
+        // possible au texte lui-même. $tight (demande explicite, case
+        // d'identification élève) va plus loin : répartition stricte 50/50
+        // sans aucun décalage haut, pour 2 lignes de MÊME taille de police.
+        if ($tight) {
+            [$y_fr, $h_fr, $y_en, $h_en] = [$y, $h * 0.5, $y + $h * 0.5, $h * 0.5];
+        } else {
+            [$y_fr, $h_fr, $y_en, $h_en] = [$y + $h * 0.02, $h * 0.52, $y + $h * 0.54, $h * 0.44];
+        }
+        $pdf->SetFont('Arial', 'B', $taille_fr);
+        $pdf->SetXY($x + 0.8, $y_fr);
+        $pdf->Cell($w - 1.2, $h_fr, u($fr), 0, 0, $align);
+        $pdf->SetFont('Arial', 'I', $taille_en);
+        $pdf->SetXY($x + 0.8, $y_en);
+        $pdf->Cell($w - 1.2, $h_en, u($en), 0, 0, $align);
+    }
+    $pdf->SetXY($x + $w, $y);
+}
+
+function libelle_seq_court(?array $s): string {
+    if (!$s) return '';
+    $mot = (stripos($s['libelle'] ?? '', 'valuation') !== false) ? 'EVAL' : 'SEQ';
+    return bulletin_en() ? $mot . ' ' . (int)$s['ordre'] : (int)$s['ordre'] . 'e ' . $mot;   // 1e SEQ / SEQ 1
+}
+
+// ── Haut du bulletin dessiné par l'école (concepteur, 11/11/2026) ──
+// Paramètres → Apparence des documents → Concepteur → « Haut du bulletin » :
+// remplace les sections 1 à 3 ; le tableau des disciplines suit.
+require_once __DIR__ . '/../../../../noyau/partage/gabarits.php';
+$gab_bul = gab_bulletin_actif();
+$qr_dans_gab = false;
+if ($gab_bul) {
+    $photo_path = !empty($eleve['photo']) ? photo_sec_fichier_tmp((int) $eleve['id']) : '';   // reprise pour le QR habituel
+    $qr_dans_gab = gab_bulletin_secondaire($pdf, $gab_bul, $ml, 8, $uw, $eleve, $insc, (int) $nb_inscrits, $titre_bull, $trim_info, (string) $nom_pp, (string) $contacts_parents, (string) $val_annee, $etab,
+        fn() => gab_qr_bulletin_secondaire((int) $id_eleve, $is_seq ? 'seq' : 'trim', (int) ($is_seq ? $id_seq_u : $id_trim), $eleve));
+    $pdf->SetXY($ml, 8 + (float) $gab_bul['hauteur'] + 1);
+} else {
 // ── 1. En-tête bilingue ──────────────────────────────────────────
 $col3 = $uw / 3;
 $y0   = 8;
@@ -534,16 +654,6 @@ $pdf->Cell($uw, 5, u(bt('Année scolaire : ', 'School year: ') . $val_annee), 0,
 // ── 3. Infos élève ───────────────────────────────────────────────
 $pdf->Ln(0.5);
 
-function checkbox_ltm(FPDF $pdf, float $x, float $y, bool $checked, float $s = 3): void {
-    $pdf->SetDrawColor(0, 0, 0);
-    $pdf->Rect($x, $y, $s, $s);
-    if ($checked) {
-        $pdf->SetLineWidth(0.35);
-        $pdf->Line($x + 0.4, $y + 0.4, $x + $s - 0.4, $y + $s - 0.4);
-        $pdf->Line($x + $s - 0.4, $y + 0.4, $x + 0.4, $y + $s - 0.4);
-        $pdf->SetLineWidth(0.2);
-    }
-}
 
 // Dessine un rang ("2e/22", "2e", ...) avec le "e" ordinal en exposant
 // (demande explicite : tous les rangs affichés) au lieu du "e" en taille
@@ -556,46 +666,6 @@ function checkbox_ltm(FPDF $pdf, float $x, float $y, bool $checked, float $s = 3
 // sera réellement dessiné ici, donc jamais de débordement). Laisse le
 // curseur à (x+$w, y) — comme un Cell(ln=0) — à l'appelant de gérer la
 // suite (Ln(), SetX()...).
-function cell_rang(FPDF $pdf, float $w, float $h, ?int $rang, string $suffixe, int $border, string $align, float $taille, bool $bold = true): void {
-    $x = $pdf->GetX(); $y = $pdf->GetY();
-    $style = $bold ? 'B' : '';
-    if ($border) { $pdf->Rect($x, $y, $w, $h); }
-    if ($rang === null) {
-        $pdf->SetFont('Arial', $style, $taille);
-        $pdf->SetXY($x, $y);
-        $pdf->Cell($w, $h, '-', 0, 0, $align);
-        $pdf->SetXY($x + $w, $y);
-        return;
-    }
-
-    $part1 = (string)$rang;
-    $taille_e = round($taille * 0.62, 2);
-    $pdf->SetFont('Arial', $style, $taille);
-    $w1 = $pdf->GetStringWidth($part1);
-    $w2 = $pdf->GetStringWidth(u($suffixe));
-    $pdf->SetFont('Arial', $style, $taille_e);
-    $ord = rang_suffixe((int) $rang);
-    $we = $pdf->GetStringWidth($ord);
-    $total = $w1 + $we + $w2;
-    if ($align === 'C')     { $x0 = $x + ($w - $total) / 2; }
-    elseif ($align === 'R') { $x0 = $x + $w - $total - 1.2; }
-    else                    { $x0 = $x + 1.2; }
-
-    $pdf->SetFont('Arial', $style, $taille);
-    $pdf->SetXY($x0, $y);
-    $pdf->Cell($w1, $h, $part1, 0, 0, 'L');
-
-    $raise = $taille * 0.12; // décalage vertical approximatif (mm)
-    $pdf->SetXY($x0 + $w1, $y - $raise);
-    $pdf->SetFont('Arial', $style, $taille_e);
-    $pdf->Cell($we, $h, $ord, 0, 0, 'L');
-
-    $pdf->SetXY($x0 + $w1 + $we, $y);
-    $pdf->SetFont('Arial', $style, $taille);
-    $pdf->Cell($w2, $h, u($suffixe), 0, 0, 'L');
-
-    $pdf->SetXY($x + $w, $y);
-}
 
 // Réduit par petits pas la taille de police d'un texte (dans le style donné,
 // B/I/etc. — l'empattement gras/italique change la largeur réelle du texte)
@@ -603,15 +673,6 @@ function cell_rang(FPDF $pdf, float $w, float $h, ?int $rang, string $suffixe, i
 // Utilisé par cell2l() pour que $taille_fr/$taille_en soient des tailles
 // MAXIMALES : on peut les augmenter sans risque, chaque cellule reçoit alors
 // automatiquement la plus grande taille qui tient réellement dans sa largeur.
-function cell2l_taille_ajustee(FPDF $pdf, string $texte, string $style, float $largeur_max, float $taille_max, float $taille_min): float {
-    $taille = $taille_max;
-    $pdf->SetFont('Arial', $style, $taille);
-    while ($taille > $taille_min && $pdf->GetStringWidth(u($texte)) > $largeur_max) {
-        $taille -= 0.25;
-        $pdf->SetFont('Arial', $style, $taille);
-    }
-    return $taille;
-}
 
 // Cellule à 2 lignes (libellé FR en gras + traduction EN en italique, plus
 // petite, juste en dessous) — reproduit le style bilingue du modèle de
@@ -622,53 +683,12 @@ function cell2l_taille_ajustee(FPDF $pdf, string $texte, string $style, float $l
 // $taille_fr/$taille_en sont des MAXIMUMS (demande explicite : polices plus
 // grandes mais sans jamais déborder du cadre) — réduits automatiquement si
 // besoin par cell2l_taille_ajustee(), avec un plancher de lisibilité minimal.
-function cell2l(FPDF $pdf, float $w, float $h, string $fr, string $en, string $align = 'L', bool $fill = false, float $taille_fr = 6, float $taille_en = 4.3, ?array $fill_color = null, bool $tight = false): void {
-    [$fr, $en] = bl($fr, $en);   // section anglophone : l'anglais à la place du français
-    $fill_color ??= couleur_pdf('bandeau_section');
-    $x = $pdf->GetX(); $y = $pdf->GetY();
-    if ($fill) { $pdf->SetFillColor($fill_color[0], $fill_color[1], $fill_color[2]); $pdf->Rect($x, $y, $w, $h, 'F'); }
-    $pdf->Rect($x, $y, $w, $h);
-    // Marge de sécurité (offset 0.8+0.4 + cMargin interne de Cell()) — même
-    // principe que fpdf_texte_ajuste() ailleurs dans ce fichier.
-    $dispo = $w - 2.4;
-    if ($en === '') {
-        $taille_fr = cell2l_taille_ajustee($pdf, $fr, 'B', $dispo, $taille_fr, 5.5);
-        $pdf->SetFont('Arial', 'B', $taille_fr);
-        $pdf->SetXY($x + 0.8, $y);
-        $pdf->Cell($w - 1.2, $h, u($fr), 0, 0, $align);
-    } else {
-        $taille_fr = cell2l_taille_ajustee($pdf, $fr, 'B', $dispo, $taille_fr, 5.5);
-        $taille_en = cell2l_taille_ajustee($pdf, $en, 'I', $dispo, $taille_en, 4.5);
-        // Interligne FR/EN resserré (demande explicite) : quasiment plus de
-        // marge morte entre les 2 lignes, pour laisser le plus de place
-        // possible au texte lui-même. $tight (demande explicite, case
-        // d'identification élève) va plus loin : répartition stricte 50/50
-        // sans aucun décalage haut, pour 2 lignes de MÊME taille de police.
-        if ($tight) {
-            [$y_fr, $h_fr, $y_en, $h_en] = [$y, $h * 0.5, $y + $h * 0.5, $h * 0.5];
-        } else {
-            [$y_fr, $h_fr, $y_en, $h_en] = [$y + $h * 0.02, $h * 0.52, $y + $h * 0.54, $h * 0.44];
-        }
-        $pdf->SetFont('Arial', 'B', $taille_fr);
-        $pdf->SetXY($x + 0.8, $y_fr);
-        $pdf->Cell($w - 1.2, $h_fr, u($fr), 0, 0, $align);
-        $pdf->SetFont('Arial', 'I', $taille_en);
-        $pdf->SetXY($x + 0.8, $y_en);
-        $pdf->Cell($w - 1.2, $h_en, u($en), 0, 0, $align);
-    }
-    $pdf->SetXY($x + $w, $y);
-}
 
 // Libellé abrégé harmonisé d'une séquence, utilisé PARTOUT dans le bulletin
 // (en-tête du tableau de notes et ligne "Rappel" de RESULTATS DE L'ELEVE —
 // demande explicite, ces deux endroits affichaient des formats différents).
 // Numérotation continue sur l'année (sequence.ordre), pas la position locale
 // dans le trimestre ; le mot (EVAL/SEQ) suit le libellé réel enregistré en base.
-function libelle_seq_court(?array $s): string {
-    if (!$s) return '';
-    $mot = (stripos($s['libelle'] ?? '', 'valuation') !== false) ? 'EVAL' : 'SEQ';
-    return bulletin_en() ? $mot . ' ' . (int)$s['ordre'] : (int)$s['ordre'] . 'e ' . $mot;   // 1e SEQ / SEQ 1
-}
 
 $photo_w = 26;
 $photo_h = 29.5;
@@ -756,6 +776,7 @@ $pdf->SetFont('Arial', '', 7);
 $pdf->Cell(126, 5.5, u($contacts_parents), 1, 1, 'L');
 
 $pdf->SetY(max($pdf->GetY(), $y_photo + $photo_h));
+}   // fin du haut du bulletin standard
 
 // ── 4. Tableau des disciplines ────────────────────────────────────
 $pdf->Ln(1);
@@ -1251,7 +1272,7 @@ if ($h_rempli > 0.01) {
 require_once __DIR__ . '/../../../commun/pdf/verif_lib.php';
 require_once __DIR__ . '/../../../commun/pdf/qrcode.php';
 
-if ($h_rempli > 15) {
+if ($h_rempli > 15 && !$qr_dans_gab) {
     $verif_url = bulletin_verif_url(
         $id_eleve,
         $is_seq ? 'seq' : 'trim',
@@ -1318,7 +1339,7 @@ $pdf->SetY($y_dec2 + $h_obs_box);
 // (demande explicite).
 $pdf->SetFont('Arial', '', 6.5);
 $pdf->SetXY($ml, $ph - 9);
-$pdf->Cell($uw, 4, u('Copyright © SIGES ABZ   , E-mail: abdoulazizyahya@gmail.com'), 0, 1, 'C');
+$pdf->Cell($uw, 4, u(siges_copyright()), 0, 1, 'C');
 
 // ── Sortie ────────────────────────────────────────────────────────
 $mode     = ($_GET['dl'] ?? '') === '1' ? 'D' : 'I';

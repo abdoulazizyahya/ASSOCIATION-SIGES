@@ -17,6 +17,7 @@ require_once __DIR__ . '/../../pdf/header_pdf.php';
 $etab = etab_pour_pdf(get_etablissement());
 
 $pdf = new FPDF('P', 'mm', 'A4');
+require_once __DIR__ . '/../../../../noyau/partage/apparence_docs.php'; app_appliquer_doc($pdf, 'documents');   // Apparence des documents
 $pdf->SetMargins(12, 10, 12);
 $pdf->SetAutoPageBreak(false);
 $pdf->AddPage();

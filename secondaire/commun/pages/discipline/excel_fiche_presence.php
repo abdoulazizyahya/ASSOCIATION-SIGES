@@ -207,7 +207,7 @@ function genererFeuilleFichePresence(Spreadsheet $spreadsheet, int $idx, array $
     // ── Pied de page (copyright, comme le PDF) ───────────────────────────────
     $row_pied = $last_row + 2;
     $sheet->mergeCells("{$lettre($col_no)}{$row_pied}:{$lettre($col_total)}{$row_pied}");
-    $sheet->setCellValue("{$lettre($col_no)}{$row_pied}", 'Copyright © SIGES ABZ - ' . $val_annee);
+    $sheet->setCellValue("{$lettre($col_no)}{$row_pied}", siges_copyright());
     $sheet->getStyle("{$lettre($col_no)}{$row_pied}")->getFont()->setSize(7)->getColor()->setRGB('5A5A5A');
 
     $sheet->getPageSetup()->setFitToWidth(1)->setFitToHeight(0);

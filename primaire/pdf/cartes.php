@@ -29,7 +29,7 @@ if (!$acces_public) {
 require_once __DIR__ . '/fpdf.php';
 require_once __DIR__ . '/header_pdf.php';
 
-$id_modele = max(1, min(5, (int)($_GET['modele'] ?? 1)));
+$id_modele = max(1, min(6, (int)($_GET['modele'] ?? 1)));   // 6 = modèle du concepteur
 $id_format = (int)($_GET['format'] ?? 1);
 // En accès public, la carte est TOUJOURS restreinte au seul élève vérifié —
 // jamais à une classe entière (id_classe ignoré ci-dessous dans ce cas).
@@ -102,10 +102,12 @@ $per_pag = $nb_col * $nb_lig;
 // consulté par du personnel qui ne doit pas voir de trace technique).
 try {
 $pdf = new FPDF('P', 'mm', 'A4');
+require_once __DIR__ . '/../../noyau/partage/apparence_docs.php'; app_appliquer_doc($pdf, 'cartes');   // Apparence des documents
 $pdf->SetMargins($marge, $marge, $marge);
 $pdf->SetAutoPageBreak(false);
 
 $fn_recto = 'dessiner_carte_' . $id_modele;
+require_once __DIR__ . '/../../noyau/partage/gabarits.php';
 // Le modèle 5 a son propre verso (dessiner_carte_5_verso(), design du
 // modèle physique cs1.jpeg) — les modèles 1-4 continuent de partager
 // dessiner_carte_verso() (voir commentaire au-dessus de cette fonction).
@@ -157,6 +159,27 @@ function carte_photo_path_tmp(array $el): array {
     $avatar = stripos($el['Sexe_elv'] ?? '', 'F') === 0 ? 'fille.png' : 'garcon.png';
     return [__DIR__ . '/../../assets/img/avatars/' . $avatar, false];
 }
+// MODÈLE 6 — modèle dessiné par l'école (Paramètres → Apparence des
+// documents → Concepteur), rendu par noyau/partage/gabarits.php.
+function dessiner_carte_6(FPDF $pdf, array $el, array $etab, string $val_annee,
+                         float $x, float $y, float $cW, float $cH): void {
+    static $gab = null;
+    if ($gab === null) $gab = gab_charger('carte', !empty($_GET['gab_brouillon']));
+    $tmp = [];
+    gab_rendre($pdf, $gab, $x, $y, $cW, $cH, gab_vars_eleve($el) + gab_vars_ecole($etab, $val_annee), [
+        'logo'  => gab_logo($etab),
+        'photo' => function () use ($el, &$tmp) { [$c, $t] = carte_photo_path_tmp($el); if ($t) $tmp[] = $c; return $c; },
+        'qr'    => function () use ($el, $val_annee, &$tmp) {
+            if (!class_exists('QRCode')) require_once __DIR__ . '/qrcode.php';
+            $f = tempnam(sys_get_temp_dir(), 'abzqr_') . '.png';
+            $img = (new QRCode(carte_verif_url((int) $el['id_eleve'], $val_annee), ['s' => 'qr-h']))->render_image();
+            imagepng($img, $f); imagedestroy($img);
+            return $tmp[] = $f;
+        },
+    ]);
+    foreach ($tmp as $t) @unlink($t);
+}
+
 function carte_photo_box(FPDF $pdf, array $el, float $x, float $y, float $w, float $h): void {
     [$chemin, $est_temp] = carte_photo_path_tmp($el);
     $pdf->Image($chemin, $x, $y, $w, $h);

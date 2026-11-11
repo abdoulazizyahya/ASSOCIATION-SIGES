@@ -208,6 +208,6 @@ function tcpdf_copyright(TCPDF $pdf, float $page_w, float $page_h, float $marge_
     $pdf->SetFont('helvetica', 'I', 6.5);
     $pdf->SetTextColor(120, 120, 120);
     $pdf->SetXY(0, $page_h - $marge_bas, true);
-    $pdf->Cell($page_w, 4, 'Copyright © SIGES-V2 ABZ', 0, 0, 'C');
+    $pdf->Cell($page_w, 4, (function_exists('siges_copyright') ? siges_copyright() : 'Copyright © SIGES ABZ, E-mail: abdoulazizyahya@gmail.com, Tel: 621400800 / 699758612'), 0, 0, 'C');
     $pdf->SetTextColor(0, 0, 0);
 }

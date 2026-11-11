@@ -88,7 +88,7 @@ require_once __DIR__ . '/../../../../noyau/layout/header.php';
 <?php elseif ($vue === 'matieres'): ?>
 <div class="card"><div class="card-body">
   <div class="section-titre">Résultats détaillés par matière <span class="text-muted fw-normal" style="font-size:.75rem">— triés par taux de réussite croissant : les matières en difficulté d'abord</span></div>
-  <?php if (!$matieres): ?><div class="text-muted">Disponible pour un trimestre, au secondaire général (pas pour l'année entière, le primaire ou le technique).</div><?php else: ?>
+  <?php if (!$matieres): ?><div class="text-muted">Disponible pour un trimestre, au secondaire (pas pour l'année entière ni au primaire).</div><?php else: ?>
   <div class="table-responsive"><table class="table table-abz table-sm align-middle mb-0" style="font-size:.84rem">
     <thead><tr><th>Matière</th><th>Enseignant(s)</th><th class="text-center">Notés</th><th class="text-center">Moyenne</th><th class="text-center">Min</th><th class="text-center">Max</th><th class="text-center">Admis</th><th class="text-center">Taux</th><th class="text-center">Écart-type</th></tr></thead>
     <tbody><?php foreach ($matieres as $m): $t = (float) $m['taux']; ?>

@@ -560,7 +560,7 @@ foreach ($qualifies as $q) {
         dessiner_qr_th($pdf, $el, $vue_verif, $id_periode_verif, $pw / 2 - $qr_size / 2, $ph - $qr_size - 12, $qr_size);
         $pdf->SetFont('Arial', '', 6.5);
         $pdf->SetXY($ml-10, $ph - 13);
-        $pdf->Cell($uw, 4, u('Copyright © SIGES ABZ , E-mail: abdoulazizyahya@gmail.com'), 0, 1, 'C');
+        $pdf->Cell($uw, 4, u(siges_copyright()), 0, 1, 'C');
 
 		
 		
@@ -712,7 +712,7 @@ foreach ($qualifies as $q) {
         dessiner_qr_th($pdf, $el, $vue_verif, $id_periode_verif, $pw / 2 - $qr_size / 2, $ph - $qr_size - 12, $qr_size);
         $pdf->SetFont('Arial', '', 6.5);
         $pdf->SetXY($ml, $ph - 10);
-        $pdf->Cell($uw, 4, u('Copyright © SIGES ABZ , E-mail: abdoulazizyahya@gmail.com'), 0, 1, 'C');
+        $pdf->Cell($uw, 4, u(siges_copyright()), 0, 1, 'C');
 
     // ══════════════════════════════════════════════════════════════════
     // MODÈLE 3 — "Prestige" : police Times, bordure double filet or/marine,
@@ -822,7 +822,7 @@ foreach ($qualifies as $q) {
         dessiner_qr_th($pdf, $el, $vue_verif, $id_periode_verif, $pw - $ml - $qr_size, $ph - $qr_size - 12, $qr_size);
         $pdf->SetFont('Times', '', 6.5);
         $pdf->SetXY($ml, $ph - 10);
-        $pdf->Cell($uw, 4, u('Copyright © SIGES ABZ , E-mail: abdoulazizyahya@gmail.com'), 0, 1, 'C');
+        $pdf->Cell($uw, 4, u(siges_copyright()), 0, 1, 'C');
 		
 		
 		

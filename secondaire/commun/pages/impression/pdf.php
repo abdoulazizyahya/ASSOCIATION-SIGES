@@ -18,6 +18,7 @@ require_once __DIR__ . '/../../pdf/header_pdf.php';
 $etab = etab_pour_pdf(get_etablissement());
 $an = ed_annee();
 $pdf = new FPDF('P', 'mm', 'A4');
+require_once __DIR__ . '/../../../../noyau/partage/apparence_docs.php'; app_appliquer_doc($pdf, 'documents');   // Apparence des documents
 $pdf->SetMargins(10, 10, 10);
 $pdf->SetAutoPageBreak(false);
 $pdf->AliasNbPages();
@@ -79,12 +80,20 @@ $dfr = fn($d) => $d ? date('d/m/Y', strtotime((string) $d)) : '';
 if ($doc === 'badges') {
     $pdf->SetMargins(12, 12, 12);
     $logo = !empty($etab['logo']) ? __DIR__ . '/../../../../assets/uploads/' . $etab['logo'] : '';
-    $W = 85.6; $H = 54; $gx = 12; $gy = 12; $ex = 6.8; $ey = 3;
+    $W = 85.6; $H = 54; $gx = 12; $gy = 10; $ex = 6.8; $ey = 3;
     $i = 0;
+    require_once __DIR__ . '/../../../../noyau/partage/gabarits.php';
+    $gab_badge = (gab_existe('badge') || !empty($_GET['gab_brouillon'])) ? gab_charger('badge', !empty($_GET['gab_brouillon'])) : null;
+    $vars_ecole = gab_vars_ecole($etab, $an['libelle']);
     foreach (ed_personnel() as $p) {
         if ($i % 10 === 0) $pdf->AddPage();
         $col = $i % 2; $lig = intdiv($i % 10, 2);
         $x = $gx + $col * ($W + $ex); $y = $gy + $lig * ($H + $ey);
+        if ($gab_badge) {   // modèle dessiné par l'école (concepteur)
+            gab_rendre($pdf, $gab_badge, $x, $y, $W, $H, gab_vars_personnel($p) + $vars_ecole, ['logo' => gab_logo($etab)]);
+            $pdf->SetDrawColor(200, 200, 200); $pdf->SetLineWidth(0.1); $pdf->Rect($x, $y, $W, $H);
+            $i++; continue;
+        }
         $pdf->SetDrawColor(190, 190, 190); $pdf->SetLineWidth(0.2); $pdf->Rect($x, $y, $W, $H);
         $pdf->SetFillColor(...$MAR); $pdf->Rect($x, $y, $W, 12, 'F');
         $pdf->SetFillColor(200, 150, 10); $pdf->Rect($x, $y + 12, $W, 0.9, 'F'); $pdf->Rect($x, $y + $H - 1.6, $W, 1.6, 'F');

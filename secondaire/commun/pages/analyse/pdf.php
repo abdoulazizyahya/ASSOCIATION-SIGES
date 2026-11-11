@@ -21,7 +21,8 @@ $matieres = an_matieres($id_classe, $periode);
 require_once __DIR__ . '/../../pdf/fpdf.php';
 require_once __DIR__ . '/../../pdf/header_pdf.php';
 $etab = etab_pour_pdf(get_etablissement());
-$pdf = new FPDF('P', 'mm', 'A4'); $pdf->SetMargins(10, 10, 10); $pdf->SetAutoPageBreak(true, 14); $pdf->AddPage();
+$pdf = new FPDF('P', 'mm', 'A4'); require_once __DIR__ . '/../../../../noyau/partage/apparence_docs.php'; app_appliquer_doc($pdf, 'documents');   // Apparence des documents
+$pdf->SetMargins(10, 10, 10); $pdf->SetAutoPageBreak(true, 14); $pdf->AddPage();
 pdf_entete($pdf, $etab, 210);
 pdf_bandeau($pdf, 'ANALYSE DES PERFORMANCES', $classe_lib . ' — ' . $periode['libelle'], 210);
 $MAR = [26, 39, 68]; $OR = [200, 150, 10];

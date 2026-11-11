@@ -103,8 +103,11 @@ function pdf_pied_par_classe(FPDF_PagesParClasse $pdf, string $val_annee, float 
     $pdf->SetFont('Arial', '', 6.5);
     $pdf->SetTextColor(110, 110, 110);
     $pdf->SetXY($ml, $y + 0.5);
-    $pdf->Cell(($pw - 2 * $ml) / 2, 3.5, pdf_u('Copyright © SIGES ABZ - ' . $val_annee), 0, 0, 'L');
-    $pdf->Cell(($pw - 2 * $ml) / 2, 3.5, pdf_u('Page ' . $pdf->pageDansClasse() . ' / ' . $pdf->aliasClasse()), 0, 0, 'R');
+    $demi = ($pw - 2 * $ml) / 2;
+    for ($t = 6.5; $t > 4.5 && $pdf->GetStringWidth(pdf_u(siges_copyright())) > $demi + 20; $t -= 0.25) $pdf->SetFontSize($t);
+    $pdf->Cell($demi + 20, 3.5, pdf_u(siges_copyright()), 0, 0, 'L');
+    $pdf->SetFontSize(6.5);
+    $pdf->Cell($demi - 20, 3.5, pdf_u('Page ' . $pdf->pageDansClasse() . ' / ' . $pdf->aliasClasse()), 0, 0, 'R');
     $pdf->SetTextColor(0, 0, 0);
     $pdf->SetDrawColor(0, 0, 0);
 }

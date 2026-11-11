@@ -548,6 +548,7 @@ $cEval      = min(10, max(0, floor((194 - $reste_fixe) / 3)));
 $cENS       = 194 - $cD - $cEval * 3 - $cTR - $cCF - $cNXC - $cRG - $cMEN - $cMIN - $cMOY - $cMAX;
 
 $pdf = new PDF_LTM_C('P', 'mm', 'A4');
+require_once __DIR__ . '/../../../../noyau/partage/apparence_docs.php'; app_appliquer_doc($pdf, 'bulletins');   // Apparence des documents
 $pdf->SetMargins($ml, $ml, $mr);
 // Marge de saut de page alignée sur le cadre extérieur (4mm) — voir
 // secondaire/general/pages/bulletins/pdf.php pour l'explication (le copyright, dessiné tout en
@@ -1170,7 +1171,7 @@ foreach ($eleves as $el) {
     // extérieur (demande explicite) — identique à secondaire/general/pages/bulletins/pdf.php.
     $pdf->SetFont('Arial', '', 6.5);
     $pdf->SetXY($ml, $pdf->GetPageHeight() - 9);
-    $pdf->Cell($uw, 4, uc('Copyright © SIGES ABZ   , E-mail: abdoulazizyahya@gmail.com'), 0, 1, 'C');
+    $pdf->Cell($uw, 4, uc(siges_copyright()), 0, 1, 'C');
 }
 
 // Sortie

@@ -146,7 +146,7 @@ if (function_exists('type_enseignement_courant')) {
                 || str_starts_with($_rel, 'secondaire/commun/pages/communication/')
                 // Modules communs inspirés de l'étude ScolaPro (10/11/2026) : billets, couvertures,
                 // centre d'impression, analyse des performances — type-aware.
-                || preg_match('#^secondaire/commun/pages/(billets|couvertures|impression|analyse)/#', $_rel);
+                || preg_match('#^secondaire/commun/pages/(billets|couvertures|impression|analyse|apparence)/#', $_rel);
     if (!$_commun) {
         $_secondaire = type_enseignement_courant() === 'secondaire';
         if ($_secondaire && !str_starts_with($_rel, 'secondaire/')) {

@@ -11,7 +11,7 @@ require_once __DIR__ . '/_impression_lib.php';
 require_once __DIR__ . '/../analyse/_analyse_lib.php';
 exiger_role(imp_roles());
 
-if (!ed_secondaire() || est_technique()) die('Registre disponible pour le secondaire général.');
+if (!ed_secondaire()) die('Registre disponible pour le secondaire.');
 $id_classe = (int) ($_GET['classe'] ?? 0);
 $periodes = array_values(array_filter(an_periodes(), fn($p) => $p['cle'] !== 'annee'));
 $periode = $periodes[0] ?? null;
@@ -32,7 +32,8 @@ $rang = []; $r = 0; foreach ($moys as $eid => $m) $rang[$eid] = ++$r;
 require_once __DIR__ . '/../../pdf/fpdf.php';
 require_once __DIR__ . '/../../pdf/header_pdf.php';
 $etab = etab_pour_pdf(get_etablissement());
-$pdf = new FPDF('L', 'mm', 'A4'); $pdf->SetMargins(8, 8, 8); $pdf->SetAutoPageBreak(false); $pdf->AliasNbPages();
+$pdf = new FPDF('L', 'mm', 'A4'); require_once __DIR__ . '/../../../../noyau/partage/apparence_docs.php'; app_appliquer_doc($pdf, 'documents');   // Apparence des documents
+$pdf->SetMargins(8, 8, 8); $pdf->SetAutoPageBreak(false); $pdf->AliasNbPages();
 $pw = 297; $uw = 281;
 $MAR = [26, 39, 68];
 $w_no = 8; $w_nom = 58; $w_moy = 16; $w_rg = 11;

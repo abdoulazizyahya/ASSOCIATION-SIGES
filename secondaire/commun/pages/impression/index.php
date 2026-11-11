@@ -68,7 +68,7 @@ require_once __DIR__ . '/../../../../noyau/layout/header.php';
   <?php endforeach; ?>
 </div>
 
-<?php if ($onglet === 'etablissement' && $sec && !est_technique()):
+<?php if ($onglet === 'etablissement' && $sec):
   require_once __DIR__ . '/../analyse/_analyse_lib.php';
   $trims = array_values(array_filter(an_periodes(), fn($p) => $p['cle'] !== 'annee')); ?>
 <div class="card mt-3">

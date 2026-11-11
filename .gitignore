@@ -62,3 +62,4 @@
 
 # Archives de déploiement (zips envoyés sur l'hébergeur) : locales, jamais versionnées
 /deploy/archives/
+/assets/uploads/gabarits/

@@ -186,7 +186,7 @@ function prive_dessiner_recu_eleve(FPDF $pdf, int $id_eleve, int $id_classe, int
         $pdf->SetFont('Arial', 'BI', 7);
         $pdf->TextWithDirection(6.8, 56.5 + $offY, $u($etiquette), 'U');
         $pdf->SetFont('Arial', 'BI', 4.5);
-        $pdf->TextWithDirection(206.49, 93.49 + $offY, $u('Copyright © SIGES-V2 ABZ'), 'U');
+        $pdf->TextWithDirection(206.49, 93.49 + $offY, $u(siges_copyright()), 'U');
 
         // ── Séparateur pointillé sous la copie ───────────────────────
         $pdf->SetFont('Arial', '', 18);

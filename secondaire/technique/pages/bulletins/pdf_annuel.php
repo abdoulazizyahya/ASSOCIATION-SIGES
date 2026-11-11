@@ -527,6 +527,7 @@ $appreciation_annuelle = $moy_generale !== null ? bulletin_appreciation_annuelle
 
 // ── Génération PDF ────────────────────────────────────────────────
 $pdf = new PDF_LTM('P', 'mm', 'A4');
+require_once __DIR__ . '/../../../../noyau/partage/apparence_docs.php'; app_appliquer_doc($pdf, 'bulletins');   // Apparence des documents
 $pdf->SetMargins(8, 8, 8);
 // Marge de saut de page alignée sur le cadre extérieur (4mm) — la mention
 // copyright est dessinée volontairement tout en bas, juste au-dessus du
@@ -1424,7 +1425,7 @@ try {
 // (demande explicite).
 $pdf->SetFont('Arial', '', 6.5);
 $pdf->SetXY($ml, $ph - 9);
-$pdf->Cell($uw, 4, u('Copyright © SIGES ABZ   , E-mail: abdoulazizyahya@gmail.com'), 0, 1, 'C');
+$pdf->Cell($uw, 4, u(siges_copyright()), 0, 1, 'C');
 
 // ── Sortie ────────────────────────────────────────────────────────
 $mode     = ($_GET['dl'] ?? '') === '1' ? 'D' : 'I';

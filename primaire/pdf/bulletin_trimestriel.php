@@ -178,6 +178,38 @@ function dessiner_bulletin_trimestriel(
     $pdf->SetFillColor(255, 255, 255);
     $pdf->RoundedRect(3.5, 3.5, 202, 289, 7, 'DF');
     pdf_filigrane($pdf, $etab, $pw, $ph);
+    // ── Haut du bulletin dessiné par l'école (concepteur, 11/11/2026) ──
+    // Paramètres → Apparence des documents → Concepteur → « Haut du bulletin » :
+    // remplace l'en-tête, le titre, la grille d'identité, le titulaire et la
+    // photo (zone 200 × 63 mm) ; le tableau des compétences reste à sa place.
+    require_once __DIR__ . '/../../noyau/partage/gabarits.php';
+    static $gab_bul = false;
+    if ($gab_bul === false) $gab_bul = (!empty($_GET['gab_brouillon']) || gab_existe('bulletin')) ? gab_charger('bulletin', !empty($_GET['gab_brouillon'])) : null;
+    $qr_dans_gab = false;
+    if ($gab_bul) {
+        static $tit_cache_g = [];
+        $cle_g = $id_classe . '|' . $val_annee;
+        if (!array_key_exists($cle_g, $tit_cache_g)) $tit_cache_g[$cle_g] = prim_titulaire_trimestre((int) $id_classe, $val_annee, (int) $id_trim, 'fr');
+        $ens_g = $tit_cache_g[$cle_g];
+        $tmp_g = [];
+        gab_rendre($pdf, $gab_bul, 5, 4.5, 200, 63, gab_vars_eleve($eleve + ['classe' => $classe_nom]) + gab_vars_ecole($etab, $val_annee) + [
+            'titre' => 'BULLETIN DE NOTES', 'titre_en' => 'REPORT CARD', 'periode' => (string) $trimestre['libelle_trim'], 'periode_en' => $trim_en,
+            'effectif' => (string) $effectif_classe, 'redoublant' => (string) $statut,
+            'titulaire' => trim(($ens_g['civilite_ens'] ?? '') . ' ' . ($ens_g['nom_ens'] ?? '') . ' ' . ($ens_g['prenom_ens'] ?? '')),
+            'pays' => mb_strtoupper($pays_fr), 'region' => mb_strtoupper($etab['region_fr'] ?: "REGION DE L'ADAMAOUA"), 'region_en' => mb_strtoupper($etab['region_en'] ?: 'ADAMAWA REGION'),
+            'departement' => mb_strtoupper($dept_fr), 'division_en' => mb_strtoupper($div_en), 'arrondissement' => mb_strtoupper($arr_fr), 'subdivision_en' => mb_strtoupper($sub_en),
+        ], [
+            'logo' => gab_logo($etab),
+            'photo' => function () use ($eleve, $id, &$tmp_g) {
+                $p = photo_eleve_fichier_temp($eleve['Photo_elv'] ?? null, $id);
+                if ($p) return $tmp_g[] = $p;
+                return __DIR__ . '/../../assets/img/avatars/' . (stripos($eleve['Sexe_elv'] ?? '', 'F') === 0 ? 'fille.png' : 'garcon.png');
+            },
+            'qr' => fn() => (string) bulletin_qr_fichier_temp($eleve, 'trim', $id_trim),
+        ]);
+        foreach ($tmp_g as $t) @unlink($t);
+        $qr_dans_gab = (bool) array_filter($gab_bul['elements'], fn($e) => $e['type'] === 'image' && $e['source'] === 'qr');
+    } else {
     if (!empty($etab['logo'])) {
         $logo_path = __DIR__ . '/../../assets/uploads/' . $etab['logo'];
         if (is_file($logo_path)) pdf_logo_cadre($pdf, $logo_path, 90, 7, 25, 25);
@@ -302,6 +334,7 @@ function dessiner_bulletin_trimestriel(
         $avatar_path = __DIR__ . '/../../assets/img/avatars/' . $avatar;
         if (is_file($avatar_path)) $pdf->Image($avatar_path, 167.7, 33.5, 28.6, 31.8);
     }
+    }   // fin du haut du bulletin standard
 
     // ── En-tête tableau compétences ──────────────────────────────
     $pdf->SetFont('Arial', 'B', 8.5);
@@ -731,7 +764,7 @@ function dessiner_bulletin_trimestriel(
     // position de tableau/texte au-dessus. Toujours au même endroit, quel
     // que soit le contenu du bulletin.
     $qr_tmp = bulletin_qr_fichier_temp($eleve, 'trim', $id_trim);
-    if ($qr_tmp) {
+    if ($qr_tmp && !$qr_dans_gab) {
         $pdf->Image($qr_tmp, 96, $ph - 28, 16, 16, 'PNG');
     }
 
@@ -771,6 +804,7 @@ precharger_exclusions_classe_trim((int) $liste[0]['id_classe'], $id_trim, $val_a
 // fonctions.php::pdf_erreur_generation() (même principe que bulletin_annuel.php).
 try {
 $pdf = new FPDF('P', 'mm', 'A4');
+require_once __DIR__ . '/../../noyau/partage/apparence_docs.php'; app_appliquer_doc($pdf, 'bulletins');   // Apparence des documents
 $pdf->SetAutoPageBreak(false, 0);
 
 foreach ($liste as $e) {

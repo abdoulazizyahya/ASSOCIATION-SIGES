@@ -121,6 +121,7 @@ $menu = [
         ['Mon compte',        'compte/profil.php',                    'key', []],
         ['Directeur',         'primaire/pages/fondateur/directeur.php', 'person-badge', ['FONDATEUR']],
         ['Configurations',    'primaire/pages/parametres/index.php',    'gear',        ['DIRECTEUR','FONDATEUR']],
+        ['Apparence des documents', 'secondaire/commun/pages/apparence/index.php', 'palette', ['DIRECTEUR','FONDATEUR']],
         // « Utilisateurs » retiré (17/10/2026) : comptes gérés dans Ressources humaines → Enseignant(e)s
         // (fiche de chaque membre ; bouton « Tous les comptes » de la liste, privilèges compris).
         ['Journal d\'audit',  'primaire/pages/utilisateurs/journal.php','shield-check',['DIRECTEUR','FONDATEUR']],

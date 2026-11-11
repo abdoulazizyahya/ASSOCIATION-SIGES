@@ -29,6 +29,7 @@ $an = ed_annee();
 $MAR = [26, 39, 68]; $OR = [200, 150, 10];
 $fmt = $R['format'] === 'A5' ? 'A5' : 'A4';
 $pdf = new FPDF('P', 'mm', $fmt);
+require_once __DIR__ . '/../../../../noyau/partage/apparence_docs.php'; app_appliquer_doc($pdf, 'documents');   // Apparence des documents
 $pdf->SetAutoPageBreak(false);
 $pw = $fmt === 'A5' ? 148 : 210; $ph = $fmt === 'A5' ? 210 : 297;
 $k = $pw / 210;            // échelle : toutes les cotes sont pensées pour l'A4
@@ -58,6 +59,24 @@ $cadre = function () use ($pdf, $R, $pw, $ph, $k, $MAR, $OR) {
     $pdf->SetDrawColor(0, 0, 0); $pdf->SetLineWidth(0.2);
 };
 $titre_couleur = $R['modele'] === 'leger' || $R['modele'] === 'officiel' ? [0, 0, 0] : $MAR;
+
+// Modèle dessiné par l'école (concepteur) : rendu libre, page entière.
+if ($R['modele'] === 'perso' || !empty($_GET['gab_brouillon'])) {
+    require_once __DIR__ . '/../../../../noyau/partage/gabarits.php';
+    $gab = gab_charger('couverture', !empty($_GET['gab_brouillon']));
+    $vars_ecole = gab_vars_ecole($etab, $an['libelle']);
+    foreach ($eleves as $e) {
+        $pdf->AddPage();
+        $tmp = [];
+        gab_rendre($pdf, $gab, 0, 0, $pw, $ph, ($e ? gab_vars_eleve($e) : array_fill_keys(['nom_complet', 'nom', 'prenom', 'classe', 'identifiant', 'matricule', 'niu', 'sexe', 'date_naiss', 'lieu_naiss'], '')) + $vars_ecole, [
+            'logo' => gab_logo($etab),
+            'photo' => function () use ($e, &$tmp) { $p = $e ? ed_photo_fichier((int) $e['id']) : null; if ($p) $tmp[] = $p; return (string) $p; },
+        ]);
+        foreach ($tmp as $t) @unlink($t);
+    }
+    $pdf->Output('I', 'couvertures_' . date('Ymd') . '.pdf');
+    exit;
+}
 
 foreach ($eleves as $e) {
     $pdf->AddPage();

@@ -691,6 +691,7 @@ precharger_exclusions_classe_trim((int) $liste[0]['id_classe'], $id_trim, $val_a
 // fonctions.php::pdf_erreur_generation() (même principe que bulletin_trimestriel.php).
 try {
 $pdf = new FPDF('P', 'mm', 'A4');
+require_once __DIR__ . '/../../noyau/partage/apparence_docs.php'; app_appliquer_doc($pdf, 'bulletins');   // Apparence des documents
 $pdf->SetAutoPageBreak(false, 0);
 
 foreach ($liste as $e) {

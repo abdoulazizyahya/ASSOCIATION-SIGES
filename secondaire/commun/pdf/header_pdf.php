@@ -404,7 +404,7 @@ function pdf_bandeau(FPDF $pdf, string $titre_fr, string $titre_en, float $page_
 function pdf_copyright(FPDF $pdf, float $page_w, float $page_h, float $marge_bas = 8): void {
     $pdf->SetFont('Arial', 'I', 6.5);
     $pdf->SetTextColor(120, 120, 120);
-    $texte = pdf_u('Copyright © SIGES-V2 ABZ');
+    $texte = pdf_u((function_exists('siges_copyright') ? siges_copyright() : 'Copyright © SIGES ABZ, E-mail: abdoulazizyahya@gmail.com, Tel: 621400800 / 699758612'));
     $h = 4;
     $taille_police_mm = 6.5 / (72 / 25.4);
     $x = ($page_w - $pdf->GetStringWidth($texte)) / 2;
@@ -438,7 +438,7 @@ function pdf_filigrane_expire(FPDF $pdf, float $page_w, float $page_h, string $t
     $pdf->SetTextColor(0, 0, 0);
 }
 
-// Pied de page "Copyright © SIGES ABZ - {année scolaire}" (gauche) +
+// Pied de page « siges_copyright() » (gauche, mention unique du 11/11/2026) +
 // "Page X / Y" (droite), séparés du contenu par un mince filet horizontal —
 // modèle fourni par l'utilisateur pour la fiche de présence et le relevé
 // vierge (secondaire/commun/pages/discipline/pdf_fiche_presence.php,
@@ -454,8 +454,11 @@ function pdf_pied_copyright(FPDF $pdf, string $val_annee, float $page_w, float $
     $pdf->SetFont('Arial', '', 7);
     $pdf->SetTextColor(90, 90, 90);
     $pdf->SetX($marge);
-    $pdf->Cell(($page_w - 2 * $marge) / 2, 4, pdf_u('Copyright © SIGES ABZ - ' . $val_annee), 0, 0, 'L');
-    $pdf->Cell(($page_w - 2 * $marge) / 2, 4, pdf_u('Page ' . $pdf->PageNo() . ' / {nb}'), 0, 0, 'R');
+    $demi = ($page_w - 2 * $marge) / 2;
+    for ($t = 7; $t > 4.5 && $pdf->GetStringWidth(pdf_u(siges_copyright())) > $demi + 20; $t -= 0.25) $pdf->SetFontSize($t);   // mention unique, réduite pour tenir
+    $pdf->Cell($demi + 20, 4, pdf_u(siges_copyright()), 0, 0, 'L');
+    $pdf->SetFontSize(7);
+    $pdf->Cell($demi - 20, 4, pdf_u('Page ' . $pdf->PageNo() . ' / {nb}'), 0, 0, 'R');
     $pdf->SetTextColor(0, 0, 0);
     $pdf->SetDrawColor(0, 0, 0);
 }
@@ -482,7 +485,9 @@ function pdf_pied_copyright_qr(FPDF $pdf, string $val_annee, float $page_w, floa
     $pdf->SetFont('Arial', '', 7);
     $pdf->SetTextColor(90, 90, 90);
     $pdf->SetXY($tx, $y_top + 1);
-    $pdf->Cell($tw, 4, pdf_u('Copyright © SIGES ABZ - ' . $val_annee), 0, 2, 'L');
+    for ($t = 7; $t > 4.5 && $pdf->GetStringWidth(pdf_u(siges_copyright())) > $tw; $t -= 0.25) $pdf->SetFontSize($t);
+    $pdf->Cell($tw, 4, pdf_u(siges_copyright()), 0, 2, 'L');
+    $pdf->SetFontSize(7);
     $pdf->SetX($tx);
     $pdf->Cell($tw, 4, pdf_u('Page ' . $pdf->PageNo() . ' / {nb}'), 0, 2, 'L');
     $pdf->SetX($tx);

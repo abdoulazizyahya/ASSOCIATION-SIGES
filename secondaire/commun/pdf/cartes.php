@@ -6,7 +6,7 @@ require_once __DIR__ . '/../../../noyau/fonctions.php';
 require_once __DIR__ . '/verif_carte_lib.php';
 
 $id_format = (int)($_GET['format'] ?? 1);
-$id_modele = max(1, min(5, (int)($_GET['modele'] ?? 1)));
+$id_modele = max(1, min(6, (int)($_GET['modele'] ?? 1)));   // 6 = modèle du concepteur
 $id_annee  = (int)($_GET['annee']  ?? 0);
 $id_classe = (int)($_GET['classe'] ?? 0);
 $id_eleve  = (int)($_GET['eleve']  ?? 0);
@@ -85,6 +85,7 @@ $nb_lig  = max(1, (int)(($page_h - 2*$marge + $ecart) / ($cH + $ecart)));
 $per_pag = $nb_col * $nb_lig;
 
 $pdf = new FPDF('P', 'mm', 'A4');
+require_once __DIR__ . '/../../../noyau/partage/apparence_docs.php'; app_appliquer_doc($pdf, 'cartes');   // Apparence des documents
 $pdf->SetMargins($marge, $marge, $marge);
 $pdf->SetAutoPageBreak(false);
 
@@ -94,6 +95,7 @@ $pdf->SetAutoPageBreak(false);
 // (recto du lot N) est directement suivie physiquement par la page verso du
 // MÊME lot — jamais décalée par rapport aux autres lots.
 $fn_recto = 'dessiner_carte_' . $id_modele;
+require_once __DIR__ . '/../../../noyau/partage/gabarits.php';
 
 $lots = array_chunk($eleves, $per_pag);
 foreach ($lots as $lot) {
@@ -260,7 +262,7 @@ function dessiner_carte_1(FPDF $pdf, array $el, array $etab, array $annee,
 
     // Signature numérique (uniquement si demandée à l'impression — jamais
     // automatique), discrète dans le coin bas-droit du pied de carte.
-    if (($_GET['signature'] ?? '0') === '1') {
+    if (($_GET['signature'] ?? (app_reglages('cartes')['signature'] ? '1' : '0')) === '1') {
         $sig_w = min(12, $cW * 0.14);
         $sig_h = 4.5;
         $sx = $x + $cW - $sig_w - 1;
@@ -276,6 +278,21 @@ function dessiner_carte_1(FPDF $pdf, array $el, array $etab, array $annee,
 // Photo de l'élève (chemin réel ou avatar par défaut selon le sexe — même
 // repli que les bulletins/tableau d'honneur), utilisée à la fois pour la
 // photo affichée sur la carte et pour celle incrustée dans le QR.
+// MODÈLE 6 — modèle dessiné par l'école (Paramètres → Apparence des
+// documents → Concepteur), rendu par noyau/partage/gabarits.php.
+function dessiner_carte_6(FPDF $pdf, array $el, array $etab, array $annee,
+                         float $x, float $y, float $cW, float $cH): void {
+    static $gab = null;
+    if ($gab === null) $gab = gab_charger('carte', !empty($_GET['gab_brouillon']));
+    $tmp = [];
+    gab_rendre($pdf, $gab, $x, $y, $cW, $cH, gab_vars_eleve($el) + gab_vars_ecole($etab, (string) ($annee['libelle'] ?? '')), [
+        'logo'  => gab_logo($etab),
+        'photo' => fn() => carte_photo_path($el),
+        'qr'    => function () use ($el, $annee, &$tmp) { return $tmp[] = carte_qr_tmp($el, $annee); },
+    ]);
+    foreach ($tmp as $t) @unlink($t);
+}
+
 function carte_photo_path(array $el): string {
     $photo_path = !empty($el['photo']) ? photo_sec_fichier_tmp((int) $el['id']) : '';
     if ($photo_path && is_file($photo_path)) return $photo_path;
@@ -482,7 +499,7 @@ function dessiner_carte_2(FPDF $pdf, array $el, array $etab, array $annee,
     $pdf->SetFont('Arial', 'I', max(2.8, $cW / 30));
     $pdf->SetXY($x + 1.5, $yBody + max(8, $photoH) + 0.3);
     $pdf->MultiCell($photoW, 1.7, pdf_u(strtoupper(bt($etab['chef_etablissement'] ?? 'LE PROVISEUR', $etab['chef_etablissement_en'] ?? 'THE PRINCIPAL')) . "\n" . bt('Le Proviseur', 'The Principal')), 0, 'C');
-    if (($_GET['signature'] ?? '0') === '1') {
+    if (($_GET['signature'] ?? (app_reglages('cartes')['signature'] ? '1' : '0')) === '1') {
         $sig_w = min(14, $photoW);
         $sig_h = 5;
         $sx = $x + 1.5 + ($photoW - $sig_w) / 2;
@@ -650,7 +667,7 @@ function dessiner_carte_3(FPDF $pdf, array $el, array $etab, array $annee,
     $pdf->SetLineWidth(0.2);
     // Signature numérique à l'intérieur du sceau (uniquement si demandée à
     // l'impression — jamais automatique).
-    if (($_GET['signature'] ?? '0') === '1') {
+    if (($_GET['signature'] ?? (app_reglages('cartes')['signature'] ? '1' : '0')) === '1') {
         $sig_w = $sealR * 1.2;
         $sx = $sealCx - $sig_w / 2;
         $sy = $sealCy - $sig_w / 2;
@@ -854,7 +871,7 @@ function dessiner_carte_5(FPDF $pdf, array $el, array $etab, array $annee,
 
     // Signature numérique (sur demande uniquement, jamais automatique) :
     // placée sous la photo, seul espace libre disponible sur ce modèle épuré.
-    if (($_GET['signature'] ?? '0') === '1') {
+    if (($_GET['signature'] ?? (app_reglages('cartes')['signature'] ? '1' : '0')) === '1') {
         $sig_y = $yBody + $photoH + 0.4;
         $sig_h = ($y + $cH - 5) - 0.3 - $sig_y;
         if ($sig_h > 2) {
@@ -939,7 +956,7 @@ function dessiner_carte_verso(FPDF $pdf, array $el, array $etab, ?array $tuteur,
     $pdf->Cell($wb, 4, pdf_u(strtoupper(bt($etab['chef_etablissement'] ?? 'LE PROVISEUR', $etab['chef_etablissement_en'] ?? 'THE PRINCIPAL'))), 0, 0, 'C');
 
     // Signature numérique (sur demande uniquement, jamais automatique).
-    if (($_GET['signature'] ?? '0') === '1') {
+    if (($_GET['signature'] ?? (app_reglages('cartes')['signature'] ? '1' : '0')) === '1') {
         $sig_w = min($wb * 0.22, 14);
         $sig_h = 8;
         $sx = $x + $cW - $pad - $sig_w;

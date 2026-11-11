@@ -1993,7 +1993,17 @@ function generer_filigrane_logo(string $source_abs, string $dest_abs): bool {
 // pas 1 requête par appel SetFillColor() ni par élève imprimé). Clé
 // inconnue ou pas encore migrée (table absente) -> couleur de secours
 // blanche plutôt qu'une erreur, pour ne jamais casser un PDF existant.
+/**
+ * Mention de copyright UNIQUE de tous les documents (PDF, Excel, maquettes) —
+ * demande du 11/11/2026 : le seul endroit à modifier si elle change.
+ */
+function siges_copyright(): string {
+    return 'Copyright © SIGES ABZ, E-mail: abdoulazizyahya@gmail.com, Tel: 621400800 / 699758612';
+}
+
 function couleur_pdf(string $cle): array {
+    // Aperçu en direct (Apparence des documents, 11/11/2026) : rien n'est enregistré.
+    if (isset($GLOBALS['APP_PDF_COULEURS'][$cle])) return $GLOBALS['APP_PDF_COULEURS'][$cle];
     static $cache = null;
     if ($cache === null) {
         $cache = [];

@@ -312,6 +312,7 @@ require_once __DIR__ . '/../../../noyau/layout/header.php';
           <option value="3">Modèle 3 — Bandeau année</option>
           <option value="4">Modèle 4 — Badge centré</option>
           <option value="5">Modèle 5 — Minimaliste</option>
+          <option value="6">Modèle 6 — Mon modèle (concepteur)</option>
         </select>
         <label class="form-label">Format</label>
         <select id="selFormat" class="form-select form-select-sm mb-2">
@@ -455,4 +456,14 @@ function lancerCartes() {
 }
 </script>
 
+<?php // Apparence des documents (11/11/2026) : choix par défaut des cartes de l'école.
+require_once __DIR__ . '/../../../noyau/partage/apparence_docs.php'; $__cd = app_reglages('cartes'); ?>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  var d = <?= json_encode(['modele' => (int) $__cd['modele'], 'format' => (int) $__cd['format'], 'verso' => (int) $__cd['verso'], 'signature' => (int) $__cd['signature']]) ?>;
+  var m = document.getElementById('selModele'); if (m) m.value = String(d.modele);
+  var f = document.getElementById('selFormat'); if (f && d.format && f.querySelector('option[value="' + d.format + '"]')) f.value = String(d.format);
+  var v = document.getElementById('chkVerso'); if (v && d.verso) { v.checked = true; var o = document.getElementById('optFlip'); if (o) o.classList.remove('d-none'); }
+});
+</script>
 <?php require_once __DIR__ . '/../../../noyau/layout/footer.php'; ?>

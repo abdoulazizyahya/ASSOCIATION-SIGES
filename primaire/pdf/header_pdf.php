@@ -555,7 +555,7 @@ function pdf_bandeau(FPDF $pdf, string $titre_fr, string $titre_en, float $page_
 function pdf_copyright(FPDF $pdf, float $page_w, float $page_h, float $marge_bas = 8): void {
     $pdf->SetFont('Arial', 'I', 6.5);
     $pdf->SetTextColor(120, 120, 120);
-    $texte = pdf_u('Copyright © SIGES-V2 ABZ');
+    $texte = pdf_u((function_exists('siges_copyright') ? siges_copyright() : 'Copyright © SIGES ABZ, E-mail: abdoulazizyahya@gmail.com, Tel: 621400800 / 699758612'));
     $h = 4;
     // Taille de police (mm) = 6.5pt / (72/25.4) — $k n'est pas exposé par ce
     // fork de FPDF (propriété protected, pas de GetFontSize()), mais la

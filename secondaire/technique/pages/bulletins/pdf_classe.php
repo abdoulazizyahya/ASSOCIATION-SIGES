@@ -509,6 +509,9 @@ if ($is_seq_mode) {
 }
 
 $pdf = new PDF_LTM_C('P', 'mm', 'A4');
+require_once __DIR__ . '/../../../../noyau/partage/apparence_docs.php'; app_appliquer_doc($pdf, 'bulletins');   // Apparence des documents
+require_once __DIR__ . '/../../../../noyau/partage/gabarits.php';
+$gab_bul = gab_bulletin_actif();
 $pdf->SetMargins($ml, $ml, $mr);
 // Marge de saut de page alignée sur le cadre extérieur (4mm) — voir
 // secondaire/technique/pages/bulletins/pdf.php pour l'explication (le copyright, dessiné tout en
@@ -633,6 +636,13 @@ foreach ($eleves as $el) {
     $pdf->RoundedRect(4, 4, $pw - 8, $pdf->GetPageHeight() - 8, 4, 'D');
     $pdf->SetLineWidth(0.2);
 
+    // Haut du bulletin dessiné par l'école (concepteur, 11/11/2026) — voir pdf.php.
+    $qr_dans_gab = false;
+    if ($gab_bul) {
+        $qr_dans_gab = gab_bulletin_secondaire($pdf, $gab_bul, $ml, $y0, $uw, $eleve, $insc, (int) $nb_inscrits, $titre_bull, $trim_info, (string) $nom_pp, (string) $contacts_parents, (string) $val_annee, $etab,
+            fn() => gab_qr_bulletin_secondaire((int) $id_eleve, $is_seq_mode ? 'seq' : 'trim', (int) ($is_seq_mode ? $id_seq : $id_trim), $eleve));
+        $pdf->SetXY($ml, $y0 + (float) $gab_bul['hauteur'] + 1);
+    } else {
     // En-tête bilingue
     $pdf->SetXY(bulletin_en() ? $ml + $col3 * 2 : $ml, $y0);   // section anglophone : français à droite
     $pdf->SetFont('Arial', '', 6.5);
@@ -793,6 +803,7 @@ foreach ($eleves as $el) {
 	$pdf->Cell(126, 5.5, uc($contacts_parents), 1, 1, 'L');
 
 	$pdf->SetY(max($pdf->GetY(), $y_photo + $photo_h));
+    }   // fin du haut du bulletin standard
 
     // En-tête tableau disciplines
     $pdf->Ln(1);
@@ -1199,7 +1210,7 @@ foreach ($eleves as $el) {
     require_once __DIR__ . '/../../../commun/pdf/verif_lib.php';
     require_once __DIR__ . '/../../../commun/pdf/qrcode.php';
 
-    if ($h_rempli_c > 15) {
+    if ($h_rempli_c > 15 && !$qr_dans_gab) {
         $verif_url_c = bulletin_verif_url(
             $id_eleve,
             $is_seq_mode ? 'seq' : 'trim',
@@ -1278,7 +1289,7 @@ foreach ($eleves as $el) {
     // extérieur (demande explicite) — identique à secondaire/technique/pages/bulletins/pdf.php.
     $pdf->SetFont('Arial', '', 6.5);
     $pdf->SetXY($ml, $pdf->GetPageHeight() - 9);
-    $pdf->Cell($uw, 4, uc('Copyright © SIGES ABZ   , E-mail: abdoulazizyahya@gmail.com'), 0, 1, 'C');
+    $pdf->Cell($uw, 4, uc(siges_copyright()), 0, 1, 'C');
 }
 
 // Sortie

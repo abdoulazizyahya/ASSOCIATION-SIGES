@@ -67,7 +67,7 @@ function an_tranches(array $moys): array {
  * [['matiere', 'enseignant', 'notes', 'moyenne', 'min', 'max', 'admis', 'taux', 'ecart']], triés par taux croissant.
  */
 function an_matieres(int $id_classe, array $periode): array {
-    if (!ed_secondaire() || $periode['cle'] === 'annee' || est_technique()) return [];
+    if (!ed_secondaire() || $periode['cle'] === 'annee') return [];
     $an = ed_annee();
     try {
         $d = pv_charger_donnees_comp($id_classe, (int) $periode['id'], (int) $an['cle']);

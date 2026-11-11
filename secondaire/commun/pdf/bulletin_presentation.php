@@ -19,7 +19,9 @@ trait BulletinPoliceCondensee
 
     function SetFont($family, $style = '', $size = 0)
     {
-        if (strcasecmp((string) $family, 'Arial') === 0) {
+        if (strcasecmp((string) $family, 'Arial') === 0 && $this->siges_police && $this->siges_police !== 'robotoc') {
+            $family = $this->siges_police;   // Apparence des documents (11/11/2026)
+        } elseif (strcasecmp((string) $family, 'Arial') === 0) {
             if (!$this->police_condensee_ok) {
                 foreach (['' => 'robotoc', 'B' => 'robotocb', 'I' => 'robotoci', 'BI' => 'robotocbi'] as $st => $f) {
                     $this->AddFont('RobotoC', $st, $f . '.php', __DIR__ . '/font/');

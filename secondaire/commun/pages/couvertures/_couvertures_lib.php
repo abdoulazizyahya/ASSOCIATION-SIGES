@@ -8,6 +8,7 @@ const COUV_MODELES = [
     'siges'    => ['Moderne',   'Bandeau marine et filet or, aux couleurs de SIGES'],
     'prestige' => ['Prestige',  'Double filet or, coins ornés, présentation soignée'],
     'leger'    => ['Économique','Trait fin, sans aplat de couleur — économise l\'encre'],
+    'perso'    => ['Mon modèle', 'Dessiné dans Paramètres → Apparence des documents → Concepteur'],
 ];
 
 function couv_roles(): array {

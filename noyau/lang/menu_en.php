@@ -71,6 +71,7 @@ return [
     'Mes bulletins de paie'     => 'My payslips',
     'Mon compte'                => 'My account',
     'Configurations'            => 'Configuration',
+    'Apparence des documents'   => 'Document appearance',
     "Journal d'audit"           => 'Audit log',
     'Licence'                   => 'Licence',
     'Frais & obligations'       => 'Fees & obligations',
