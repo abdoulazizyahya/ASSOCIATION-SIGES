@@ -61,6 +61,7 @@ return [
     'Envoyer aux parents'       => 'Message parents',
     'Passerelle SMS'            => 'SMS gateway',
     'Billets & autorisations'   => 'Passes & permissions',
+    'Couvertures de bulletins'  => 'Report booklet covers',
     'Grille salariale'          => 'Salary scale',
     'Paie'                      => 'Payroll',
     'Avances sur salaire'       => 'Salary advances',
