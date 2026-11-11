@@ -1246,6 +1246,22 @@ document.getElementById('form-seq').addEventListener('submit', function(e){
     panneau à droite, pour la changer : elle s'applique en direct partout où ce rôle est utilisé.
   </div>
 </div>
+<?php
+// Aperçu réel (10/11/2026) : le vrai bulletin PDF d'un élève de l'école, avec
+// les couleurs enregistrées — pour vérifier le rendu avant d'imprimer en masse.
+$__an = get_annee_active();
+$__trim = (int) (db_val("SELECT id FROM trimestre WHERE id_annee=? ORDER BY active DESC, ordre LIMIT 1", [(int) ($__an['id'] ?? 0)]) ?? 0);
+$__el = (int) (db_val("SELECT i.id_eleve FROM inscription i JOIN eleve e ON e.id=i.id_eleve AND e.statut='actif' WHERE i.id_annee=? ORDER BY i.id_classe, e.nom LIMIT 1", [(int) ($__an['id'] ?? 0)]) ?? 0);
+$__url = $__el && $__trim ? APP_URL . '/secondaire/' . (est_technique() ? 'technique' : 'general') . '/pages/bulletins/pdf.php?eleve=' . $__el . '&annee=' . (int) $__an['id'] . '&trim=' . $__trim : '';
+?>
+<?php if ($__url): ?>
+<div class="d-flex align-items-center gap-2 mb-3">
+  <button type="button" class="btn btn-outline-primary btn-sm" onclick="afficherApercu(<?= h(json_encode($__url)) ?>, 'Aperçu réel du bulletin', 'apercu_bulletin', 'portrait')">
+    <i class="bi bi-eye me-1"></i>Voir un vrai bulletin avec ces couleurs
+  </button>
+  <span class="text-muted" style="font-size:.76rem">Bulletin PDF réel d'un élève de l'école (couleurs enregistrées) — enregistrez vos changements avant de l'ouvrir.</span>
+</div>
+<?php endif; ?>
 
 <style>
 /* Préfixe cbk- : scope à cet onglet, pour ne rien casser ailleurs sur la page */

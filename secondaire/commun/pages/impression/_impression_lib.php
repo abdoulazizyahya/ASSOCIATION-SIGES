@@ -46,6 +46,7 @@ const IMP_DOCS = [
     ],
     'personnel' => [
         'personnel'  => ['Liste du personnel', 'people', 'Nom, fonction, matricule, téléphone'],
+        'badges'     => ['Badges du personnel', 'person-badge', 'Format carte bancaire (85,6 × 54 mm), 10 par page A4, à découper'],
         'titulaires' => ['Professeurs principaux / titulaires', 'star', 'Responsable de chaque classe'],
         'matieres'   => ['Matières par classe et enseignants', 'journal-bookmark', 'Coefficients et enseignants de chaque matière (secondaire)'],
     ],

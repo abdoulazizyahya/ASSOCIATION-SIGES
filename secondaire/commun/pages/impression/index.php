@@ -68,6 +68,25 @@ require_once __DIR__ . '/../../../../noyau/layout/header.php';
   <?php endforeach; ?>
 </div>
 
+<?php if ($onglet === 'etablissement' && $sec && !est_technique()):
+  require_once __DIR__ . '/../analyse/_analyse_lib.php';
+  $trims = array_values(array_filter(an_periodes(), fn($p) => $p['cle'] !== 'annee')); ?>
+<div class="card mt-3">
+  <div class="card-body">
+    <div class="d-flex align-items-start gap-2 mb-2">
+      <div style="width:38px;height:38px;border-radius:10px;background:#f3f6fb;display:flex;align-items:center;justify-content:center"><i class="bi bi-archive" style="color:#1a2744;font-size:1.1rem"></i></div>
+      <div><div class="fw-semibold" style="font-size:.9rem">Registre de conservation des notes</div>
+        <div class="text-muted" style="font-size:.76rem">Moyenne de chaque élève dans chaque matière, moyenne générale et rang, pour une classe et un trimestre — à signer et à archiver.</div></div>
+    </div>
+    <div class="d-flex flex-wrap gap-2">
+      <select id="reg-classe" class="form-select form-select-sm" style="max-width:220px"><?php foreach ($classes as $c): ?><option value="<?= (int) $c['id'] ?>"><?= h($c['libelle']) ?></option><?php endforeach; ?></select>
+      <select id="reg-periode" class="form-select form-select-sm" style="max-width:180px"><?php foreach ($trims as $t): ?><option value="<?= $t['cle'] ?>"><?= h($t['libelle']) ?></option><?php endforeach; ?></select>
+      <button type="button" class="btn btn-primary btn-sm" onclick="afficherApercu(<?= h(json_encode(APP_URL . '/secondaire/commun/pages/impression/registre.php')) ?> + '?classe=' + document.getElementById('reg-classe').value + '&periode=' + document.getElementById('reg-periode').value, 'Registre de conservation des notes', 'registre_notes', 'landscape')"><i class="bi bi-file-earmark-pdf me-1"></i>Aperçu</button>
+    </div>
+  </div>
+</div>
+<?php endif; ?>
+
 <div class="card mt-3">
   <div class="card-body">
     <div class="section-titre"><i class="bi bi-link-45deg me-1"></i>Autres documents de SIGES</div>
