@@ -451,6 +451,7 @@ CREATE TABLE `groupe` (
   `libelle_groupe_comp` varchar(250) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `libelle_en` varchar(250) DEFAULT NULL,
   `id_section` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `ordre` int NOT NULL DEFAULT '1',
   PRIMARY KEY (`id_groupe_comp`)
 ) ENGINE=InnoDB AUTO_INCREMENT=3 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;

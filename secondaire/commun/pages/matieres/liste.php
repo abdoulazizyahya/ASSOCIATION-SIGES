@@ -140,7 +140,7 @@ $nb_sans_serie  = 0;
 $series_dispo   = db_colonne_existe('discipline_serie', 'id_serie');
 
 if ($onglet === 'par_classe') {
-    $groupes = db_all("SELECT * FROM groupe ORDER BY id_groupe_comp");
+    $groupes = db_all("SELECT * FROM groupe ORDER BY " . sec_tri_groupes());
 
     if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         csrf_verifier();
@@ -158,6 +158,7 @@ if ($onglet === 'par_classe') {
                 if ($id_mat && $id_groupe) {
                     db_exec("INSERT IGNORE INTO discipline (id_mat,IDClasses,id_groupe,coef,ordre) VALUES (?,?,?,?,?)",
                             [$id_mat, $id_cl_aff, $id_groupe, $coef, (string)$ordre]);
+                    sec_renumeroter_disciplines($id_cl_aff, [$id_mat, $id_groupe], $ordre);   // ordre 1..n (12/11/2026)
                     $added++;
                 }
             }
@@ -177,6 +178,7 @@ if ($onglet === 'par_classe') {
                 db_exec("DELETE FROM dispenser_periode WHERE id_mat=? AND IDClasses=? AND val_annee=?",
                         [$id_mat, $id_cl_aff, $val_annee]);
             }
+            sec_renumeroter_disciplines($id_cl_aff);
             flash_set('succes', 'Matière retirée.');
             rediriger("secondaire/commun/pages/matieres/liste.php?onglet=par_classe&niveau_aff=" . urlencode($niveau_aff) . "&classe_aff=$id_cl_aff");
         }
@@ -203,6 +205,23 @@ if ($onglet === 'par_classe') {
             rediriger("secondaire/commun/pages/matieres/liste.php?onglet=par_classe&niveau_aff=" . urlencode($niveau_aff) . "&classe_aff=$id_cl_aff");
         }
 
+        // Ordre des groupes au bulletin et dans les listes (12/11/2026) : 1 en haut.
+        if ($action === 'ordre_groupes' && $id_cl_aff && sec_ordre_groupes_dispo()) {
+            $saisis = array_map('intval', (array) ($_POST['ordre_groupe'] ?? []));
+            $ids = array_keys($saisis);
+            if ($ids) {
+                $actuel = array_column(db_all("SELECT id_groupe_comp, ordre FROM groupe ORDER BY ordre, id_groupe_comp"), 'ordre', 'id_groupe_comp');
+                $rang_actuel = array_flip(array_keys($actuel));
+                usort($ids, fn($a, $b) => [$saisis[$a], $rang_actuel[$a] ?? 999] <=> [$saisis[$b], $rang_actuel[$b] ?? 999]);
+                // Les groupes de la section reçoivent les rangs 1..n ; les autres sont rangés après.
+                $autres = array_values(array_diff(array_map('intval', array_keys($actuel)), $ids));
+                foreach (array_merge($ids, $autres) as $k => $idg) db_exec("UPDATE groupe SET ordre=? WHERE id_groupe_comp=?", [$k + 1, (int) $idg]);
+                foreach (db_all("SELECT DISTINCT IDClasses FROM discipline") as $rc) sec_renumeroter_disciplines((int) $rc['IDClasses']);
+                flash_set('succes', 'Ordre des groupes enregistré : il s\'applique aux listes et aux bulletins.');
+            }
+            rediriger("secondaire/commun/pages/matieres/liste.php?onglet=par_classe&niveau_aff=" . urlencode($niveau_aff) . "&classe_aff=$id_cl_aff");
+        }
+
         if ($action === 'edit_disc' && $id_cl_aff) {
             $id_mat_old    = (int)post('id_mat_old');
             $id_groupe_old = (int)post('id_groupe_old');
@@ -218,6 +237,7 @@ if ($onglet === 'par_classe') {
                 db_exec("UPDATE discipline SET coef=?,ordre=? WHERE id_mat=? AND IDClasses=? AND id_groupe=?",
                         [$coef_new, (string)$ordre_new, $id_mat_old, $id_cl_aff, $id_groupe_old]);
             }
+            sec_renumeroter_disciplines($id_cl_aff, [$id_mat_old, $id_groupe_new], $ordre_new);
             flash_set('succes', 'Matière mise à jour.');
             rediriger("secondaire/commun/pages/matieres/liste.php?onglet=par_classe&niveau_aff=" . urlencode($niveau_aff) . "&classe_aff=$id_cl_aff");
         }
@@ -227,7 +247,7 @@ if ($onglet === 'par_classe') {
         $classe_info    = db_one("SELECT * FROM classe WHERE id=?", [$id_cl_aff]);
         $section        = $classe_info['libelle_section'] ?? '';
         $groupes_filtre = $section
-            ? db_all("SELECT * FROM groupe WHERE id_section=? ORDER BY id_groupe_comp", [$section])
+            ? db_all("SELECT * FROM groupe WHERE id_section=? ORDER BY " . sec_tri_groupes(), [$section])
             : $groupes;
 
         // Classe sans AUCUNE matière : affectation automatique — d'abord
@@ -240,6 +260,7 @@ if ($onglet === 'par_classe') {
             secondaire_auto_matieres_classe($id_cl_aff, $classe_info['code_niveau'] ?? null, $classe_info['libelle_section'] ?? null);
         }
 
+        sec_renumeroter_disciplines($id_cl_aff);
         $disciplines = db_all(
             "SELECT d.id_mat, d.IDClasses, d.id_groupe, d.coef, d.ordre,
                     m.libelle AS mat_libelle,
@@ -248,7 +269,7 @@ if ($onglet === 'par_classe') {
              JOIN matiere m ON m.id = d.id_mat AND m.actif=1
              LEFT JOIN groupe g ON g.id_groupe_comp = d.id_groupe
              WHERE d.IDClasses=?
-             ORDER BY d.id_groupe, d.ordre" . sec_ordre_num() . ", m.libelle",
+             ORDER BY " . sec_tri_disciplines() . ", m.libelle",
             [$id_cl_aff]
         );
         $total_coeff  = array_sum(array_column($disciplines, 'coef'));
@@ -321,6 +342,7 @@ if ($onglet === 'competences_trim') {
                      VALUES (?,?,?,?,?,?)",
                     [$id_mat, $niveau, $id_trim, $lib, $lib_en ?: null, $ord]
                 );
+                sec_renumeroter_competences($id_mat, (string) $niveau, $id_trim, (int) db_last_id(), $ord);
                 flash_set('succes', 'Compétence ajoutée.');
             }
             rediriger("$redir_comp_base&niveau_comp=" . urlencode($niveau) . "&trim_comp=$id_trim");
@@ -336,6 +358,9 @@ if ($onglet === 'competences_trim') {
             if ($id && $lib) {
                 db_exec("UPDATE competence SET libelle=?,libelle_en=?,ordre=? WHERE id=?",
                         [$lib, $lib_en ?: null, $ord, $id]);
+                if ($cp = db_one("SELECT id_matiere, code_niveau, id_trim FROM competence WHERE id=?", [$id])) {
+                    sec_renumeroter_competences((int) $cp['id_matiere'], (string) $cp['code_niveau'], (int) $cp['id_trim'], $id, $ord);
+                }
                 flash_set('succes', 'Compétence mise à jour.');
             }
             rediriger("$redir_comp_base&niveau_comp=" . urlencode($niveau) . "&trim_comp=$id_trim");
@@ -345,7 +370,9 @@ if ($onglet === 'competences_trim') {
             $id      = (int)post('comp_id');
             $niveau  = post('code_niveau');
             $id_trim = (int)post('id_trim');
+            $cp = db_one("SELECT id_matiere, code_niveau, id_trim FROM competence WHERE id=?", [$id]);
             db_exec("DELETE FROM competence WHERE id=?", [$id]);
+            if ($cp) sec_renumeroter_competences((int) $cp['id_matiere'], (string) $cp['code_niveau'], (int) $cp['id_trim']);
             flash_set('succes', 'Compétence supprimée.');
             rediriger("$redir_comp_base&niveau_comp=" . urlencode($niveau) . "&trim_comp=$id_trim");
         }
@@ -436,8 +463,8 @@ if ($onglet === 'enseignants') {
              LEFT JOIN dispenser disp ON disp.id_mat=d.id_mat AND disp.IDClasses=d.IDClasses AND disp.val_annee=?
              LEFT JOIN enseignant e ON e.matricule_ens = disp.matricule_ens
              WHERE d.IDClasses=?
-             GROUP BY d.id_mat, d.IDClasses, d.id_groupe, d.coef, d.ordre, m.libelle, g.libelle_groupe_comp
-             ORDER BY d.id_groupe, d.ordre" . sec_ordre_num() . ", m.libelle",
+             GROUP BY d.id_mat, d.IDClasses, d.id_groupe, d.coef, d.ordre, m.libelle, g.libelle_groupe_comp" . (sec_ordre_groupes_dispo() ? ', g.ordre' : '') . "
+             ORDER BY " . sec_tri_disciplines() . ", m.libelle",
             [$val_annee, $id_cl_ens]
         );
         $historique_ens  = sec_historique_affectations($id_cl_ens, $val_annee);
@@ -929,7 +956,14 @@ function reinitForm() {
               </tr>
             </thead>
             <tbody>
-              <?php foreach ($disciplines as $i => $d): ?>
+              <?php $grp_prec = null; foreach ($disciplines as $i => $d): ?>
+              <?php if ((int) $d['id_groupe'] !== $grp_prec): $grp_prec = (int) $d['id_groupe']; ?>
+              <tr style="background:#eef2ff;border-bottom:1px solid #c7d2fe">
+                <td colspan="5" style="padding:4px 12px;font-size:.66rem;font-weight:700;color:#3730a3;text-transform:uppercase;letter-spacing:.04em">
+                  <i class="bi bi-collection me-1"></i><?= h($d['groupe_libelle'] ?? 'Sans groupe') ?>
+                </td>
+              </tr>
+              <?php endif; ?>
               <tr class="disc-row" style="border-bottom:1px solid #e5e7eb"
                   onmouseover="this.style.background='#f8faff'" onmouseout="this.style.background=''">
                 <td style="width:24px;padding:5px 4px 5px 12px;color:#d1d5db;font-size:.7rem;text-align:right;white-space:nowrap;border-right:1px solid #e5e7eb">
@@ -987,6 +1021,35 @@ function reinitForm() {
   </div>
 
 </div><!-- /row -->
+
+<?php if (sec_ordre_groupes_dispo() && $groupes_filtre && $disciplines): ?>
+<!-- ══ Ordre des groupes (12/11/2026) : 1 en haut, sur les listes ET les bulletins ══ -->
+<div class="card mt-3" style="border:1px solid #c7d2fe;overflow:hidden">
+  <div class="card-header py-2 px-3 d-flex align-items-center gap-2" style="background:#eef2ff;border-bottom:1px solid #c7d2fe">
+    <i class="bi bi-sort-numeric-down" style="color:#3730a3;font-size:.95rem"></i>
+    <span class="fw-bold" style="font-size:.8rem;color:#3730a3">Ordre des groupes au bulletin</span>
+    <span class="text-muted ms-2" style="font-size:.72rem">1 = en haut. L'ordre des matières (colonne « Ordre ») se règle avec <i class="bi bi-pencil"></i> ; il est numéroté 1, 2, 3… dans toute la classe.</span>
+  </div>
+  <div class="card-body py-2 px-3">
+    <form method="post" class="d-flex align-items-end gap-3 flex-wrap">
+      <?= csrf_champ() ?>
+      <input type="hidden" name="action" value="ordre_groupes">
+      <?php foreach ($groupes_filtre as $k => $g): ?>
+        <div>
+          <label class="form-label mb-1" style="font-size:.72rem;font-weight:600"><?= h($g['libelle_groupe_comp']) ?></label>
+          <select name="ordre_groupe[<?= (int) $g['id_groupe_comp'] ?>]" class="form-select form-select-sm text-center" style="width:80px">
+            <?php for ($o = 1; $o <= count($groupes_filtre); $o++): ?>
+              <option value="<?= $o ?>" <?= $o === $k + 1 ? 'selected' : '' ?>><?= $o ?></option>
+            <?php endfor; ?>
+          </select>
+        </div>
+      <?php endforeach; ?>
+      <button class="btn btn-primary btn-sm"><i class="bi bi-check-lg me-1"></i>Enregistrer l'ordre</button>
+    </form>
+    <div class="text-muted mt-1" style="font-size:.7rem">S'applique à toutes les classes de la section <?= h($section ?: '') ?>.</div>
+  </div>
+</div>
+<?php endif; ?>
 
 <?php if ($series_dispo && $disciplines): ?>
 <!-- ══ Classe mixte : matières par série / LV2 ══ -->

@@ -1742,13 +1742,91 @@ function est_technique(): bool {
 }
 
 // Tri des matières d'une classe (08/11/2026) : discipline.ordre est un
-// VARCHAR, « ORDER BY d.ordre » rangeait 10 avant 6 sur les bulletins. Au
-// général, tri numérique (« d.ordre+0 ») ; technique inchangé (demande
-// explicite). À concaténer juste après « d.ordre » dans un ORDER BY.
+// VARCHAR, « ORDER BY d.ordre » rangeait 10 avant 6 sur les bulletins : tri
+// numérique (« d.ordre+0 »), au général puis au technique depuis le 12/11/2026.
+// À concaténer juste après « d.ordre » dans un ORDER BY.
 function sec_ordre_num(): string {
-    return est_technique() ? '' : '+0';
+    return '+0';
 }
 
+// ── Ordre d'affichage (12/11/2026, migration secondaire v37) ─────────────
+// « Ordre » = rang d'affichage partout, listes ET bulletins : 1 en haut, puis
+// 2, 3… Les groupes (1er GROUPE, 2e GROUPE…) sont rangés par groupe.ordre,
+// puis les matières de la classe par discipline.ordre (numérotées 1..n de
+// façon continue dans la classe), puis les compétences par competence.ordre.
+// Général ET technique (technique ajouté le 12/11/2026, migration v38).
+
+function sec_ordre_groupes_dispo(): bool {
+    return db_colonne_existe('groupe', 'ordre');
+}
+
+/** Clause ORDER BY des matières d'une classe (alias d = discipline, g = groupe, m = matiere). */
+function sec_tri_disciplines(): string {
+    return (sec_ordre_groupes_dispo() ? 'COALESCE(g.ordre, 999), ' : '') . 'd.id_groupe, d.ordre+0';
+}
+
+/** Clause ORDER BY des groupes (table groupe, sans alias). */
+function sec_tri_groupes(): string {
+    return sec_ordre_groupes_dispo() ? 'ordre, id_groupe_comp' : 'id_groupe_comp';
+}
+
+/**
+ * Renumérote 1..n les matières d'une classe dans leur ordre d'affichage. Avec
+ * $deplace = [id_mat, id_groupe] et $position, cette matière est d'abord
+ * placée au rang demandé (les suivantes descendent d'un cran) ; elle reste
+ * dans son groupe (les groupes gardent leur propre ordre).
+ */
+function sec_renumeroter_disciplines(int $id_classe, ?array $deplace = null, int $position = 0): void {
+    if (!$id_classe) return;
+    $go = sec_ordre_groupes_dispo() ? 'COALESCE(g.ordre, 999)' : '0';
+    $rows = db_all(
+        "SELECT d.id_mat, d.id_groupe, d.ordre, $go AS go
+         FROM discipline d
+         LEFT JOIN matiere m ON m.id = d.id_mat
+         LEFT JOIN groupe g ON g.id_groupe_comp = d.id_groupe
+         WHERE d.IDClasses = ?
+         ORDER BY $go, d.id_groupe, d.ordre+0, m.libelle, d.id_mat",
+        [$id_classe]
+    );
+    if ($deplace) {
+        foreach ($rows as $k => $r) {
+            if ((int) $r['id_mat'] === (int) $deplace[0] && (int) $r['id_groupe'] === (int) $deplace[1]) {
+                $item = $r;
+                array_splice($rows, $k, 1);
+                array_splice($rows, max(0, min(count($rows), $position - 1)), 0, [$item]);
+                break;
+            }
+        }
+        // Tri stable par groupe : la matière reste dans son groupe, au plus près du rang voulu.
+        foreach ($rows as $k => &$r) $r['_i'] = $k;
+        unset($r);
+        usort($rows, fn($a, $b) => [(int) $a['go'], (int) $a['id_groupe'], $a['_i']] <=> [(int) $b['go'], (int) $b['id_groupe'], $b['_i']]);
+    }
+    foreach ($rows as $k => $r) {
+        if ((string) $r['ordre'] !== (string) ($k + 1)) {
+            db_exec("UPDATE discipline SET ordre=? WHERE IDClasses=? AND id_mat=? AND id_groupe=?",
+                    [(string) ($k + 1), $id_classe, (int) $r['id_mat'], (int) $r['id_groupe']]);
+        }
+    }
+}
+
+/** Renumérote 1..n les compétences d'une matière / niveau / trimestre ($deplace = id placé au rang $position). */
+function sec_renumeroter_competences(int $id_matiere, string $code_niveau, int $id_trim, int $deplace = 0, int $position = 0): void {
+    $rows = db_all("SELECT id, ordre FROM competence WHERE id_matiere=? AND code_niveau=? AND id_trim=? ORDER BY ordre, id",
+                   [$id_matiere, $code_niveau, $id_trim]);
+    if ($deplace) {
+        foreach ($rows as $k => $r) {
+            if ((int) $r['id'] === $deplace) {
+                array_splice($rows, $k, 1);
+                array_splice($rows, max(0, min(count($rows), $position - 1)), 0, [$r]);
+                break;
+            }
+        }
+    }
+    foreach ($rows as $k => $r) {
+        if ((int) $r['ordre'] !== $k + 1) db_exec("UPDATE competence SET ordre=? WHERE id=?", [$k + 1, (int) $r['id']]);
+    }
+}
 // Langue d'enseignement de l'école, primaire ou secondaire (migrations v70
 // primaire et v33 secondaire) : 'francophone', 'anglophone' ou 'bilingue'
 // (sections Fr et An). Choisie à la création de l'école, modifiable dans

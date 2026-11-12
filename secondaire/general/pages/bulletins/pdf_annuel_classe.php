@@ -328,7 +328,7 @@ $disciplines = db_all(
      LEFT JOIN groupe g ON g.id_groupe_comp=d.id_groupe
      LEFT JOIN dispenser disp ON disp.id_mat=d.id_mat AND disp.IDClasses=d.IDClasses AND disp.val_annee=?
      LEFT JOIN enseignant e ON e.matricule_ens=disp.matricule_ens
-     WHERE d.IDClasses=? ORDER BY d.id_groupe, d.ordre+0, m.libelle",
+     WHERE d.IDClasses=? ORDER BY " . sec_tri_disciplines() . ", m.libelle",
     [$val_annee, $id_classe]
 );
 

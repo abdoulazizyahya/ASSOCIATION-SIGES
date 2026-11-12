@@ -51,6 +51,8 @@ INSERT IGNORE INTO `groupe` (`id_groupe_comp`, `libelle_groupe_comp`, `id_sectio
 (4, 'AUTRES ENSEIGNEMENTS', 'INDUSTRIELLE'),
 (5, 'ENSEIGNEMENT GÉNÉRAL', 'INDUSTRIELLE'),
 (6, 'ENSEIGNEMENT PROFESSIONNEL', 'INDUSTRIELLE');
+-- Ordre d'affichage des groupes (bulletins, listes) : 1 en haut (migration v37).
+UPDATE `groupe` SET `ordre` = `id_groupe_comp`;
 
 INSERT IGNORE INTO `matiere` (`id`, `code`, `libelle`, `libelle_en`, `libelle_section`, `ordre`, `actif`) VALUES
 (1, NULL, 'Mathématiques', 'Mathematics', NULL, 1, 1),
