@@ -11,6 +11,7 @@ exiger_connexion();
 $annee    = get_annee_active();
 $id_annee = (int) ($annee['id'] ?? 0);
 
+eleves_liste_filtre_memoire();   // classe conservée au retour de la fiche
 $q         = trim($_GET['q'] ?? '');
 $id_classe = (int) ($_GET['classe'] ?? 0);
 $id_serie  = (int) ($_GET['serie'] ?? 0);
@@ -142,7 +143,7 @@ require_once __DIR__ . '/../../../../noyau/layout/header.php';
 <ul class="nav nav-tabs mb-2">
   <?php $qs_tab = array_filter(['q' => $q, 'classe' => $id_classe ?: null, 'serie' => $id_serie ?: null, 'pp' => $pp !== 25 ? $pp : null]); ?>
   <li class="nav-item">
-    <a class="nav-link <?= $statut === 'actif' ? 'active' : '' ?>" href="?<?= http_build_query($qs_tab) ?>">
+    <a class="nav-link <?= $statut === 'actif' ? 'active' : '' ?>" href="?<?= http_build_query($qs_tab + ['statut' => 'actif']) ?>">
       <i class="bi bi-check-circle me-1"></i>Actifs
     </a>
   </li>
@@ -223,7 +224,7 @@ require_once __DIR__ . '/../../../../noyau/layout/header.php';
       <div class="col-auto d-flex gap-1">
         <button class="btn btn-primary btn-sm"><i class="bi bi-search"></i></button>
         <?php if ($q || $id_classe || $id_serie): ?>
-          <a href="<?= APP_URL ?>/secondaire/commun/pages/eleves/liste.php" class="btn btn-outline-secondary btn-sm"><i class="bi bi-x-lg"></i></a>
+          <a href="<?= APP_URL ?>/secondaire/commun/pages/eleves/liste.php?classe=0" class="btn btn-outline-secondary btn-sm" title="Effacer les filtres"><i class="bi bi-x-lg"></i></a>
         <?php endif; ?>
       </div>
       <?php $titre_export = $id_classe ? 'Liste des élèves de ' . $classe_nom_choisie : 'Liste des élèves de toutes les classes'; ?>

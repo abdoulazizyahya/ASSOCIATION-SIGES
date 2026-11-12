@@ -1997,6 +1997,25 @@ function generer_filigrane_logo(string $source_abs, string $dest_abs): bool {
  * Mention de copyright UNIQUE de tous les documents (PDF, Excel, maquettes) —
  * demande du 11/11/2026 : le seul endroit à modifier si elle change.
  */
+function eleves_liste_filtre_memoire(): void {
+    // Liste des élèves (primaire et secondaire) : mémorise la classe / série /
+    // recherche / tri / statut choisis, et les restaure quand on revient sur la
+    // liste par une URL nue (bouton Retour de la fiche, redirection après
+    // suppression, désactivation ou mise à jour, menu Élèves) — 11/11/2026.
+    // La page n'est pas restaurée (elle peut ne plus exister après suppression).
+    $cles = ['q', 'classe', 'serie', 'statut', 'tri', 'ordre', 'pp'];
+    $ec = function_exists('ecole_courante') ? (ecole_courante()['code'] ?? (ecole_courante()['id'] ?? '')) : '';
+    $cle_sess = 'eleves_liste_filtre_' . $ec;
+    $recus = array_intersect_key($_GET, array_flip(array_merge($cles, ['page'])));
+    if ($recus) {
+        $st = $_GET['statut'] ?? 'actif';
+        if (in_array($st, ['actif', 'desactive', ''], true))   // pas les onglets outils / photos…
+            $_SESSION[$cle_sess] = array_intersect_key($_GET, array_flip($cles));
+    } elseif (!empty($_SESSION[$cle_sess]) && is_array($_SESSION[$cle_sess])) {
+        $_GET = $_SESSION[$cle_sess] + $_GET;
+    }
+}
+
 function siges_copyright(): string {
     return 'Copyright © SIGES ABZ, E-mail: abdoulazizyahya@gmail.com, Tel: 621400800 / 699758612';
 }

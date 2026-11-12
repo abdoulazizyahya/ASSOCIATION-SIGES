@@ -10,6 +10,7 @@ $annee     = get_annee_active();
 $val_annee = $annee['val_annee'] ?? '';
 
 // ── Paramètres de filtre / tri / pagination ──────────────
+eleves_liste_filtre_memoire();   // classe conservée au retour de la fiche
 $q         = trim($_GET['q'] ?? '');
 $id_classe = (int)($_GET['classe'] ?? 0);
 // Écriture déléguée : superadmin association entré en mode écriture, OU
