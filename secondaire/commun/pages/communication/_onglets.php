@@ -5,6 +5,7 @@ $__ong = [
     'modeles'  => ['Modèles & automatiques', 'card-text', 'modeles.php'],
     'journal'  => ['Journal', 'journal-text', 'journal.php'],
     'contacts' => ['Contacts des parents', 'telephone', 'contacts_parents.php'],
+    'espace_parents' => ['Espace parents', 'house-heart', 'espace_parents.php'],   // 16/11/2026
 ];
 if (function_exists('sms_gw_peut_configurer') && sms_gw_peut_configurer()) $__ong['passerelle'] = ['Passerelle SMS', 'phone', 'passerelle.php'];
 ?>

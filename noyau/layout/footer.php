@@ -5,6 +5,8 @@
       <?php require_once __DIR__ . '/../pwa.php'; if (pwa_mode_app()): // seulement dans l'application installée ?> · <a href="<?= APP_URL ?>/compte/a_propos.php" style="color:inherit">À propos</a><?php endif; ?>
     </footer>
     <?php require_once __DIR__ . '/../pwa.php'; echo pwa_bandeau_apk(), pwa_nouveautes();   // application : nouvelle version, nouveautés ?>
+    <?php // Relance SMS automatique des impayés, après l'affichage de la page si elle est due (16/11/2026).
+          try { require_once __DIR__ . '/../../secondaire/commun/pages/communication/_sms_lib.php'; sms_relance_planifier(); } catch (\Throwable $e) {} ?>
 
   </div><!-- /.abz-main -->
 </div><!-- /.abz-shell -->

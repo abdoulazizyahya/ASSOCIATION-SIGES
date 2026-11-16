@@ -17,7 +17,7 @@ const SMS_TYPES = [
     'paiement' => ['Paiement reçu + reste à payer', 'cash-coin', true,
         "{ecole} : nous avons recu {montant} FCFA pour {eleve} ({classe}) le {date}. Reste a payer : {reste} FCFA. Merci.",
         "{ecole}: we received {montant} FCFA for {eleve} ({classe}) on {date}. Balance due: {reste} FCFA. Thank you."],
-    'relance' => ['Relance de paiement', 'exclamation-circle', false,
+    'relance' => ['Relance de paiement', 'exclamation-circle', true,   // automatique : tous les N jours (16/11/2026)
         "{ecole} : il reste {reste} FCFA a payer pour la scolarite de {eleve} ({classe}). Merci de regulariser rapidement.",
         "{ecole}: {reste} FCFA remain due for the school fees of {eleve} ({classe}). Please settle as soon as possible."],
     'bulletin' => ['Bulletin / moyenne du trimestre', 'mortarboard', false,
@@ -224,4 +224,80 @@ function sms_auto(string $type, int $id_eleve, array $vars = []): string {
         $r = sms_envoyer($type, $id_eleve, ed_nom($e), $tels[0], $texte, 'auto');
         return $r['ok'] ? ' SMS envoyé au parent (' . tel_affiche($tels[0]) . ').' : (!empty($r['attente']) ? ' SMS au parent mis en attente.' : ' SMS au parent non envoyé.');
     } catch (\Throwable $ex) { return ''; }
+}
+
+// ── Relance automatique des impayés (16/11/2026) ──────────────────────────
+//  Si le modèle « Relance de paiement » est coché automatique : tous les
+//  `jours` jours, un SMS à un parent de chaque élève dont le reste à payer
+//  atteint `seuil` FCFA. Seulement quand la passerelle est configurée (sinon
+//  des centaines de messages s'empileraient en attente). Lancée après
+//  l'affichage d'une page de l'école (noyau/layout/footer.php) ou à la main.
+
+const SMS_RELANCE_DEFAUT = ['jours' => 30, 'seuil' => 1000, 'dernier' => ''];
+const SMS_RELANCE_MAX = 400;   // messages au plus par passage
+
+function sms_relance_reglages(): array { return ed_reglages('sms_relance', SMS_RELANCE_DEFAUT); }
+
+/** Date de la prochaine relance automatique (Y-m-d), ou null si désactivée. */
+function sms_relance_prochaine(): ?string {
+    if (empty(sms_modeles()['relance']['auto'])) return null;
+    $r = sms_relance_reglages();
+    if ($r['dernier'] === '') return date('Y-m-d');
+    return date('Y-m-d', strtotime($r['dernier'] . ' +' . max(1, (int) $r['jours']) . ' days'));
+}
+
+function sms_relance_due(): bool {
+    $p = sms_relance_prochaine();
+    return $p !== null && $p <= date('Y-m-d') && sms_gw_actif();
+}
+
+/** Élèves à relancer : [['id','nom','classe','id_classe','reste','tel']]. */
+function sms_relance_cibles(float $seuil): array {
+    $eleves = ed_eleves();
+    if (!$eleves) return [];
+    $fin = sms_finances_lot(array_column($eleves, 'id'));
+    $dus = array_filter($eleves, fn($e) => ($fin[(int) $e['id']]['reste'] ?? 0) >= max(1.0, $seuil));
+    $contacts = $dus ? contacts_parents_lot(array_column($dus, 'id')) : [];
+    $out = [];
+    foreach ($dus as $e) {
+        $tels = array_column($contacts[(int) $e['id']] ?? [], 'tel');
+        if (!$tels) continue;
+        $out[] = ['id' => (int) $e['id'], 'nom' => ed_nom($e), 'classe' => $e['classe'], 'id_classe' => (int) $e['id_classe'],
+                  'reste' => $fin[(int) $e['id']]['reste'], 'tel' => $tels[0]];
+    }
+    return $out;
+}
+
+/** Envoie la relance. Retour : ['envoyes', 'attente', 'echecs', 'cibles']. */
+function sms_relance_executer(string $mode = 'auto'): array {
+    $reg = sms_relance_reglages();
+    // Date notée AVANT l'envoi : deux pages ouvertes en même temps ne relancent pas deux fois.
+    ed_reglages_enregistrer('sms_relance', ['dernier' => date('Y-m-d')] + $reg);
+    $mods = sms_modeles();
+    $res = ['envoyes' => 0, 'attente' => 0, 'echecs' => 0, 'cibles' => 0];
+    @set_time_limit(600);
+    foreach (array_slice(sms_relance_cibles((float) $reg['seuil']), 0, SMS_RELANCE_MAX) as $c) {
+        $res['cibles']++;
+        $texte = sms_rendre($mods['relance'][sms_langue($c['id_classe'])],
+                            ['eleve' => $c['nom'], 'classe' => $c['classe'], 'reste' => number_format($c['reste'], 0, ',', ' ')]);
+        $r = sms_envoyer('relance', $c['id'], $c['nom'], $c['tel'], $texte, $mode);
+        $r['ok'] ? $res['envoyes']++ : (!empty($r['attente']) ? $res['attente']++ : $res['echecs']++);
+        if (!empty($r['attente'])) break;   // passerelle injoignable : le reste attendra le prochain passage
+    }
+    return $res;
+}
+
+/** Appelée en bas de chaque page de l'école : relance après l'affichage, si elle est due. */
+function sms_relance_planifier(): void {
+    static $fait = false;
+    if ($fait || !function_exists('fastcgi_finish_request')) return;   // sans PHP-FPM : bouton « Relancer maintenant »
+    $fait = true;
+    try { if (!sms_relance_due()) return; } catch (\Throwable $e) { return; }
+    register_shutdown_function(function () {
+        fastcgi_finish_request();
+        try {
+            $r = sms_relance_executer('auto');
+            if (function_exists('journaliser_action')) journaliser_action('sms_relance_auto', null, "{$r['envoyes']} envoyé(s), {$r['attente']} en attente, {$r['echecs']} échec(s)");
+        } catch (\Throwable $e) { /* jamais d'erreur visible */ }
+    });
 }

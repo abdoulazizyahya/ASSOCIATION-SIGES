@@ -144,6 +144,8 @@ if (function_exists('type_enseignement_courant')) {
                 || str_starts_with($_rel, 'secondaire/commun/pages/emploi_temps/')
                 // Communication avec les parents (contacts, SMS / WhatsApp, 10/11/2026) : commun, type-aware.
                 || str_starts_with($_rel, 'secondaire/commun/pages/communication/')
+                // Espace parents (16/11/2026) : commun, type-aware (noyau/partage/espace_parents.php).
+                || str_starts_with($_rel, 'parents/')
                 // Modules communs inspirés de l'étude ScolaPro (10/11/2026) : billets, couvertures,
                 // centre d'impression, analyse des performances — type-aware.
                 || preg_match('#^secondaire/commun/pages/(billets|couvertures|impression|analyse|apparence)/#', $_rel);

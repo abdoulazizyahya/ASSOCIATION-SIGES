@@ -11,6 +11,16 @@ $ici = 'secondaire/commun/pages/communication/modeles.php';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     csrf_verifier();
+    if (post('relancer_maintenant')) {   // relance des impayés à la main (16/11/2026)
+        if (!sms_gw_actif()) { flash_set('erreur', "Configurez d'abord la passerelle SMS."); rediriger($ici); }
+        $r = sms_relance_executer('manuel');
+        journaliser_action('sms_relance', null, "{$r['envoyes']} envoyé(s), {$r['attente']} en attente, {$r['echecs']} échec(s)");
+        flash_set($r['echecs'] || $r['attente'] ? 'erreur' : 'succes',
+            "Relance : {$r['cibles']} parent(s) visé(s) — {$r['envoyes']} envoyé(s), {$r['attente']} en attente, {$r['echecs']} échec(s).");
+        rediriger($ici);
+    }
+    ed_reglages_enregistrer('sms_relance', ['jours' => max(1, min(365, (int) post('relance_jours'))),
+                                            'seuil' => max(0, (int) preg_replace('/\D/', '', (string) post('relance_seuil')))] + sms_relance_reglages());
     $nv = [];
     foreach (SMS_TYPES as $k => [, , $autom, $fr, $en]) {
         if (post('reinit') === $k) continue;   // modèle remis par défaut
@@ -58,7 +68,16 @@ require_once __DIR__ . '/../../../../noyau/layout/header.php';
             <td class="text-center">
               <?php if ($m['automatisable']): ?>
                 <div class="form-check form-switch d-inline-block"><input class="form-check-input" type="checkbox" name="auto[<?= $k ?>]" value="1" <?= $m['auto'] ? 'checked' : '' ?>></div>
-                <div class="text-muted" style="font-size:.7rem"><?= ['inscription' => 'à chaque nouvel élève', 'paiement' => 'à chaque paiement', 'sortie' => 'à chaque billet de sortie', 'infirmerie' => 'à chaque billet d\'infirmerie'][$k] ?? '' ?></div>
+                <div class="text-muted" style="font-size:.7rem"><?= ['inscription' => 'à chaque nouvel élève', 'paiement' => 'à chaque paiement', 'sortie' => 'à chaque billet de sortie', 'infirmerie' => 'à chaque billet d\'infirmerie', 'relance' => 'impayés, automatiquement'][$k] ?? '' ?></div>
+                <?php if ($k === 'relance'): $rl = sms_relance_reglages(); $prochaine = sms_relance_prochaine(); ?>
+                  <div class="text-start mt-1" style="font-size:.72rem">
+                    tous les <input type="number" name="relance_jours" min="1" max="365" value="<?= (int) $rl['jours'] ?>" class="form-control form-control-sm d-inline-block p-0 px-1" style="width:52px;font-size:.72rem"> j,<br>
+                    si reste ≥ <input type="text" name="relance_seuil" value="<?= (int) $rl['seuil'] ?>" class="form-control form-control-sm d-inline-block p-0 px-1" style="width:62px;font-size:.72rem"> F
+                    <div class="text-muted"><?= $rl['dernier'] ? 'dernière : ' . h(date('d/m/Y', strtotime($rl['dernier']))) : 'jamais lancée' ?><?= $prochaine ? '<br>prochaine : ' . h(date('d/m/Y', strtotime($prochaine))) : '' ?></div>
+                    <button class="btn btn-outline-warning btn-sm py-0 mt-1" style="font-size:.72rem" name="relancer_maintenant" value="1"
+                            onclick="return confirm('Envoyer maintenant un SMS de relance à un parent de chaque élève dont le reste à payer atteint le seuil ?')"><i class="bi bi-send me-1"></i>Relancer maintenant</button>
+                  </div>
+                <?php endif; ?>
               <?php else: ?><span class="text-muted" style="font-size:.74rem">—</span><?php endif; ?>
             </td>
           </tr>
