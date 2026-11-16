@@ -63,3 +63,6 @@
 # Archives de déploiement (zips envoyés sur l'hébergeur) : locales, jamais versionnées
 /deploy/archives/
 /assets/uploads/gabarits/
+
+# Clé privée de signature des zips de mise à jour (deploy/outils/generer_cle_maj.php) : jamais en dépôt
+/deploy/cles/

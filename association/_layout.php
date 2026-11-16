@@ -36,6 +36,7 @@ function _asso_nav_entrees(): array {
         'Administration' => [
             ['Réglages du site', 'gear',         'parametres.php',      ['parametres.php'],                          true,  false],   // page d'entrée du site (18/10/2026)
             ['Journal',         'journal-text',  'journal.php',         ['journal.php'],                             true,  false],
+            ['Mise à jour',     'cloud-arrow-up', 'mise_a_jour.php',    ['mise_a_jour.php'],                         true,  true],    // code SIGES sans FTP, zip signé (16/11/2026)
             ['Accès MySQL',     'person-lock',   'acces_bd.php',        ['acces_bd.php'],                            true,  true],    // diagnostic droits cPanel (21/10/2026)
         ],
     ];
