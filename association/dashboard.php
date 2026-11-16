@@ -80,6 +80,8 @@ asso_haut('Tableau de bord');
         <th class="text-end">Classes</th>
         <th class="text-end">Ens.</th>
         <th>Schéma</th>
+        <th>Connexion</th>
+        <th>Licence</th>
         <th>Sauvegarde</th>
         <th>Taille</th>
         <th>État</th>
@@ -108,7 +110,17 @@ asso_haut('Tableau de bord');
             <?php if ($r['version_ok']): ?>
               <span class="text-success">v<?= (int) $r['version'] ?></span>
             <?php else: ?>
-              <span class="text-warning">v<?= (int) $r['version'] ?> ⟶ v<?= (int) $c['migration_max'] ?></span>
+              <span class="text-warning">v<?= (int) $r['version'] ?> ⟶ v<?= (int) $r['version_max'] ?></span>
+            <?php endif; ?>
+          </td>
+          <td class="<?= ($r['derniere_connexion'] !== null && $r['derniere_connexion'] > time() - 14 * 86400) ? 'text-muted2' : 'text-warning' ?>">
+            <?= h(_il_y_a($r['derniere_connexion'])) ?>
+          </td>
+          <td>
+            <?php $lic = $r['licence']; if (!$lic): ?><span class="text-muted2">—</span>
+            <?php elseif ($lic['etat'] === 'expiree'): ?><a href="<?= APP_URL ?>/association/licences.php" class="text-danger fw-semibold text-decoration-none">expirée</a>
+            <?php else: ?><a href="<?= APP_URL ?>/association/licences.php" class="text-decoration-none <?= $lic['etat'] === 'alerte' ? 'text-warning fw-semibold' : 'text-muted2' ?>"
+                 title="Expire le <?= h(date('d/m/Y', strtotime((string) ($lic['licence']['date_expiration'] ?? '')))) ?>"><?= (int) $lic['jours_restants'] ?> j</a>
             <?php endif; ?>
           </td>
           <td class="<?= ($r['sauvegarde'] !== null && $r['sauvegarde'] > time() - 172800) ? 'text-muted2' : 'text-warning' ?>">
@@ -130,7 +142,7 @@ asso_haut('Tableau de bord');
         </tr>
       <?php endforeach; ?>
       <?php if (!$c['ecoles']): ?>
-        <tr><td colspan="8" class="text-center text-muted2 py-3">Aucun établissement.</td></tr>
+        <tr><td colspan="10" class="text-center text-muted2 py-3">Aucun établissement.</td></tr>
       <?php endif; ?>
     </tbody>
   </table>

@@ -1781,6 +1781,7 @@ function assoc_derniere_sauvegarde(string $db_name): ?int {
 
 function assoc_cockpit(): array {
     $vmax  = assoc_migration_max();
+    $vmax_types = [];
     $ecoles = assoc_all("SELECT * FROM etablissement ORDER BY actif DESC, nom");
 
     $srv = null;
@@ -1805,11 +1806,19 @@ function assoc_cockpit(): array {
 
         $row['version'] = (int) (assoc_val(
             "SELECT version FROM schema_version_etab WHERE id_etablissement=?", [$e['id']]) ?? 0);
-        $row['version_ok'] = $row['version'] >= $vmax;
+        // Chaque école est comparée à la série de SON type (bd/ ou bd/secondaire/) — 16/11/2026.
+        $type_e = ($e['type_enseignement'] ?? 'primaire') === 'secondaire' ? 'secondaire' : 'primaire';
+        $vmax_types[$type_e] ??= (int) (max(array_keys(assoc_migrations_disponibles($type_e)) ?: [0]));
+        $row['version_max'] = $vmax_types[$type_e];
+        $row['version_ok'] = $row['version'] >= $row['version_max'];
+
+        // Dernière connexion d'un utilisateur de l'école (journal d'audit de l'annuaire).
+        $dc = assoc_val("SELECT MAX(`date`) FROM journal_audit WHERE id_etablissement=? AND evenement='connexion' AND acteur_type='user'", [$e['id']]);
+        $row['derniere_connexion'] = $dc ? strtotime((string) $dc) : null;
 
         $row['directeur'] = (bool) assoc_val(
             "SELECT COUNT(*) FROM personnel_affectation
-             WHERE id_etablissement=? AND actif=1 AND fonction IN ('DIRECTEUR','FONDATEUR')", [$e['id']]);
+             WHERE id_etablissement=? AND actif=1 AND UPPER(fonction) IN ('DIRECTEUR','FONDATEUR','PROVISEUR','PRINCIPAL')", [$e['id']]);
 
         if ($srv) {
             $s = null;
@@ -1825,7 +1834,24 @@ function assoc_cockpit(): array {
         }
 
         try {
-            $d = avec_ecole((int) $e['id'], function (mysqli $l) {
+            $d = avec_ecole((int) $e['id'], function (mysqli $l) use ($type_e) {
+                if ($type_e === 'secondaire') {   // schéma LAM_ABZ (16/11/2026 : était compté « injoignable »)
+                    $active = ecole_one($l, "SELECT id, libelle FROM annee_scolaire WHERE active=1 LIMIT 1");
+                    $annee  = $active ?: ecole_one($l, "SELECT id, libelle FROM annee_scolaire ORDER BY id DESC LIMIT 1");
+                    $eff = $annee ? ecole_one($l,
+                        "SELECT COUNT(*) AS total, SUM(el.sexe='M') AS g, SUM(el.sexe='F') AS f
+                         FROM inscription i JOIN eleve el ON el.id=i.id_eleve
+                         WHERE i.id_annee=? AND el.statut='actif'", [$annee['id']]) : null;
+                    return [
+                        'annee' => $annee['libelle'] ?? null, 'annee_active' => !empty($active),
+                        'eleves' => (int) ($eff['total'] ?? 0),
+                        'g' => (int) ($eff['g'] ?? 0), 'f' => (int) ($eff['f'] ?? 0),
+                        'classes' => (int) (ecole_one($l, "SELECT COUNT(*) AS n FROM classe WHERE archivee=0")['n'] ?? 0),
+                        'enseignants' => (int) (ecole_one($l, "SELECT COUNT(*) AS n FROM enseignant WHERE statut_ens='actif' OR statut_ens IS NULL OR statut_ens=''")['n'] ?? 0),
+                        // Chef d'établissement : compte de l'école (RH → Enseignants), pas l'annuaire.
+                        'directeur_local' => (bool) (ecole_one($l, "SELECT COUNT(*) AS n FROM utilisateur WHERE UPPER(role) IN ('PROVISEUR','PRINCIPAL','DIRECTEUR','FONDATEUR')")['n'] ?? 0),
+                    ];
+                }
                 $active = ecole_one($l, "SELECT val_annee FROM annee_scolaire WHERE Etat_annee_scolaire=1 LIMIT 1");
                 $annee  = $active ?: ecole_one($l, "SELECT val_annee FROM annee_scolaire ORDER BY val_annee DESC LIMIT 1");
                 $va = $annee['val_annee'] ?? null;
@@ -1845,6 +1871,7 @@ function assoc_cockpit(): array {
                 ];
             });
             $row = array_merge($row, $d, ['joignable' => true]);
+            if (!empty($d['directeur_local'])) $row['directeur'] = true;
             $tot['eleves'] += $d['eleves']; $tot['g'] += $d['g']; $tot['f'] += $d['f'];
             $tot['classes'] += $d['classes']; $tot['enseignants'] += $d['enseignants'];
         } catch (\Throwable $ex) {
@@ -1854,8 +1881,18 @@ function assoc_cockpit(): array {
         // ── Alertes ──
         if ($e['actif'] && !$row['joignable'])       $row['alertes'][] = "base injoignable";
         if ($e['actif'] && $row['joignable'] && !$row['annee_active']) $row['alertes'][] = "aucune année active";
-        if ($e['actif'] && !$row['version_ok'])       $row['alertes'][] = "schéma v{$row['version']} < v$vmax";
+        if ($e['actif'] && !$row['version_ok'])       $row['alertes'][] = "schéma v{$row['version']} < v{$row['version_max']}";
         if ($e['actif'] && !$row['directeur'])        $row['alertes'][] = "aucun directeur affecté";
+        // Licence (16/11/2026) : alerte 30 jours avant l'expiration, et à l'expiration.
+        $row['licence'] = null;
+        if ($e['actif'] && $row['joignable'] && function_exists('licence_etat_ecole')) {
+            $row['licence'] = licence_etat_ecole($e);
+            $lic = $row['licence'];
+            if ($lic['etat'] === 'expiree')    $row['alertes'][] = 'licence expirée';
+            elseif ($lic['etat'] === 'alerte') $row['alertes'][] = 'licence : ' . (int) $lic['jours_restants'] . ' j restants';
+        }
+        if ($e['actif'] && $row['joignable'] && $row['derniere_connexion'] !== null && $row['derniere_connexion'] < time() - 14 * 86400)
+            $row['alertes'][] = 'aucune connexion depuis ' . (int) ((time() - $row['derniere_connexion']) / 86400) . ' j';
         if ($e['actif'] && $row['sauvegarde'] === null) $row['alertes'][] = "jamais sauvegardée";
         elseif ($e['actif'] && $row['sauvegarde'] < time() - 172800) $row['alertes'][] = "sauvegarde > 48 h";
 
